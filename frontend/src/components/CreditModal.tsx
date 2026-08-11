@@ -30,7 +30,7 @@ export const CreditModal: React.FC = () => {
     setIsProcessing(true);
     try {
       const res = await api.topUpCredits(selectedPackage, paymentMethod);
-      setUser(prev => ({ ...prev, credits: res.new_balance }));
+      setUser(prev => prev ? { ...prev, credits: res.new_balance } : prev);
 
       confetti({
         particleCount: 100,
@@ -60,7 +60,7 @@ export const CreditModal: React.FC = () => {
                 Gestão & Recarga de Créditos
               </h3>
               <p className="text-xs text-slate-400">
-                Saldo Atual: <strong className="text-amber-400 font-extrabold">{user.credits} CR</strong>
+                Saldo Atual: <strong className="text-amber-400 font-extrabold">{user?.credits ?? 0} CR</strong>
               </p>
             </div>
           </div>

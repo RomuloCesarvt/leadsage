@@ -6,10 +6,10 @@ import { api } from '../services/api';
 export const ProfileModal: React.FC = () => {
   const { isProfileModalOpen, setIsProfileModalOpen, user, setUser } = useApp();
 
-  const [name, setName] = useState(user.name);
-  const [company, setCompany] = useState(user.company_name);
-  const [email, setEmail] = useState(user.email);
-  const [niche, setNiche] = useState(user.niche_focus);
+  const [name, setName] = useState(user?.name || '');
+  const [company, setCompany] = useState(user?.company_name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [niche, setNiche] = useState(user?.niche_focus || '');
   const [isSaving, setIsSaving] = useState(false);
 
   if (!isProfileModalOpen) return null;
@@ -38,7 +38,7 @@ export const ProfileModal: React.FC = () => {
       <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
         <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
           <div className="flex items-center gap-3">
-            <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full object-cover ring-2 ring-indigo-500/40" />
+            <img src={user?.avatar || ''} alt={user?.name || ''} className="w-10 h-10 rounded-full object-cover ring-2 ring-indigo-500/40" />
             <div>
               <h3 className="text-base font-bold text-slate-100">Personalização de Perfil</h3>
               <p className="text-xs text-slate-400">Dados utilizados pela IA nas assinaturas de e-mail</p>

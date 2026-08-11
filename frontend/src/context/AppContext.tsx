@@ -1,13 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { LeadItem, UserProfile, SearchHistoryItem, SuggestedNiche } from '../types';
 import { api } from '../services/api';
-import { User, onAuthStateChanged } from 'firebase/auth';
+import type { User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
-import { apiRequest } from '../lib/api';
-import type { LeadItem, SearchHistoryItem, SuggestedNiche } from '../types';
+import type { LeadItem, SearchHistoryItem, SuggestedNiche, UserProfile } from '../types';
 
 interface AppContextType {
-  user: User | null;
+  user: UserProfile | null;
+  firebaseUser: FirebaseUser | null;
+  setUser: React.Dispatch<React.SetStateAction<UserProfile | null>>;
   authLoading: boolean;
   leads: LeadItem[];
   setLeads: React.Dispatch<React.SetStateAction<LeadItem[]>>;
@@ -48,7 +49,8 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   const [leads, setLeads] = useState<LeadItem[]>([]);
@@ -69,22 +71,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [viewState, setViewState] = useState<'hero' | 'workspace' | 'tasks' | 'history' | 'emails' | 'lists'>('hero');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setFirebaseUser(currentUser);
+      if (currentUser) {
+        // Obter dados do perfil e créditos da API backend
+        try {
+          const profile = await api.getProfile();
+          setUser(profile);
+        } catch (error) {
+          console.error("Erro ao puxar perfil da API", error);
+        }
+      } else {
+        setUser(null);
+      }
       setAuthLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
   const refreshUserData = async () => {
-    if (!user) return;
+    if (!firebaseUser) return;
     try {
-      // Temporarily bypass api.getProfile since user comes from Firebase now
-      // setUser(u); // Remove this
+      const p = await api.getProfile();
+      setUser(p);
       const h = await api.getSearchHistory();
       setHistory(h);
     } catch (err) {
-      console.error("Erro ao carregar perfil de usuário", err);
+      console.error("Erro ao carregar dados do usuário", err);
     }
   };
 
@@ -94,12 +107,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const res = await api.searchLeads({ niche, location, limit });
       setLeads(res.leads);
-      // setUser(prev => ({ ...prev, credits: res.remaining_credits })); // Removed until backend returns new user schema
+      if (user) {
+        setUser({ ...user, credits: res.remaining_credits });
+      }
       setCurrentNiche(niche);
       setCurrentLocation(location);
       await refreshUserData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Erro ao realizar busca de leads.");
+      alert(err.message || err.response?.data?.detail || "Erro ao realizar busca de leads.");
     } finally {
       setIsLoading(false);
     }
@@ -112,7 +127,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     if (!authLoading && user) {
-      refreshUserData();
       api.getSuggestedNiches().then(setSuggestedNiches);
     }
   }, [authLoading, user]);
@@ -121,6 +135,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider
       value={{
         user,
+        firebaseUser,
         setUser,
         leads,
         setLeads,

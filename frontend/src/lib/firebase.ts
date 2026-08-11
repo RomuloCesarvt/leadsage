@@ -3,13 +3,12 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  // Replace these with your actual Firebase config
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "YOUR_API_KEY",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "YOUR_AUTH_DOMAIN",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "YOUR_PROJECT_ID",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "YOUR_STORAGE_BUCKET",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "YOUR_MESSAGING_SENDER_ID",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "YOUR_APP_ID"
+  apiKey: "AIzaSyAiX9dyw9bCVthc5Zo1-r2Z0E6uLuLfSd0",
+  authDomain: "leadsage-84600.firebaseapp.com",
+  projectId: "leadsage-84600",
+  storageBucket: "leadsage-84600.firebasestorage.app",
+  messagingSenderId: "41320860203",
+  appId: "1:41320860203:web:8e9b1c61127c0c15af386e"
 };
 
 const app = initializeApp(firebaseConfig);

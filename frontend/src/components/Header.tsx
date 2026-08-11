@@ -37,14 +37,14 @@ export const Header: React.FC<{ toggleSidebar: () => void }> = ({ toggleSidebar 
           className="px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-bold text-zinc-100 flex items-center gap-1.5 hover:border-zinc-700 transition-colors"
         >
           <Zap className="w-3.5 h-3.5 text-white fill-white" />
-          <span>{user.credits}</span>
+          <span>{user?.credits ?? 0}</span>
         </button>
 
         <button
           onClick={() => setIsProfileModalOpen(true)}
           className="w-7 h-7 rounded-full overflow-hidden ring-1 ring-zinc-700 hover:ring-zinc-500 transition-all"
         >
-          <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+          <img src={user?.avatar || ''} alt={user?.name || ''} className="w-full h-full object-cover" />
         </button>
       </div>
     </header>

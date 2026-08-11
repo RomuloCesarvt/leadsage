@@ -43,7 +43,7 @@ export const MessageEditorModal: React.FC = () => {
         lead,
         tone,
         custom_instructions: customInstructions,
-        sender_name: user.name
+        sender_name: user?.name || 'LeadSage'
       });
       setSubject(res.subject);
       setBody(res.body);
@@ -77,7 +77,7 @@ export const MessageEditorModal: React.FC = () => {
         body
       });
 
-      setUser(prev => ({ ...prev, credits: res.remaining_credits }));
+      setUser(prev => prev ? { ...prev, credits: res.remaining_credits } : prev);
 
       setLeads(prevLeads =>
         prevLeads.map(l => (l.id === lead.id ? { ...l, outreach_status: 'Enviado' } : l))
