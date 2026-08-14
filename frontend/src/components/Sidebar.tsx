@@ -37,7 +37,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> =
           <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center font-serif text-black font-extrabold text-lg">
             L
           </div>
-          <span className="font-semibold text-white text-base tracking-tight">Lessie</span>
+          <span className="font-semibold text-white text-base tracking-tight">LeadSage</span>
         </div>
         <button
           onClick={toggleSidebar}

@@ -60,7 +60,7 @@ export const SplitViewWorkspace: React.FC = () => {
     {
       id: '2',
       sender: 'agent',
-      text: `Lessie AI Agent: Buscando leads qualificados em ${currentLocation} com sinais fortes de contato ativo...`
+      text: `LeadSage AI: Buscando leads qualificados em ${currentLocation} com sinais fortes de contato ativo...`
     }
   ]);
 
@@ -78,7 +78,7 @@ export const SplitViewWorkspace: React.FC = () => {
         {
           id: (Date.now() + 1).toString(),
           sender: 'agent',
-          text: `Lessie AI Agent: Atualizando tabela de prospecção e filtrando contatos em ${currentLocation}...`
+          text: `LeadSage AI: Atualizando tabela de prospecção e filtrando contatos em ${currentLocation}...`
         }
       ]);
       performLeadSearch(currentNiche, currentLocation, 5);
@@ -110,7 +110,7 @@ export const SplitViewWorkspace: React.FC = () => {
                 ) : (
                   <>
                     <Bot className="w-3 h-3 text-zinc-400" />
-                    <span>Lessie AI</span>
+                    <span>LeadSage AI</span>
                   </>
                 )}
               </div>
@@ -140,7 +140,7 @@ export const SplitViewWorkspace: React.FC = () => {
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Envie uma mensagem para a Lessie AI..."
+              placeholder="Envie uma mensagem para o LeadSage AI..."
               className="w-full pl-4 pr-12 py-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-[13px] text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-700 focus:ring-1 focus:ring-zinc-700 transition-all shadow-inner"
             />
             <button

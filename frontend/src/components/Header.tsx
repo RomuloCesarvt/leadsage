@@ -20,7 +20,7 @@ export const Header: React.FC<{ toggleSidebar: () => void }> = ({ toggleSidebar 
           <div className="w-6 h-6 rounded-md bg-white flex items-center justify-center font-serif text-black font-extrabold text-sm">
             L
           </div>
-          <span className="font-bold text-white text-sm tracking-tight">Lessie AI Agent</span>
+          <span className="font-bold text-white text-sm tracking-tight">LeadSage AI</span>
         </div>
       </div>
 
