@@ -1,89 +1,61 @@
 import React from 'react';
-import { Search, List, Kanban, Settings, Zap } from 'lucide-react';
+import { Menu, Zap, Bell } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
-export const Header: React.FC = () => {
-  const { user, setIsCreditModalOpen, setIsProfileModalOpen, viewState, setViewState } = useApp() as any;
+export const Header: React.FC<{ toggleSidebar: () => void }> = ({ toggleSidebar }) => {
+  const { user, setIsCreditModalOpen, setIsProfileModalOpen, viewState } = useApp() as any;
+
+  const getPageTitle = () => {
+    switch(viewState) {
+      case 'hero': return 'Nova Busca';
+      case 'workspace': return 'Meus Leads';
+      case 'pipeline': return 'Pipeline de Vendas';
+      case 'proposals': return 'Propostas Comerciais';
+      case 'emails': return 'Campanhas de E-mail';
+      default: return 'Dashboard';
+    }
+  };
 
   return (
-    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200">
-      <div className="max-w-7xl mx-auto h-16 px-4 md:px-6 flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-30 bg-slate-50 border-b border-slate-200">
+      <div className="h-16 px-4 md:px-8 flex items-center justify-between">
         
-        {/* Logo */}
-        <div 
-          className="flex items-center gap-2.5 cursor-pointer"
-          onClick={() => setViewState('hero')}
-        >
-          <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center font-serif text-white font-extrabold text-sm shadow-sm">
-            L
-          </div>
-          <span className="font-bold text-slate-900 text-lg tracking-tight">LeadSage</span>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={toggleSidebar}
+            className="p-2 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200 md:hidden transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <h1 className="text-xl font-bold text-slate-800 tracking-tight hidden md:block">
+            {getPageTitle()}
+          </h1>
         </div>
 
-        {/* Top Navigation (Pills) */}
-        <nav className="hidden md:flex items-center p-1 bg-slate-100 rounded-full border border-slate-200/60 shadow-inner">
-          <button
-            onClick={() => setViewState('workspace')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
-              viewState === 'workspace' || viewState === 'hero' 
-                ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-900/5' 
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
-            }`}
-          >
-            <Search className="w-4 h-4" />
-            <span>Busca</span>
-          </button>
+        <div className="flex items-center gap-4">
           
           <button
-            onClick={() => setViewState('pipeline')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
-              viewState === 'pipeline' 
-                ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-900/5' 
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
-            }`}
-          >
-            <Kanban className="w-4 h-4" />
-            <span>CRM</span>
-          </button>
-
-          <button
-            onClick={() => setViewState('lists')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
-              viewState === 'lists' 
-                ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-900/5' 
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
-            }`}
-          >
-            <List className="w-4 h-4" />
-            <span>Listas</span>
-          </button>
-        </nav>
-
-        {/* Right Actions */}
-        <div className="flex items-center gap-3">
-          <button
             onClick={() => setIsCreditModalOpen(true)}
-            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors"
+            className="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-full bg-white border border-slate-200 text-sm font-bold text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition-all shadow-sm"
           >
-            <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-            <span>{user?.credits ?? 0}</span>
+            <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
+            <span>{user?.credits ?? 0} créditos</span>
           </button>
 
-          <button
-            className="p-2 text-slate-400 hover:text-slate-600 transition-colors rounded-full hover:bg-slate-100"
-            title="Configurações"
-          >
-            <Settings className="w-5 h-5" />
+          <button className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors">
+            <Bell className="w-5 h-5" />
           </button>
+
+          <div className="h-6 w-px bg-slate-200 mx-1"></div>
 
           <button
             onClick={() => setIsProfileModalOpen(true)}
-            className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-white shadow-sm border border-slate-200 hover:ring-indigo-100 transition-all"
+            className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white shadow-sm border border-slate-200 hover:ring-blue-100 transition-all"
           >
             <img src={user?.avatar || ''} alt={user?.name || ''} className="w-full h-full object-cover" />
           </button>
-        </div>
 
+        </div>
       </div>
     </header>
   );

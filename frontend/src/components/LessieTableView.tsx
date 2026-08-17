@@ -40,25 +40,6 @@ export const LessieTableView: React.FC = () => {
     }
   };
 
-  const renderSocialBadges = (socials: LeadItem['socials']) => {
-    return (
-      <div className="flex items-center gap-1.5 notranslate" translate="no">
-        {socials.instagram && (
-          <a href={socials.instagram} target="_blank" rel="noreferrer" className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 flex items-center justify-center text-white text-[10px] font-extrabold shadow-sm hover:scale-110 transition-transform">ig</a>
-        )}
-        {socials.linkedin && (
-          <a href={socials.linkedin} target="_blank" rel="noreferrer" className="w-6 h-6 rounded-full bg-[#0077b5] flex items-center justify-center text-white text-[10px] font-extrabold shadow-sm hover:scale-110 transition-transform">in</a>
-        )}
-        {socials.tiktok && (
-          <a href={socials.tiktok} target="_blank" rel="noreferrer" className="w-6 h-6 rounded-full bg-black border border-slate-700 flex items-center justify-center text-white text-[10px] font-extrabold shadow-sm hover:scale-110 transition-transform">tk</a>
-        )}
-        {socials.facebook && (
-          <a href={socials.facebook} target="_blank" rel="noreferrer" className="w-6 h-6 rounded-full bg-[#1877f2] flex items-center justify-center text-white text-[10px] font-extrabold shadow-sm hover:scale-110 transition-transform">fb</a>
-        )}
-      </div>
-    );
-  };
-
   if (leads.length === 0) {
     return (
       <div className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-12 text-center shadow-sm">
@@ -101,100 +82,89 @@ export const LessieTableView: React.FC = () => {
       </div>
 
       {/* Table Area */}
-      <div className="flex-1 overflow-auto custom-scrollbar bg-slate-50/50 p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="flex-1 overflow-auto custom-scrollbar bg-slate-50 p-6">
+        <div className="flex flex-col space-y-3">
           {filteredLeads.map((lead: LeadItem) => (
             <div 
               key={lead.id}
               onClick={() => setSelectedProfileLead(lead)}
-              className="bg-white border border-slate-200 rounded-2xl p-5 hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer group flex flex-col"
+              className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center gap-4 hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer group"
             >
               
-              {/* Header Card */}
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-3">
-                  <img src={lead.avatar} alt={lead.name} className="w-12 h-12 rounded-full object-cover border border-slate-100 shadow-sm" />
-                  <div>
-                    <h3 className="font-bold text-slate-800 text-[15px] leading-tight flex items-center gap-1.5">
-                      {lead.name}
-                      {lead.verified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
-                    </h3>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">{lead.role}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  {lead.opportunityScore && (
-                    <div className="inline-flex flex-col items-end">
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Score</span>
-                      <span className="text-lg font-black text-indigo-600 leading-none">{lead.opportunityScore}</span>
-                    </div>
-                  )}
+              {/* Profile Image & Name */}
+              <div className="flex items-center gap-3 md:w-1/4 shrink-0">
+                <img src={lead.avatar} alt={lead.name} className="w-10 h-10 rounded-full object-cover border border-slate-100" />
+                <div className="min-w-0">
+                  <h3 className="font-bold text-slate-800 text-[14px] truncate flex items-center gap-1.5">
+                    {lead.name}
+                    {lead.verified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium truncate">{lead.role}</p>
                 </div>
               </div>
 
               {/* Company Info */}
-              <div className="mb-4">
-                <p className="text-sm font-semibold text-slate-700 flex items-center gap-1.5 mb-1">
+              <div className="md:w-1/4 shrink-0">
+                <p className="text-sm font-semibold text-slate-700 flex items-center gap-1.5 mb-1 truncate">
                   <Building2 className="w-4 h-4 text-slate-400" />
                   {lead.company}
                 </p>
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold uppercase tracking-wide">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide bg-slate-100 px-2 py-0.5 rounded">
                     {lead.niche}
                   </span>
-                  <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold uppercase tracking-wide">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide bg-slate-100 px-2 py-0.5 rounded">
                     {lead.city}
                   </span>
                 </div>
               </div>
 
-              {/* Tags Deficiencias */}
-              {lead.missingDigitalAssets && lead.missingDigitalAssets.length > 0 && (
-                <div className="mb-4 flex flex-wrap gap-1.5">
-                  {lead.missingDigitalAssets.map(asset => (
-                    <span key={asset} className="px-2 py-1 bg-rose-50 border border-rose-100 text-rose-600 rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-                      Sem {asset}
-                    </span>
-                  ))}
-                </div>
-              )}
-
               {/* Contacts */}
-              <div className="mt-auto pt-4 border-t border-slate-100 space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <Mail className="w-4 h-4 text-slate-400" />
-                    <span className="truncate max-w-[120px]">{lead.email}</span>
-                  </div>
+              <div className="md:w-1/4 shrink-0">
+                <div className="flex items-center gap-2 text-sm text-slate-600 mb-1">
+                  <Mail className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="truncate max-w-[150px]">{lead.email}</span>
                 </div>
                 {lead.phone && (
-                  <div className="flex items-center gap-2 text-slate-600 text-sm">
-                    <Phone className="w-4 h-4 text-slate-400" />
-                    <span>{lead.phone}</span>
+                  <div className="flex items-center gap-2 text-sm text-slate-600">
+                    <Phone className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="truncate">{lead.phone}</span>
                   </div>
                 )}
-                
-                <div className="flex items-center justify-between mt-3 pt-2">
-                  {renderSocialBadges(lead.socials)}
-                  
-                  <div className="flex gap-2">
-                    <button
-                      onClick={(e) => handleGenerateDemoSite(lead, e)}
-                      className="p-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-600 transition-colors"
-                      title="Gerar Site IA"
-                    >
-                      <LayoutTemplate className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setSelectedLeadForMessage(lead); }}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
-                      title="Gerar Copy IA"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
+              </div>
+
+              {/* Status / Tags */}
+              <div className="md:w-[15%] shrink-0 flex flex-col gap-2">
+                {lead.opportunityScore && (
+                  <span className="text-xs font-black text-blue-600 bg-blue-50 border border-blue-100 px-2 py-1 rounded w-fit">
+                    {lead.opportunityScore} Score
+                  </span>
+                )}
+                {lead.missingDigitalAssets && lead.missingDigitalAssets.length > 0 && (
+                  <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-1 rounded border border-rose-100 flex items-center w-fit">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5 animate-pulse"></span>
+                    Sem {lead.missingDigitalAssets[0]}
+                  </span>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-2 md:flex-1 mt-4 md:mt-0">
+                <button
+                  onClick={(e) => handleGenerateDemoSite(lead, e)}
+                  className="px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-bold transition-colors flex items-center gap-1.5"
+                  title="Gerar Site IA"
+                >
+                  <LayoutTemplate className="w-3.5 h-3.5" />
+                  <span>Site IA</span>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setSelectedLeadForMessage(lead); }}
+                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                  title="Gerar Copy IA"
+                >
+                  <Sparkles className="w-4 h-4" />
+                </button>
               </div>
               
             </div>

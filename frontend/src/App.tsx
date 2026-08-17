@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { ChatPrompt } from './components/ChatPrompt';
 import { SplitViewWorkspace } from './components/SplitViewWorkspace';
@@ -17,8 +18,10 @@ import { EmailsScreen } from './components/screens/EmailsScreen';
 import { ListsScreen } from './components/screens/ListsScreen';
 import { LoginScreen } from './components/screens/LoginScreen';
 import { PipelineScreen } from './components/screens/PipelineScreen';
+import { ProposalsScreen } from './components/screens/ProposalsScreen';
 
 const MainApp: React.FC = () => {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
   const { viewState, setViewState, user, authLoading } = useApp() as any;
 
   if (authLoading) {
@@ -30,23 +33,38 @@ const MainApp: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased selection:bg-indigo-100 selection:text-indigo-900">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex font-sans antialiased selection:bg-blue-100 selection:text-blue-900">
       
-      {/* Top Header & Navigation */}
-      <Header />
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="md:hidden fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-sm"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
 
-      {/* Main Container */}
-      <main className="flex-1 w-full max-w-7xl mx-auto flex flex-col px-4 md:px-6 py-6 transition-all duration-300">
+      {/* Sidebar (Left) */}
+      <Sidebar isOpen={isSidebarOpen} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+
+      {/* Main Content Area */}
+      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'ml-0'}`}>
         
+        {/* Header */}
+        <Header toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+
         {/* View Switcher */}
-        {viewState === 'hero' && <ChatPrompt onSearchStart={() => setViewState('workspace')} />}
-        {viewState === 'workspace' && <SplitViewWorkspace />}
-        {viewState === 'tasks' && <TasksScreen />}
-        {viewState === 'history' && <HistoryScreen />}
-        {viewState === 'emails' && <EmailsScreen />}
-        {viewState === 'lists' && <ListsScreen />}
-        {viewState === 'pipeline' && <PipelineScreen />}
-      </main>
+        <main className="flex-1 w-full max-w-7xl mx-auto flex flex-col p-6 transition-all duration-300">
+          {viewState === 'hero' && <ChatPrompt onSearchStart={() => setViewState('workspace')} />}
+          {viewState === 'workspace' && <SplitViewWorkspace />}
+          {viewState === 'tasks' && <TasksScreen />}
+          {viewState === 'history' && <HistoryScreen />}
+          {viewState === 'emails' && <EmailsScreen />}
+          {viewState === 'lists' && <ListsScreen />}
+          {viewState === 'pipeline' && <PipelineScreen />}
+          {viewState === 'proposals' && <ProposalsScreen />}
+        </main>
+
+      </div>
 
       {/* Global Modals */}
       <LeadProfilePanel />
