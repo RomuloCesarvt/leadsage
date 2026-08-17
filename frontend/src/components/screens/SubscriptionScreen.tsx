@@ -1,75 +1,141 @@
 import React from 'react';
-import { Check } from 'lucide-react';
+import { Check, Zap, Crown, Flame } from 'lucide-react';
 
 export const SubscriptionScreen: React.FC = () => {
   return (
-    <div className="flex-1 flex flex-col h-full relative max-w-5xl mx-auto w-full pb-12">
+    <div className="flex-1 flex flex-col h-full relative max-w-6xl mx-auto w-full pb-12 pt-8">
       
       {/* Header */}
       <div className="mb-10 text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-800">Planos & Preços</h1>
-        <p className="text-slate-500 mt-2">Escolha o plano ideal para escalar sua prospecção.</p>
+        <span className="text-xs font-bold tracking-widest text-blue-600 uppercase mb-4 block">PLANOS & PREÇOS</span>
+        <h1 className="text-4xl font-black tracking-tight text-slate-800 mb-4">Escolha o plano ideal para escalar sua prospecção</h1>
+        <p className="text-slate-500 text-lg max-w-2xl mx-auto">Encontre oportunidades, organize contatos e feche mais contratos<br/>com a FARO AI.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Toggle */}
+      <div className="flex justify-center mb-12">
+        <div className="bg-slate-100 p-1 rounded-full flex items-center shadow-inner">
+          <button className="px-8 py-2.5 rounded-full bg-slate-900 text-white font-bold text-sm shadow-sm transition-all">Planos</button>
+          <button className="px-8 py-2.5 rounded-full text-slate-500 font-bold text-sm hover:text-slate-700 transition-all flex items-center gap-2">
+            <span className="text-slate-400">🔑</span> Já paguei, ativar
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 px-4">
         
         {/* START */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-8 flex flex-col">
-          <h3 className="font-bold text-slate-800 text-xl mb-2">START VITALÍCIO</h3>
-          <div className="flex items-baseline gap-1 mb-6">
-            <span className="text-sm font-bold text-slate-500">R$</span>
-            <span className="text-4xl font-black text-slate-800">67</span>
+        <div className="bg-white rounded-[2rem] p-8 flex flex-col shadow-sm border border-slate-100 relative pt-12">
+          <div className="absolute top-8 right-8 w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg">
+            <Zap className="w-6 h-6 text-white" />
           </div>
-          <div className="space-y-4 mb-8 flex-1">
-            <div className="flex items-center gap-3 text-sm text-slate-600"><Check className="w-5 h-5 text-blue-500 shrink-0" /> 150 leads</div>
-            <div className="flex items-center gap-3 text-sm text-slate-600"><Check className="w-5 h-5 text-blue-500 shrink-0" /> 10 sites criados</div>
-            <div className="flex items-center gap-3 text-sm text-slate-600"><Check className="w-5 h-5 text-blue-500 shrink-0" /> Acesso vitalício</div>
-            <div className="flex items-center gap-3 text-sm text-slate-600"><Check className="w-5 h-5 text-blue-500 shrink-0" /> IA de Abordagem</div>
-            <div className="flex items-center gap-3 text-sm text-slate-600"><Check className="w-5 h-5 text-blue-500 shrink-0" /> Pipeline básico</div>
+          <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">PLANO</span>
+          <h3 className="font-black text-slate-900 text-2xl mb-8">START VITALÍCIO</h3>
+          
+          <div className="flex items-start gap-1 mb-10">
+            <span className="text-xl font-bold text-slate-500 mt-2">R$</span>
+            <span className="text-[5rem] leading-none font-black text-slate-900 tracking-tighter">67</span>
           </div>
-          <button className="w-full py-3.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl transition-colors">
-            Garantir acesso Start
-          </button>
+
+          <div className="w-full h-px bg-slate-100 mb-8"></div>
+
+          <div className="space-y-5 mb-8 flex-1">
+            <div className="flex items-center gap-4 text-[15px] font-medium text-slate-600">
+              <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                <Check className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              Acesso vitalício à FARO
+            </div>
+            <div className="flex items-center gap-4 text-[15px] font-medium text-slate-600">
+              <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                <Check className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              150 leads incluídos
+            </div>
+            <div className="flex items-center gap-4 text-[15px] font-medium text-slate-600">
+              <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                <Check className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              10 sites incluídos
+            </div>
+          </div>
         </div>
 
         {/* PRO */}
-        <div className="bg-blue-600 rounded-3xl p-8 flex flex-col shadow-xl transform md:-translate-y-4 relative border border-blue-500">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-amber-400 text-amber-900 text-xs font-black px-4 py-1.5 rounded-full tracking-widest uppercase shadow-sm">
-            Mais Vendido
+        <div className="bg-white rounded-[2rem] p-8 flex flex-col shadow-xl shadow-slate-200/50 border border-slate-100 relative pt-12 transform lg:-translate-y-4">
+          <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[11px] font-bold px-4 py-1.5 rounded-full tracking-wide shadow-md">
+            Recomendado
           </div>
-          <h3 className="font-bold text-white text-xl mb-2">PRO VITALÍCIO</h3>
-          <div className="flex items-baseline gap-1 mb-6">
-            <span className="text-blue-200 font-bold">R$</span>
-            <span className="text-4xl font-black text-white">97</span>
+          <div className="absolute top-8 right-8 w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg">
+            <Crown className="w-6 h-6 text-white" />
           </div>
-          <div className="space-y-4 mb-8 flex-1">
-            <div className="flex items-center gap-3 text-sm text-blue-50"><Check className="w-5 h-5 text-amber-400 shrink-0" /> 500 leads</div>
-            <div className="flex items-center gap-3 text-sm text-blue-50"><Check className="w-5 h-5 text-amber-400 shrink-0" /> 50 sites criados</div>
-            <div className="flex items-center gap-3 text-sm text-blue-50"><Check className="w-5 h-5 text-amber-400 shrink-0" /> Exportar leads (CSV)</div>
-            <div className="flex items-center gap-3 text-sm text-blue-50"><Check className="w-5 h-5 text-amber-400 shrink-0" /> Tudo do plano Start</div>
+          
+          <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">PLANO</span>
+          <h3 className="font-black text-slate-900 text-2xl mb-8">PRO VITALÍCIO</h3>
+          
+          <div className="flex items-start gap-1 mb-2">
+            <span className="text-xl font-bold text-slate-500 mt-2">R$</span>
+            <span className="text-[5rem] leading-none font-black text-slate-900 tracking-tighter">97</span>
           </div>
-          <button className="w-full py-3.5 bg-white hover:bg-slate-50 text-blue-700 font-bold rounded-xl transition-colors shadow-sm">
-            Escolher o Pro Vitalício
-          </button>
+          <p className="text-sm font-bold text-slate-400 mb-8">5 vezes mais sites que o Start</p>
+
+          <div className="w-full h-px bg-slate-100 mb-8"></div>
+
+          <div className="space-y-5 mb-8 flex-1">
+            <div className="flex items-center gap-4 text-[15px] font-medium text-slate-600">
+              <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                <Check className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              Acesso vitalício à FARO
+            </div>
+            <div className="flex items-center gap-4 text-[15px] font-medium text-slate-600">
+              <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                <Check className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              500 leads incluídos
+            </div>
+          </div>
         </div>
 
         {/* AGÊNCIA */}
-        <div className="bg-slate-900 rounded-3xl p-8 flex flex-col shadow-lg border border-slate-800">
-          <h3 className="font-bold text-white text-xl mb-2">AGÊNCIA VITALÍCIO</h3>
-          <div className="flex items-baseline gap-1 mb-6">
-            <span className="text-slate-400 font-bold">R$</span>
-            <span className="text-4xl font-black text-white">197</span>
+        <div className="bg-white rounded-[2rem] p-8 flex flex-col shadow-sm border-2 border-blue-500 relative pt-12">
+          <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[11px] font-bold px-4 py-1.5 rounded-full tracking-wide shadow-md">
+            Maior capacidade
           </div>
-          <div className="space-y-4 mb-8 flex-1">
-            <div className="flex items-center gap-3 text-sm text-slate-300"><Check className="w-5 h-5 text-emerald-400 shrink-0" /> 3.000 leads</div>
-            <div className="flex items-center gap-3 text-sm text-slate-300"><Check className="w-5 h-5 text-emerald-400 shrink-0" /> 200 sites criados</div>
-            <div className="flex items-center gap-3 text-sm text-slate-300"><Check className="w-5 h-5 text-emerald-400 shrink-0" /> Gerador de Propostas</div>
-            <div className="flex items-center gap-3 text-sm text-slate-300"><Check className="w-5 h-5 text-emerald-400 shrink-0" /> Gerador de Contratos</div>
-            <div className="flex items-center gap-3 text-sm text-slate-300"><Check className="w-5 h-5 text-emerald-400 shrink-0" /> Precificador</div>
+          <div className="absolute top-8 right-8 w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+            <Flame className="w-6 h-6 text-white" />
           </div>
-          <button className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors border border-slate-700">
-            Garantir acesso Agência
-          </button>
+
+          <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">PLANO</span>
+          <h3 className="font-black text-blue-600 text-2xl mb-8">AGÊNCIA VITALÍCIO</h3>
+          
+          <div className="flex items-start gap-1 mb-10">
+            <span className="text-xl font-bold text-blue-500 mt-2">R$</span>
+            <span className="text-[5rem] leading-none font-black text-blue-600 tracking-tighter">197</span>
+          </div>
+
+          <div className="w-full h-px bg-slate-100 mb-8"></div>
+
+          <div className="space-y-5 mb-8 flex-1">
+            <div className="flex items-center gap-4 text-[15px] font-bold text-slate-700">
+              <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center shrink-0 shadow-sm">
+                <Check className="w-3.5 h-3.5 text-white" />
+              </div>
+              Acesso vitalício à FARO
+            </div>
+            <div className="flex items-center gap-4 text-[15px] font-bold text-slate-700">
+              <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center shrink-0 shadow-sm">
+                <Check className="w-3.5 h-3.5 text-white" />
+              </div>
+              3.000 leads incluídos
+            </div>
+            <div className="flex items-center gap-4 text-[15px] font-bold text-slate-700">
+              <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center shrink-0 shadow-sm">
+                <Check className="w-3.5 h-3.5 text-white" />
+              </div>
+              200 sites incluídos
+            </div>
+          </div>
         </div>
 
       </div>

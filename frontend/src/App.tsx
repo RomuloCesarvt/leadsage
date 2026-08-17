@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
-import { ChatPrompt } from './components/ChatPrompt';
+import { NovaBuscaScreen } from './components/screens/NovaBuscaScreen';
 import { SplitViewWorkspace } from './components/SplitViewWorkspace';
 import { MessageEditorModal } from './components/MessageEditorModal';
 import { CreditModal } from './components/CreditModal';
@@ -31,7 +31,7 @@ import { SubscriptionScreen } from './components/screens/SubscriptionScreen';
 
 const MainApp: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
-  const { viewState, setViewState, user, authLoading } = useApp() as any;
+  const { viewState, user, authLoading } = useApp() as any;
 
   if (authLoading) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="text-slate-500 font-medium">Carregando...</div></div>;
@@ -66,7 +66,7 @@ const MainApp: React.FC = () => {
           
           {/* Principal */}
           {viewState === 'dashboard' && <DashboardScreen />}
-          {viewState === 'hero' && <ChatPrompt onSearchStart={() => setViewState('workspace')} />}
+          {viewState === 'hero' && <NovaBuscaScreen />}
           {viewState === 'workspace' && <SplitViewWorkspace />}
           {viewState === 'pipeline' && <PipelineScreen />}
           {viewState === 'history' && <HistoryScreen />}
