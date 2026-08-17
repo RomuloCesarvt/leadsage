@@ -70,7 +70,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> =
           <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
           <NavItem id="hero" icon={Search} label="Nova Busca" />
           <NavItem id="workspace" icon={Users} label="Meus Leads" />
-          <NavItem id="pipeline" icon={Kanban} label="Pipeline" />
+          <NavItem id="pipeline" icon={Kanban} label="Pipeline de Vendas" />
           <NavItem id="history" icon={History} label="Histórico" />
         </div>
 

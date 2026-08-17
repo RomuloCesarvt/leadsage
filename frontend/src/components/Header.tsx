@@ -10,7 +10,7 @@ export const Header: React.FC<{ toggleSidebar: () => void }> = ({ toggleSidebar 
       case 'dashboard': return 'Visão Geral';
       case 'hero': return 'Nova Busca';
       case 'workspace': return 'Meus Leads';
-      case 'pipeline': return 'Pipeline';
+      case 'pipeline': return 'Pipeline de Vendas';
       case 'history': return 'Histórico de Buscas';
       case 'ai-outreach': return 'IA de Abordagem';
       case 'proposals': return 'Propostas';
