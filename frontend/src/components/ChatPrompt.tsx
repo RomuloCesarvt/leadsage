@@ -1,139 +1,102 @@
 import React, { useState } from 'react';
-import { Plus, CornerDownLeft, ArrowDown } from 'lucide-react';
+import { Search, MapPin, Building2, Briefcase, ArrowRight } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export const ChatPrompt: React.FC<{ onSearchStart?: () => void }> = ({ onSearchStart }) => {
-  const { performLeadSearch, isLoading } = useApp();
-  const [promptText, setPromptText] = useState('');
+  const { performLeadSearch, isLoading } = useApp() as any;
+  const [niche, setNiche] = useState('');
+  const [location, setLocation] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!promptText.trim()) return;
-
-    let niche = 'Farmacêuticos';
-    let location = 'Botucatu, SP';
-    const txt = promptText.toLowerCase();
-
-    if (txt.includes('farmac') || txt.includes('droga')) niche = 'Farmacêuticos';
-    else if (txt.includes('medic') || txt.includes('dermat') || txt.includes('saúde')) niche = 'Médicos';
-    else if (txt.includes('dent') || txt.includes('odon')) niche = 'Dentistas';
-    else if (txt.includes('corret') || txt.includes('imov')) niche = 'Corretores de Imóveis';
-    else if (txt.includes('advog')) niche = 'Advogados';
-
-    if (txt.includes('botucatu')) location = 'Botucatu, SP';
-    else if (txt.includes('são paulo') || txt.includes('sp')) location = 'São Paulo, SP';
-    else if (txt.includes('rio')) location = 'Rio de Janeiro, RJ';
+    if (!niche.trim() || !location.trim()) return;
 
     performLeadSearch(niche, location, 10);
     if (onSearchStart) onSearchStart();
   };
 
-  const handleChipClick = (niche: string, promptContent: string) => {
-    setPromptText(promptContent);
-    performLeadSearch(niche, 'Botucatu, SP', 10);
+  const handleChipClick = (n: string, l: string) => {
+    setNiche(n);
+    setLocation(l);
+    performLeadSearch(n, l, 10);
     if (onSearchStart) onSearchStart();
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto py-12 px-4 flex flex-col items-center justify-center min-h-[75vh]">
+    <div className="w-full max-w-4xl mx-auto pt-20 px-4 flex flex-col items-center min-h-[75vh]">
+      
       {/* Title */}
-      <h1 className="text-3xl md:text-4xl font-serif text-white text-center font-normal tracking-tight mb-8">
-        Seu People Search AI Agent
-      </h1>
+      <div className="text-center mb-10">
+        <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-4">
+          Encontre seus próximos clientes.
+        </h1>
+        <p className="text-lg text-slate-500 font-medium">
+          A inteligência artificial do LeadSage varre a internet para encontrar decisores e empresas para você.
+        </p>
+      </div>
 
-      {/* Large Input Text Box */}
-      <form onSubmit={handleSubmit} className="w-full mb-6">
-        <div className="lessie-input-box rounded-2xl p-4 flex flex-col justify-between min-h-[140px] shadow-2xl relative">
-          <textarea
-            value={promptText}
-            onChange={(e) => setPromptText(e.target.value)}
-            placeholder="Descreva o tipo de pessoa ou empresa que você quer encontrar"
-            rows={3}
-            className="w-full bg-transparent text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none resize-none"
-          />
-
-          {/* Bottom Action Row inside Textarea */}
-          <div className="flex items-center justify-between pt-2 border-t border-zinc-900/60">
-            <button
-              type="button"
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-              title="Anexar arquivo ou contexto"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-
-            <button
-              type="submit"
-              disabled={isLoading || !promptText.trim()}
-              className="px-4 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-200 font-semibold text-xs flex items-center gap-1.5 transition-colors border border-zinc-700"
-            >
-              <span>Encontrar</span>
-              <CornerDownLeft className="w-3.5 h-3.5 text-zinc-400" />
-            </button>
+      {/* Faro-style Search Bar */}
+      <form onSubmit={handleSubmit} className="w-full mb-10">
+        <div className="bg-white rounded-2xl p-2 shadow-xl shadow-slate-200/50 border border-slate-200 flex flex-col md:flex-row items-center gap-2">
+          
+          <div className="flex-1 w-full flex items-center px-4 py-3 bg-slate-50 rounded-xl border border-transparent focus-within:bg-white focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
+            <Briefcase className="w-5 h-5 text-indigo-500 shrink-0 mr-3" />
+            <input
+              type="text"
+              value={niche}
+              onChange={(e) => setNiche(e.target.value)}
+              placeholder="Qual nicho? (ex: Dentistas, Clínicas)"
+              className="w-full bg-transparent text-slate-900 placeholder-slate-400 font-medium focus:outline-none"
+            />
           </div>
+
+          <div className="flex-1 w-full flex items-center px-4 py-3 bg-slate-50 rounded-xl border border-transparent focus-within:bg-white focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
+            <MapPin className="w-5 h-5 text-indigo-500 shrink-0 mr-3" />
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="Onde? (ex: São Paulo, Botucatu)"
+              className="w-full bg-transparent text-slate-900 placeholder-slate-400 font-medium focus:outline-none"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading || !niche.trim() || !location.trim()}
+            className="w-full md:w-auto px-8 py-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+          >
+            <span>Buscar Leads</span>
+            <Search className="w-4 h-4" />
+          </button>
         </div>
       </form>
 
-      {/* Prompt Suggestion Chips */}
-      <div className="w-full space-y-2 mb-10">
-        {/* Chip 1 */}
+      {/* Suggestion Chips */}
+      <div className="w-full max-w-3xl flex flex-wrap justify-center gap-3">
         <button
-          onClick={() => handleChipClick('Farmacêuticos', 'Donos de farmácias e farmacêuticos em Botucatu buscando renovar ou automatizar contato, com LinkedIn e e-mail')}
-          className="w-full p-2.5 rounded-xl border border-zinc-800/80 bg-zinc-950 hover:bg-zinc-900/80 text-left text-xs transition-colors flex items-center gap-2 group"
+          onClick={() => handleChipClick('Farmácias', 'São Paulo, SP')}
+          className="px-4 py-2 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 rounded-full text-sm font-semibold text-slate-600 transition-colors flex items-center gap-2 shadow-sm"
         >
-          <span className="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400 font-medium text-[11px] shrink-0">
-            Encontrar clientes
-          </span>
-          <span className="text-zinc-300 font-medium truncate">
-            Donos de pequenos negócios nos EUA buscando criar ou renovar o site, com LinkedIn ou e-mail
-          </span>
+          <Building2 className="w-4 h-4 text-indigo-500" />
+          Farmácias em São Paulo
         </button>
-
-        {/* Chip 2 */}
         <button
-          onClick={() => handleChipClick('Médicos', 'Médicos dermatologistas e cirurgiões em Botucatu e região de SP')}
-          className="w-full p-2.5 rounded-xl border border-zinc-800/80 bg-zinc-950 hover:bg-zinc-900/80 text-left text-xs transition-colors flex items-center gap-2 group"
+          onClick={() => handleChipClick('Clínicas Médicas', 'Campinas, SP')}
+          className="px-4 py-2 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 rounded-full text-sm font-semibold text-slate-600 transition-colors flex items-center gap-2 shadow-sm"
         >
-          <span className="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400 font-medium text-[11px] shrink-0">
-            Encontrar empresas
-          </span>
-          <span className="text-zinc-300 font-medium truncate">
-            Startups de IA nos EUA em Série A/B com demanda de computação GPU e contratação em infraestrutura...
-          </span>
+          <Building2 className="w-4 h-4 text-indigo-500" />
+          Clínicas Médicas em Campinas
         </button>
-
-        {/* Chip 3 */}
         <button
-          onClick={() => handleChipClick('Dentistas', 'Dentistas e especialistas em odontologia com Instagram e telefone ativo')}
-          className="w-full p-2.5 rounded-xl border border-zinc-800/80 bg-zinc-950 hover:bg-zinc-900/80 text-left text-xs transition-colors flex items-center gap-2 group"
+          onClick={() => handleChipClick('Imobiliárias', 'Rio de Janeiro, RJ')}
+          className="px-4 py-2 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 rounded-full text-sm font-semibold text-slate-600 transition-colors flex items-center gap-2 shadow-sm"
         >
-          <span className="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400 font-medium text-[11px] shrink-0">
-            Encontrar influenciadores
-          </span>
-          <span className="text-zinc-300 font-medium truncate">
-            Influenciadores de maquiagem no TikTok com 50K seguidores recém-abertos a parcerias com...
-          </span>
-        </button>
-
-        {/* Chip 4 */}
-        <button
-          onClick={() => handleChipClick('Advogados', 'Advogados corporativos e especialistas em direito médico')}
-          className="w-full p-2.5 rounded-xl border border-zinc-800/80 bg-zinc-950 hover:bg-zinc-900/80 text-left text-xs transition-colors flex items-center gap-2 group"
-        >
-          <span className="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400 font-medium text-[11px] shrink-0">
-            Encontrar candidatos
-          </span>
-          <span className="text-zinc-300 font-medium truncate">
-            Pesquisadores de IA que publicaram sobre raciocínio de LLM na NeurIPS ou ICML no último ano
-          </span>
+          <Building2 className="w-4 h-4 text-indigo-500" />
+          Imobiliárias no Rio
         </button>
       </div>
 
-      {/* Bottom Scroll Pill */}
-      <button className="px-4 py-1.5 rounded-full border border-zinc-800 bg-zinc-950 text-zinc-400 text-xs flex items-center gap-1.5 hover:text-zinc-200 transition-colors">
-        <span>Role para baixo para ver exemplos</span>
-        <ArrowDown className="w-3.5 h-3.5" />
-      </button>
     </div>
   );
 };

@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
-import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { ChatPrompt } from './components/ChatPrompt';
 import { SplitViewWorkspace } from './components/SplitViewWorkspace';
@@ -20,11 +19,10 @@ import { LoginScreen } from './components/screens/LoginScreen';
 import { PipelineScreen } from './components/screens/PipelineScreen';
 
 const MainApp: React.FC = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
   const { viewState, setViewState, user, authLoading } = useApp() as any;
 
   if (authLoading) {
-    return <div className="min-h-screen bg-[#000000] flex items-center justify-center"><div className="text-white">Carregando...</div></div>;
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="text-slate-500 font-medium">Carregando...</div></div>;
   }
 
   if (!user) {
@@ -32,23 +30,14 @@ const MainApp: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#000000] text-zinc-100 flex flex-col font-sans antialiased selection:bg-zinc-800">
-      {/* Mobile Overlay */}
-      {isSidebarOpen && (
-        <div 
-          className="md:hidden fixed inset-0 z-30 bg-black/80 backdrop-blur-sm"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      {/* Lessie Sidebar */}
-      <Sidebar isOpen={isSidebarOpen} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased selection:bg-indigo-100 selection:text-indigo-900">
+      
+      {/* Top Header & Navigation */}
+      <Header />
 
       {/* Main Container */}
-      <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'ml-0'}`}>
-        {/* Header */}
-        <Header toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
-
+      <main className="flex-1 w-full max-w-7xl mx-auto flex flex-col px-4 md:px-6 py-6 transition-all duration-300">
+        
         {/* View Switcher */}
         {viewState === 'hero' && <ChatPrompt onSearchStart={() => setViewState('workspace')} />}
         {viewState === 'workspace' && <SplitViewWorkspace />}
@@ -57,7 +46,7 @@ const MainApp: React.FC = () => {
         {viewState === 'emails' && <EmailsScreen />}
         {viewState === 'lists' && <ListsScreen />}
         {viewState === 'pipeline' && <PipelineScreen />}
-      </div>
+      </main>
 
       {/* Global Modals */}
       <LeadProfilePanel />
