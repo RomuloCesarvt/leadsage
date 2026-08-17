@@ -4,17 +4,41 @@ import {
   Users, 
   Kanban,
   FileText,
-  Mail,
   Settings,
-  ChevronLeft
+  ChevronLeft,
+  LayoutDashboard,
+  History,
+  MessageSquare,
+  ScrollText,
+  Calculator,
+  Globe,
+  LayoutTemplate,
+  PlayCircle,
+  Bell,
+  HelpCircle,
+  CreditCard
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> = ({ isOpen, toggleSidebar }) => {
-  const { 
-    viewState,
-    setViewState
-  } = useApp() as any;
+  const { viewState, setViewState } = useApp() as any;
+
+  const NavItem = ({ id, icon: Icon, label, disabled = false }: { id: string, icon: any, label: string, disabled?: boolean }) => (
+    <button
+      onClick={() => !disabled && setViewState(id)}
+      disabled={disabled}
+      className={`w-full py-2.5 px-3 rounded-xl flex items-center gap-3 text-sm font-semibold transition-all ${
+        viewState === id 
+          ? 'bg-blue-50 text-blue-600' 
+          : disabled 
+            ? 'text-slate-300 cursor-not-allowed'
+            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+      }`}
+    >
+      <Icon className={`w-5 h-5 ${viewState === id ? 'text-blue-600' : disabled ? 'text-slate-300' : 'text-slate-400'}`} />
+      <span>{label}</span>
+    </button>
+  );
 
   return (
     <aside
@@ -38,82 +62,44 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> =
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-8">
+      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-8 custom-scrollbar">
         
-        {/* Main Section */}
+        {/* Principal Section */}
         <div className="space-y-1">
-          <p className="px-3 mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Principal</p>
-          
-          <button
-            onClick={() => setViewState('hero')}
-            className={`w-full py-2.5 px-3 rounded-xl flex items-center gap-3 text-sm font-semibold transition-all ${
-              viewState === 'hero' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <Search className={`w-5 h-5 ${viewState === 'hero' ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span>Busca</span>
-          </button>
-
-          <button
-            onClick={() => setViewState('workspace')}
-            className={`w-full py-2.5 px-3 rounded-xl flex items-center gap-3 text-sm font-semibold transition-all ${
-              viewState === 'workspace' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <Users className={`w-5 h-5 ${viewState === 'workspace' ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span>Meus Leads</span>
-          </button>
+          <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Principal</p>
+          <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
+          <NavItem id="hero" icon={Search} label="Nova Busca" />
+          <NavItem id="workspace" icon={Users} label="Meus Leads" />
+          <NavItem id="pipeline" icon={Kanban} label="Pipeline" />
+          <NavItem id="history" icon={History} label="Histórico" />
         </div>
 
-        {/* CRM & Sales Section */}
+        {/* Ferramentas de Vendas Section */}
         <div className="space-y-1">
-          <p className="px-3 mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Vendas</p>
-          
-          <button
-            onClick={() => setViewState('pipeline')}
-            className={`w-full py-2.5 px-3 rounded-xl flex items-center gap-3 text-sm font-semibold transition-all ${
-              viewState === 'pipeline' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <Kanban className={`w-5 h-5 ${viewState === 'pipeline' ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span>Pipeline</span>
-          </button>
-
-          <button
-            onClick={() => setViewState('proposals')}
-            className={`w-full py-2.5 px-3 rounded-xl flex items-center gap-3 text-sm font-semibold transition-all ${
-              viewState === 'proposals' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <FileText className={`w-5 h-5 ${viewState === 'proposals' ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span>Propostas</span>
-          </button>
+          <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Ferramentas de Vendas</p>
+          <NavItem id="ai-outreach" icon={MessageSquare} label="IA de Abordagem" />
+          <NavItem id="proposals" icon={FileText} label="Propostas" />
+          <NavItem id="contracts" icon={ScrollText} label="Contratos" />
+          <NavItem id="calculator" icon={Calculator} label="Precificador" />
         </div>
 
-        {/* Marketing Section */}
+        {/* Construtor Section */}
         <div className="space-y-1">
-          <p className="px-3 mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Marketing</p>
-          
-          <button
-            onClick={() => setViewState('emails')}
-            className={`w-full py-2.5 px-3 rounded-xl flex items-center gap-3 text-sm font-semibold transition-all ${
-              viewState === 'emails' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <Mail className={`w-5 h-5 ${viewState === 'emails' ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span>Campanhas</span>
-          </button>
+          <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Construtor</p>
+          <NavItem id="create-site" icon={Globe} label="Criar Site" />
+          <NavItem id="my-sites" icon={LayoutTemplate} label="Meus Sites" />
         </div>
 
-      </div>
+        {/* Ajuda & Conta Section */}
+        <div className="space-y-1">
+          <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Ajuda & Conta</p>
+          <NavItem id="tutorials" icon={PlayCircle} label="Tutoriais" />
+          <NavItem id="notifications" icon={Bell} label="Avisos" />
+          <NavItem id="settings" icon={Settings} label="Configurações" />
+          <NavItem id="help" icon={HelpCircle} label="Ajuda" />
+          <NavItem id="subscription" icon={CreditCard} label="Assinatura" />
+        </div>
 
-      <div className="p-4 border-t border-slate-100">
-        <button
-          className="w-full py-2.5 px-3 rounded-xl flex items-center gap-3 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
-        >
-          <Settings className="w-5 h-5 text-slate-400" />
-          <span>Configurações</span>
-        </button>
       </div>
     </aside>
   );

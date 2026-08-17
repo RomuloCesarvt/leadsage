@@ -12,13 +12,22 @@ import { ExportModal } from './components/ExportModal';
 import { DemoSiteModal } from './components/DemoSiteModal';
 
 import { LeadProfilePanel } from './components/LeadProfilePanel';
-import { TasksScreen } from './components/screens/TasksScreen';
 import { HistoryScreen } from './components/screens/HistoryScreen';
-import { EmailsScreen } from './components/screens/EmailsScreen';
-import { ListsScreen } from './components/screens/ListsScreen';
 import { LoginScreen } from './components/screens/LoginScreen';
 import { PipelineScreen } from './components/screens/PipelineScreen';
 import { ProposalsScreen } from './components/screens/ProposalsScreen';
+
+import { DashboardScreen } from './components/screens/DashboardScreen';
+import { AIOutreachScreen } from './components/screens/AIOutreachScreen';
+import { ContractsScreen } from './components/screens/ContractsScreen';
+import { CalculatorScreen } from './components/screens/CalculatorScreen';
+import { WebsiteBuilderScreen } from './components/screens/WebsiteBuilderScreen';
+import { MySitesScreen } from './components/screens/MySitesScreen';
+import { TutorialsScreen } from './components/screens/TutorialsScreen';
+import { NotificationsScreen } from './components/screens/NotificationsScreen';
+import { SettingsScreen } from './components/screens/SettingsScreen';
+import { HelpScreen } from './components/screens/HelpScreen';
+import { SubscriptionScreen } from './components/screens/SubscriptionScreen';
 
 const MainApp: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
@@ -54,14 +63,31 @@ const MainApp: React.FC = () => {
 
         {/* View Switcher */}
         <main className="flex-1 w-full max-w-7xl mx-auto flex flex-col p-6 transition-all duration-300">
+          
+          {/* Principal */}
+          {viewState === 'dashboard' && <DashboardScreen />}
           {viewState === 'hero' && <ChatPrompt onSearchStart={() => setViewState('workspace')} />}
           {viewState === 'workspace' && <SplitViewWorkspace />}
-          {viewState === 'tasks' && <TasksScreen />}
-          {viewState === 'history' && <HistoryScreen />}
-          {viewState === 'emails' && <EmailsScreen />}
-          {viewState === 'lists' && <ListsScreen />}
           {viewState === 'pipeline' && <PipelineScreen />}
+          {viewState === 'history' && <HistoryScreen />}
+
+          {/* Ferramentas de Vendas */}
+          {viewState === 'ai-outreach' && <AIOutreachScreen />}
           {viewState === 'proposals' && <ProposalsScreen />}
+          {viewState === 'contracts' && <ContractsScreen />}
+          {viewState === 'calculator' && <CalculatorScreen />}
+
+          {/* Construtor */}
+          {viewState === 'create-site' && <WebsiteBuilderScreen />}
+          {viewState === 'my-sites' && <MySitesScreen />}
+
+          {/* Ajuda e Conta */}
+          {viewState === 'tutorials' && <TutorialsScreen />}
+          {viewState === 'notifications' && <NotificationsScreen />}
+          {viewState === 'settings' && <SettingsScreen />}
+          {viewState === 'help' && <HelpScreen />}
+          {viewState === 'subscription' && <SubscriptionScreen />}
+          
         </main>
 
       </div>

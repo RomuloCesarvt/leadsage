@@ -7,12 +7,23 @@ export const Header: React.FC<{ toggleSidebar: () => void }> = ({ toggleSidebar 
 
   const getPageTitle = () => {
     switch(viewState) {
+      case 'dashboard': return 'Visão Geral';
       case 'hero': return 'Nova Busca';
       case 'workspace': return 'Meus Leads';
-      case 'pipeline': return 'Pipeline de Vendas';
-      case 'proposals': return 'Propostas Comerciais';
-      case 'emails': return 'Campanhas de E-mail';
-      default: return 'Dashboard';
+      case 'pipeline': return 'Pipeline';
+      case 'history': return 'Histórico de Buscas';
+      case 'ai-outreach': return 'IA de Abordagem';
+      case 'proposals': return 'Propostas';
+      case 'contracts': return 'Contratos';
+      case 'calculator': return 'Precificador';
+      case 'create-site': return 'Construtor de Sites';
+      case 'my-sites': return 'Meus Projetos (Sites)';
+      case 'tutorials': return 'Tutoriais';
+      case 'notifications': return 'Avisos';
+      case 'settings': return 'Configurações';
+      case 'help': return 'Central de Ajuda';
+      case 'subscription': return 'Planos & Preços';
+      default: return 'LeadSage';
     }
   };
 
