@@ -8,7 +8,8 @@ import {
   ChevronDown, 
   ChevronUp, 
   MessageSquare, 
-  ChevronLeft
+  ChevronLeft,
+  Kanban
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -102,7 +103,17 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> =
             }`}
           >
             <List className={`w-4 h-4 ${viewState === 'lists' ? 'text-white' : 'text-zinc-400'}`} />
-            <span>Minha Lista</span>
+            <span>Listas</span>
+          </button>
+
+          <button
+            onClick={() => setViewState('pipeline')}
+            className={`w-full py-2 px-3 rounded-lg flex items-center gap-2.5 text-xs font-medium transition-colors ${
+              viewState === 'pipeline' ? 'bg-indigo-600 text-white' : 'text-indigo-400 hover:text-indigo-300 hover:bg-zinc-900/80'
+            }`}
+          >
+            <Kanban className={`w-4 h-4 ${viewState === 'pipeline' ? 'text-white' : 'text-indigo-400'}`} />
+            <span>Pipeline (CRM)</span>
           </button>
         </div>
 

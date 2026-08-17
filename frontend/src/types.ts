@@ -32,6 +32,9 @@ export interface LeadItem {
   last_contacted_at?: string;
   last_message?: string;
   match_category?: 'fully_matched' | 'partially_matched';
+  opportunityScore?: number;
+  missingDigitalAssets?: string[];
+  pipeline_stage?: string;
 }
 
 export interface LeadSearchRequest {

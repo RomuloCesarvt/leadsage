@@ -111,14 +111,31 @@ class LeadsEngine:
             
             score = random.randint(85, 99)
             
+            has_website = random.random() > 0.4
+            has_instagram = random.random() > 0.3
+            has_linkedin = random.random() > 0.2
+            
+            missing_assets = []
+            opportunity_score = 0
+            
+            if not has_website:
+                missing_assets.append("website")
+                opportunity_score += 45
+            if not has_instagram:
+                missing_assets.append("instagram")
+                opportunity_score += 30
+            if not has_linkedin:
+                missing_assets.append("linkedin")
+                opportunity_score += 25
+
             socials = LeadSocialLinks(
-                linkedin=f"https://linkedin.com/in/{clean_name}-{random.randint(100,999)}",
-                instagram=f"https://instagram.com/{clean_name}.official",
+                linkedin=f"https://linkedin.com/in/{clean_name}-{random.randint(100,999)}" if has_linkedin else None,
+                instagram=f"https://instagram.com/{clean_name}.official" if has_instagram else None,
                 tiktok=f"https://tiktok.com/@{clean_name}",
                 facebook=f"https://facebook.com/{clean_name}",
                 x_twitter=f"https://x.com/{clean_name}",
                 reddit=f"https://reddit.com/user/{clean_name}",
-                website=f"https://www.{clean_company}.com.br"
+                website=f"https://www.{clean_company}.com.br" if has_website else None
             )
             
             lead_id = f"lead_{uuid.uuid4().hex[:8]}"
@@ -143,7 +160,9 @@ class LeadsEngine:
                 match_location="",
                 match_business="",
                 experience="",
-                outreach_status="Pendente"
+                outreach_status="Pendente",
+                opportunityScore=opportunity_score,
+                missingDigitalAssets=missing_assets
             ))
 
         leads.sort(key=lambda x: x.quality_score, reverse=True)

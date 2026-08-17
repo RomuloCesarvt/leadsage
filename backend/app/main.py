@@ -8,7 +8,8 @@ from app.models import (
     LeadSearchRequest, LeadSearchResponse, LeadItem,
     PitchGenerationRequest, PitchGenerationResponse,
     DispatchRequest, DispatchResponse,
-    CreditTopUpRequest, UserProfile
+    CreditTopUpRequest, UserProfile,
+    DemoSiteRequest, DemoSiteResponse
 )
 from app.leads_engine import LeadsEngine
 from app.ai_generator import AIGenerator
@@ -115,6 +116,11 @@ async def search_leads(req: LeadSearchRequest, user: dict = Depends(get_current_
 @app.post("/api/generate-pitch", response_model=PitchGenerationResponse)
 async def generate_pitch(req: PitchGenerationRequest, user: dict = Depends(get_current_user)):
     return await AIGenerator.generate_pitch(req)
+
+@app.post("/api/generate-demo-site", response_model=DemoSiteResponse)
+async def generate_demo_site(req: DemoSiteRequest, user: dict = Depends(get_current_user)):
+    # Simula a geração ou usa AIGenerator
+    return await AIGenerator.generate_demo_site(req)
 
 @app.post("/api/dispatch", response_model=DispatchResponse)
 async def dispatch_outreach(req: DispatchRequest, user: dict = Depends(get_current_user)):

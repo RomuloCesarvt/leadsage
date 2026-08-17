@@ -9,6 +9,7 @@ import { CreditModal } from './components/CreditModal';
 import { ProfileModal } from './components/ProfileModal';
 import { IntegrationsModal } from './components/IntegrationsModal';
 import { ExportModal } from './components/ExportModal';
+import { DemoSiteModal } from './components/DemoSiteModal';
 
 import { LeadProfilePanel } from './components/LeadProfilePanel';
 import { TasksScreen } from './components/screens/TasksScreen';
@@ -16,6 +17,7 @@ import { HistoryScreen } from './components/screens/HistoryScreen';
 import { EmailsScreen } from './components/screens/EmailsScreen';
 import { ListsScreen } from './components/screens/ListsScreen';
 import { LoginScreen } from './components/screens/LoginScreen';
+import { PipelineScreen } from './components/screens/PipelineScreen';
 
 const MainApp: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
@@ -54,6 +56,7 @@ const MainApp: React.FC = () => {
         {viewState === 'history' && <HistoryScreen />}
         {viewState === 'emails' && <EmailsScreen />}
         {viewState === 'lists' && <ListsScreen />}
+        {viewState === 'pipeline' && <PipelineScreen />}
       </div>
 
       {/* Global Modals */}
@@ -63,6 +66,7 @@ const MainApp: React.FC = () => {
       <ProfileModal />
       <IntegrationsModal />
       <ExportModal />
+      <DemoSiteModal />
     </div>
   );
 };

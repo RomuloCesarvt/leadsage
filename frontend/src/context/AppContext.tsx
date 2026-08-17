@@ -31,6 +31,10 @@ interface AppContextType {
   setIsIntegrationsModalOpen: (open: boolean) => void;
   isExportModalOpen: boolean;
   setIsExportModalOpen: (open: boolean) => void;
+  isDemoSiteModalOpen: boolean;
+  setIsDemoSiteModalOpen: (open: boolean) => void;
+  demoSiteData: any;
+  setDemoSiteData: (data: any) => void;
   
   selectedLeadForMessage: LeadItem | null;
   setSelectedLeadForMessage: (lead: LeadItem | null) => void;
@@ -42,8 +46,8 @@ interface AppContextType {
   refreshUserData: () => Promise<void>;
   performLeadSearch: (niche: string, location: string, limit?: number) => Promise<void>;
   resetWorkspace: () => void;
-  viewState: 'hero' | 'workspace' | 'tasks' | 'history' | 'emails' | 'lists';
-  setViewState: (viewState: 'hero' | 'workspace' | 'tasks' | 'history' | 'emails' | 'lists') => void;
+  viewState: 'hero' | 'workspace' | 'tasks' | 'history' | 'emails' | 'lists' | 'pipeline';
+  setViewState: (viewState: 'hero' | 'workspace' | 'tasks' | 'history' | 'emails' | 'lists' | 'pipeline') => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -64,11 +68,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isCreditModalOpen, setIsCreditModalOpen] = useState<boolean>(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [isIntegrationsModalOpen, setIsIntegrationsModalOpen] = useState<boolean>(false);
-  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isDemoSiteModalOpen, setIsDemoSiteModalOpen] = useState(false);
+  const [demoSiteData, setDemoSiteData] = useState<any>(null);
   const [selectedLeadForMessage, setSelectedLeadForMessage] = useState<LeadItem | null>(null);
   const [selectedProfileLead, setSelectedProfileLead] = useState<LeadItem | null>(null);
 
-  const [viewState, setViewState] = useState<'hero' | 'workspace' | 'tasks' | 'history' | 'emails' | 'lists'>('hero');
+  const [viewState, setViewState] = useState<'hero' | 'workspace' | 'tasks' | 'history' | 'emails' | 'lists' | 'pipeline'>('hero');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -125,6 +131,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLeads([]);
   };
 
+  const updateLeadStage = (leadId: string, stage: string) => {
+    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, pipeline_stage: stage } : l));
+  };
+
   useEffect(() => {
     if (!authLoading && user) {
       api.getSuggestedNiches().then(setSuggestedNiches);
@@ -156,6 +166,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsIntegrationsModalOpen,
         isExportModalOpen,
         setIsExportModalOpen,
+        isDemoSiteModalOpen,
+        setIsDemoSiteModalOpen,
+        demoSiteData,
+        setDemoSiteData,
         selectedLeadForMessage,
         setSelectedLeadForMessage,
         selectedProfileLead,
@@ -163,6 +177,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         refreshUserData,
         performLeadSearch,
         resetWorkspace,
+        updateLeadStage,
         viewState,
         setViewState
       } as any}

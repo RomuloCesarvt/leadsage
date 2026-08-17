@@ -8,17 +8,27 @@ import {
   Send, 
   Check, 
   CheckCircle2,
-  Mail
+  Mail,
+  LayoutTemplate
 } from 'lucide-react';
 import type { LeadItem } from '../types';
 import { useApp } from '../context/AppContext';
+import { api } from '../services/api';
 
 export const LessieTableView: React.FC = () => {
-  const { leads, setSelectedLeadForMessage, performLeadSearch, currentNiche, currentLocation, setSelectedProfileLead } = useApp() as any;
+  const { leads, setSelectedLeadForMessage, performLeadSearch, currentNiche, currentLocation, setSelectedProfileLead, setIsDemoSiteModalOpen, setDemoSiteData } = useApp() as any;
   
   const [isGroup1Open, setIsGroup1Open] = useState(true);
   const [isGroup2Open, setIsGroup2Open] = useState(true);
   const [copiedEmailId, setCopiedEmailId] = useState<string | null>(null);
+  const [filterMissingWebsite, setFilterMissingWebsite] = useState(false);
+
+  const filteredLeads = filterMissingWebsite 
+    ? leads.filter((l: LeadItem) => l.missingDigitalAssets && l.missingDigitalAssets.includes('website'))
+    : leads;
+
+  const fullyMatched = filteredLeads.slice(0, Math.ceil(filteredLeads.length * 0.6));
+  const partiallyMatched = filteredLeads.slice(Math.ceil(filteredLeads.length * 0.6));
 
   const copyEmail = (email: string, id: string) => {
     navigator.clipboard.writeText(email);
@@ -26,8 +36,24 @@ export const LessieTableView: React.FC = () => {
     setTimeout(() => setCopiedEmailId(null), 2000);
   };
 
-  const fullyMatched = leads.slice(0, Math.ceil(leads.length * 0.6));
-  const partiallyMatched = leads.slice(Math.ceil(leads.length * 0.6));
+  const handleGenerateDemoSite = async (lead: LeadItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const btn = e.currentTarget as HTMLButtonElement;
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="animate-pulse">Gerando...</span>';
+      btn.disabled = true;
+
+      const data = await api.generateDemoSite({ lead });
+      setDemoSiteData(data);
+      setIsDemoSiteModalOpen(true);
+
+      btn.innerHTML = originalHtml;
+      btn.disabled = false;
+    } catch (err) {
+      alert("Erro ao gerar site demo");
+    }
+  };
 
   const renderSocialBadges = (socials: LeadItem['socials']) => {
     return (
@@ -125,6 +151,26 @@ export const LessieTableView: React.FC = () => {
         </div>
       </td>
 
+      {/* Score */}
+      <td className="p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1.5">
+            <div className={`text-xs font-bold px-2 py-0.5 rounded-md ${lead.opportunityScore && lead.opportunityScore > 40 ? 'bg-indigo-500/10 border border-indigo-500/20 text-indigo-400' : 'bg-zinc-800 border border-zinc-700 text-zinc-400'}`}>
+              {lead.opportunityScore || lead.quality_score || 0} pts
+            </div>
+          </div>
+          {lead.missingDigitalAssets && lead.missingDigitalAssets.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {lead.missingDigitalAssets.map(asset => (
+                <span key={asset} className="text-[9px] uppercase font-bold text-rose-400 bg-rose-400/10 border border-rose-400/20 px-1.5 py-0.5 rounded-sm">
+                  Sem {asset}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </td>
+
       {/* Social Links Badges */}
       <td className="p-4" onClick={(e) => e.stopPropagation()}>
         {renderSocialBadges(lead.socials)}
@@ -158,11 +204,19 @@ export const LessieTableView: React.FC = () => {
       <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-2">
           <button
+            onClick={(e) => handleGenerateDemoSite(lead, e)}
+            className="px-3 py-1.5 rounded-lg bg-indigo-950/40 hover:bg-indigo-900/40 border border-indigo-900/50 text-indigo-400 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
+            title="Gerar Landing Page Demo com IA"
+          >
+            <LayoutTemplate className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Site IA</span>
+          </button>
+          <button
             onClick={() => setSelectedLeadForMessage(lead)}
-            className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-indigo-400 hover:text-indigo-300 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
+            className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
             title="Gerar Copy Personalizada com IA"
           >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <Sparkles className="w-3.5 h-3.5 text-zinc-400" />
             <span>Copy IA</span>
           </button>
           <button
@@ -189,9 +243,15 @@ export const LessieTableView: React.FC = () => {
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setFilterMissingWebsite(!filterMissingWebsite)}
+            className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-colors ${filterMissingWebsite ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-zinc-200'}`}
+          >
+            Apenas "Sem Site"
+          </button>
           <span className="px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs font-semibold">
-            {leads.length} na lista
+            {filteredLeads.length} na lista
           </span>
         </div>
       </div>
@@ -218,6 +278,7 @@ export const LessieTableView: React.FC = () => {
                   <tr>
                     <th className="p-3 text-center w-10">#</th>
                     <th className="p-3">Name</th>
+                    <th className="p-3">Score</th>
                     <th className="p-3">Link</th>
                     <th className="p-3">Email</th>
                     <th className="p-3 text-right">Actions</th>
@@ -263,6 +324,7 @@ export const LessieTableView: React.FC = () => {
                     <tr>
                       <th className="p-3 text-center w-10">#</th>
                       <th className="p-3">Name</th>
+                      <th className="p-3">Score</th>
                       <th className="p-3">Link</th>
                       <th className="p-3">Email</th>
                       <th className="p-3 text-right">Actions</th>

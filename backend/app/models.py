@@ -31,6 +31,9 @@ class LeadItem(BaseModel):
     outreach_status: str = "Pendente" # Pendente, Mensagem Gerada, Enviado, Entregue, Lido, Respondido
     last_contacted_at: Optional[str] = None
     last_message: Optional[str] = None
+    opportunityScore: Optional[int] = None
+    missingDigitalAssets: Optional[List[str]] = None
+    pipeline_stage: str = "Novos"
 
 class LeadSearchRequest(BaseModel):
     niche: str
@@ -95,3 +98,15 @@ class UserProfile(BaseModel):
     credits: int = 450
     plan: str = "Pro Builder"
     avatar: str = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
+
+class DemoSiteRequest(BaseModel):
+    lead: LeadItem
+
+class DemoSiteResponse(BaseModel):
+    lead_id: str
+    hero_title: str
+    hero_subtitle: str
+    about_text: str
+    services: List[str]
+    cta_text: str
+

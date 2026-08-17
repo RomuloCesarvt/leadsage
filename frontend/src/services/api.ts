@@ -85,6 +85,13 @@ export const api = {
     });
   },
 
+  async generateDemoSite(req: { lead: any }): Promise<any> {
+    return await fetchWithToken('/generate-demo-site', {
+      method: 'POST',
+      body: JSON.stringify(req)
+    });
+  },
+
   async getCreditBalance(): Promise<{ credits: number; history: any[] }> {
     try {
       return await fetchWithToken('/credits/balance');
