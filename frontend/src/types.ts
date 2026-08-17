@@ -19,6 +19,10 @@ export interface LeadItem {
   city: string;
   email: string;
   phone: string;
+  whatsapp?: string;
+  website?: string;
+  address?: string;
+  instagram?: string;
   socials: LeadSocialLinks;
   quality_score: number;
   verified: boolean;

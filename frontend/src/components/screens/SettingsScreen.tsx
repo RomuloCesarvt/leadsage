@@ -1,9 +1,22 @@
-import React from 'react';
-import { Save, User, Shield, Target } from 'lucide-react';
+import React, { useState } from 'react';
+import { Save, User, Shield, Target, Globe } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const SettingsScreen: React.FC = () => {
   const { user } = useApp() as any;
+  const [selectedServices, setSelectedServices] = useState<string[]>(['Sites']);
+  const [selectedNiches, setSelectedNiches] = useState<string[]>(['Clínicas', 'Imobiliárias']);
+  const [selectedChannel, setSelectedChannel] = useState('WhatsApp');
+  const [selectedGoal, setSelectedGoal] = useState('4 a 10');
+  const [lang, setLang] = useState('pt');
+
+  const toggleService = (s: string) => {
+    setSelectedServices(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
+  };
+
+  const removeNiche = (n: string) => {
+    setSelectedNiches(prev => prev.filter(x => x !== n));
+  };
 
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar max-w-5xl mx-auto w-full">
@@ -16,7 +29,7 @@ export const SettingsScreen: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Left Col - Navigation (Optional/Static in UI) */}
+        {/* Left Col - Navigation */}
         <div className="col-span-1 space-y-2 hidden lg:block">
           <button className="w-full text-left px-4 py-3 bg-blue-50 text-blue-600 font-bold rounded-xl text-sm transition-colors">
             Preferências de Prospecção
@@ -31,6 +44,21 @@ export const SettingsScreen: React.FC = () => {
 
         {/* Right Col - Forms */}
         <div className="col-span-1 lg:col-span-2 space-y-8">
+
+          {/* Language */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <Globe className="w-5 h-5 text-blue-600" /> Idioma
+            </h2>
+            <div className="flex gap-2">
+              <button onClick={() => setLang('pt')} className={`px-5 py-2 rounded-full text-sm font-bold transition-colors ${lang === 'pt' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                Português
+              </button>
+              <button onClick={() => setLang('en')} className={`px-5 py-2 rounded-full text-sm font-bold transition-colors ${lang === 'en' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                English
+              </button>
+            </div>
+          </div>
           
           {/* Prospecção Form */}
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
@@ -40,10 +68,14 @@ export const SettingsScreen: React.FC = () => {
 
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-3">O que você vende?</label>
+                <label className="block text-sm font-bold text-slate-700 mb-3">Serviço que você vende</label>
                 <div className="flex flex-wrap gap-2">
-                  {['Criação de Sites', 'Tráfego Pago', 'Social Media', 'Design', 'Consultoria'].map((item, i) => (
-                    <button key={item} className={`px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${i === 0 ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                  {['Sites', 'Tráfego pago', 'Social media', 'Design', 'Consultoria'].map((item) => (
+                    <button 
+                      key={item} 
+                      onClick={() => toggleService(item)}
+                      className={`px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${selectedServices.includes(item) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                    >
                       {item}
                     </button>
                   ))}
@@ -51,11 +83,11 @@ export const SettingsScreen: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-3">Nichos que mais prospecta</label>
+                <label className="block text-sm font-bold text-slate-700 mb-3">Nichos que você prospecta</label>
                 <div className="flex flex-wrap gap-2 mb-3">
-                  {['Clínicas', 'Imobiliárias', 'Advogados', 'Restaurantes'].map((item) => (
+                  {selectedNiches.map((item) => (
                     <div key={item} className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-sm font-medium flex items-center gap-2">
-                      {item} <span className="text-slate-400 hover:text-slate-600 cursor-pointer">&times;</span>
+                      {item} <span onClick={() => removeNiche(item)} className="text-slate-400 hover:text-slate-600 cursor-pointer">&times;</span>
                     </div>
                   ))}
                 </div>
@@ -63,8 +95,38 @@ export const SettingsScreen: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-3">Cidades de atuação (opcional)</label>
+                <label className="block text-sm font-bold text-slate-700 mb-3">Cidades ou regiões atendidas</label>
                 <input type="text" placeholder="Ex: São Paulo, SP" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-3">Canal preferido</label>
+                <div className="flex flex-wrap gap-2">
+                  {['WhatsApp', 'Instagram', 'E-mail', 'Ligação'].map((item) => (
+                    <button 
+                      key={item} 
+                      onClick={() => setSelectedChannel(item)}
+                      className={`px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${selectedChannel === item ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-3">Meta de novos clientes por mês</label>
+                <div className="flex flex-wrap gap-2">
+                  {['1 a 3', '4 a 10', '11 a 20', 'Mais de 20'].map((item) => (
+                    <button 
+                      key={item}
+                      onClick={() => setSelectedGoal(item)}
+                      className={`px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${selectedGoal === item ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
