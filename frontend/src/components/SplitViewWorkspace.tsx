@@ -6,6 +6,7 @@ import { useApp } from '../context/AppContext';
 export const SplitViewWorkspace: React.FC = () => {
   const { currentNiche, currentLocation, performLeadSearch, isLoading } = useApp();
   const [chatInput, setChatInput] = useState('');
+  const [activeTab, setActiveTab] = useState<'chat' | 'table'>('chat');
   
   // Resizable pane state
   const [leftWidth, setLeftWidth] = useState(40); // 40% default
@@ -86,11 +87,28 @@ export const SplitViewWorkspace: React.FC = () => {
   };
 
   return (
-    <div className="w-full flex-1 flex h-[calc(100vh-3.5rem)] overflow-hidden bg-[#000000]">
+    <div className="w-full flex-1 flex flex-col md:flex-row h-[calc(100vh-3.5rem)] overflow-hidden bg-[#000000]">
+      
+      {/* Mobile Tab Switcher */}
+      <div className="md:hidden flex items-center bg-[#050505] border-b border-[#18181b] shrink-0">
+        <button
+          onClick={() => setActiveTab('chat')}
+          className={`flex-1 py-3 text-sm font-semibold transition-colors ${activeTab === 'chat' ? 'text-white border-b-2 border-white' : 'text-zinc-500'}`}
+        >
+          Chat IA
+        </button>
+        <button
+          onClick={() => setActiveTab('table')}
+          className={`flex-1 py-3 text-sm font-semibold transition-colors ${activeTab === 'table' ? 'text-white border-b-2 border-white' : 'text-zinc-500'}`}
+        >
+          Resultados
+        </button>
+      </div>
+
       {/* Left Chat Pane */}
       <div 
-        style={{ width: `${leftWidth}%` }} 
-        className="flex flex-col h-full bg-[#000000] shrink-0"
+        style={{ width: window.innerWidth < 768 ? '100%' : `${leftWidth}%` }} 
+        className={`flex-col h-full bg-[#000000] shrink-0 ${activeTab === 'chat' ? 'flex' : 'hidden'} md:flex`}
       >
         <div className="h-12 px-4 border-b border-[#18181b] flex items-center justify-between bg-[#050505]">
           <h2 className="text-xs font-semibold text-zinc-300 truncate">
@@ -160,13 +178,13 @@ export const SplitViewWorkspace: React.FC = () => {
       {/* Resizable Divider */}
       <div 
         onMouseDown={startDragging}
-        className="w-1.5 flex items-center justify-center bg-[#09090b] hover:bg-zinc-700 border-x border-[#18181b] cursor-col-resize shrink-0 transition-colors group z-10"
+        className="hidden md:flex w-1.5 items-center justify-center bg-[#09090b] hover:bg-zinc-700 border-x border-[#18181b] cursor-col-resize shrink-0 transition-colors group z-10"
       >
         <div className="w-0.5 h-8 bg-zinc-700 group-hover:bg-zinc-400 rounded-full transition-colors" />
       </div>
 
       {/* Right Table Pane */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0 relative bg-[#000000]">
+      <div className={`flex-1 flex-col h-full overflow-hidden min-w-0 relative bg-[#000000] ${activeTab === 'table' ? 'flex' : 'hidden'} md:flex`}>
         <LessieTableView />
       </div>
     </div>

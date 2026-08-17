@@ -18,7 +18,7 @@ import { ListsScreen } from './components/screens/ListsScreen';
 import { LoginScreen } from './components/screens/LoginScreen';
 
 const MainApp: React.FC = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
   const { viewState, setViewState, user, authLoading } = useApp() as any;
 
   if (authLoading) {
@@ -31,6 +31,14 @@ const MainApp: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#000000] text-zinc-100 flex flex-col font-sans antialiased selection:bg-zinc-800">
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="md:hidden fixed inset-0 z-30 bg-black/80 backdrop-blur-sm"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Lessie Sidebar */}
       <Sidebar isOpen={isSidebarOpen} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 

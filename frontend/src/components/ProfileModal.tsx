@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { X, User, Building2, Mail, Briefcase, Check } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
+import { signOut } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 
 export const ProfileModal: React.FC = () => {
   const { isProfileModalOpen, setIsProfileModalOpen, user, setUser } = useApp();
@@ -98,21 +100,33 @@ export const ProfileModal: React.FC = () => {
             />
           </div>
 
-          <div className="pt-4 flex items-center justify-end gap-3">
+          <div className="pt-4 flex items-center justify-between gap-3 border-t border-slate-800 mt-4">
             <button
               type="button"
-              onClick={() => setIsProfileModalOpen(false)}
-              className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200"
+              onClick={async () => {
+                await signOut(auth);
+                setIsProfileModalOpen(false);
+              }}
+              className="px-4 py-2 text-xs font-semibold text-red-400 hover:text-red-300 flex items-center gap-1.5"
             >
-              Cancelar
+              Sair da Conta
             </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/30"
-            >
-              <Check className="w-4 h-4" /> Salvar Perfil
-            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setIsProfileModalOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/30"
+              >
+                <Check className="w-4 h-4" /> Salvar Perfil
+              </button>
+            </div>
           </div>
         </form>
       </div>

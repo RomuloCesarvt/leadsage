@@ -212,8 +212,8 @@ export const LessieTableView: React.FC = () => {
           </button>
 
           {isGroup1Open && (
-            <div className="lessie-panel rounded-xl overflow-hidden">
-              <table className="w-full text-left border-collapse">
+            <div className="lessie-panel rounded-xl overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[600px]">
                 <thead className="bg-[#050505] text-zinc-500 font-semibold border-b border-[#18181b] text-[11px]">
                   <tr>
                     <th className="p-3 text-center w-10">#</th>
@@ -257,8 +257,8 @@ export const LessieTableView: React.FC = () => {
             </button>
 
             {isGroup2Open && (
-              <div className="lessie-panel rounded-xl overflow-hidden">
-                <table className="w-full text-left border-collapse">
+              <div className="lessie-panel rounded-xl overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[600px]">
                   <thead className="bg-[#050505] text-zinc-500 font-semibold border-b border-[#18181b] text-[11px]">
                     <tr>
                       <th className="p-3 text-center w-10">#</th>

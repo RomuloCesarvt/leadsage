@@ -69,7 +69,9 @@ export const LoginScreen: React.FC = () => {
       }
     } catch (err: any) {
       console.error(err);
-      if (err.code !== 'auth/popup-closed-by-user') {
+      if (err.code === 'auth/unauthorized-domain') {
+        setError('O domínio atual não está autorizado no Firebase. Adicione este domínio no painel do Firebase Authentication.');
+      } else if (err.code !== 'auth/popup-closed-by-user') {
         setError(err.message || 'Erro ao entrar com Google.');
       }
     } finally {
