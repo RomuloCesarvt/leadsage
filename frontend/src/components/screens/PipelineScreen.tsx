@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import type { LeadItem } from '../../types';
-import { GripVertical, Building2 } from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 
 const COLUMNS = ['Novos', 'Contatados', 'Reunião Agendada', 'Proposta', 'Fechado'];
 

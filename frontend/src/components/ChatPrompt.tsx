@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, MapPin, Building2, Briefcase, ArrowRight } from 'lucide-react';
+import { Search, MapPin, Building2, Briefcase } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export const ChatPrompt: React.FC<{ onSearchStart?: () => void }> = ({ onSearchStart }) => {

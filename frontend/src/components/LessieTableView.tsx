@@ -1,37 +1,25 @@
 import React, { useState } from 'react';
 import { 
-  Table as TableIcon, 
-  ChevronDown, 
-  ChevronRight, 
+  Table as TableIcon,
   Sparkles, 
-  Send, 
   CheckCircle2,
   Mail,
   LayoutTemplate,
   Building2,
-  Phone,
-  Globe,
-  MoreVertical
+  Phone
 } from 'lucide-react';
 import type { LeadItem } from '../types';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
 
 export const LessieTableView: React.FC = () => {
-  const { leads, setSelectedLeadForMessage, performLeadSearch, currentNiche, currentLocation, setSelectedProfileLead, setIsDemoSiteModalOpen, setDemoSiteData } = useApp() as any;
+  const { leads, setSelectedLeadForMessage, currentNiche, setSelectedProfileLead, setIsDemoSiteModalOpen, setDemoSiteData } = useApp() as any;
   
-  const [copiedEmailId, setCopiedEmailId] = useState<string | null>(null);
   const [filterMissingWebsite, setFilterMissingWebsite] = useState(false);
 
   const filteredLeads = filterMissingWebsite 
     ? leads.filter((l: LeadItem) => l.missingDigitalAssets && l.missingDigitalAssets.includes('website'))
     : leads;
-
-  const copyEmail = (email: string, id: string) => {
-    navigator.clipboard.writeText(email);
-    setCopiedEmailId(id);
-    setTimeout(() => setCopiedEmailId(null), 2000);
-  };
 
   const handleGenerateDemoSite = async (lead: LeadItem, e: React.MouseEvent) => {
     e.stopPropagation();
