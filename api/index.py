@@ -1,7 +1,8 @@
 import sys
 import os
 
-# Adiciona o diretório raiz ao PYTHONPATH para o Vercel conseguir achar o pacote backend
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+root_dir = os.path.dirname(os.path.dirname(__file__))
+sys.path.append(root_dir)
+sys.path.append(os.path.join(root_dir, "backend"))
 
-from backend.app.main import app
+from app.main import app
