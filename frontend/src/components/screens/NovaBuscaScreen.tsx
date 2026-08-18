@@ -1,10 +1,24 @@
 import React, { useState } from 'react';
 import { Search, ChevronDown } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { Country, State, City } from 'country-state-city';
+
+const POPULAR_NICHES = [
+  "Academias", "Advogados", "Agências de Marketing", "Arquitetos", "Autopeças",
+  "Bares", "Barbearias", "Boutiques", "Cabeleireiros", "Cafeterias", 
+  "Clínicas de Estética", "Clínicas Médicas", "Clínicas Odontológicas", "Consultorias", 
+  "Contabilidades", "Corretores de Imóveis", "Coworking", "Designers", 
+  "Distribuidores", "E-commerces", "Empreiteiras", "Escolas", "Estúdios de Tatuagem",
+  "Farmácias", "Fisioterapeutas", "Floriculturas", "Fotógrafos", "Hospitais",
+  "Hotéis", "Imobiliárias", "Lojas de Roupas", "Marcenarias", "Mecânicas",
+  "Nutricionistas", "Oficinas", "Padarias", "Pet Shops", "Pizzarias",
+  "Restaurantes", "Salões de Beleza", "Seguradoras", "Supermercados", "Transportadoras"
+];
 
 export const NovaBuscaScreen: React.FC = () => {
   const { performLeadSearch, setViewState } = useApp() as any;
   const [niche, setNiche] = useState('');
+  const [country, setCountry] = useState('BR');
   const [state, setState] = useState('');
   const [city, setCity] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
@@ -12,12 +26,17 @@ export const NovaBuscaScreen: React.FC = () => {
   const [searchLimit, setSearchLimit] = useState(10);
   const [isSearching, setIsSearching] = useState(false);
 
+  const countries = Country.getAllCountries();
+  const states = State.getStatesOfCountry(country);
+  const cities = State.getStateByCodeAndCountry(state, country) ? City.getCitiesOfState(country, state) : [];
+
   const handleSearch = async () => {
     if (!niche || !city || !state) {
       alert("Preencha Nicho, Estado e Cidade para buscar.");
       return;
     }
-    const fullLocation = `${neighborhood ? neighborhood + ', ' : ''}${city}, ${state}, Brasil`;
+    const countryName = countries.find(c => c.isoCode === country)?.name || 'Brasil';
+    const fullLocation = `${neighborhood ? neighborhood + ', ' : ''}${city}, ${state}, ${countryName}`;
     
     setIsSearching(true);
     try {
@@ -47,25 +66,39 @@ export const NovaBuscaScreen: React.FC = () => {
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">País</label>
             <div className="relative">
-              <select className="w-full pl-4 pr-10 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer">
-                <option>Brasil</option>
+              <select 
+                value={country}
+                onChange={(e) => {
+                  setCountry(e.target.value);
+                  setState('');
+                  setCity('');
+                }}
+                className="w-full pl-4 pr-10 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer"
+              >
+                {countries.map(c => (
+                  <option key={c.isoCode} value={c.isoCode}>{c.name}</option>
+                ))}
               </select>
               <ChevronDown className="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           </div>
           
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Estado</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Estado / Região</label>
             <div className="relative">
               <select 
                 value={state}
-                onChange={(e) => setState(e.target.value)}
-                className="w-full pl-4 pr-10 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer"
+                onChange={(e) => {
+                  setState(e.target.value);
+                  setCity('');
+                }}
+                disabled={!country}
+                className="w-full pl-4 pr-10 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="">Selecione o(a) estado...</option>
-                <option value="SP">São Paulo</option>
-                <option value="RJ">Rio de Janeiro</option>
-                <option value="MG">Minas Gerais</option>
+                <option value="">Selecione...</option>
+                {states.map(s => (
+                  <option key={s.isoCode} value={s.isoCode}>{s.name}</option>
+                ))}
               </select>
               <ChevronDown className="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
@@ -73,14 +106,30 @@ export const NovaBuscaScreen: React.FC = () => {
 
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Cidade</label>
-            <input 
-              type="text" 
-              placeholder={state ? "Digite a cidade..." : "Escolha um(a) estado primeiro"}
-              disabled={!state}
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            />
+            <div className="relative">
+              <select 
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                disabled={!state || cities.length === 0}
+                className="w-full pl-4 pr-10 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">{cities.length === 0 && state ? "Digite abaixo ou mude o estado" : "Selecione a cidade..."}</option>
+                {cities.map(c => (
+                  <option key={c.name} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+              <ChevronDown className="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+            {/* Fallback para países sem lista de cidades mapeada */}
+            {state && cities.length === 0 && (
+              <input 
+                type="text" 
+                placeholder="Digite o nome da cidade"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="w-full mt-2 px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              />
+            )}
           </div>
         </div>
 
@@ -91,11 +140,17 @@ export const NovaBuscaScreen: React.FC = () => {
               <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
               <input 
                 type="text" 
+                list="niche-list"
                 placeholder="Buscar ou selecionar nicho..."
                 value={niche}
                 onChange={(e) => setNiche(e.target.value)}
                 className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               />
+              <datalist id="niche-list">
+                {POPULAR_NICHES.map(n => (
+                  <option key={n} value={n} />
+                ))}
+              </datalist>
             </div>
           </div>
 
