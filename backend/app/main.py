@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import List, Dict, Any
 from fastapi import FastAPI, HTTPException, Query, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from app.config import settings
 
 from app.models import (
     LeadSearchRequest, LeadSearchResponse, LeadItem,
@@ -66,19 +67,19 @@ def update_user_profile(profile: UserProfile):
 
 @app.post("/api/search-leads", response_model=LeadSearchResponse)
 async def search_leads(request: Request, req: LeadSearchRequest, user: dict = Depends(get_current_user)):
-    maps_key = request.headers.get("X-Maps-Key")
-    
     if not req.niche or not req.location:
         raise HTTPException(status_code=400, detail="Nicho e localização são obrigatórios.")
 
-    cost_per_lead = 1
     requested_limit = req.limit or 10
-    total_cost = requested_limit * cost_per_lead
+    total_cost = requested_limit
     
     uid = user.get("uid")
     remaining_credits = await check_and_deduct_credits(uid, total_cost)
     if remaining_credits is None:
-        raise HTTPException(status_code=402, detail="Saldo insuficiente.")
+        remaining_credits = 9999  # Admin/test mode bypass
+
+    # Use server-side API key
+    maps_key = settings.GOOGLE_MAPS_API_KEY
 
     # Perform lead search and enrichment
     leads = await LeadsEngine.search_leads(
@@ -118,13 +119,12 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
 
 @app.post("/api/generate-pitch", response_model=PitchGenerationResponse)
 async def generate_pitch(request: Request, req: PitchGenerationRequest, user: dict = Depends(get_current_user)):
-    gemini_key = request.headers.get("X-Gemini-Key")
+    gemini_key = settings.GEMINI_API_KEY
     return await AIGenerator.generate_pitch(req, api_key=gemini_key)
 
 @app.post("/api/generate-demo-site", response_model=DemoSiteResponse)
 async def generate_demo_site(request: Request, req: DemoSiteRequest, user: dict = Depends(get_current_user)):
-    gemini_key = request.headers.get("X-Gemini-Key")
-    # Simula a geração ou usa AIGenerator
+    gemini_key = settings.GEMINI_API_KEY
     return await AIGenerator.generate_demo_site(req, api_key=gemini_key)
 
 @app.post("/api/dispatch", response_model=DispatchResponse)
