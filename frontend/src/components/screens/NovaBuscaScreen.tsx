@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Lock, ChevronDown } from 'lucide-react';
+import { Search, ChevronDown } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const NovaBuscaScreen: React.FC = () => {
@@ -9,6 +9,7 @@ export const NovaBuscaScreen: React.FC = () => {
   const [city, setCity] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
   const [radius, setRadius] = useState('10');
+  const [searchLimit, setSearchLimit] = useState(10);
   const [isSearching, setIsSearching] = useState(false);
 
   const handleSearch = async () => {
@@ -20,7 +21,7 @@ export const NovaBuscaScreen: React.FC = () => {
     
     setIsSearching(true);
     try {
-      await performLeadSearch(niche, fullLocation, 5);
+      await performLeadSearch(niche, fullLocation, searchLimit);
       setViewState('workspace');
     } catch (e) {
       console.error(e);
@@ -37,25 +38,6 @@ export const NovaBuscaScreen: React.FC = () => {
       <div className="mb-6">
         <h1 className="text-3xl font-bold tracking-tight text-slate-800">Nova Busca</h1>
         <p className="text-slate-500 mt-1">Encontre negócios locais com oportunidades de venda.</p>
-      </div>
-
-      {/* Warning Box */}
-      <div className="bg-amber-50/50 border border-amber-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 bg-white rounded-xl border border-amber-100 flex items-center justify-center shrink-0">
-            <Lock className="w-5 h-5 text-amber-600" />
-          </div>
-          <div>
-            <h3 className="font-bold text-amber-900">Você usou todos os seus 5 leads de teste</h3>
-            <p className="text-sm text-amber-700/80">Assine um plano para continuar gerando leads.</p>
-          </div>
-        </div>
-        <button 
-          onClick={() => setViewState('subscription')}
-          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-sm transition-colors whitespace-nowrap"
-        >
-          Ver Planos
-        </button>
       </div>
 
       {/* Form Area */}
@@ -140,11 +122,13 @@ export const NovaBuscaScreen: React.FC = () => {
         </div>
 
         <div className="mb-8">
-          <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Qtd. de Leads</label>
-          <div className="w-full md:w-1/3 px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium flex items-center justify-between cursor-not-allowed opacity-80">
-            <span>Até 5 leads</span>
-            <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Plano Gratuito</span>
-          </div>
+          <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Qtd. de Leads (Teste Ilimitado)</label>
+          <input 
+            type="number" 
+            value={searchLimit}
+            onChange={(e) => setSearchLimit(parseInt(e.target.value) || 10)}
+            className="w-full md:w-1/3 px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+          />
         </div>
 
         <p className="text-sm text-slate-400">Buscaremos até 20 empresas. Você só utiliza créditos pelos leads reais encontrados.</p>
