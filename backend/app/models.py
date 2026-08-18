@@ -19,6 +19,7 @@ class LeadItem(BaseModel):
     city: str
     email: str
     phone: str
+    whatsapp: Optional[bool] = None
     socials: LeadSocialLinks
     quality_score: int
     verified: bool = True
@@ -28,11 +29,12 @@ class LeadItem(BaseModel):
     match_location: Optional[str] = None
     match_business: Optional[str] = None
     experience: Optional[str] = None
-    outreach_status: str = "Pendente" # Pendente, Mensagem Gerada, Enviado, Entregue, Lido, Respondido
+    opportunityScore: Optional[int] = None
+    missingDigitalAssets: Optional[List[str]] = []
+    outreach_status: str = "Pendente"
     last_contacted_at: Optional[str] = None
     last_message: Optional[str] = None
-    opportunityScore: Optional[int] = None
-    missingDigitalAssets: Optional[List[str]] = None
+    match_category: Optional[str] = None
     pipeline_stage: str = "Novos"
 
 class LeadSearchRequest(BaseModel):

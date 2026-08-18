@@ -115,10 +115,11 @@ class LeadsEngine:
                                     city=address.split(',')[0] if ',' in address else city_display,
                                     location=address,
                                     email=email,
-                                    phone=clean_phone if clean_phone else None,
+                                    phone=clean_phone if clean_phone else "",
                                     whatsapp=has_whatsapp,
                                     avatar=avatar,
                                     opportunityScore=min(99, opportunity_score),
+                                    quality_score=min(99, opportunity_score),
                                     verified=True,
                                     missingDigitalAssets=missing_assets,
                                     socials=LeadSocialLinks(
@@ -169,6 +170,7 @@ class LeadsEngine:
                     whatsapp=True,
                     avatar=avatar,
                     opportunityScore=min(99, score),
+                    quality_score=min(99, score),
                     verified=random.choice([True, False]),
                     missingDigitalAssets=missing,
                     socials=LeadSocialLinks(
