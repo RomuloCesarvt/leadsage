@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Save, User, Shield, Target, Globe } from 'lucide-react';
+import { Save, User, Target, Globe } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const SettingsScreen: React.FC = () => {
@@ -9,17 +9,7 @@ export const SettingsScreen: React.FC = () => {
   const [selectedChannel, setSelectedChannel] = useState('WhatsApp');
   const [selectedGoal, setSelectedGoal] = useState('4 a 10');
   const [lang, setLang] = useState('pt');
-  const [activeTab, setActiveTab] = useState<'prospeccao' | 'perfil' | 'api'>('prospeccao');
-
-  // API Keys state
-  const [geminiKey, setGeminiKey] = useState(localStorage.getItem('LEADSAGE_GEMINI_KEY') || '');
-  const [mapsKey, setMapsKey] = useState(localStorage.getItem('LEADSAGE_MAPS_KEY') || '');
-
-  const saveApiKeys = () => {
-    localStorage.setItem('LEADSAGE_GEMINI_KEY', geminiKey);
-    localStorage.setItem('LEADSAGE_MAPS_KEY', mapsKey);
-    alert('Chaves de API salvas com sucesso no seu navegador!');
-  };
+  const [activeTab, setActiveTab] = useState<'prospeccao' | 'perfil'>('prospeccao');
 
   const toggleService = (s: string) => {
     setSelectedServices(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
@@ -54,12 +44,6 @@ export const SettingsScreen: React.FC = () => {
           >
             <User className="w-4 h-4" /> Perfil da Conta
           </button>
-          <button 
-            onClick={() => setActiveTab('api')}
-            className={`w-full text-left px-4 py-3 font-bold rounded-xl text-sm transition-colors flex items-center gap-2 ${activeTab === 'api' ? 'bg-blue-50 text-blue-600' : 'hover:bg-slate-50 text-slate-600 font-medium'}`}
-          >
-            <Shield className="w-4 h-4" /> Integrações / APIs
-          </button>
         </div>
 
         {/* Right Col - Forms */}
@@ -80,54 +64,6 @@ export const SettingsScreen: React.FC = () => {
             </div>
           </div>
           
-          {/* API Integrations Form */}
-          {activeTab === 'api' && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                <Shield className="w-5 h-5 text-blue-600" /> Integrações e Chaves de API
-              </h2>
-              
-              <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-xl text-sm mb-6">
-                Para que a busca de leads reais e a geração de textos via Inteligência Artificial funcionem perfeitamente, você precisa inserir suas próprias chaves de API abaixo. Elas são salvas apenas no seu navegador local.
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Google Places API Key (Obrigatório para Nova Busca)</label>
-                  <p className="text-xs text-slate-500 mb-2">Usado para buscar empresas reais, telefones e sites diretamente do Google Maps.</p>
-                  <input 
-                    type="password" 
-                    value={mapsKey}
-                    onChange={(e) => setMapsKey(e.target.value)}
-                    placeholder="AIzaSyA..." 
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Google Gemini API Key (Obrigatório para IA)</label>
-                  <p className="text-xs text-slate-500 mb-2">Usado para gerar as mensagens de prospecção e os textos do construtor de sites. Obtenha no Google AI Studio.</p>
-                  <input 
-                    type="password" 
-                    value={geminiKey}
-                    onChange={(e) => setGeminiKey(e.target.value)}
-                    placeholder="AIzaSyB..." 
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                  />
-                </div>
-              </div>
-
-              <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end">
-                <button 
-                  onClick={saveApiKeys}
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-sm transition-colors flex items-center gap-2"
-                >
-                  <Save className="w-4 h-4" /> Salvar Chaves de API
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Prospecção Form */}
           {activeTab === 'prospeccao' && (
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">

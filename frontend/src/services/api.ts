@@ -20,14 +20,9 @@ async function fetchWithToken(endpoint: string, options: RequestInit = {}) {
     token = await user.getIdToken();
   }
 
-  const geminiKey = localStorage.getItem('LEADSAGE_GEMINI_KEY');
-  const mapsKey = localStorage.getItem('LEADSAGE_MAPS_KEY');
-
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    ...(geminiKey ? { 'X-Gemini-Key': geminiKey } : {}),
-    ...(mapsKey ? { 'X-Maps-Key': mapsKey } : {}),
     ...options.headers,
   };
 
