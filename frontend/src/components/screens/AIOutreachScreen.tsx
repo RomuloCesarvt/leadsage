@@ -1,7 +1,46 @@
-import React from 'react';
-import { MessageSquare, Sparkles, ChevronDown } from 'lucide-react';
+import React, { useState } from 'react';
+import { MessageSquare, Sparkles, ChevronDown, Check, Copy } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
+import { api } from '../../services/api';
 
 export const AIOutreachScreen: React.FC = () => {
+  const { leads } = useApp() as any;
+  const [selectedLeadId, setSelectedLeadId] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedPitch, setGeneratedPitch] = useState<{subject: string, body: string} | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleGenerate = async () => {
+    if (!selectedLeadId) return alert('Selecione um lead primeiro.');
+    const lead = leads.find((l: any) => l.id === selectedLeadId);
+    if (!lead) return;
+
+    setIsGenerating(true);
+    try {
+      const res = await api.generatePitch({
+        lead: lead,
+        tone: 'Consultivo',
+        sender_name: 'Consultor LeadSage',
+      });
+      setGeneratedPitch({
+        subject: res.subject,
+        body: res.body
+      });
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao gerar mensagem. Verifique sua chave da API Gemini nas configurações.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    if (!generatedPitch) return;
+    navigator.clipboard.writeText(`Assunto: ${generatedPitch.subject}\n\n${generatedPitch.body}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full relative">
       
@@ -16,25 +55,63 @@ export const AIOutreachScreen: React.FC = () => {
         {/* Content */}
         <div className="w-full md:w-1/3 bg-white border border-slate-200 rounded-2xl p-5 flex flex-col h-fit shadow-sm">
           <label className="block text-sm font-bold text-slate-700 mb-2">Lead</label>
-          <div className="relative">
-            <div className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 flex items-center justify-between cursor-pointer hover:border-blue-400 transition-colors">
-              Selecionar um lead...
-              <ChevronDown className="w-4 h-4" />
-            </div>
+          <div className="relative mb-6">
+            <select 
+              value={selectedLeadId}
+              onChange={(e) => setSelectedLeadId(e.target.value)}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="">Selecione um lead...</option>
+              {leads.map((l: any) => (
+                <option key={l.id} value={l.id}>{l.name} - {l.company}</option>
+              ))}
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
           
-          <button className="w-full mt-6 py-3 bg-blue-600 hover:bg-blue-700 transition-colors text-white font-bold rounded-xl flex items-center justify-center gap-2">
-            <Sparkles className="w-4 h-4" />
-            Gerar Abordagem
+          <button 
+            onClick={handleGenerate}
+            disabled={isGenerating || !selectedLeadId}
+            className={`w-full py-3 transition-colors text-white font-bold rounded-xl flex items-center justify-center gap-2 ${isGenerating || !selectedLeadId ? 'bg-slate-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+          >
+            {isGenerating ? (
+              <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> Gerando...</>
+            ) : (
+              <><Sparkles className="w-4 h-4" /> Gerar Abordagem</>
+            )}
           </button>
         </div>
 
-        <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-8 flex flex-col items-center justify-center text-center shadow-sm">
-          <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-4">
-            <MessageSquare className="w-8 h-8" />
-          </div>
-          <h3 className="font-bold text-slate-800 text-lg mb-2">Selecione um lead e clique em Gerar</h3>
-          <p className="text-slate-500 max-w-sm">A IA irá analisar o perfil da empresa (nicho, localização, deficiências digitais) e criará 3 mensagens perfeitas para você copiar e colar no WhatsApp.</p>
+        <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-8 flex flex-col shadow-sm">
+          {!generatedPitch ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center">
+              <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-4">
+                <MessageSquare className="w-8 h-8" />
+              </div>
+              <h3 className="font-bold text-slate-800 text-lg mb-2">Selecione um lead e clique em Gerar</h3>
+              <p className="text-slate-500 max-w-sm">A IA irá analisar o perfil da empresa (nicho, localização, deficiências digitais) e criará uma mensagem perfeita para você copiar e colar no WhatsApp ou E-mail.</p>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">Mensagem Gerada</h3>
+                  <p className="text-sm text-slate-500">Pronta para ser enviada</p>
+                </div>
+                <button 
+                  onClick={copyToClipboard}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors flex items-center gap-2"
+                >
+                  {copied ? <><Check className="w-4 h-4 text-green-600" /> Copiado</> : <><Copy className="w-4 h-4" /> Copiar Tudo</>}
+                </button>
+              </div>
+              
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-sm text-slate-700 whitespace-pre-wrap flex-1 overflow-y-auto">
+                <span className="font-bold text-slate-900 block mb-2">Assunto: {generatedPitch.subject}</span>
+                {generatedPitch.body}
+              </div>
+            </div>
+          )}
         </div>
 
       </div>

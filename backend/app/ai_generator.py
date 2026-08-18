@@ -3,12 +3,9 @@ import google.generativeai as genai
 from app.config import settings
 from app.models import LeadItem, PitchGenerationRequest, PitchGenerationResponse
 
-if settings.GEMINI_API_KEY:
-    genai.configure(api_key=settings.GEMINI_API_KEY)
-
 class AIGenerator:
     @staticmethod
-    async def generate_pitch(req: PitchGenerationRequest) -> PitchGenerationResponse:
+    async def generate_pitch(req: PitchGenerationRequest, api_key: str = None) -> PitchGenerationResponse:
         lead = req.lead
         tone = req.tone or "Consultivo"
         sender = req.sender_name or "LeadSage Prospecção"
@@ -22,13 +19,15 @@ class AIGenerator:
             "nicho": lead.niche
         }
 
+        active_key = api_key or settings.GEMINI_API_KEY
+
         # Fallback caso a chave do Gemini não esteja presente
-        if not settings.GEMINI_API_KEY:
+        if not active_key:
             first_name = placeholders["primeiro_nome"]
             subject = f"Oportunidade para a {lead.company} em {lead.city}"
             body = (
                 f"Olá {first_name}, notei que atua como {lead.role}.\n\n"
-                "Para configurar a IA real, adicione a chave GEMINI_API_KEY no arquivo .env.\n\n"
+                "Para configurar a IA real, insira sua chave Gemini nas Configurações -> Integrações.\n\n"
                 f"Abraço,\n{sender}"
             )
             return PitchGenerationResponse(
@@ -40,6 +39,7 @@ class AIGenerator:
             )
 
         try:
+            genai.configure(api_key=active_key)
             model = genai.GenerativeModel('gemini-1.5-flash')
             prompt = f"""
 Você é um especialista em cold e-mail B2B de altíssima conversão.
@@ -90,66 +90,62 @@ Não use blocos markdown (```json). Apenas as chaves.
         )
 
     @staticmethod
-    async def generate_demo_site(req) -> dict:
+    async def generate_demo_site(req, api_key: str = None) -> dict:
         from app.models import DemoSiteResponse
-        lead = req.lead
+        lead = getattr(req, 'lead', req)
+        
+        active_key = api_key or settings.GEMINI_API_KEY
 
-        # Fallback if no Gemini key
-        if not settings.GEMINI_API_KEY:
+        if not active_key:
             return DemoSiteResponse(
                 lead_id=lead.id,
-                hero_title=f"A Nova Era para {lead.company}",
-                hero_subtitle=f"Soluções em {lead.niche} para transformar o seu negócio em {lead.city}.",
-                about_text=f"A {lead.company} é líder em seu segmento, oferecendo o melhor atendimento para você.",
-                services=["Atendimento Especializado", "Consultoria Rápida", "Suporte Contínuo"],
-                cta_text="Falar com Especialista"
+                preview_url="https://leadsage.app/preview/mock",
+                html_content="<h1>Configure sua chave do Gemini em Configurações para gerar sites reais.</h1>",
+                generation_time=0.5
             )
 
         try:
+            genai.configure(api_key=active_key)
             model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            # Simple prompt to generate a landing page structure
             prompt = f"""
-            Você é um Copywriter e Web Designer criando os textos de uma Landing Page matadora para a empresa abaixo.
-            A ideia é impressionar o dono da empresa com um site novo.
+Gere o código HTML completo de uma landing page profissional e responsiva (usando TailwindCSS via CDN) para a seguinte empresa:
+- Empresa: {lead.company}
+- Nicho: {lead.niche}
+- Localização: {lead.city}
+- Contato: {lead.phone}
 
-            DADOS DA EMPRESA:
-            - Nome: {lead.company}
-            - Nicho: {lead.niche}
-            - Cidade: {lead.city}
+A página deve ter:
+1. Header com o nome da empresa e um CTA "Agendar Consulta/Contato"
+2. Hero section impactante com um título persuasivo
+3. Seção de Serviços/Benefícios com 3 itens
+4. Seção "Sobre Nós" curta
+5. Footer simples
 
-            Retorne UM JSON EXATO contendo:
-            "hero_title": Título principal da página. Curto e de impacto.
-            "hero_subtitle": Subtítulo persuasivo.
-            "about_text": 2 ou 3 frases sobre a missão/empresa.
-            "services": Lista com 3 strings curtas de serviços que eles possivelmente oferecem.
-            "cta_text": Texto do botão principal (ex: "Agende uma Consulta").
-
-            NÃO use markdown, devolva apenas o JSON.
-            """
+Use classes do TailwindCSS.
+O output DEVE ser apenas o código HTML, sem blocos markdown. Comece com <!DOCTYPE html> e termine com </html>.
+"""
             response = model.generate_content(prompt)
-            raw_text = response.text.strip()
-            if raw_text.startswith("```json"):
-                raw_text = raw_text[7:]
-            if raw_text.startswith("```"):
-                raw_text = raw_text[3:]
-            if raw_text.endswith("```"):
-                raw_text = raw_text[:-3]
-
-            data = json.loads(raw_text.strip())
+            html_content = response.text.strip()
+            if html_content.startswith("```html"):
+                html_content = html_content[7:]
+            if html_content.startswith("```"):
+                html_content = html_content[3:]
+            if html_content.endswith("```"):
+                html_content = html_content[:-3]
+                
             return DemoSiteResponse(
                 lead_id=lead.id,
-                hero_title=data.get("hero_title", f"Bem-vindo à {lead.company}"),
-                hero_subtitle=data.get("hero_subtitle", "Sua melhor opção."),
-                about_text=data.get("about_text", ""),
-                services=data.get("services", ["Serviço 1", "Serviço 2", "Serviço 3"]),
-                cta_text=data.get("cta_text", "Saiba Mais")
+                preview_url=f"https://leadsage.app/preview/{lead.id}",
+                html_content=html_content.strip(),
+                generation_time=2.5
             )
         except Exception as e:
-            print(f"Erro no DemoSite: {e}")
+            print(f"Erro ao gerar site: {e}")
             return DemoSiteResponse(
                 lead_id=lead.id,
-                hero_title=f"Site Oficial: {lead.company}",
-                hero_subtitle="O melhor serviço da região.",
-                about_text="Conheça mais sobre nós.",
-                services=["Serviço A", "Serviço B", "Serviço C"],
-                cta_text="Contato"
+                preview_url="https://leadsage.app/preview/error",
+                html_content=f"<h1>Erro ao gerar site.</h1><p>{str(e)}</p>",
+                generation_time=0.1
             )

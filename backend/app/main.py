@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import List, Dict, Any
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import FastAPI, HTTPException, Query, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.models import (
@@ -65,7 +65,9 @@ def update_user_profile(profile: UserProfile):
     return CURRENT_USER
 
 @app.post("/api/search-leads", response_model=LeadSearchResponse)
-async def search_leads(req: LeadSearchRequest, user: dict = Depends(get_current_user)):
+async def search_leads(request: Request, req: LeadSearchRequest, user: dict = Depends(get_current_user)):
+    maps_key = request.headers.get("X-Maps-Key")
+    
     if not req.niche or not req.location:
         raise HTTPException(status_code=400, detail="Nicho e localização são obrigatórios.")
 
@@ -83,7 +85,8 @@ async def search_leads(req: LeadSearchRequest, user: dict = Depends(get_current_
         niche=req.niche,
         location=req.location,
         query=req.query or "",
-        limit=requested_limit
+        limit=requested_limit,
+        api_key=maps_key
     )
 
     # Store leads in memory database
@@ -114,13 +117,15 @@ async def search_leads(req: LeadSearchRequest, user: dict = Depends(get_current_
     )
 
 @app.post("/api/generate-pitch", response_model=PitchGenerationResponse)
-async def generate_pitch(req: PitchGenerationRequest, user: dict = Depends(get_current_user)):
-    return await AIGenerator.generate_pitch(req)
+async def generate_pitch(request: Request, req: PitchGenerationRequest, user: dict = Depends(get_current_user)):
+    gemini_key = request.headers.get("X-Gemini-Key")
+    return await AIGenerator.generate_pitch(req, api_key=gemini_key)
 
 @app.post("/api/generate-demo-site", response_model=DemoSiteResponse)
-async def generate_demo_site(req: DemoSiteRequest, user: dict = Depends(get_current_user)):
+async def generate_demo_site(request: Request, req: DemoSiteRequest, user: dict = Depends(get_current_user)):
+    gemini_key = request.headers.get("X-Gemini-Key")
     # Simula a geração ou usa AIGenerator
-    return await AIGenerator.generate_demo_site(req)
+    return await AIGenerator.generate_demo_site(req, api_key=gemini_key)
 
 @app.post("/api/dispatch", response_model=DispatchResponse)
 async def dispatch_outreach(req: DispatchRequest, user: dict = Depends(get_current_user)):

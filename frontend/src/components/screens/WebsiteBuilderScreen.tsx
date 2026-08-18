@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
 import { Globe, Wand2, LayoutTemplate, ArrowLeft, ArrowRight, Building2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { api } from '../../services/api';
 
-type Step = 'choice' | 'select-lead' | 'form' | 'photos' | 'template';
+type Step = 'choice' | 'select-lead' | 'form' | 'photos' | 'template' | 'preview';
 
 export const WebsiteBuilderScreen: React.FC = () => {
   const { leads } = useApp() as any;
   const [step, setStep] = useState<Step>('choice');
-  const [_selectedLead, setSelectedLead] = useState<any>(null);
+  const [selectedLead, setSelectedLead] = useState<any>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState('Moderno');
+  
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedHtml, setGeneratedHtml] = useState<string>('');
 
   // Form fields
   const [companyName, setCompanyName] = useState('');
@@ -23,6 +28,33 @@ export const WebsiteBuilderScreen: React.FC = () => {
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [mapsUrl, setMapsUrl] = useState('');
+
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    setStep('preview');
+    try {
+      const leadPayload = selectedLead ? { ...selectedLead } : {
+        id: `site_lead_${Date.now()}`,
+        name: 'Cliente',
+        company: companyName,
+        niche: category,
+        phone: phone,
+        city: city
+      };
+      
+      const res = await api.generateDemoSite({ lead: leadPayload });
+      if (res.html_content) {
+        setGeneratedHtml(res.html_content);
+      } else {
+        setGeneratedHtml("<h1>Erro ao gerar o site com IA. Verifique sua chave API.</h1>");
+      }
+    } catch (err) {
+      console.error(err);
+      setGeneratedHtml("<h1>Erro na requisição. Verifique sua conexão e chave API.</h1>");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const fillFromLead = (lead: any) => {
     setSelectedLead(lead);
@@ -329,6 +361,50 @@ export const WebsiteBuilderScreen: React.FC = () => {
     );
   }
 
+  // Step: preview
+  if (step === 'preview') {
+    return (
+      <div className="flex-1 flex flex-col h-full relative max-w-6xl mx-auto w-full p-4">
+        <div className="mb-4 flex items-center justify-between">
+          <button onClick={() => setStep('template')} className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700">
+            <ArrowLeft className="w-4 h-4" /> Editar Opções
+          </button>
+          {isGenerating ? (
+            <div className="text-blue-600 font-bold flex items-center gap-2">
+              <span className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></span>
+              A Inteligência Artificial está escrevendo o código do seu site...
+            </div>
+          ) : (
+            <div className="flex gap-4">
+              <button className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors">
+                Ver Código Fonte
+              </button>
+              <button className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-sm transition-colors flex items-center gap-2">
+                <Globe className="w-4 h-4" /> Publicar Site
+              </button>
+            </div>
+          )}
+        </div>
+        
+        <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col relative">
+          {isGenerating ? (
+            <div className="flex-1 flex flex-col items-center justify-center bg-slate-50/50">
+              <Wand2 className="w-16 h-16 text-blue-500 animate-pulse mb-6" />
+              <h3 className="text-2xl font-bold text-slate-800 mb-2">Construindo seu site...</h3>
+              <p className="text-slate-500 max-w-md text-center">A IA está processando suas preferências de design, criando copys persuasivas e estruturando os componentes visuais.</p>
+            </div>
+          ) : (
+            <iframe 
+              srcDoc={generatedHtml} 
+              className="w-full h-full border-none"
+              title="Preview do Site"
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // Step: template (Nicho e Template)
   return (
     <div className="flex-1 flex flex-col h-full relative max-w-4xl mx-auto w-full overflow-y-auto custom-scrollbar pb-20">
@@ -377,15 +453,19 @@ export const WebsiteBuilderScreen: React.FC = () => {
           <p className="text-sm text-slate-500 mb-4">Escolha o estilo visual do site que será gerado.</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
-              { name: 'Moderno', desc: 'Clean e minimalista com cores vibrantes', selected: true },
-              { name: 'Clássico', desc: 'Elegante com tipografia sofisticada', selected: false },
-              { name: 'Impactante', desc: 'Bold com imagens grandes e contrastes fortes', selected: false },
+              { name: 'Moderno', desc: 'Clean e minimalista com cores vibrantes' },
+              { name: 'Clássico', desc: 'Elegante com tipografia sofisticada' },
+              { name: 'Impactante', desc: 'Bold com imagens grandes e contrastes fortes' },
             ].map((tpl) => (
-              <button key={tpl.name} className={`rounded-xl border-2 p-5 text-left transition-all ${tpl.selected ? 'border-blue-500 bg-blue-50/50 shadow-sm' : 'border-slate-200 bg-white hover:border-blue-300'}`}>
-                <div className={`w-full h-24 rounded-lg mb-4 ${tpl.selected ? 'bg-blue-100' : 'bg-slate-100'} flex items-center justify-center`}>
-                  <LayoutTemplate className={`w-8 h-8 ${tpl.selected ? 'text-blue-500' : 'text-slate-300'}`} />
+              <button 
+                key={tpl.name} 
+                onClick={() => setSelectedTemplate(tpl.name)}
+                className={`rounded-xl border-2 p-5 text-left transition-all ${selectedTemplate === tpl.name ? 'border-blue-500 bg-blue-50/50 shadow-sm' : 'border-slate-200 bg-white hover:border-blue-300'}`}
+              >
+                <div className={`w-full h-24 rounded-lg mb-4 ${selectedTemplate === tpl.name ? 'bg-blue-100' : 'bg-slate-100'} flex items-center justify-center`}>
+                  <LayoutTemplate className={`w-8 h-8 ${selectedTemplate === tpl.name ? 'text-blue-500' : 'text-slate-300'}`} />
                 </div>
-                <h4 className={`font-bold text-sm mb-1 ${tpl.selected ? 'text-blue-700' : 'text-slate-700'}`}>{tpl.name}</h4>
+                <h4 className={`font-bold text-sm mb-1 ${selectedTemplate === tpl.name ? 'text-blue-700' : 'text-slate-700'}`}>{tpl.name}</h4>
                 <p className="text-xs text-slate-500">{tpl.desc}</p>
               </button>
             ))}
@@ -395,7 +475,10 @@ export const WebsiteBuilderScreen: React.FC = () => {
 
       {/* Floating Action Button */}
       <div className="fixed bottom-8 right-8 z-30">
-        <button className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full shadow-xl shadow-blue-600/30 transition-all flex items-center gap-3 text-lg hover:scale-105 active:scale-95">
+        <button 
+          onClick={handleGenerate}
+          className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full shadow-xl shadow-blue-600/30 transition-all flex items-center gap-3 text-lg hover:scale-105 active:scale-95"
+        >
           <Wand2 className="w-5 h-5" />
           Gerar Site com IA
         </button>

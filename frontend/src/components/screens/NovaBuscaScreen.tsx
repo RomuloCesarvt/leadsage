@@ -9,15 +9,25 @@ export const NovaBuscaScreen: React.FC = () => {
   const [city, setCity] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
   const [radius, setRadius] = useState('10');
+  const [isSearching, setIsSearching] = useState(false);
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!niche || !city || !state) {
       alert("Preencha Nicho, Estado e Cidade para buscar.");
       return;
     }
     const fullLocation = `${neighborhood ? neighborhood + ', ' : ''}${city}, ${state}, Brasil`;
-    performLeadSearch(niche, fullLocation, 5);
-    setViewState('workspace');
+    
+    setIsSearching(true);
+    try {
+      await performLeadSearch(niche, fullLocation, 5);
+      setViewState('workspace');
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao buscar leads. Verifique sua conexão e chave API.");
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   return (
@@ -145,10 +155,20 @@ export const NovaBuscaScreen: React.FC = () => {
       <div className="fixed bottom-8 right-8 z-30">
         <button 
           onClick={handleSearch}
-          className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full shadow-xl shadow-blue-600/30 transition-all flex items-center gap-3 text-lg hover:scale-105 active:scale-95"
+          disabled={isSearching}
+          className={`px-8 py-4 font-bold rounded-full shadow-xl transition-all flex items-center gap-3 text-lg ${isSearching ? 'bg-blue-400 cursor-not-allowed text-white shadow-none' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/30 hover:scale-105 active:scale-95'}`}
         >
-          <Search className="w-5 h-5" />
-          Buscar Oportunidades
+          {isSearching ? (
+            <>
+              <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              Buscando no Google Maps...
+            </>
+          ) : (
+            <>
+              <Search className="w-5 h-5" />
+              Buscar Oportunidades
+            </>
+          )}
         </button>
       </div>
 

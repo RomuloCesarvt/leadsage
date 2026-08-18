@@ -57,7 +57,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  const [leads, setLeads] = useState<LeadItem[]>([]);
+  const [leads, setLeads] = useState<LeadItem[]>(() => {
+    const savedLeads = localStorage.getItem('LEADSAGE_LEADS');
+    if (savedLeads) {
+      try {
+        return JSON.parse(savedLeads);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
   const [history, setHistory] = useState<SearchHistoryItem[]>([]);
   const [suggestedNiches, setSuggestedNiches] = useState<SuggestedNiche[]>([]);
   
@@ -140,6 +150,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       api.getSuggestedNiches().then(setSuggestedNiches);
     }
   }, [authLoading, user]);
+
+  useEffect(() => {
+    localStorage.setItem('LEADSAGE_LEADS', JSON.stringify(leads));
+  }, [leads]);
 
   return (
     <AppContext.Provider
