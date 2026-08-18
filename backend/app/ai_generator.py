@@ -40,7 +40,7 @@ class AIGenerator:
 
         try:
             genai.configure(api_key=active_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            model = genai.GenerativeModel('gemini-3.6-flash')
             prompt = f"""
 Você é um especialista em cold e-mail B2B de altíssima conversão.
 Escreva um e-mail curto e direto para o seguinte Lead. 
@@ -106,7 +106,7 @@ Não use blocos markdown (```json). Apenas as chaves.
 
         try:
             genai.configure(api_key=active_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            model = genai.GenerativeModel('gemini-3.6-flash')
             
             # Simple prompt to generate a landing page structure
             prompt = f"""
