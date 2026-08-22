@@ -23,10 +23,10 @@ def init_firebase():
                 sa_dict = json.loads(sa_json)
                 cred = credentials.Certificate(sa_dict)
                 firebase_admin.initialize_app(cred)
-                print("✅ Firebase Admin inicializado via FIREBASE_SERVICE_ACCOUNT_JSON")
+                print("Firebase Admin inicializado via FIREBASE_SERVICE_ACCOUNT_JSON")
                 return
             except Exception as e:
-                print(f"⚠️ Erro ao parsear FIREBASE_SERVICE_ACCOUNT_JSON: {e}")
+                print(f"Erro ao parsear FIREBASE_SERVICE_ACCOUNT_JSON: {e}")
 
         # Mode 2: File path via GOOGLE_APPLICATION_CREDENTIALS
         sa_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
@@ -34,19 +34,19 @@ def init_firebase():
             try:
                 cred = credentials.Certificate(sa_path)
                 firebase_admin.initialize_app(cred)
-                print("✅ Firebase Admin inicializado via GOOGLE_APPLICATION_CREDENTIALS")
+                print("Firebase Admin inicializado via GOOGLE_APPLICATION_CREDENTIALS")
                 return
             except Exception as e:
-                print(f"⚠️ Erro ao usar GOOGLE_APPLICATION_CREDENTIALS: {e}")
+                print(f"Erro ao usar GOOGLE_APPLICATION_CREDENTIALS: {e}")
 
         # Mode 3: Application Default Credentials (GCP environments)
         try:
             cred = credentials.ApplicationDefault()
             firebase_admin.initialize_app(cred)
-            print("✅ Firebase Admin inicializado via Application Default Credentials")
+            print("Firebase Admin inicializado via Application Default Credentials")
             return
         except Exception as e:
-            print(f"⚠️ Nenhuma credencial encontrada. Firebase rodará sem Firestore. Erro: {e}")
+            print(f"Nenhuma credencial encontrada. Firebase rodara sem Firestore. Erro: {e}")
             try:
                 firebase_admin.initialize_app()
             except:
@@ -57,7 +57,7 @@ try:
     init_firebase()
     db = firestore.client()
 except Exception as e:
-    print(f"⚠️ Firestore client não inicializado: {e}")
+    print(f"Firestore client nao inicializado: {e}")
 
 async def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
     """FastAPI Dependency to verify Firebase JWT Token"""

@@ -6,6 +6,8 @@ class LeadSocialLinks(BaseModel):
     linkedin: Optional[str] = None
     instagram: Optional[str] = None
     facebook: Optional[str] = None
+    twitter: Optional[str] = None
+    tiktok: Optional[str] = None
     website: Optional[str] = None
 
 class LeadItem(BaseModel):
@@ -59,6 +61,7 @@ class PitchGenerationRequest(BaseModel):
     tone: str = "Consultivo" # Consultivo, Amigável, Direto, Autoridade, Promocional
     custom_instructions: Optional[str] = ""
     sender_name: Optional[str] = "Prospecção LeadSage"
+    user_product: Optional[str] = ""
 
 class PitchGenerationResponse(BaseModel):
     lead_id: str
@@ -97,6 +100,7 @@ class UserProfile(BaseModel):
     email: str = "romulo@leadsage.ai"
     company_name: str = "LeadSage Corp"
     niche_focus: str = "Saúde & Farmacêutica"
+    product_description: str = "Ajudo empresas do setor de saúde a captarem mais clientes com automação de marketing."
     credits: int = 450
     plan: str = "Pro Builder"
     avatar: str = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"

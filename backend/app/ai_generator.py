@@ -1,5 +1,5 @@
 import json
-import google.generativeai as genai
+from google import genai
 from app.config import settings
 from app.models import LeadItem, PitchGenerationRequest, PitchGenerationResponse
 
@@ -39,17 +39,22 @@ class AIGenerator:
             )
 
         try:
-            genai.configure(api_key=active_key)
-            model = genai.GenerativeModel('gemini-3.6-flash')
+            client = genai.Client(api_key=active_key)
+            user_product_info = req.user_product or "Software/Serviço genérico"
+            
             prompt = f"""
-Você é um especialista em cold e-mail B2B de altíssima conversão.
-Escreva um e-mail curto e direto para o seguinte Lead. 
+Você é um especialista em cold e-mail B2B de altíssima conversão e um copywriter brilhante.
+Sua missão é escrever o primeiro contato para um Lead. 
 
-DADOS DO LEAD:
+DADOS DO SEU PRODUTO/OFERTA:
+- O que você vende / Problema que resolve: {user_product_info}
+
+DADOS DO LEAD (ALVO):
 - Nome: {lead.name}
 - Cargo: {lead.role}
 - Empresa: {lead.company}
 - Localização: {lead.city} ({lead.location})
+- Nicho: {lead.niche}
 - Resumo IA: {lead.ai_summary}
 
 DADOS DA MENSAGEM:
@@ -57,12 +62,20 @@ DADOS DA MENSAGEM:
 - Remetente: {sender}
 - Instruções Extras: {req.custom_instructions or "Nenhuma. Foco em gerar uma reunião rápida de 5 minutos."}
 
-REGRA ESTILÍSTICA:
-Crie algo muito natural e persuasivo, sem parecer um robô.
-Retorne um JSON exato com duas chaves: "subject" (o assunto do email) e "body" (o corpo do e-mail com quebras de linha). 
-Não use blocos markdown (```json). Apenas as chaves.
+INSTRUÇÕES ESTRATÉGICAS:
+1. Comece com um 'hook' (gancho) hiper-personalizado focado no nicho da empresa ({lead.company}) ou no seu resumo.
+2. Apresente de forma fluida como o seu produto/oferta ({user_product_info}) resolve uma dor latente desse mercado.
+3. Não seja genérico, não pareça um panfleto. Seja um consultor de negócios trazendo uma oportunidade.
+4. Finalize com um CTA (Call to Action) claro e de baixo atrito.
+
+RETORNO ESPERADO:
+Retorne um JSON exato com duas chaves: "subject" (o assunto do email, chamativo e curto) e "body" (o corpo do e-mail com quebras de linha). 
+Não use blocos markdown (```json). Apenas as chaves em formato JSON puro.
 """
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=prompt
+            )
             
             raw_text = response.text.strip()
             if raw_text.startswith("```json"):
@@ -105,8 +118,7 @@ Não use blocos markdown (```json). Apenas as chaves.
             )
 
         try:
-            genai.configure(api_key=active_key)
-            model = genai.GenerativeModel('gemini-3.6-flash')
+            client = genai.Client(api_key=active_key)
             
             # Simple prompt to generate a landing page structure
             prompt = f"""
@@ -126,7 +138,10 @@ A página deve ter:
 Use classes do TailwindCSS.
 O output DEVE ser apenas o código HTML, sem blocos markdown. Comece com <!DOCTYPE html> e termine com </html>.
 """
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=prompt
+            )
             html_content = response.text.strip()
             if html_content.startswith("```html"):
                 html_content = html_content[7:]

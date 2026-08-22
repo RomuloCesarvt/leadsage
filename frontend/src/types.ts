@@ -64,6 +64,7 @@ export interface PitchGenerationRequest {
   tone: string;
   custom_instructions?: string;
   sender_name?: string;
+  user_product?: string;
 }
 
 export interface PitchGenerationResponse {
@@ -101,6 +102,7 @@ export interface UserProfile {
   email: string;
   company_name: string;
   niche_focus: string;
+  product_description?: string;
   credits: number;
   plan: string;
   avatar: string;

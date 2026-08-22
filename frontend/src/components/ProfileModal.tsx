@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, User, Building2, Mail, Briefcase, Check } from 'lucide-react';
+import { X, User, Building2, Mail, Briefcase, Check, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
 import { signOut } from 'firebase/auth';
@@ -12,6 +12,7 @@ export const ProfileModal: React.FC = () => {
   const [company, setCompany] = useState(user?.company_name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [niche, setNiche] = useState(user?.niche_focus || '');
+  const [productDescription, setProductDescription] = useState(user?.product_description || '');
   const [isSaving, setIsSaving] = useState(false);
 
   if (!isProfileModalOpen) return null;
@@ -24,7 +25,8 @@ export const ProfileModal: React.FC = () => {
         name,
         company_name: company,
         email,
-        niche_focus: niche
+        niche_focus: niche,
+        product_description: productDescription
       });
       setUser(updated);
       setIsProfileModalOpen(false);
@@ -97,6 +99,19 @@ export const ProfileModal: React.FC = () => {
               value={niche}
               onChange={(e) => setNiche(e.target.value)}
               className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Seu Produto / Oferta (Para IA)
+            </label>
+            <textarea
+              rows={3}
+              value={productDescription}
+              onChange={(e) => setProductDescription(e.target.value)}
+              placeholder="Descreva o seu produto/serviço, qual problema ele resolve e seus diferenciais. A IA vai usar isso para gerar emails hiper-personalizados."
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-indigo-500 custom-scrollbar"
             />
           </div>
 

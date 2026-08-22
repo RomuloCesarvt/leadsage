@@ -10,7 +10,8 @@ import {
   Target,
   UserPlus,
   Send,
-  Globe
+  Globe,
+  MessageCircle
 } from 'lucide-react';
 
 export const LeadProfilePanel: React.FC = () => {
@@ -71,12 +72,22 @@ export const LeadProfilePanel: React.FC = () => {
             <div className="flex flex-wrap justify-center items-center gap-2 text-xs text-zinc-500">
               <div className="flex items-center gap-1.5 bg-zinc-900/50 px-2.5 py-1 rounded-full border border-zinc-800/50">
                 <Building2 className="w-3.5 h-3.5 text-zinc-400" />
-                <span>{lead.company}</span>
+                <span className="truncate max-w-[150px]">{lead.company}</span>
               </div>
               <div className="flex items-center gap-1.5 bg-zinc-900/50 px-2.5 py-1 rounded-full border border-zinc-800/50">
                 <MapPin className="w-3.5 h-3.5 text-zinc-400" />
-                <span>{lead.location}</span>
+                <span className="truncate max-w-[150px]">{lead.location}</span>
               </div>
+              {lead.phone && (
+                <div className="flex items-center gap-1.5 bg-zinc-900/50 px-2.5 py-1 rounded-full border border-zinc-800/50 text-emerald-400">
+                  <span className="font-medium">{lead.phone}</span>
+                </div>
+              )}
+              {lead.email && (
+                <div className="flex items-center gap-1.5 bg-zinc-900/50 px-2.5 py-1 rounded-full border border-zinc-800/50 text-blue-400">
+                  <span className="font-medium truncate max-w-[150px]">{lead.email}</span>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 pt-2 notranslate" translate="no">
@@ -95,9 +106,24 @@ export const LeadProfilePanel: React.FC = () => {
                   fb
                 </a>
               )}
+              {lead.whatsapp && lead.phone && (
+                <a href={`https://wa.me/${lead.phone}`} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-[#25D366] flex items-center justify-center text-white transition-transform hover:scale-110">
+                  <MessageCircle className="w-4 h-4" />
+                </a>
+              )}
               {lead.socials.website && (
                 <a href={lead.socials.website} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 flex items-center justify-center text-zinc-300 transition-transform hover:scale-110">
                   <Globe className="w-4 h-4" />
+                </a>
+              )}
+              {lead.socials.twitter && (
+                <a href={lead.socials.twitter} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white text-[10px] font-bold shadow-sm transition-transform hover:scale-110">
+                  𝕏
+                </a>
+              )}
+              {lead.socials.tiktok && (
+                <a href={lead.socials.tiktok} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white text-[10px] font-bold shadow-sm transition-transform hover:scale-110">
+                  tk
                 </a>
               )}
             </div>

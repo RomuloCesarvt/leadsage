@@ -59,19 +59,7 @@ export const LessieTableView: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       
-      {/* Warning Banner */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-amber-600 text-lg">🔒</span>
-          <div>
-            <span className="font-bold text-amber-800 text-sm">Plano gratuito: </span>
-            <span className="text-amber-700 text-sm">os telefones aparecem parcialmente ocultos (ex: (11) ••••••-0000). Assine para ver o contato completo.</span>
-          </div>
-        </div>
-        <button className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap">
-          Ver Planos
-        </button>
-      </div>
+
 
       {/* Filters Row */}
       <div className="bg-white border border-slate-200 rounded-t-xl px-5 py-3">
@@ -172,9 +160,9 @@ export const LessieTableView: React.FC = () => {
                     <p className="text-sm text-slate-600">{lead.city || lead.location?.split(',')[0] || '-'}</p>
                   </td>
                   <td className="py-4 px-4">
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm font-medium text-slate-700">
                       {lead.phone 
-                        ? `(${lead.phone.slice(0,2)}) ••••••-${lead.phone.slice(-4)}`
+                        ? `+${lead.phone}`
                         : '-'
                       }
                     </p>
@@ -186,17 +174,20 @@ export const LessieTableView: React.FC = () => {
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex flex-col gap-1">
-                      {!lead.socials?.instagram && (
-                        <span className="text-xs font-bold text-rose-600">Sem IG</span>
+                      {lead.socials?.instagram ? (
+                        <span className="text-xs font-bold text-emerald-600">Instagram ✅</span>
+                      ) : (
+                        <span className="text-xs font-bold text-rose-600">Sem IG ❌</span>
                       )}
+                      
+                      {!lead.missingDigitalAssets?.includes('website') ? (
+                        <span className="text-xs font-bold text-emerald-600">Website ✅</span>
+                      ) : (
+                        <span className="text-xs font-bold text-rose-600">Sem Site ❌</span>
+                      )}
+                      
                       {lead.whatsapp && (
-                        <span className="text-xs font-bold text-emerald-600">WhatsApp disponível</span>
-                      )}
-                      {lead.missingDigitalAssets?.includes('website') && (
-                        <span className="text-xs font-bold text-rose-600">Sem Site</span>
-                      )}
-                      {!lead.whatsapp && !lead.missingDigitalAssets?.length && lead.socials?.instagram && (
-                        <span className="text-xs text-slate-400">—</span>
+                        <span className="text-xs font-bold text-emerald-600">WhatsApp ✅</span>
                       )}
                     </div>
                   </td>

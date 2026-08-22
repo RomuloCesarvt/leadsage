@@ -43,7 +43,8 @@ export const MessageEditorModal: React.FC = () => {
         lead,
         tone,
         custom_instructions: customInstructions,
-        sender_name: user?.name || 'LeadSage'
+        sender_name: user?.name || 'LeadSage',
+        user_product: user?.product_description || ''
       });
       setSubject(res.subject);
       setBody(res.body);

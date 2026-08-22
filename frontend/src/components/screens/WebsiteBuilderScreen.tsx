@@ -73,7 +73,7 @@ export const WebsiteBuilderScreen: React.FC = () => {
 
   if (step === 'choice') {
     return (
-      <div className="flex-1 flex flex-col h-full relative max-w-4xl mx-auto w-full">
+      <div key="choice" className="flex-1 flex flex-col h-full relative max-w-4xl mx-auto w-full">
         <div className="mb-6 text-center">
           <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Globe className="w-8 h-8" />
@@ -111,7 +111,7 @@ export const WebsiteBuilderScreen: React.FC = () => {
 
   if (step === 'select-lead') {
     return (
-      <div className="flex-1 flex flex-col h-full relative max-w-4xl mx-auto w-full">
+      <div key="select-lead" className="flex-1 flex flex-col h-full relative max-w-4xl mx-auto w-full">
         <div className="mb-6">
           <button onClick={() => setStep('choice')} className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 mb-4">
             <ArrowLeft className="w-4 h-4" /> Voltar
@@ -152,7 +152,7 @@ export const WebsiteBuilderScreen: React.FC = () => {
 
   if (step === 'form') {
     return (
-      <div className="flex-1 flex flex-col h-full relative max-w-4xl mx-auto w-full overflow-y-auto custom-scrollbar pb-20">
+      <div key="form" className="flex-1 flex flex-col h-full relative max-w-4xl mx-auto w-full overflow-y-auto custom-scrollbar pb-20">
         <div className="mb-6">
           <button onClick={() => setStep('choice')} className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 mb-4">
             <ArrowLeft className="w-4 h-4" /> Voltar
@@ -274,7 +274,7 @@ export const WebsiteBuilderScreen: React.FC = () => {
 
   if (step === 'photos') {
     return (
-      <div className="flex-1 flex flex-col h-full relative max-w-4xl mx-auto w-full overflow-y-auto custom-scrollbar pb-20">
+      <div key="photos" className="flex-1 flex flex-col h-full relative max-w-4xl mx-auto w-full overflow-y-auto custom-scrollbar pb-20">
         <div className="mb-6">
           <button onClick={() => setStep('form')} className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 mb-4">
             <ArrowLeft className="w-4 h-4" /> Voltar
@@ -364,7 +364,7 @@ export const WebsiteBuilderScreen: React.FC = () => {
   // Step: preview
   if (step === 'preview') {
     return (
-      <div className="flex-1 flex flex-col h-full relative max-w-6xl mx-auto w-full p-4">
+      <div key="preview" className="flex-1 flex flex-col h-full relative max-w-6xl mx-auto w-full p-4">
         <div className="mb-4 flex items-center justify-between">
           <button onClick={() => setStep('template')} className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700">
             <ArrowLeft className="w-4 h-4" /> Editar Opções
@@ -407,7 +407,7 @@ export const WebsiteBuilderScreen: React.FC = () => {
 
   // Step: template (Nicho e Template)
   return (
-    <div className="flex-1 flex flex-col h-full relative max-w-4xl mx-auto w-full overflow-y-auto custom-scrollbar pb-20">
+    <div key="template" className="flex-1 flex flex-col h-full relative max-w-4xl mx-auto w-full overflow-y-auto custom-scrollbar pb-20">
       <div className="mb-6">
         <button onClick={() => setStep('photos')} className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 mb-4">
           <ArrowLeft className="w-4 h-4" /> Voltar

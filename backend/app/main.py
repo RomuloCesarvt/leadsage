@@ -63,6 +63,7 @@ def update_user_profile(profile: UserProfile):
     CURRENT_USER.company_name = profile.company_name
     CURRENT_USER.niche_focus = profile.niche_focus
     CURRENT_USER.email = profile.email
+    CURRENT_USER.product_description = profile.product_description
     return CURRENT_USER
 
 @app.post("/api/search-leads", response_model=LeadSearchResponse)
@@ -82,13 +83,16 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
     maps_key = settings.GOOGLE_MAPS_API_KEY
 
     # Perform lead search and enrichment
-    leads = await LeadsEngine.search_leads(
-        niche=req.niche,
-        location=req.location,
-        query=req.query or "",
-        limit=requested_limit,
-        api_key=maps_key
-    )
+    try:
+        leads = await LeadsEngine.search_leads(
+            niche=req.niche,
+            location=req.location,
+            query=req.query or "",
+            limit=requested_limit,
+            api_key=maps_key
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     # Store leads in memory database
     for lead in leads:
