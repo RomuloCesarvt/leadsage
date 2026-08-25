@@ -88,25 +88,50 @@ class SocialScraper:
 
     @staticmethod
     async def enrich_lead(company_name: str, city: str, website: str) -> Dict[str, Any]:
+        data = {
+            "instagram": None,
+            "linkedin": None,
+            "facebook": None,
+            "twitter": None,
+            "tiktok": None,
+            "bio": ""
+        }
+        
+        if website:
+            website_lower = website.lower()
+            # If the website itself is a social media link, map it directly
+            if 'instagram.com/' in website_lower:
+                data['instagram'] = website
+                website = "" # Don't try to scrape instagram.com
+            elif 'facebook.com/' in website_lower:
+                data['facebook'] = website
+                website = ""
+            elif 'linkedin.com/' in website_lower:
+                data['linkedin'] = website
+                website = ""
+        
         # 1. Try website first
-        data = await SocialScraper.extract_socials_from_website(website)
+        if website:
+            scraped_data = await SocialScraper.extract_socials_from_website(website)
+            for k, v in scraped_data.items():
+                if v and not data[k]:
+                    data[k] = v
         
         # 2. Fallback to DDG for missing critical socials
-        # We run these synchronously in a thread pool or just use asyncio.to_thread to not block async loop
-        
+        # DDG works better without 'site:' operator sometimes
         if not data.get("instagram"):
             data["instagram"] = await asyncio.to_thread(
-                SocialScraper.search_duckduckgo, f"{company_name} {city} site:instagram.com", "instagram.com"
+                SocialScraper.search_duckduckgo, f"{company_name} {city} instagram", "instagram.com"
             )
             
         if not data.get("linkedin"):
             data["linkedin"] = await asyncio.to_thread(
-                SocialScraper.search_duckduckgo, f"{company_name} {city} site:linkedin.com", "linkedin.com"
+                SocialScraper.search_duckduckgo, f"{company_name} {city} linkedin", "linkedin.com"
             )
             
         if not data.get("facebook"):
             data["facebook"] = await asyncio.to_thread(
-                SocialScraper.search_duckduckgo, f"{company_name} {city} site:facebook.com", "facebook.com"
+                SocialScraper.search_duckduckgo, f"{company_name} {city} facebook", "facebook.com"
             )
             
         return data
