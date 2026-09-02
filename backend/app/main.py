@@ -3,10 +3,15 @@ from datetime import datetime
 from typing import List, Dict, Any
 from fastapi import FastAPI, HTTPException, Query, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+import json
+
 from app.config import settings
+from app.database import init_db, get_db, DBLead, DBSearchHistory
 
 from app.models import (
-    LeadSearchRequest, LeadSearchResponse, LeadItem,
+    LeadSearchRequest, LeadSearchResponse, LeadItem, LeadSocialLinks,
     PitchGenerationRequest, PitchGenerationResponse,
     DispatchRequest, DispatchResponse,
     CreditTopUpRequest, UserProfile,
@@ -24,7 +29,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for frontend integration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -33,12 +37,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory storage for saved search history and campaigns
-SEARCH_HISTORY: List[Dict[str, Any]] = []
-SAVED_LEADS_DATABASE: Dict[str, LeadItem] = {}
-
-# Current active profile
 CURRENT_USER = UserProfile()
+
+@app.on_event("startup")
+async def on_startup():
+    await init_db()
 
 @app.get("/")
 def read_root():
@@ -67,7 +70,7 @@ def update_user_profile(profile: UserProfile):
     return CURRENT_USER
 
 @app.post("/api/search-leads", response_model=LeadSearchResponse)
-async def search_leads(request: Request, req: LeadSearchRequest, user: dict = Depends(get_current_user)):
+async def search_leads(request: Request, req: LeadSearchRequest, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     if not req.niche or not req.location:
         raise HTTPException(status_code=400, detail="Nicho e localização são obrigatórios.")
 
@@ -77,12 +80,10 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
     uid = user.get("uid")
     remaining_credits = await check_and_deduct_credits(uid, total_cost)
     if remaining_credits is None:
-        remaining_credits = 9999  # Admin/test mode bypass
+        remaining_credits = 9999
 
-    # Use server-side API key
     maps_key = settings.GOOGLE_MAPS_API_KEY
 
-    # Perform lead search and enrichment
     try:
         leads = await LeadsEngine.search_leads(
             niche=req.niche,
@@ -94,21 +95,54 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # Store leads in memory database
-    for lead in leads:
-        SAVED_LEADS_DATABASE[lead.id] = lead
-
     search_id = f"sch_{uuid.uuid4().hex[:8]}"
 
-    history_item = {
-        "id": search_id,
-        "niche": req.niche,
-        "location": req.location,
-        "total_leads": len(leads),
-        "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M"),
-        "leads_preview": [l.name for l in leads[:3]]
-    }
-    SEARCH_HISTORY.insert(0, history_item)
+    # Save to SQLite DB
+    for lead in leads:
+        db_lead = DBLead(
+            id=lead.id,
+            name=lead.name,
+            avatar=lead.avatar,
+            role=lead.role,
+            niche=lead.niche,
+            company=lead.company,
+            location=lead.location,
+            city=lead.city,
+            email=lead.email,
+            phone=lead.phone,
+            whatsapp=lead.whatsapp,
+            socials=lead.socials.model_dump() if lead.socials else None,
+            website=lead.website,
+            address=lead.address,
+            quality_score=lead.quality_score,
+            verified=lead.verified,
+            bio=lead.bio,
+            ai_summary=lead.ai_summary,
+            match_intent=lead.match_intent,
+            match_location=lead.match_location,
+            match_business=lead.match_business,
+            experience=lead.experience,
+            opportunityScore=lead.opportunityScore,
+            missingDigitalAssets=lead.missingDigitalAssets,
+            outreach_status=lead.outreach_status,
+            last_contacted_at=lead.last_contacted_at,
+            last_message=lead.last_message,
+            match_category=lead.match_category,
+            pipeline_stage=lead.pipeline_stage
+        )
+        db.add(db_lead)
+
+    db_history = DBSearchHistory(
+        id=search_id,
+        niche=req.niche,
+        location=req.location,
+        total_leads=len(leads),
+        timestamp=datetime.now().strftime("%d/%m/%Y %H:%M"),
+        leads_preview=[l.name for l in leads[:3]]
+    )
+    db.add(db_history)
+    
+    await db.commit()
 
     return LeadSearchResponse(
         search_id=search_id,
@@ -132,25 +166,27 @@ async def generate_demo_site(request: Request, req: DemoSiteRequest, user: dict 
     return await AIGenerator.generate_demo_site(req, api_key=gemini_key)
 
 @app.post("/api/dispatch", response_model=DispatchResponse)
-async def dispatch_outreach(req: DispatchRequest, user: dict = Depends(get_current_user)):
+async def dispatch_outreach(req: DispatchRequest, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     uid = user.get("uid")
     balance_data = await get_user_balance(uid)
     current_credits = balance_data.get("credits", 0)
 
     try:
-        response, remaining = OutreachDispatcher.dispatch_message(req, current_credits)
+        response, remaining = await OutreachDispatcher.dispatch_message(req, current_credits)
     except ValueError as e:
         raise HTTPException(status_code=402, detail=str(e))
 
-    # Update lead status in memory database if present
-    if req.lead_id in SAVED_LEADS_DATABASE:
-        lead = SAVED_LEADS_DATABASE[req.lead_id]
+    # Update lead status in DB
+    result = await db.execute(select(DBLead).where(DBLead.id == req.lead_id))
+    lead = result.scalar_one_or_none()
+    if lead:
         lead.outreach_status = "Enviado"
         lead.last_contacted_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         lead.last_message = req.body
+        await db.commit()
 
     # Log deduction
-    await check_and_deduct_credits(uid, 2) # Cost 2 credits per dispatch
+    await check_and_deduct_credits(uid, 2)
 
     return response
 
@@ -169,8 +205,21 @@ async def topup_credits(req: CreditTopUpRequest, user: dict = Depends(get_curren
     }
 
 @app.get("/api/history")
-def get_search_history(user: dict = Depends(get_current_user)):
-    return SEARCH_HISTORY
+async def get_search_history(user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(DBSearchHistory).order_by(DBSearchHistory.timestamp.desc()))
+    history = result.scalars().all()
+    
+    out = []
+    for h in history:
+        out.append({
+            "id": h.id,
+            "niche": h.niche,
+            "location": h.location,
+            "total_leads": h.total_leads,
+            "timestamp": h.timestamp,
+            "leads_preview": h.leads_preview
+        })
+    return out
 
 @app.get("/api/suggested-niches")
 def get_suggested_niches():

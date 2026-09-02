@@ -96,53 +96,57 @@ class LeadsEngine:
                             else:
                                 avatar = f"https://ui-avatars.com/api/?name={company_name.replace(' ', '+')}&background=random&size=150"
                             
+                            # Clean phone number
                             clean_phone = ''.join(filter(str.isdigit, phone)) if phone else ""
                             if clean_phone and not clean_phone.startswith("55"):
                                 clean_phone = f"55{clean_phone}"
+                            
+                            # Calculate opportunity score
+                            missing_assets = []
+                            opportunity_score = int(random.uniform(50, 80))
+                            
+                            if not website:
+                                missing_assets.append("website")
+                                opportunity_score += 15
                                 
-                                missing_assets = []
-                                opportunity_score = int(random.uniform(50, 80))
+                            if rating > 4.5:
+                                opportunity_score += 5
                                 
-                                if not website:
-                                    missing_assets.append("website")
-                                    opportunity_score += 15
-                                    
-                                if rating > 4.5:
-                                    opportunity_score += 5
-                                    
-                                # App proposing: guess whatsapp based on phone prefix
-                                has_whatsapp = bool(clean_phone and len(clean_phone) >= 12 and clean_phone[4] == '9')
+                            # Guess whatsapp based on phone prefix
+                            has_whatsapp = bool(clean_phone and len(clean_phone) >= 12 and clean_phone[4] == '9')
+                            
+                            # Google Maps API does not provide Instagram/LinkedIn
+                            missing_assets.append("instagram")
+                            
+                            email = f"contato@{company_name.lower().replace(' ', '')}.com.br" if website else ""
+                            
+                            leads.append(LeadItem(
+                                id=place.get("id", f"ld_{uuid.uuid4().hex[:8]}"),
+                                name=company_name,
+                                company=company_name,
+                                role=random.choice(niche_data["roles"]),
+                                niche=niche,
+                                city=address.split(',')[0] if ',' in address else city_display,
+                                location=address,
+                                email=email,
+                                phone=clean_phone if clean_phone else "",
+                                whatsapp=has_whatsapp,
+                                website=website,
+                                address=address,
+                                avatar=avatar,
+                                opportunityScore=min(99, opportunity_score),
+                                quality_score=min(99, opportunity_score),
+                                verified=True,
+                                missingDigitalAssets=missing_assets,
+                                socials=LeadSocialLinks(
+                                    linkedin=None,
+                                    instagram=None,
+                                    website=website
+                                ),
+                                ai_summary=f"Encontrado no Google Maps. Nota {rating}. {'Precisa de presenca online forte' if missing_assets else 'Pode otimizar conversao'}."
+                            ))
                                 
-                                # Google Maps API does not provide Instagram/LinkedIn
-                                missing_assets.append("instagram")
-                                
-                                email = f"contato@{company_name.lower().replace(' ', '')}.com.br" if website else ""
-                                
-                                leads.append(LeadItem(
-                                    id=place.get("id", f"ld_{uuid.uuid4().hex[:8]}"),
-                                    name=company_name,
-                                    company=company_name,
-                                    role=random.choice(niche_data["roles"]),
-                                    niche=niche,
-                                    city=address.split(',')[0] if ',' in address else city_display,
-                                    location=address,
-                                    email=email,
-                                    phone=clean_phone if clean_phone else "",
-                                    whatsapp=has_whatsapp,
-                                    avatar=avatar,
-                                    opportunityScore=min(99, opportunity_score),
-                                    quality_score=min(99, opportunity_score),
-                                    verified=True,
-                                    missingDigitalAssets=missing_assets,
-                                    socials=LeadSocialLinks(
-                                        linkedin=None,
-                                        instagram=None,
-                                        website=website
-                                    ),
-                                    ai_summary=f"Encontrado no Google Maps. Nota {rating}. {'Precisa de presenca online forte' if missing_assets else 'Pode otimizar conversao'}."
-                                ))
-                                
-                        # Run deep enrichment for all leads concurrently but limit to 3 at a time to avoid DDG/Vercel rate limits
+                        # Run deep enrichment for all leads concurrently (limit to 3 at a time)
                         sem = asyncio.Semaphore(3)
                         async def bounded_enrich(lead):
                             async with sem:
@@ -160,7 +164,7 @@ class LeadsEngine:
                                 lead.socials.instagram = result.get("instagram")
                                 lead.socials.linkedin = result.get("linkedin")
                                 lead.socials.facebook = result.get("facebook")
-                                lead.socials.twitter = result.get("twitter")
+                                lead.socials.x_twitter = result.get("twitter")
                                 lead.socials.tiktok = result.get("tiktok")
                                 
                                 # Remove missing assets if found

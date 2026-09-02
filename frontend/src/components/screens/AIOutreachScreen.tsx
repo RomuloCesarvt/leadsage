@@ -3,9 +3,20 @@ import { MessageSquare, Sparkles, ChevronDown, Check, Copy } from 'lucide-react'
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
 
+const TONES = [
+  { id: 'Consultivo', label: 'Consultivo', desc: 'Tom de consultor de negócios' },
+  { id: 'Amigável', label: 'Amigável', desc: 'Tom leve e descontraído' },
+  { id: 'Direto', label: 'Direto', desc: 'Vai direto ao ponto' },
+  { id: 'Autoridade', label: 'Autoridade', desc: 'Posicionamento de especialista' },
+  { id: 'Promocional', label: 'Promocional', desc: 'Ofertas e benefícios' },
+];
+
 export const AIOutreachScreen: React.FC = () => {
-  const { leads } = useApp() as any;
+  const { leads, user } = useApp() as any;
   const [selectedLeadId, setSelectedLeadId] = useState('');
+  const [selectedTone, setSelectedTone] = useState('Consultivo');
+  const [customInstructions, setCustomInstructions] = useState('');
+  const [userProduct, setUserProduct] = useState(user?.product_description || '');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPitch, setGeneratedPitch] = useState<{subject: string, body: string} | null>(null);
   const [copied, setCopied] = useState(false);
@@ -16,11 +27,14 @@ export const AIOutreachScreen: React.FC = () => {
     if (!lead) return;
 
     setIsGenerating(true);
+    setGeneratedPitch(null);
     try {
       const res = await api.generatePitch({
         lead: lead,
-        tone: 'Consultivo',
-        sender_name: 'Consultor LeadSage',
+        tone: selectedTone,
+        custom_instructions: customInstructions,
+        sender_name: user?.name || 'Consultor LeadSage',
+        user_product: userProduct,
       });
       setGeneratedPitch({
         subject: res.subject,
@@ -41,6 +55,8 @@ export const AIOutreachScreen: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const selectedLead = leads.find((l: any) => l.id === selectedLeadId);
+
   return (
     <div className="flex-1 flex flex-col h-full relative">
       
@@ -52,36 +68,91 @@ export const AIOutreachScreen: React.FC = () => {
 
       <div className="flex-1 relative flex flex-col md:flex-row gap-6">
         
-        {/* Content */}
-        <div className="w-full md:w-1/3 bg-white border border-slate-200 rounded-2xl p-5 flex flex-col h-fit shadow-sm">
-          <label className="block text-sm font-bold text-slate-700 mb-2">Lead</label>
-          <div className="relative mb-6">
-            <select 
-              value={selectedLeadId}
-              onChange={(e) => setSelectedLeadId(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-            >
-              <option value="">Selecione um lead...</option>
-              {leads.map((l: any) => (
-                <option key={l.id} value={l.id}>{l.name} - {l.company}</option>
-              ))}
-            </select>
-            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+        {/* Left Panel - Config */}
+        <div className="w-full md:w-1/3 space-y-4">
           
+          {/* Lead Selection */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <label className="block text-sm font-bold text-slate-700 mb-2">Lead</label>
+            <div className="relative mb-4">
+              <select 
+                value={selectedLeadId}
+                onChange={(e) => setSelectedLeadId(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
+                <option value="">Selecione um lead...</option>
+                {leads.map((l: any) => (
+                  <option key={l.id} value={l.id}>{l.name} - {l.company}</option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+
+            {selectedLead && (
+              <div className="bg-slate-50 rounded-xl p-3 text-xs text-slate-500 space-y-1">
+                <p><span className="font-bold text-slate-700">{selectedLead.company}</span></p>
+                <p>{selectedLead.niche} · {selectedLead.city}</p>
+                {selectedLead.ai_summary && <p className="text-slate-400 line-clamp-2">{selectedLead.ai_summary}</p>}
+              </div>
+            )}
+          </div>
+
+          {/* Tone Selection */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <label className="block text-sm font-bold text-slate-700 mb-3">Tom da mensagem</label>
+            <div className="flex flex-wrap gap-2">
+              {TONES.map(tone => (
+                <button
+                  key={tone.id}
+                  onClick={() => setSelectedTone(tone.id)}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${selectedTone === tone.id ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                  title={tone.desc}
+                >
+                  {tone.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Product/Service */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <label className="block text-sm font-bold text-slate-700 mb-2">Seu produto/serviço</label>
+            <textarea
+              value={userProduct}
+              onChange={(e) => setUserProduct(e.target.value)}
+              placeholder="Descreva brevemente o que você vende ou o problema que resolve..."
+              rows={2}
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            />
+          </div>
+
+          {/* Custom Instructions */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <label className="block text-sm font-bold text-slate-700 mb-2">Instruções extras <span className="text-slate-400 font-normal">(opcional)</span></label>
+            <textarea
+              value={customInstructions}
+              onChange={(e) => setCustomInstructions(e.target.value)}
+              placeholder="Ex: Mencionar que sou de Botucatu, oferecer desconto de 20%..."
+              rows={2}
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            />
+          </div>
+
+          {/* Generate Button */}
           <button 
             onClick={handleGenerate}
             disabled={isGenerating || !selectedLeadId}
             className={`w-full py-3 transition-colors text-white font-bold rounded-xl flex items-center justify-center gap-2 ${isGenerating || !selectedLeadId ? 'bg-slate-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
           >
             {isGenerating ? (
-              <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> Gerando...</>
+              <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> Gerando com IA...</>
             ) : (
               <><Sparkles className="w-4 h-4" /> Gerar Abordagem</>
             )}
           </button>
         </div>
 
+        {/* Right Panel - Result */}
         <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-8 flex flex-col shadow-sm">
           {!generatedPitch ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center">
@@ -96,19 +167,30 @@ export const AIOutreachScreen: React.FC = () => {
               <div className="flex justify-between items-start mb-6">
                 <div>
                   <h3 className="text-lg font-bold text-slate-800">Mensagem Gerada</h3>
-                  <p className="text-sm text-slate-500">Pronta para ser enviada</p>
+                  <p className="text-sm text-slate-500">Tom: {selectedTone} · Pronta para ser enviada</p>
                 </div>
-                <button 
-                  onClick={copyToClipboard}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors flex items-center gap-2"
-                >
-                  {copied ? <><Check className="w-4 h-4 text-green-600" /> Copiado</> : <><Copy className="w-4 h-4" /> Copiar Tudo</>}
-                </button>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={copyToClipboard}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors flex items-center gap-2"
+                  >
+                    {copied ? <><Check className="w-4 h-4 text-green-600" /> Copiado</> : <><Copy className="w-4 h-4" /> Copiar Tudo</>}
+                  </button>
+                </div>
               </div>
               
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-sm text-slate-700 whitespace-pre-wrap flex-1 overflow-y-auto">
                 <span className="font-bold text-slate-900 block mb-2">Assunto: {generatedPitch.subject}</span>
                 {generatedPitch.body}
+              </div>
+
+              <div className="mt-4 flex gap-3">
+                <button 
+                  onClick={handleGenerate}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors flex items-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4" /> Regenerar
+                </button>
               </div>
             </div>
           )}

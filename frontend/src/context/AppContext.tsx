@@ -46,8 +46,8 @@ interface AppContextType {
   refreshUserData: () => Promise<void>;
   performLeadSearch: (niche: string, location: string, limit?: number) => Promise<void>;
   resetWorkspace: () => void;
-  viewState: 'hero' | 'workspace' | 'tasks' | 'history' | 'emails' | 'lists' | 'pipeline';
-  setViewState: (viewState: 'hero' | 'workspace' | 'tasks' | 'history' | 'emails' | 'lists' | 'pipeline') => void;
+  viewState: string;
+  setViewState: (viewState: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -84,7 +84,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedLeadForMessage, setSelectedLeadForMessage] = useState<LeadItem | null>(null);
   const [selectedProfileLead, setSelectedProfileLead] = useState<LeadItem | null>(null);
 
-  const [viewState, setViewState] = useState<'hero' | 'workspace' | 'tasks' | 'history' | 'emails' | 'lists' | 'pipeline'>('hero');
+  const [viewState, setViewState] = useState<string>('dashboard');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {

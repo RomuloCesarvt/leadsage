@@ -19,7 +19,7 @@ export interface LeadItem {
   city: string;
   email: string;
   phone: string;
-  whatsapp?: string;
+  whatsapp?: boolean;
   website?: string;
   address?: string;
   instagram?: string;

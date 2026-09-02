@@ -6,7 +6,7 @@ class LeadSocialLinks(BaseModel):
     linkedin: Optional[str] = None
     instagram: Optional[str] = None
     facebook: Optional[str] = None
-    twitter: Optional[str] = None
+    x_twitter: Optional[str] = None
     tiktok: Optional[str] = None
     website: Optional[str] = None
 
@@ -22,6 +22,8 @@ class LeadItem(BaseModel):
     email: str
     phone: str
     whatsapp: Optional[bool] = None
+    website: Optional[str] = None
+    address: Optional[str] = None
     socials: LeadSocialLinks
     quality_score: int
     verified: bool = True
@@ -110,9 +112,7 @@ class DemoSiteRequest(BaseModel):
 
 class DemoSiteResponse(BaseModel):
     lead_id: str
-    hero_title: str
-    hero_subtitle: str
-    about_text: str
-    services: List[str]
-    cta_text: str
+    preview_url: str = ""
+    html_content: str = ""
+    generation_time: float = 0.0
 

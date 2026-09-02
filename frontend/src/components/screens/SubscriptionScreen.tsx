@@ -59,6 +59,10 @@ export const SubscriptionScreen: React.FC = () => {
               10 sites incluídos
             </div>
           </div>
+
+          <button className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl text-sm transition-colors mt-auto">
+            Começar Agora
+          </button>
         </div>
 
         {/* PRO */}
@@ -95,6 +99,10 @@ export const SubscriptionScreen: React.FC = () => {
               500 leads incluídos
             </div>
           </div>
+
+          <button className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl text-sm transition-colors shadow-lg mt-auto">
+            Assinar Pro
+          </button>
         </div>
 
         {/* AGÊNCIA */}
@@ -136,6 +144,10 @@ export const SubscriptionScreen: React.FC = () => {
               200 sites incluídos
             </div>
           </div>
+
+          <button className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-sm transition-colors shadow-lg shadow-blue-500/20 mt-auto">
+            Falar com Vendas
+          </button>
         </div>
 
       </div>

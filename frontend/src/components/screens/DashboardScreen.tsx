@@ -3,7 +3,27 @@ import { Search, Users, ArrowUpRight, BarChart2, Zap, Globe, MessageCircle, Targ
 import { useApp } from '../../context/AppContext';
 
 export const DashboardScreen: React.FC = () => {
-  const { setViewState, leads, history } = useApp() as any;
+  const { setViewState, leads, history, user } = useApp() as any;
+
+  // Real computed metrics
+  const totalLeads = leads.length;
+  const highOpportunity = leads.filter((l: any) => (l.opportunityScore || l.quality_score || 0) >= 80).length;
+  const pipelineActive = leads.filter((l: any) => l.pipeline_stage && l.pipeline_stage !== 'Novos' && l.pipeline_stage !== 'Novo Lead').length;
+  const avgScore = totalLeads > 0 ? Math.round(leads.reduce((sum: number, l: any) => sum + (l.opportunityScore || l.quality_score || 0), 0) / totalLeads) : 0;
+  const noWebsite = leads.filter((l: any) => l.missingDigitalAssets?.includes('website') || (!l.website && !l.socials?.website)).length;
+  const withWhatsapp = leads.filter((l: any) => l.whatsapp === true).length;
+  const followUps = leads.filter((l: any) => l.outreach_status === 'Enviado' || l.outreach_status === 'Entregue').length;
+
+  // Pipeline stages
+  const stageData = [
+    { label: 'Novo Lead', count: leads.filter((l: any) => !l.pipeline_stage || l.pipeline_stage === 'Novos' || l.pipeline_stage === 'Novo Lead').length, color: 'bg-blue-600', dot: 'bg-blue-600' },
+    { label: 'Contato Enviado', count: leads.filter((l: any) => l.pipeline_stage === 'Contato Enviado').length, color: 'bg-indigo-600', dot: 'bg-indigo-600' },
+    { label: 'Reunião Agendada', count: leads.filter((l: any) => l.pipeline_stage === 'Reunião' || l.pipeline_stage === 'Reunião Agendada').length, color: 'bg-purple-600', dot: 'bg-purple-600' },
+    { label: 'Proposta Enviada', count: leads.filter((l: any) => l.pipeline_stage === 'Proposta' || l.pipeline_stage === 'Proposta Enviada').length, color: 'bg-fuchsia-600', dot: 'bg-fuchsia-600' },
+    { label: 'Fechado', count: leads.filter((l: any) => l.pipeline_stage === 'Fechado').length, color: 'bg-emerald-600', dot: 'bg-emerald-600' }
+  ];
+
+  const maxStageCount = Math.max(1, ...stageData.map(s => s.count));
 
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar text-slate-800">
@@ -35,8 +55,8 @@ export const DashboardScreen: React.FC = () => {
             </div>
           </div>
           <div>
-            <div className="text-6xl font-bold tracking-tighter mb-1 text-slate-900">{leads.length || '0'}</div>
-            <div className="text-sm text-slate-400">{leads.length || '0'} este mês</div>
+            <div className="text-6xl font-bold tracking-tighter mb-1 text-slate-900">{totalLeads}</div>
+            <div className="text-sm text-slate-400">{totalLeads} este mês</div>
           </div>
         </div>
 
@@ -49,7 +69,7 @@ export const DashboardScreen: React.FC = () => {
             </div>
           </div>
           <div>
-            <div className="text-6xl font-bold tracking-tighter mb-1 text-white">0</div>
+            <div className="text-6xl font-bold tracking-tighter mb-1 text-white">{highOpportunity}</div>
             <div className="text-sm text-blue-100">Score acima de 80</div>
           </div>
         </div>
@@ -63,7 +83,7 @@ export const DashboardScreen: React.FC = () => {
             </div>
           </div>
           <div>
-            <div className="text-6xl font-bold tracking-tighter mb-1 text-slate-900">0</div>
+            <div className="text-6xl font-bold tracking-tighter mb-1 text-slate-900">{pipelineActive}</div>
             <div className="text-sm text-slate-400">Leads em acompanhamento</div>
           </div>
         </div>
@@ -79,7 +99,7 @@ export const DashboardScreen: React.FC = () => {
           </div>
           <div>
             <span className="text-xs font-bold text-slate-400">Score Médio</span>
-            <div className="text-2xl font-bold text-slate-800 leading-none mt-1">0</div>
+            <div className="text-2xl font-bold text-slate-800 leading-none mt-1">{avgScore}</div>
           </div>
         </div>
 
@@ -89,7 +109,7 @@ export const DashboardScreen: React.FC = () => {
           </div>
           <div>
             <span className="text-xs font-bold text-slate-400">Sem Website</span>
-            <div className="text-2xl font-bold text-slate-800 leading-none mt-1">0</div>
+            <div className="text-2xl font-bold text-slate-800 leading-none mt-1">{noWebsite}</div>
           </div>
         </div>
 
@@ -99,7 +119,7 @@ export const DashboardScreen: React.FC = () => {
           </div>
           <div>
             <span className="text-xs font-bold text-slate-400">Com WhatsApp</span>
-            <div className="text-2xl font-bold text-slate-800 leading-none mt-1">{leads.length || '0'}</div>
+            <div className="text-2xl font-bold text-slate-800 leading-none mt-1">{withWhatsapp}</div>
           </div>
         </div>
 
@@ -109,7 +129,7 @@ export const DashboardScreen: React.FC = () => {
           </div>
           <div>
             <span className="text-xs font-bold text-slate-400">Follow-ups</span>
-            <div className="text-2xl font-bold text-slate-800 leading-none mt-1">0</div>
+            <div className="text-2xl font-bold text-slate-800 leading-none mt-1">{followUps}</div>
           </div>
         </div>
 
@@ -120,11 +140,14 @@ export const DashboardScreen: React.FC = () => {
         <div>
           <span className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-2 block">Seu Uso</span>
           <div className="flex gap-6 text-sm font-bold text-slate-800">
-            <span>Leads: <span className="font-medium text-slate-600">0 restantes</span></span>
-            <span>Sites: <span className="font-medium text-slate-600">1 restantes</span></span>
+            <span>Créditos: <span className="font-medium text-slate-600">{user?.credits ?? 0} restantes</span></span>
+            <span>Plano: <span className="font-medium text-slate-600">{user?.plan ?? 'Free'}</span></span>
           </div>
         </div>
-        <button className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm transition-colors w-full md:w-auto">
+        <button 
+          onClick={() => setViewState('subscription')}
+          className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm transition-colors w-full md:w-auto"
+        >
           Ver detalhes
         </button>
       </div>
@@ -152,11 +175,12 @@ export const DashboardScreen: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="font-bold text-slate-800 text-sm">{item.niche}</h4>
+                    <p className="text-xs text-slate-400">{item.location}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-bold text-blue-600">{item.resultsFound} leads</div>
-                  <div className="text-xs text-slate-400">{new Date(item.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</div>
+                  <div className="text-sm font-bold text-blue-600">{item.total_leads} leads</div>
+                  <div className="text-xs text-slate-400">{item.timestamp}</div>
                 </div>
               </div>
             )) : (
@@ -181,28 +205,25 @@ export const DashboardScreen: React.FC = () => {
           </div>
           
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
-            {/* Fake Funnel Rows */}
-            {[
-              { label: 'Novo Lead', count: leads.length, color: 'bg-blue-600', dot: 'bg-blue-600', width: '100%', pct: '100%' },
-              { label: 'Contato Enviado', count: 0, color: 'bg-indigo-600', dot: 'bg-indigo-600', width: '0%', pct: '0%' },
-              { label: 'Reunião Agendada', count: 0, color: 'bg-purple-600', dot: 'bg-purple-600', width: '0%', pct: '0%' },
-              { label: 'Proposta Enviada', count: 0, color: 'bg-fuchsia-600', dot: 'bg-fuchsia-600', width: '0%', pct: '0%' },
-              { label: 'Fechado', count: 0, color: 'bg-emerald-600', dot: 'bg-emerald-600', width: '0%', pct: '0%' }
-            ].map((stage, i) => (
-              <div key={i} className="flex items-center gap-4 group">
-                <div className="w-40 flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <span className={`w-2 h-2 rounded-full ${stage.dot}`}></span>
-                  {stage.label}
-                </div>
-                <div className="flex-1 flex items-center gap-3">
-                  <div className="font-bold text-slate-800 w-6">{stage.count}</div>
-                  <div className="flex-1 h-8 bg-slate-50 rounded-lg overflow-hidden relative border border-slate-100 group-hover:bg-slate-100 transition-colors">
-                    <div className={`h-full ${stage.color} opacity-20`} style={{ width: stage.width }}></div>
+            {stageData.map((stage, i) => {
+              const widthPct = totalLeads > 0 ? Math.round((stage.count / maxStageCount) * 100) : 0;
+              const pctLabel = totalLeads > 0 ? `${Math.round((stage.count / totalLeads) * 100)}%` : '0%';
+              return (
+                <div key={i} className="flex items-center gap-4 group">
+                  <div className="w-40 flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <span className={`w-2 h-2 rounded-full ${stage.dot}`}></span>
+                    {stage.label}
                   </div>
-                  <div className="w-10 text-right text-xs font-bold text-slate-400">{stage.pct}</div>
+                  <div className="flex-1 flex items-center gap-3">
+                    <div className="font-bold text-slate-800 w-6">{stage.count}</div>
+                    <div className="flex-1 h-8 bg-slate-50 rounded-lg overflow-hidden relative border border-slate-100 group-hover:bg-slate-100 transition-colors">
+                      <div className={`h-full ${stage.color} opacity-20`} style={{ width: `${widthPct}%` }}></div>
+                    </div>
+                    <div className="w-10 text-right text-xs font-bold text-slate-400">{pctLabel}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
