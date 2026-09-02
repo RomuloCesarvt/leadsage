@@ -1,19 +1,94 @@
 import React, { useState } from 'react';
-import { Search, ChevronDown } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
+import * as Icons from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Country, State, City } from 'country-state-city';
 
-const POPULAR_NICHES = [
-  "Academias", "Advogados", "Agências de Marketing", "Arquitetos", "Autopeças",
-  "Bares", "Barbearias", "Boutiques", "Cabeleireiros", "Cafeterias", 
-  "Clínicas de Estética", "Clínicas Médicas", "Clínicas Odontológicas", "Consultorias", 
-  "Contabilidades", "Corretores de Imóveis", "Coworking", "Designers", 
-  "Distribuidores", "E-commerces", "Empreiteiras", "Escolas", "Estúdios de Tatuagem",
-  "Farmácias", "Fisioterapeutas", "Floriculturas", "Fotógrafos", "Hospitais",
-  "Hotéis", "Imobiliárias", "Lojas de Roupas", "Marcenarias", "Mecânicas",
-  "Nutricionistas", "Oficinas", "Padarias", "Pet Shops", "Pizzarias",
-  "Restaurantes", "Salões de Beleza", "Seguradoras", "Supermercados", "Transportadoras"
+const NICHE_CATEGORIES = [
+  {
+    category: "Saúde e Bem-Estar",
+    icon: "HeartPulse",
+    niches: [
+      { name: "Academias", icon: "Dumbbell" },
+      { name: "Clínicas de Estética", icon: "Sparkles" },
+      { name: "Clínicas Médicas", icon: "Stethoscope" },
+      { name: "Clínicas Odontológicas", icon: "Smile" },
+      { name: "Farmácias", icon: "Pill" },
+      { name: "Fisioterapeutas", icon: "Activity" },
+      { name: "Nutricionistas", icon: "Apple" },
+      { name: "Salões de Beleza", icon: "Scissors" },
+      { name: "Barbearias", icon: "Scissors" },
+    ]
+  },
+  {
+    category: "Imóveis e Construção",
+    icon: "Building",
+    niches: [
+      { name: "Arquitetos", icon: "PenTool" },
+      { name: "Corretores de Imóveis", icon: "Home" },
+      { name: "Empreiteiras", icon: "HardHat" },
+      { name: "Imobiliárias", icon: "Building2" },
+      { name: "Marcenarias", icon: "Hammer" },
+      { name: "Materiais de Construção", icon: "Wrench" }
+    ]
+  },
+  {
+    category: "Comércio e Varejo",
+    icon: "ShoppingBag",
+    niches: [
+      { name: "Autopeças", icon: "Car" },
+      { name: "Boutiques", icon: "ShoppingBag" },
+      { name: "Distribuidores", icon: "Truck" },
+      { name: "E-commerces", icon: "MousePointerClick" },
+      { name: "Floriculturas", icon: "Flower2" },
+      { name: "Lojas de Roupas", icon: "Shirt" },
+      { name: "Pet Shops", icon: "Dog" },
+      { name: "Supermercados", icon: "ShoppingCart" },
+    ]
+  },
+  {
+    category: "Alimentação",
+    icon: "Utensils",
+    niches: [
+      { name: "Bares", icon: "Beer" },
+      { name: "Cafeterias", icon: "Coffee" },
+      { name: "Padarias", icon: "Croissant" },
+      { name: "Pizzarias", icon: "Pizza" },
+      { name: "Restaurantes", icon: "Utensils" }
+    ]
+  },
+  {
+    category: "Serviços Profissionais",
+    icon: "Briefcase",
+    niches: [
+      { name: "Advogados", icon: "Scale" },
+      { name: "Agências de Marketing", icon: "Megaphone" },
+      { name: "Consultorias", icon: "LineChart" },
+      { name: "Contabilidades", icon: "Calculator" },
+      { name: "Designers", icon: "PenTool" },
+      { name: "Fotógrafos", icon: "Camera" },
+      { name: "Seguradoras", icon: "Shield" },
+      { name: "Desenvolvedores de Software", icon: "Code" }
+    ]
+  },
+  {
+    category: "Serviços Gerais",
+    icon: "Wrench",
+    niches: [
+      { name: "Coworking", icon: "Users" },
+      { name: "Escolas", icon: "GraduationCap" },
+      { name: "Estúdios de Tatuagem", icon: "PenTool" },
+      { name: "Mecânicas", icon: "Wrench" },
+      { name: "Oficinas", icon: "Wrench" },
+      { name: "Transportadoras", icon: "Truck" }
+    ]
+  }
 ];
+
+const DynamicIcon = ({ name, className }: { name: string, className?: string }) => {
+  const IconComponent = (Icons as any)[name] || Icons.HelpCircle;
+  return <IconComponent className={className} />;
+};
 
 export const NovaBuscaScreen: React.FC = () => {
   const { performLeadSearch, setViewState } = useApp() as any;
@@ -25,6 +100,7 @@ export const NovaBuscaScreen: React.FC = () => {
   const [radius, setRadius] = useState('10');
   const [searchLimit, setSearchLimit] = useState(10);
   const [isSearching, setIsSearching] = useState(false);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(NICHE_CATEGORIES[0].category);
 
   const countries = Country.getAllCountries();
   const states = State.getStatesOfCountry(country);
@@ -50,6 +126,11 @@ export const NovaBuscaScreen: React.FC = () => {
     }
   };
 
+  const handleNicheClick = (selectedNiche: string) => {
+    setNiche(selectedNiche);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full relative max-w-5xl mx-auto w-full pb-20">
       
@@ -60,7 +141,7 @@ export const NovaBuscaScreen: React.FC = () => {
       </div>
 
       {/* Form Area */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm mb-8">
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           <div>
@@ -140,17 +221,11 @@ export const NovaBuscaScreen: React.FC = () => {
               <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
               <input 
                 type="text" 
-                list="niche-list"
-                placeholder="Buscar ou selecionar nicho..."
+                placeholder="Digite ou escolha abaixo..."
                 value={niche}
                 onChange={(e) => setNiche(e.target.value)}
-                className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                className="w-full pl-11 pr-4 py-3.5 bg-white border border-blue-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               />
-              <datalist id="niche-list">
-                {POPULAR_NICHES.map(n => (
-                  <option key={n} value={n} />
-                ))}
-              </datalist>
             </div>
           </div>
 
@@ -176,7 +251,7 @@ export const NovaBuscaScreen: React.FC = () => {
           </div>
         </div>
 
-        <div className="mb-8">
+        <div className="mb-4">
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Qtd. de Leads (Teste Ilimitado)</label>
           <input 
             type="number" 
@@ -186,8 +261,56 @@ export const NovaBuscaScreen: React.FC = () => {
           />
         </div>
 
-        <p className="text-sm text-slate-400">Buscaremos até 20 empresas. Você só utiliza créditos pelos leads reais encontrados.</p>
+        <p className="text-sm text-slate-400">Buscaremos até {searchLimit} empresas. Você só utiliza créditos pelos leads reais encontrados.</p>
+      </div>
 
+      {/* Categorias de Nichos */}
+      <div className="mb-24">
+        <h2 className="text-xl font-bold text-slate-800 mb-6">Sugestões de Nichos por Categoria</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {NICHE_CATEGORIES.map((cat, idx) => {
+            const isExpanded = expandedCategory === cat.category;
+            return (
+              <div key={idx} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                {/* Category Header */}
+                <button 
+                  onClick={() => setExpandedCategory(isExpanded ? null : cat.category)}
+                  className="w-full flex items-center justify-between p-5 bg-white hover:bg-slate-50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+                      <DynamicIcon name={cat.icon} className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <h3 className="font-bold text-slate-800 text-lg">{cat.category}</h3>
+                  </div>
+                  {isExpanded ? (
+                    <ChevronUp className="w-5 h-5 text-slate-400" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-slate-400" />
+                  )}
+                </button>
+                
+                {/* Nichos (Expanded Content) */}
+                {isExpanded && (
+                  <div className="p-5 pt-2 border-t border-slate-100 bg-slate-50/50">
+                    <div className="grid grid-cols-2 gap-3">
+                      {cat.niches.map((n, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleNicheClick(n.name)}
+                          className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all text-left ${niche === n.name ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/30'}`}
+                        >
+                          <DynamicIcon name={n.icon} className={`w-4 h-4 ${niche === n.name ? 'text-blue-600' : 'text-slate-400'}`} />
+                          <span className="font-semibold text-sm line-clamp-1">{n.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* Floating Action Button */}
