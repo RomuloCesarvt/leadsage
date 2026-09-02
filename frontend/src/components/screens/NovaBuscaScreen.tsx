@@ -224,94 +224,83 @@ export const NovaBuscaScreen: React.FC = () => {
                 placeholder="Digite ou escolha abaixo..."
                 value={niche}
                 onChange={(e) => setNiche(e.target.value)}
-                className="w-full pl-11 pr-4 py-3.5 bg-white border border-blue-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                onFocus={() => setExpandedCategory(expandedCategory || NICHE_CATEGORIES[0].category)}
+                className="w-full pl-11 pr-4 py-3.5 bg-white border border-blue-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer"
+                onClick={() => setExpandedCategory(expandedCategory || NICHE_CATEGORIES[0].category)}
               />
+              
+              {/* Dropdown de Categorias */}
+              {expandedCategory !== null && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 max-h-[400px] overflow-y-auto">
+                  <div className="p-3 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white/95 backdrop-blur z-10">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Selecione uma Categoria</span>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setExpandedCategory(null); }}
+                      className="text-slate-400 hover:text-slate-600 text-sm font-semibold px-2 py-1"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                  
+                  <div className="p-2 space-y-2">
+                    {NICHE_CATEGORIES.map((cat, idx) => {
+                      const isExpanded = expandedCategory === cat.category;
+                      return (
+                        <div key={idx} className="bg-white border border-slate-100 rounded-xl overflow-hidden transition-shadow">
+                          {/* Category Header */}
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setExpandedCategory(isExpanded ? 'NONE' : cat.category);
+                            }}
+                            className="w-full flex items-center justify-between p-3 hover:bg-slate-50 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                                <DynamicIcon name={cat.icon} className="w-4 h-4 text-blue-600" />
+                              </div>
+                              <h3 className="font-bold text-slate-800 text-sm">{cat.category}</h3>
+                            </div>
+                            {isExpanded ? (
+                              <ChevronUp className="w-4 h-4 text-slate-400" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-slate-400" />
+                            )}
+                          </button>
+                          
+                          {/* Nichos (Expanded Content) */}
+                          {isExpanded && (
+                            <div className="p-3 pt-0 border-t border-slate-50 bg-slate-50/30">
+                              <div className="grid grid-cols-1 gap-2 mt-3">
+                                {cat.niches.map((n, i) => (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleNicheClick(n.name);
+                                      setExpandedCategory(null); // Fecha o dropdown ao selecionar
+                                    }}
+                                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all text-left ${niche === n.name ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/50'}`}
+                                  >
+                                    <DynamicIcon name={n.icon} className={`w-4 h-4 ${niche === n.name ? 'text-blue-600' : 'text-slate-400'}`} />
+                                    <span className="font-semibold text-sm line-clamp-1">{n.name}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Bairro / Região <span className="text-slate-400 font-normal lowercase tracking-normal">(opcional)</span></label>
-            <input 
-              type="text" 
-              placeholder="Ex: Centro, Jardins..."
-              value={neighborhood}
-              onChange={(e) => setNeighborhood(e.target.value)}
-              className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Raio (KM)</label>
-            <input 
-              type="number" 
-              value={radius}
-              onChange={(e) => setRadius(e.target.value)}
-              className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-            />
-          </div>
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Qtd. de Leads (Teste Ilimitado)</label>
-          <input 
-            type="number" 
-            value={searchLimit}
-            onChange={(e) => setSearchLimit(parseInt(e.target.value) || 10)}
-            className="w-full md:w-1/3 px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-          />
-        </div>
-
-        <p className="text-sm text-slate-400">Buscaremos até {searchLimit} empresas. Você só utiliza créditos pelos leads reais encontrados.</p>
-      </div>
-
-      {/* Categorias de Nichos */}
-      <div className="mb-24">
-        <h2 className="text-xl font-bold text-slate-800 mb-6">Sugestões de Nichos por Categoria</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {NICHE_CATEGORIES.map((cat, idx) => {
-            const isExpanded = expandedCategory === cat.category;
-            return (
-              <div key={idx} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                {/* Category Header */}
-                <button 
-                  onClick={() => setExpandedCategory(isExpanded ? null : cat.category)}
-                  className="w-full flex items-center justify-between p-5 bg-white hover:bg-slate-50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
-                      <DynamicIcon name={cat.icon} className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <h3 className="font-bold text-slate-800 text-lg">{cat.category}</h3>
-                  </div>
-                  {isExpanded ? (
-                    <ChevronUp className="w-5 h-5 text-slate-400" />
-                  ) : (
-                    <ChevronRight className="w-5 h-5 text-slate-400" />
-                  )}
-                </button>
-                
-                {/* Nichos (Expanded Content) */}
-                {isExpanded && (
-                  <div className="p-5 pt-2 border-t border-slate-100 bg-slate-50/50">
-                    <div className="grid grid-cols-2 gap-3">
-                      {cat.niches.map((n, i) => (
-                        <button
-                          key={i}
-                          onClick={() => handleNicheClick(n.name)}
-                          className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all text-left ${niche === n.name ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/30'}`}
-                        >
-                          <DynamicIcon name={n.icon} className={`w-4 h-4 ${niche === n.name ? 'text-blue-600' : 'text-slate-400'}`} />
-                          <span className="font-semibold text-sm line-clamp-1">{n.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
 
       {/* Floating Action Button */}
       <div className="fixed bottom-8 right-8 z-30">
