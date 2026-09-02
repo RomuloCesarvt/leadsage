@@ -24,12 +24,16 @@ export const LoginScreen: React.FC = () => {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         
-        await setDoc(doc(db, "users", user.uid), {
-          email: user.email,
-          role: "user",
-          credits: 10,
-          createdAt: new Date().toISOString()
-        });
+        try {
+          await setDoc(doc(db, "users", user.uid), {
+            email: user.email,
+            role: "user",
+            credits: 10,
+            createdAt: new Date().toISOString()
+          });
+        } catch (dbErr) {
+          console.warn("Não foi possível salvar no Firestore (possível falta de permissão), mas o usuário foi criado:", dbErr);
+        }
       }
     } catch (err: any) {
       console.error(err);
@@ -40,6 +44,8 @@ export const LoginScreen: React.FC = () => {
         setError('Este e-mail já está cadastrado. Faça login.');
       } else if (code === 'auth/weak-password') {
         setError('A senha precisa ter pelo menos 6 caracteres.');
+      } else if (code === 'auth/operation-not-allowed') {
+        setError('Login por E-mail/Senha não está ativado no Firebase. Vá no Console do Firebase > Authentication > Sign-in method e ative.');
       } else {
         setError(err.message || 'Erro de autenticação.');
       }
@@ -70,7 +76,9 @@ export const LoginScreen: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/unauthorized-domain') {
-        setError('O domínio atual não está autorizado no Firebase. Adicione este domínio no painel do Firebase Authentication.');
+        setError('O domínio atual não está autorizado no Firebase. Adicione este domínio (ex: leadsage-web.vercel.app) no painel do Firebase Authentication > Configurações > Domínios Autorizados.');
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError('Login com Google não está ativado no Firebase. Vá no Console do Firebase > Authentication > Sign-in method e ative o provedor Google.');
       } else if (err.code !== 'auth/popup-closed-by-user') {
         setError(err.message || 'Erro ao entrar com Google.');
       }
