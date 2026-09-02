@@ -62,16 +62,20 @@ export const LoginScreen: React.FC = () => {
       const user = result.user;
 
       // Criar documento no Firestore se for a primeira vez
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (!userDoc.exists()) {
-        await setDoc(doc(db, "users", user.uid), {
-          email: user.email,
-          name: user.displayName,
-          avatar: user.photoURL,
-          role: "user",
-          credits: 10,
-          createdAt: new Date().toISOString()
-        });
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (!userDoc.exists()) {
+          await setDoc(doc(db, "users", user.uid), {
+            email: user.email,
+            name: user.displayName,
+            avatar: user.photoURL,
+            role: "user",
+            credits: 10,
+            createdAt: new Date().toISOString()
+          });
+        }
+      } catch (dbErr) {
+        console.warn("Não foi possível salvar ou ler do Firestore (possível falta de permissão), mas o login via Google ocorreu:", dbErr);
       }
     } catch (err: any) {
       console.error(err);
