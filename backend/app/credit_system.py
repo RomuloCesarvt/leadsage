@@ -1,13 +1,33 @@
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from app.firebase_config import db
+from app.config import settings
 
-async def check_and_deduct_credits(uid: str, amount: int) -> Optional[int]:
+UNLIMITED = 9999
+
+
+def is_admin(email: Optional[str]) -> bool:
+    """Admin pela lista de e-mails da configuracao.
+
+    O papel "admin" gravado no Firestore continua valendo, mas se perde
+    silenciosamente quando o documento do usuario e recriado (a propria
+    check_and_deduct_credits recria com role="user"). A lista de e-mails
+    nao depende do banco.
+    """
+    return bool(email) and email.strip().lower() in settings.admin_emails
+
+
+async def check_and_deduct_credits(
+    uid: str, amount: int, email: Optional[str] = None
+) -> Optional[int]:
     """
     Checks if user has enough credits and deducts them.
-    If the user role is 'admin', bypasses deduction and returns 9999.
+    Admins (por e-mail ou pelo papel no Firestore) nao consomem creditos.
     Returns the new balance or None if insufficient credits.
     """
+    if is_admin(email):
+        return UNLIMITED
+
     if db is None:
         # Fallback para dev local sem Firestore
         return 9999
@@ -27,7 +47,7 @@ async def check_and_deduct_credits(uid: str, amount: int) -> Optional[int]:
         user_data = user_doc.to_dict()
 
     if user_data.get("role") == "admin":
-        return 9999 # Infinitos para admin
+        return UNLIMITED  # Infinitos para admin
 
     current_credits = user_data.get("credits", 0)
     if current_credits < amount:
@@ -46,9 +66,12 @@ async def check_and_deduct_credits(uid: str, amount: int) -> Optional[int]:
 
     return new_credits
 
-async def get_user_balance(uid: str) -> Dict[str, Any]:
+async def get_user_balance(uid: str, email: Optional[str] = None) -> Dict[str, Any]:
+    if is_admin(email):
+        return {"credits": UNLIMITED, "history": [], "is_admin": True}
+
     if db is None:
-        return {"credits": 9999, "history": []}
+        return {"credits": UNLIMITED, "history": []}
 
     user_ref = db.collection('users').document(uid)
     user_doc = user_ref.get()
@@ -56,7 +79,7 @@ async def get_user_balance(uid: str) -> Dict[str, Any]:
     credits = 0
     if user_doc.exists:
         data = user_doc.to_dict()
-        credits = 9999 if data.get("role") == "admin" else data.get("credits", 0)
+        credits = UNLIMITED if data.get("role") == "admin" else data.get("credits", 0)
 
     history_ref = user_ref.collection('history').order_by('timestamp', direction='DESCENDING').limit(20)
     history_docs = history_ref.stream()
@@ -66,7 +89,7 @@ async def get_user_balance(uid: str) -> Dict[str, Any]:
 
 async def add_credits(uid: str, amount: int, reason: str = "Recarga de Créditos (Pix/Cartão)") -> int:
     if db is None:
-        return 9999
+        return UNLIMITED
         
     user_ref = db.collection('users').document(uid)
     user_doc = user_ref.get()

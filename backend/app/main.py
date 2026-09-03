@@ -1,3 +1,4 @@
+import re
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -44,13 +45,20 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# allow_origins=["*"] com allow_credentials=True e uma combinacao invalida
+# (o navegador recusa) e deixava qualquer site chamar a API. Com
+# ALLOWED_ORIGINS definido, so as origens listadas passam.
+_origins = settings.allowed_origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_origins or ["*"],
+    allow_credentials=bool(_origins),
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+
+# Formato real da referencia de foto da Places API: places/<id>/photos/<id>
+PLACE_PHOTO_RE = re.compile(r"places/[A-Za-z0-9_-]+/photos/[A-Za-z0-9_-]+")
 
 @app.get("/")
 def read_root():
@@ -65,7 +73,7 @@ def read_root():
 async def get_user_profile(user: dict = Depends(get_current_user)):
     uid = user.get("uid")
     profile = await get_profile(uid)
-    balance = await get_user_balance(uid)
+    balance = await get_user_balance(uid, user.get("email"))
     profile.credits = balance.get("credits", 0)
     return profile
 
@@ -79,7 +87,7 @@ async def update_user_profile(profile: UserProfile, user: dict = Depends(get_cur
     """
     uid = user.get("uid")
     saved = await save_profile(uid, profile.model_dump())
-    balance = await get_user_balance(uid)
+    balance = await get_user_balance(uid, user.get("email"))
     saved.credits = balance.get("credits", 0)
     return saved
 
@@ -94,11 +102,16 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
     # Confere saldo ANTES de gastar a cota do Google, mas so debita
     # depois, pelo numero de leads realmente entregues. Antes o credito
     # era cobrado antecipadamente e se perdia se a busca falhasse.
-    balance = await get_user_balance(uid)
+    email = user.get("email")
+    balance = await get_user_balance(uid, email)
     if balance.get("credits", 0) < requested_limit:
         raise HTTPException(
             status_code=402,
-            detail=f"Creditos insuficientes: a busca custa {requested_limit} e voce tem {balance.get('credits', 0)}."
+            detail=(
+                f"Créditos insuficientes: esta busca custa {requested_limit} "
+                f"e você tem {balance.get('credits', 0)}. "
+                "Reduza a quantidade de leads ou recarregue em Assinatura."
+            )
         )
 
     try:
@@ -115,7 +128,7 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
 
     search_id = f"sch_{uuid.uuid4().hex[:8]}"
     total_cost = len(leads)
-    remaining_credits = await check_and_deduct_credits(uid, total_cost) if total_cost else balance.get("credits", 0)
+    remaining_credits = await check_and_deduct_credits(uid, total_cost, email) if total_cost else balance.get("credits", 0)
     if remaining_credits is None:
         remaining_credits = 9999
 
@@ -211,7 +224,8 @@ async def dispatch_outreach(
     "Enviado" de qualquer jeito.
     """
     uid = user.get("uid")
-    balance = await get_user_balance(uid)
+    email = user.get("email")
+    balance = await get_user_balance(uid, email)
     current_credits = balance.get("credits", 0)
     config = await get_integrations(uid)
 
@@ -232,7 +246,7 @@ async def dispatch_outreach(
         await db.commit()
 
     if response.credits_consumed:
-        remaining = await check_and_deduct_credits(uid, response.credits_consumed)
+        remaining = await check_and_deduct_credits(uid, response.credits_consumed, email)
         if remaining is not None:
             response.remaining_credits = remaining
 
@@ -253,7 +267,7 @@ async def update_integrations(
 
 @app.get("/api/credits/balance")
 async def get_credits_balance(user: dict = Depends(get_current_user)):
-    return await get_user_balance(user.get("uid"))
+    return await get_user_balance(user.get("uid"), user.get("email"))
 
 @app.post("/api/credits/topup")
 async def topup_credits(req: CreditTopUpRequest, user: dict = Depends(get_current_user)):
@@ -325,8 +339,10 @@ async def place_photo(name: str):
     O avatar antes vinha como URL direta com `key=<GOOGLE_MAPS_API_KEY>`
     embutida, ou seja, a chave ia no HTML de todo usuario.
     """
-    if not name.startswith("places/"):
-        raise HTTPException(status_code=400, detail="Referencia de foto invalida.")
+    # Regex em vez de so checar o prefixo: `name` entra numa URL, entao
+    # "places/../../algo" poderia sair do caminho pretendido.
+    if not PLACE_PHOTO_RE.fullmatch(name):
+        raise HTTPException(status_code=400, detail="Referência de foto inválida.")
     if not settings.GOOGLE_MAPS_API_KEY:
         raise HTTPException(status_code=503, detail="Chave do Google Maps nao configurada.")
 

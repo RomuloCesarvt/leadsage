@@ -9,12 +9,14 @@ Agora cada canal diz a verdade em `delivered`. Quem nao tem API de envio
 (WhatsApp, Instagram, LinkedIn) devolve `action_url`: o link pronto para
 o usuario concluir o contato, sem fingir que a plataforma foi acionada.
 """
+import ipaddress
 import re
+import socket
 import uuid
 from datetime import datetime
 from email.message import EmailMessage
 from typing import Any, Dict, Optional, Tuple
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import aiosmtplib
 import httpx
@@ -94,12 +96,47 @@ async def _send_email(req: DispatchRequest, config: Dict[str, Any]) -> str:
     return f"Enviado para {recipient}"
 
 
+def _validar_destino_webhook(url: str) -> None:
+    """Impede que o webhook aponte para a rede interna do servidor.
+
+    Sem isso, quem configurasse a integracao faria o backend chamar
+    qualquer endereco alcancavel de dentro da infraestrutura — inclusive
+    o endpoint de metadados da nuvem (169.254.169.254), que devolve
+    credenciais. E o SSRF classico.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise DispatchError("A URL do webhook precisa começar com http:// ou https://")
+
+    host = parsed.hostname
+    if not host:
+        raise DispatchError("A URL do webhook não tem um endereço válido.")
+
+    if host.lower() in ("localhost", "metadata.google.internal") or host.endswith(".internal"):
+        raise DispatchError("O webhook não pode apontar para um endereço interno.")
+
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        raise DispatchError(f"Não foi possível resolver o endereço do webhook: {host}")
+
+    for info in infos:
+        endereco = ipaddress.ip_address(info[4][0])
+        if (
+            endereco.is_private
+            or endereco.is_loopback
+            or endereco.is_link_local
+            or endereco.is_reserved
+            or endereco.is_multicast
+        ):
+            raise DispatchError("O webhook não pode apontar para um endereço interno.")
+
+
 async def _send_webhook(req: DispatchRequest, config: Dict[str, Any]) -> str:
     url = (config.get("webhook_url") or "").strip()
     if not url:
         raise DispatchError("Nenhum webhook configurado em Integrações.")
-    if not url.startswith(("http://", "https://")):
-        raise DispatchError("A URL do webhook precisa começar com http:// ou https://")
+    _validar_destino_webhook(url)
 
     payload = {
         "lead_id": req.lead_id,
@@ -111,7 +148,8 @@ async def _send_webhook(req: DispatchRequest, config: Dict[str, Any]) -> str:
         "sent_at": datetime.now().isoformat(timespec="seconds"),
     }
     try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        # follow_redirects=False: um 302 para 127.0.0.1 driblaria a checagem
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=False) as client:
             resp = await client.post(url, json=payload)
     except Exception as exc:
         raise DispatchError(f"Não foi possível chamar o webhook: {exc}")

@@ -13,6 +13,17 @@ class Settings(BaseModel):
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     GOOGLE_MAPS_API_KEY: str = os.getenv("GOOGLE_MAPS_API_KEY", "")
     DEFAULT_USER_CREDITS: int = 500
+
+    # E-mails com creditos ilimitados, separados por virgula.
+    # O papel "admin" no Firestore continua valendo, mas some se o
+    # documento do usuario for recriado (check_and_deduct_credits recria
+    # com role="user"). Esta lista nao se perde.
+    ADMIN_EMAILS: str = os.getenv("ADMIN_EMAILS", "")
+
+    # Origens autorizadas do frontend, separadas por virgula.
+    # Vazio mantem o comportamento permissivo antigo para nao quebrar
+    # o dev local sem configuracao.
+    ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS", "")
     
     # SMTP Settings
     SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
@@ -20,5 +31,14 @@ class Settings(BaseModel):
     SMTP_USER: str = os.getenv("SMTP_USER", "")
     SMTP_PASS: str = os.getenv("SMTP_PASS", "")
     FROM_EMAIL: str = os.getenv("FROM_EMAIL", "")
+
+    @property
+    def admin_emails(self) -> set:
+        return {e.strip().lower() for e in self.ADMIN_EMAILS.split(",") if e.strip()}
+
+    @property
+    def allowed_origins(self) -> list:
+        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+
 
 settings = Settings()
