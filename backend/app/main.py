@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 from typing import List, Dict, Any
 from fastapi import FastAPI, HTTPException, Query, Depends, Request
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -21,6 +22,7 @@ from app.leads_engine import LeadsEngine
 from app.ai_generator import AIGenerator
 from app.dispatcher import OutreachDispatcher
 from app.credit_system import check_and_deduct_credits, get_user_balance, add_credits
+import httpx
 from app.firebase_config import get_current_user
 
 app = FastAPI(
@@ -75,14 +77,17 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
         raise HTTPException(status_code=400, detail="Nicho e localização são obrigatórios.")
 
     requested_limit = req.limit or 10
-    total_cost = requested_limit
-    
     uid = user.get("uid")
-    remaining_credits = await check_and_deduct_credits(uid, total_cost)
-    if remaining_credits is None:
-        remaining_credits = 9999
 
-    maps_key = settings.GOOGLE_MAPS_API_KEY
+    # Confere saldo ANTES de gastar a cota do Google, mas so debita
+    # depois, pelo numero de leads realmente entregues. Antes o credito
+    # era cobrado antecipadamente e se perdia se a busca falhasse.
+    balance = await get_user_balance(uid)
+    if balance.get("credits", 0) < requested_limit:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Creditos insuficientes: a busca custa {requested_limit} e voce tem {balance.get('credits', 0)}."
+        )
 
     try:
         leads = await LeadsEngine.search_leads(
@@ -90,12 +95,17 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
             location=req.location,
             query=req.query or "",
             limit=requested_limit,
-            api_key=maps_key
+            api_key=settings.GOOGLE_MAPS_API_KEY,
+            enrich=req.enrich if req.enrich is not None else True,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     search_id = f"sch_{uuid.uuid4().hex[:8]}"
+    total_cost = len(leads)
+    remaining_credits = await check_and_deduct_credits(uid, total_cost) if total_cost else balance.get("credits", 0)
+    if remaining_credits is None:
+        remaining_credits = 9999
 
     # Save to SQLite DB
     for lead in leads:
@@ -128,17 +138,28 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
             last_contacted_at=lead.last_contacted_at,
             last_message=lead.last_message,
             match_category=lead.match_category,
-            pipeline_stage=lead.pipeline_stage
+            pipeline_stage=lead.pipeline_stage,
+            rating=lead.rating,
+            rating_count=lead.rating_count,
+            maps_url=lead.maps_url,
+            business_status=lead.business_status,
+            opening_hours=lead.opening_hours,
+            all_emails=lead.all_emails,
+            contactability=lead.contactability,
+            owner_uid=uid,
+            search_id=search_id,
         )
-        db.add(db_lead)
+        await db.merge(db_lead)
 
     db_history = DBSearchHistory(
         id=search_id,
         niche=req.niche,
         location=req.location,
         total_leads=len(leads),
-        timestamp=datetime.now().strftime("%d/%m/%Y %H:%M"),
-        leads_preview=[l.name for l in leads[:3]]
+        # ISO ordena corretamente como string; "%d/%m/%Y" nao ordenava
+        timestamp=datetime.now().isoformat(timespec="seconds"),
+        leads_preview=[l.name for l in leads[:3]],
+        owner_uid=uid,
     )
     db.add(db_history)
     
@@ -206,7 +227,12 @@ async def topup_credits(req: CreditTopUpRequest, user: dict = Depends(get_curren
 
 @app.get("/api/history")
 async def get_search_history(user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(DBSearchHistory).order_by(DBSearchHistory.timestamp.desc()))
+    result = await db.execute(
+        select(DBSearchHistory)
+        .where(DBSearchHistory.owner_uid == user.get("uid"))
+        .order_by(DBSearchHistory.timestamp.desc())
+        .limit(50)
+    )
     history = result.scalars().all()
     
     out = []
@@ -220,6 +246,36 @@ async def get_search_history(user: dict = Depends(get_current_user), db: AsyncSe
             "leads_preview": h.leads_preview
         })
     return out
+
+@app.get("/api/place-photo")
+async def place_photo(name: str):
+    """Serve a foto do Google Maps sem expor a chave da API.
+
+    O avatar antes vinha como URL direta com `key=<GOOGLE_MAPS_API_KEY>`
+    embutida, ou seja, a chave ia no HTML de todo usuario.
+    """
+    if not name.startswith("places/"):
+        raise HTTPException(status_code=400, detail="Referencia de foto invalida.")
+    if not settings.GOOGLE_MAPS_API_KEY:
+        raise HTTPException(status_code=503, detail="Chave do Google Maps nao configurada.")
+
+    url = f"https://places.googleapis.com/v1/{name}/media"
+    params = {"maxHeightPx": 400, "maxWidthPx": 400, "key": settings.GOOGLE_MAPS_API_KEY}
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            resp = await client.get(url, params=params)
+    except Exception:
+        raise HTTPException(status_code=502, detail="Falha ao buscar a foto.")
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code, detail="Foto indisponivel.")
+
+    return Response(
+        content=resp.content,
+        media_type=resp.headers.get("content-type", "image/jpeg"),
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
 
 @app.get("/api/suggested-niches")
 def get_suggested_niches():

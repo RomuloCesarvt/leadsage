@@ -1,188 +1,518 @@
-import random
-import uuid
+import re
+import unicodedata
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import quote_plus
+
 import httpx
-import json
-import asyncio
-# google-genai is used in ai_generator.py, not here
-from typing import List, Dict, Any
-from app.social_scraper import SocialScraper
+
 from app.models import LeadItem, LeadSocialLinks
-from app.config import settings
+from app.social_scraper import SocialScraper
 
-AVATARS_FEMALE = [
-    "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80",
-    "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80",
-    "https://images.unsplash.com/photo-1594824813566-78853679014b?w=150&auto=format&fit=crop&q=80"
-]
+PLACES_URL = "https://places.googleapis.com/v1/places:searchText"
 
-AVATARS_MALE = [
-    "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80",
-    "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=150&auto=format&fit=crop&q=80",
-    "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&auto=format&fit=crop&q=80"
-]
+# Campos pedidos ao Google. Manter enxuto: cada campo entra no SKU cobrado.
+FIELD_MASK = ",".join([
+    "nextPageToken",
+    "places.id",
+    "places.displayName",
+    "places.formattedAddress",
+    "places.addressComponents",
+    "places.businessStatus",
+    "places.primaryTypeDisplayName",
+    "places.nationalPhoneNumber",
+    "places.internationalPhoneNumber",
+    "places.websiteUri",
+    "places.googleMapsUri",
+    "places.rating",
+    "places.userRatingCount",
+    "places.photos",
+    "places.regularOpeningHours",
+])
 
-DATA_BY_NICHE: Dict[str, Dict[str, Any]] = {
-    "farmaceutico": {"roles": ["Farmacêutico", "Proprietário", "Gerente"], "companies": ["Farmácia", "Drogaria"]},
-    "medico": {"roles": ["Médico", "Diretor Clínico"], "companies": ["Clínica", "Consultório"]},
-    "dentista": {"roles": ["Dentista", "Ortodontista"], "companies": ["Odonto", "Clínica Dental"]},
-    "corretor": {"roles": ["Corretor", "Diretor"], "companies": ["Imobiliária", "Imóveis"]},
-    "advogado": {"roles": ["Advogado", "Sócio"], "companies": ["Advocacia", "Sociedade de Advogados"]}
+PAGE_SIZE = 20           # maximo que a Places API (New) aceita por requisicao
+MAX_PAGES_PER_QUERY = 3  # 3 x 20 = ate 60 resultados por variacao de consulta
+
+# Sinonimos por nicho: amplia a base sem depender de o usuario escrever
+# exatamente o termo que o Google indexa.
+NICHE_SYNONYMS: Dict[str, List[str]] = {
+    "farmacia": ["farmácia", "drogaria", "farmácia de manipulação"],
+    "farmaceutico": ["farmácia", "drogaria"],
+    "medico": ["clínica médica", "consultório médico"],
+    "clinica medica": ["clínica médica", "consultório médico"],
+    "dentista": ["dentista", "clínica odontológica", "ortodontia"],
+    "odontologica": ["clínica odontológica", "dentista"],
+    "advogado": ["advogado", "escritório de advocacia"],
+    "imobiliaria": ["imobiliária", "corretor de imóveis"],
+    "corretor": ["corretor de imóveis", "imobiliária"],
+    "academia": ["academia", "crossfit", "studio de treinamento"],
+    "estetica": ["clínica de estética", "estética avançada", "harmonização facial"],
+    "salao": ["salão de beleza", "cabeleireiro"],
+    "barbearia": ["barbearia", "barber shop"],
+    "pet shop": ["pet shop", "clínica veterinária", "banho e tosa"],
+    "restaurante": ["restaurante", "bistrô"],
+    "padaria": ["padaria", "panificadora", "confeitaria"],
+    "pizzaria": ["pizzaria"],
+    "cafeteria": ["cafeteria", "café"],
+    "contabilidade": ["escritório de contabilidade", "contador"],
+    "marketing": ["agência de marketing", "agência de publicidade"],
+    "arquiteto": ["arquiteto", "escritório de arquitetura"],
+    "mecanica": ["oficina mecânica", "auto center"],
+    "nutricionista": ["nutricionista", "clínica de nutrição"],
+    "fisioterapeuta": ["fisioterapeuta", "clínica de fisioterapia"],
+    "escola": ["escola", "colégio", "curso"],
+    "supermercado": ["supermercado", "mercado"],
 }
 
-FIRST_NAMES_MALE = ["Gabriel", "Lucas", "Rodrigo", "Felipe", "Matheus", "Carlos"]
-FIRST_NAMES_FEMALE = ["Camila", "Mariana", "Beatriz", "Fernanda", "Juliana", "Aline"]
-LAST_NAMES = ["Melo", "Leite", "Silva", "Santos", "Oliveira", "Souza"]
+_UF_RE = re.compile(r"^[A-Z]{2}$")
+
+# O campo websiteUri do Google raramente e um site proprio. Vem perfil de
+# rede social, linktree, cardapio de delivery ou ate link de WhatsApp.
+# Tratar tudo como "tem site" apagava justamente o lead mais vendavel:
+# o negocio que so existe no Instagram e precisa de um site.
+SOCIAL_AS_SITE = ("instagram.com", "facebook.com", "linkedin.com", "tiktok.com", "twitter.com", "x.com")
+AGGREGATOR_AS_SITE = (
+    "linktr.ee", "linktree", "beacons.ai", "bio.link", "ifood.com", "goomer",
+    "prefirodelivery", "delivery.com", "rappi", "aiqfome", "anota.ai",
+    "menudino", "cardapioweb", "abrhil", "google.com/maps",
+)
+WHATSAPP_AS_SITE = ("wa.me", "api.whatsapp.com", "whatsapp.com/send")
+
+
+def classify_website(url: str) -> Tuple[str, str]:
+    """Diz o que o campo websiteUri realmente e.
+
+    Devolve (tipo, url) com tipo em: own, social, aggregator, whatsapp, none.
+    """
+    if not url:
+        return "none", ""
+    low = url.lower()
+    if any(d in low for d in WHATSAPP_AS_SITE):
+        return "whatsapp", url
+    if any(d in low for d in SOCIAL_AS_SITE):
+        return "social", url
+    if any(d in low for d in AGGREGATOR_AS_SITE):
+        return "aggregator", url
+    return "own", url
+
+
+def whatsapp_from_url(url: str) -> str:
+    """Extrai o numero de um link wa.me / api.whatsapp.com."""
+    match = re.search(r"(?:wa\.me/|phone=)(\+?\d{8,15})", url or "")
+    if not match:
+        return ""
+    digits = re.sub(r"\D", "", match.group(1))
+    return digits if 10 <= len(digits) <= 15 else ""
+
+
+def strip_accents(text: str) -> str:
+    return "".join(
+        c for c in unicodedata.normalize("NFD", text or "") if unicodedata.category(c) != "Mn"
+    )
+
 
 def normalize_key(text: str) -> str:
-    t = text.lower().strip()
-    if "farmac" in t or "droga" in t: return "farmaceutico"
-    elif "med" in t or "clinic" in t: return "medico"
-    elif "dent" in t or "odon" in t: return "dentista"
-    elif "imov" in t or "corret" in t: return "corretor"
-    elif "adv" in t or "juri" in t: return "advogado"
-    return t
+    return strip_accents(text).lower().strip()
+
+
+def niche_variants(niche: str) -> List[str]:
+    """Termo do usuario + sinonimos conhecidos, sem repetir."""
+    base = (niche or "").strip()
+    key = normalize_key(base)
+    variants = [base] if base else []
+
+    for slug, synonyms in NICHE_SYNONYMS.items():
+        if slug in key or key in slug:
+            variants.extend(synonyms)
+            break
+
+    seen, out = set(), []
+    for variant in variants:
+        k = normalize_key(variant)
+        if k and k not in seen:
+            seen.add(k)
+            out.append(variant)
+    return out or [base or "empresa"]
+
+
+def parse_location(location: str) -> Tuple[str, str, str]:
+    """Separa 'Bairro, Cidade, UF, Pais' em (consulta, cidade, uf).
+
+    O codigo anterior colava ', SP' em qualquer local que nao contivesse
+    SP/RJ/MG/PR, corrompendo a busca em 23 dos 27 estados brasileiros.
+    """
+    raw = (location or "").strip()
+    if not raw:
+        return "", "", ""
+
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    if parts and normalize_key(parts[-1]) in ("brasil", "brazil", "br"):
+        parts = parts[:-1]
+
+    uf = ""
+    for part in reversed(parts):
+        if _UF_RE.match(part.upper()) and len(part) == 2:
+            uf = part.upper()
+            break
+
+    city = ""
+    for part in reversed(parts):
+        if part.upper() != uf:
+            city = part
+            break
+
+    return ", ".join(parts), city, uf
+
+
+def extract_component(place: Dict[str, Any], wanted: Tuple[str, ...], short: bool = False) -> str:
+    for component in place.get("addressComponents") or []:
+        if any(t in component.get("types", []) for t in wanted):
+            key = "shortText" if short else "longText"
+            return component.get(key) or component.get("longText") or ""
+    return ""
+
+
+def extract_city(place: Dict[str, Any], fallback: str) -> str:
+    """Cidade real, lida de addressComponents.
+
+    O codigo anterior usava address.split(',')[0], que devolvia o nome da
+    RUA ('R. Bahia', 'Alameda Padua') no lugar da cidade.
+    """
+    return extract_component(place, ("locality", "administrative_area_level_2")) or fallback
+
+
+def normalize_phone(national: str, international: str) -> Tuple[str, bool]:
+    """Normaliza para E.164 sem '+' e detecta celular brasileiro."""
+    source = (international or national or "").strip()
+    digits = re.sub(r"\D", "", source)
+    if not digits:
+        return "", False
+
+    if not source.startswith("+") and not digits.startswith("55"):
+        digits = "55" + digits
+
+    # BR: 55 + DDD(2) + 9 + 8 digitos = 13. O '9' de celular fica na posicao 4.
+    is_mobile = digits.startswith("55") and len(digits) == 13 and digits[4] == "9"
+    return digits, is_mobile
+
+
+def score_lead(
+    has_own_website: bool,
+    has_instagram: bool,
+    has_facebook: bool,
+    has_email: bool,
+    has_phone: bool,
+    has_whatsapp: bool,
+    rating: float,
+    rating_count: int,
+) -> Tuple[int, int, List[str]]:
+    """Pontuacao deterministica. Substitui random.uniform(50, 80).
+
+    opportunity = o quanto o lead PRECISA do servico (lacunas digitais).
+    quality     = o quanto ele e acionavel (da para falar com ele?).
+    """
+    missing: List[str] = []
+    opportunity = 40
+
+    if not has_own_website:
+        opportunity += 25
+        missing.append("website")
+    if not has_instagram:
+        opportunity += 15
+        missing.append("instagram")
+    if not has_facebook:
+        opportunity += 5
+        missing.append("facebook")
+    if not has_email:
+        missing.append("email")
+    if not has_phone:
+        missing.append("telefone")
+    elif not has_whatsapp:
+        missing.append("whatsapp")
+
+    # Negocio com movimento real vale mais o contato
+    if rating_count >= 200:
+        opportunity += 10
+    elif rating_count >= 50:
+        opportunity += 6
+    elif rating_count >= 10:
+        opportunity += 3
+
+    # Nota alta = negocio bom que so peca no digital: melhor alvo
+    if rating >= 4.5:
+        opportunity += 5
+    elif 0 < rating < 3.5:
+        opportunity -= 5
+
+    quality = 30
+    if has_phone:
+        quality += 20
+    if has_whatsapp:
+        quality += 15
+    if has_email:
+        quality += 20
+    if has_instagram:
+        quality += 10
+    if rating_count >= 20:
+        quality += 5
+
+    return max(1, min(99, opportunity)), max(1, min(99, quality)), missing
+
+
+def build_summary(
+    company: str, city: str, rating: float, rating_count: int, missing: List[str], bio: str
+) -> str:
+    parts = [f"{company} em {city}." if city else f"{company}."]
+    if rating and rating_count:
+        parts.append(f"Nota {rating:.1f} no Google com {rating_count} avaliações.")
+    elif rating_count:
+        parts.append(f"{rating_count} avaliações no Google.")
+    else:
+        parts.append("Ainda sem avaliações relevantes no Google.")
+
+    gaps = [g for g in missing if g in ("website", "instagram", "facebook")]
+    if gaps:
+        parts.append("Lacuna digital: sem " + ", sem ".join(gaps) + ".")
+    else:
+        parts.append("Presença digital montada — a oportunidade está em conversão, não em existir.")
+
+    if bio:
+        parts.append(f"Sobre: {bio[:180].strip()}")
+    return " ".join(parts)
+
 
 class LeadsEngine:
     @staticmethod
-    async def search_leads(niche: str, location: str, query: str = "", limit: int = 10, api_key: str = None) -> List[LeadItem]:
-        niche_key = normalize_key(niche)
-        niche_data = DATA_BY_NICHE.get(niche_key, {
-            "roles": ["Proprietario", "Profissional", "Gerente"],
-            "companies": [niche.capitalize(), f"Empresa de {niche.capitalize()}"]
-        })
-        
-        city_display = location.strip() if location.strip() else "Botucatu, SP"
-        if not ("SP" in city_display or "RJ" in city_display or "MG" in city_display or "PR" in city_display):
-            city_display = f"{city_display}, SP"
+    async def _fetch_page(
+        client: httpx.AsyncClient, api_key: str, text_query: str, page_token: Optional[str] = None
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "textQuery": text_query,
+            "languageCode": "pt-BR",
+            "regionCode": "BR",
+            "pageSize": PAGE_SIZE,
+        }
+        if page_token:
+            payload["pageToken"] = page_token
 
-        leads: List[LeadItem] = []
+        resp = await client.post(
+            PLACES_URL,
+            headers={
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": api_key,
+                "X-Goog-FieldMask": FIELD_MASK,
+            },
+            json=payload,
+        )
+        data = resp.json()
+        if resp.status_code != 200:
+            message = data.get("error", {}).get("message", "erro desconhecido")
+            raise ValueError(f"Erro na API do Google Maps: {message}")
+        return data
 
-        if api_key:
-            try:
-                search_query = f"{niche} em {city_display}"
-                places_url = "https://places.googleapis.com/v1/places:searchText"
-                
-                headers = {
-                    "Content-Type": "application/json",
-                    "X-Goog-Api-Key": api_key,
-                    "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,places.photos"
-                }
-                
-                payload = {
-                    "textQuery": search_query,
-                    "languageCode": "pt-BR"
-                }
-                
-                async with httpx.AsyncClient() as client:
-                    resp = await client.post(places_url, headers=headers, json=payload)
-                    data = resp.json()
-                    
-                    if resp.status_code == 200:
-                        results = data.get("places", [])[:limit]
-                        
-                        for place in results:
-                            # Places API (New) fields
-                            company_name = place.get("displayName", {}).get("text", "Empresa Desconhecida")
-                            address = place.get("formattedAddress", city_display)
-                            phone = place.get("nationalPhoneNumber", "")
-                            website = place.get("websiteUri", "")
-                            rating = place.get("rating", 0.0)
-                            
-                            # Get actual photo from Google Maps
-                            photos = place.get("photos", [])
-                            if photos:
-                                photo_name = photos[0].get("name")
-                                avatar = f"https://places.googleapis.com/v1/{photo_name}/media?maxHeightPx=400&maxWidthPx=400&key={api_key}"
-                            else:
-                                avatar = f"https://ui-avatars.com/api/?name={company_name.replace(' ', '+')}&background=random&size=150"
-                            
-                            # Clean phone number
-                            clean_phone = ''.join(filter(str.isdigit, phone)) if phone else ""
-                            if clean_phone and not clean_phone.startswith("55"):
-                                clean_phone = f"55{clean_phone}"
-                            
-                            # Calculate opportunity score
-                            missing_assets = []
-                            opportunity_score = int(random.uniform(50, 80))
-                            
-                            if not website:
-                                missing_assets.append("website")
-                                opportunity_score += 15
-                                
-                            if rating > 4.5:
-                                opportunity_score += 5
-                                
-                            # Guess whatsapp based on phone prefix
-                            has_whatsapp = bool(clean_phone and len(clean_phone) >= 12 and clean_phone[4] == '9')
-                            
-                            # Google Maps API does not provide Instagram/LinkedIn
-                            missing_assets.append("instagram")
-                            
-                            email = f"contato@{company_name.lower().replace(' ', '')}.com.br" if website else ""
-                            
-                            leads.append(LeadItem(
-                                id=place.get("id", f"ld_{uuid.uuid4().hex[:8]}"),
-                                name=company_name,
-                                company=company_name,
-                                role=random.choice(niche_data["roles"]),
-                                niche=niche,
-                                city=address.split(',')[0] if ',' in address else city_display,
-                                location=address,
-                                email=email,
-                                phone=clean_phone if clean_phone else "",
-                                whatsapp=has_whatsapp,
-                                website=website,
-                                address=address,
-                                avatar=avatar,
-                                opportunityScore=min(99, opportunity_score),
-                                quality_score=min(99, opportunity_score),
-                                verified=True,
-                                missingDigitalAssets=missing_assets,
-                                socials=LeadSocialLinks(
-                                    linkedin=None,
-                                    instagram=None,
-                                    website=website
-                                ),
-                                ai_summary=f"Encontrado no Google Maps. Nota {rating}. {'Precisa de presenca online forte' if missing_assets else 'Pode otimizar conversao'}."
-                            ))
-                                
-                        # Run deep enrichment for all leads concurrently (limit to 3 at a time)
-                        sem = asyncio.Semaphore(3)
-                        async def bounded_enrich(lead):
-                            async with sem:
-                                return await SocialScraper.enrich_lead(lead.company, lead.city, lead.socials.website)
-                        
-                        enrich_tasks = [
-                            bounded_enrich(lead)
-                            for lead in leads
-                        ]
-                        enrich_results = await asyncio.gather(*enrich_tasks, return_exceptions=True)
-                        
-                        for i, result in enumerate(enrich_results):
-                            if isinstance(result, dict):
-                                lead = leads[i]
-                                lead.socials.instagram = result.get("instagram")
-                                lead.socials.linkedin = result.get("linkedin")
-                                lead.socials.facebook = result.get("facebook")
-                                lead.socials.x_twitter = result.get("twitter")
-                                lead.socials.tiktok = result.get("tiktok")
-                                
-                                # Remove missing assets if found
-                                if lead.socials.instagram and "instagram" in lead.missingDigitalAssets:
-                                    lead.missingDigitalAssets.remove("instagram")
-                                    
-                                if result.get("bio"):
-                                    lead.bio = result.get("bio")
-                                    lead.ai_summary += f" [Bio Info: {result.get('bio')[:100]}...]"
-                    else:
-                        error_msg = data.get('error', {}).get('message', 'Erro desconhecido na API do Google Maps')
-                        print(f"Google Maps API failed. Status: {resp.status_code}. Error: {error_msg}")
-                        raise ValueError(f"Erro na API do Google Maps: {error_msg}")
-            except Exception as e:
-                print(f"Error calling Maps API: {e}")
-                raise ValueError(f"Erro ao buscar no Google Maps: {e}")
+    @staticmethod
+    async def _collect_places(api_key: str, queries: List[str], target: int) -> List[Dict[str, Any]]:
+        """Pagina e combina varias consultas ate o alvo, sem repetir estabelecimento."""
+        seen: set = set()
+        places: List[Dict[str, Any]] = []
+
+        async with httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=8.0)) as client:
+            for query in queries:
+                token: Optional[str] = None
+                for _ in range(MAX_PAGES_PER_QUERY):
+                    try:
+                        data = await LeadsEngine._fetch_page(client, api_key, query, token)
+                    except ValueError:
+                        # Falhar na primeira consulta indica chave/quota: propaga.
+                        # Nas seguintes, o que ja foi coletado ainda serve.
+                        if not places:
+                            raise
+                        break
+
+                    for place in data.get("places", []):
+                        pid = place.get("id")
+                        if not pid or pid in seen:
+                            continue
+                        if place.get("businessStatus") == "CLOSED_PERMANENTLY":
+                            continue
+                        seen.add(pid)
+                        places.append(place)
+
+                    token = data.get("nextPageToken")
+                    if not token or len(places) >= target:
+                        break
+                if len(places) >= target:
+                    break
+        return places
+
+    @staticmethod
+    def _to_lead(
+        place: Dict[str, Any], niche: str, fallback_city: str, fallback_uf: str
+    ) -> Tuple[LeadItem, str]:
+        company = place.get("displayName", {}).get("text", "Empresa sem nome")
+        address = place.get("formattedAddress", "")
+        city = extract_city(place, fallback_city)
+        uf = extract_component(place, ("administrative_area_level_1",), short=True) or fallback_uf
+        raw_website = place.get("websiteUri") or ""
+        site_kind, _ = classify_website(raw_website)
+        # `website` guarda so site proprio. O resto vai para o campo certo.
+        website = raw_website if site_kind == "own" else ""
+        rating = float(place.get("rating") or 0.0)
+        rating_count = int(place.get("userRatingCount") or 0)
+
+        phone, is_mobile = normalize_phone(
+            place.get("nationalPhoneNumber", ""), place.get("internationalPhoneNumber", "")
+        )
+
+        socials = LeadSocialLinks(website=website or None)
+        if site_kind == "social":
+            low = raw_website.lower()
+            if "instagram.com" in low:
+                socials.instagram = raw_website
+            elif "facebook.com" in low:
+                socials.facebook = raw_website
+            elif "linkedin.com" in low:
+                socials.linkedin = raw_website
+            elif "tiktok.com" in low:
+                socials.tiktok = raw_website
+            else:
+                socials.x_twitter = raw_website
+        elif site_kind == "whatsapp":
+            # O "site" e um link de WhatsApp: numero real de contato
+            number = whatsapp_from_url(raw_website)
+            if number:
+                phone = phone or number
+                is_mobile = True
+
+        photos = place.get("photos") or []
+        if photos and photos[0].get("name"):
+            # Proxy no proprio backend: nao expoe a chave do Maps no HTML
+            avatar = f"/api/place-photo?name={quote_plus(photos[0]['name'])}"
         else:
+            avatar = (
+                f"https://ui-avatars.com/api/?name={quote_plus(company[:40])}"
+                "&background=0D6EFD&color=fff&size=150"
+            )
+
+        hours = place.get("regularOpeningHours") or {}
+        weekday = hours.get("weekdayDescriptions") or []
+
+        return LeadItem(
+            id=place.get("id", ""),
+            name=company,
+            company=company,
+            role=(place.get("primaryTypeDisplayName") or {}).get("text") or niche,
+            niche=niche,
+            city=city,
+            location=f"{city} - {uf}" if uf else (city or address),
+            email="",
+            phone=phone,
+            whatsapp=is_mobile,
+            website=website,
+            address=address,
+            avatar=avatar,
+            rating=rating or None,
+            rating_count=rating_count or None,
+            maps_url=place.get("googleMapsUri"),
+            business_status=place.get("businessStatus"),
+            opening_hours="; ".join(weekday[:3]) if weekday else None,
+            verified=True,
+            quality_score=0,
+            opportunityScore=0,
+            missingDigitalAssets=[],
+            socials=socials,
+        ), raw_website
+
+    @staticmethod
+    async def search_leads(
+        niche: str,
+        location: str,
+        query: str = "",
+        limit: int = 10,
+        api_key: str = None,
+        enrich: bool = True,
+    ) -> List[LeadItem]:
+        if not api_key:
             raise ValueError("Chave da API do Google Maps ausente.")
 
-        leads.sort(key=lambda x: x.opportunityScore or 0, reverse=True)
+        limit = max(1, min(int(limit or 10), 60))
+        location_query, fallback_city, fallback_uf = parse_location(location)
+
+        extra = (query or "").strip()
+        queries: List[str] = []
+        for variant in niche_variants(niche):
+            term = f"{variant} {extra}".strip()
+            queries.append(f"{term} em {location_query}" if location_query else term)
+
+        places = await LeadsEngine._collect_places(api_key, queries, limit)
+        if not places:
+            return []
+
+        built = [
+            LeadsEngine._to_lead(place, niche, fallback_city, fallback_uf)
+            for place in places[:limit]
+        ]
+        leads = [lead for lead, _ in built]
+        # Scrapeia a URL bruta (linktree e perfil social ainda rendem contato),
+        # nao a filtrada, que so guarda site proprio.
+        raw_sites = [raw for _, raw in built]
+
+        enrichments: List[Dict[str, Any]] = [{} for _ in leads]
+        if enrich:
+            enrichments = await SocialScraper.enrich_many(
+                [
+                    {"company": l.company, "city": l.city, "website": raw}
+                    for l, raw in zip(leads, raw_sites)
+                ]
+            )
+
+        for lead, data in zip(leads, enrichments):
+            data = data or {}
+            # so preenche o que ainda esta vazio: nao apaga o que veio do Maps
+            for field, key in (
+                ("instagram", "instagram"), ("facebook", "facebook"),
+                ("linkedin", "linkedin"), ("x_twitter", "twitter"), ("tiktok", "tiktok"),
+            ):
+                if not getattr(lead.socials, field) and data.get(key):
+                    setattr(lead.socials, field, data[key])
+
+            # Email REAL extraido do site. Nunca montado a partir do nome.
+            emails = data.get("emails") or []
+            lead.email = emails[0] if emails else ""
+            lead.all_emails = emails[:5]
+
+            # Link wa.me tem prioridade sobre o palpite pelo prefixo do telefone
+            wa_numbers = data.get("whatsapp_numbers") or []
+            if wa_numbers:
+                lead.whatsapp = True
+                if not lead.phone:
+                    lead.phone = wa_numbers[0]
+
+            if data.get("bio"):
+                lead.bio = data["bio"][:400]
+
+            opportunity, quality, missing = score_lead(
+                has_own_website=bool(lead.website),
+                has_instagram=bool(lead.socials.instagram),
+                has_facebook=bool(lead.socials.facebook),
+                has_email=bool(lead.email),
+                has_phone=bool(lead.phone),
+                has_whatsapp=bool(lead.whatsapp),
+                rating=lead.rating or 0.0,
+                rating_count=lead.rating_count or 0,
+            )
+            lead.opportunityScore = opportunity
+            lead.quality_score = quality
+            lead.missingDigitalAssets = missing
+            lead.contactability = sum([
+                bool(lead.phone), bool(lead.whatsapp), bool(lead.email), bool(lead.socials.instagram)
+            ])
+            lead.ai_summary = build_summary(
+                lead.company, lead.city, lead.rating or 0.0, lead.rating_count or 0,
+                missing, lead.bio or ""
+            )
+
+        # Primeiro quem da para contatar, depois quem mais precisa do servico
+        leads.sort(
+            key=lambda l: ((l.contactability or 0) * 25 + (l.opportunityScore or 0)), reverse=True
+        )
         return leads

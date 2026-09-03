@@ -9,5 +9,9 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      # Sem esta chave a busca de leads falha com "Chave da API do
+      # Google Maps ausente" — faltava na configuracao do Render.
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
       - key: PORT
         value: 8000

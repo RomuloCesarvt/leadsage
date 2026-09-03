@@ -1,7 +1,77 @@
 import json
+from typing import Optional
+
 from google import genai
+from google.genai import types
+
 from app.config import settings
 from app.models import LeadItem, PitchGenerationRequest, PitchGenerationResponse
+
+# gemini-2.0-flash foi descontinuado e responde 404 NOT_FOUND: era por isso
+# que todo pitch voltava como texto de erro.
+#
+# Ordem medida em 2026-09-03 (2 tentativas cada):
+#   gemini-flash-lite-latest  5.8s / 10.1s  OK
+#   gemini-flash-latest       >20s          timeout (modelo de raciocinio)
+#   gemini-3.6-flash          16.6s         503 UNAVAILABLE
+# O rapido e confiavel vai primeiro; os outros ficam so como rede de
+# seguranca para quando este sair do ar.
+MODEL_CHAIN = (
+    "gemini-flash-lite-latest",
+    "gemini-flash-latest",
+    "gemini-3.6-flash",
+)
+
+REQUEST_TIMEOUT_MS = 25_000
+
+_working_model: Optional[str] = None
+
+
+def build_client(api_key: str) -> genai.Client:
+    return genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(timeout=REQUEST_TIMEOUT_MS),
+    )
+
+
+def generate_with_fallback(client, prompt: str) -> str:
+    """Tenta os modelos em ordem ate um responder. Memoriza o que funcionou.
+
+    Sem o cache, um cold start pagava ~36s tentando modelos mortos antes
+    de chegar ao que responde.
+    """
+    global _working_model
+
+    chain = list(MODEL_CHAIN)
+    if _working_model in chain:
+        chain.remove(_working_model)
+        chain.insert(0, _working_model)
+
+    last_error: Optional[Exception] = None
+    for model in chain:
+        try:
+            response = client.models.generate_content(model=model, contents=prompt)
+            text = (response.text or "").strip()
+            if text:
+                _working_model = model
+                return text
+            last_error = RuntimeError(f"{model} devolveu resposta vazia")
+        except Exception as exc:
+            last_error = exc
+            continue
+
+    raise RuntimeError(f"Nenhum modelo Gemini disponivel. Ultimo erro: {last_error}")
+
+
+def strip_code_fence(text: str) -> str:
+    """Remove blocos ```json / ```html que o modelo insiste em adicionar."""
+    text = text.strip()
+    if text.startswith("```"):
+        first_newline = text.find(chr(10))
+        text = text[first_newline + 1:] if first_newline != -1 else text.lstrip("`")
+    if text.endswith("```"):
+        text = text[:-3]
+    return text.strip()
 
 class AIGenerator:
     @staticmethod
@@ -39,9 +109,32 @@ class AIGenerator:
             )
 
         try:
-            client = genai.Client(api_key=active_key)
+            client = build_client(active_key)
             user_product_info = req.user_product or "Software/Serviço genérico"
-            
+
+            # Sinais reais do Google Maps + enriquecimento. Sao eles que
+            # separam um gancho verdadeiro de um texto generico.
+            if lead.rating and lead.rating_count:
+                reputation = f"nota {lead.rating:.1f} com {lead.rating_count} avaliações no Google"
+            elif lead.rating_count:
+                reputation = f"{lead.rating_count} avaliações no Google"
+            else:
+                reputation = "ainda sem avaliações relevantes no Google"
+
+            channels = []
+            if lead.website:
+                channels.append(f"site próprio ({lead.website})")
+            if lead.socials and lead.socials.instagram:
+                channels.append("Instagram")
+            if lead.socials and lead.socials.facebook:
+                channels.append("Facebook")
+            if lead.whatsapp:
+                channels.append("WhatsApp")
+            presence = ", ".join(channels) if channels else "apenas o perfil no Google Maps"
+
+            missing = lead.missingDigitalAssets or []
+            gaps = ("não possui " + ", nem ".join(missing)) if missing else "nenhuma lacuna óbvia"
+
             prompt = f"""
 Você é um especialista em cold e-mail B2B de altíssima conversão e um copywriter brilhante.
 Sua missão é escrever o primeiro contato para um Lead. 
@@ -49,13 +142,15 @@ Sua missão é escrever o primeiro contato para um Lead.
 DADOS DO SEU PRODUTO/OFERTA:
 - O que você vende / Problema que resolve: {user_product_info}
 
-DADOS DO LEAD (ALVO):
+DADOS DO LEAD (ALVO) — tudo verificado no Google Maps, pode citar:
 - Nome: {lead.name}
-- Cargo: {lead.role}
-- Empresa: {lead.company}
+- Tipo de negócio: {lead.role}
 - Localização: {lead.city} ({lead.location})
 - Nicho: {lead.niche}
-- Resumo IA: {lead.ai_summary}
+- Reputação: {reputation}
+- Presença digital hoje: {presence}
+- Lacunas concretas: {gaps}
+- Resumo: {lead.ai_summary}
 
 DADOS DA MENSAGEM:
 - Tom: {tone}
@@ -72,20 +167,8 @@ RETORNO ESPERADO:
 Retorne um JSON exato com duas chaves: "subject" (o assunto do email, chamativo e curto) e "body" (o corpo do e-mail com quebras de linha). 
 Não use blocos markdown (```json). Apenas as chaves em formato JSON puro.
 """
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=prompt
-            )
-            
-            raw_text = response.text.strip()
-            if raw_text.startswith("```json"):
-                raw_text = raw_text[7:]
-            if raw_text.startswith("```"):
-                raw_text = raw_text[3:]
-            if raw_text.endswith("```"):
-                raw_text = raw_text[:-3]
-                
-            data = json.loads(raw_text.strip())
+            raw_text = strip_code_fence(generate_with_fallback(client, prompt))
+            data = json.loads(raw_text)
             subject = data.get("subject", f"Oportunidade para a {lead.company}")
             body = data.get("body", "Erro ao gerar corpo do e-mail.")
 
@@ -118,7 +201,7 @@ Não use blocos markdown (```json). Apenas as chaves em formato JSON puro.
             )
 
         try:
-            client = genai.Client(api_key=active_key)
+            client = build_client(active_key)
             
             # Simple prompt to generate a landing page structure
             prompt = f"""
@@ -138,18 +221,8 @@ A página deve ter:
 Use classes do TailwindCSS.
 O output DEVE ser apenas o código HTML, sem blocos markdown. Comece com <!DOCTYPE html> e termine com </html>.
 """
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=prompt
-            )
-            html_content = response.text.strip()
-            if html_content.startswith("```html"):
-                html_content = html_content[7:]
-            if html_content.startswith("```"):
-                html_content = html_content[3:]
-            if html_content.endswith("```"):
-                html_content = html_content[:-3]
-                
+            html_content = strip_code_fence(generate_with_fallback(client, prompt))
+
             return DemoSiteResponse(
                 lead_id=lead.id,
                 preview_url=f"https://leadsage.app/preview/{lead.id}",

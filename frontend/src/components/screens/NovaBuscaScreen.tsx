@@ -1,8 +1,16 @@
-import React, { useState } from 'react';
-import { Search, ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
-import * as Icons from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  Search, ChevronDown, ChevronRight, ChevronUp,
+  Activity, Apple, Beer, Briefcase, Building, Building2,
+  Calculator, Camera, Car, Code, Coffee, Croissant,
+  Dog, Dumbbell, Flower2, GraduationCap, Hammer, HardHat,
+  HeartPulse, Home, LineChart, Megaphone, MousePointerClick, PenTool,
+  Pill, Pizza, Scale, Scissors, Shield, Shirt,
+  ShoppingBag, ShoppingCart, Smile, Sparkles, Stethoscope, Truck,
+  Users, Utensils, Wrench, HelpCircle
+} from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { Country, State, City } from 'country-state-city';
+import type { ICountry, IState, ICity } from 'country-state-city';
 
 const NICHE_CATEGORIES = [
   {
@@ -85,8 +93,54 @@ const NICHE_CATEGORIES = [
   }
 ];
 
+// Mapa explicito em vez de `import * as Icons`. O namespace import
+// anulava o tree-shaking e trazia a biblioteca inteira de icones
+// para o bundle.
+const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  Activity,
+  Apple,
+  Beer,
+  Briefcase,
+  Building,
+  Building2,
+  Calculator,
+  Camera,
+  Car,
+  Code,
+  Coffee,
+  Croissant,
+  Dog,
+  Dumbbell,
+  Flower2,
+  GraduationCap,
+  Hammer,
+  HardHat,
+  HeartPulse,
+  HelpCircle,
+  Home,
+  LineChart,
+  Megaphone,
+  MousePointerClick,
+  PenTool,
+  Pill,
+  Pizza,
+  Scale,
+  Scissors,
+  Shield,
+  Shirt,
+  ShoppingBag,
+  ShoppingCart,
+  Smile,
+  Sparkles,
+  Stethoscope,
+  Truck,
+  Users,
+  Utensils,
+  Wrench,
+};
+
 const DynamicIcon = ({ name, className }: { name: string, className?: string }) => {
-  const IconComponent = (Icons as any)[name] || Icons.HelpCircle;
+  const IconComponent = ICONS[name] || HelpCircle;
   return <IconComponent className={className} />;
 };
 
@@ -96,14 +150,39 @@ export const NovaBuscaScreen: React.FC = () => {
   const [country, setCountry] = useState('BR');
   const [state, setState] = useState('');
   const [city, setCity] = useState('');
-  const [neighborhood] = useState('');
-  const [searchLimit] = useState(10);
+  const [neighborhood, setNeighborhood] = useState('');
+  const [searchLimit, setSearchLimit] = useState(20);
   const [isSearching, setIsSearching] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(NICHE_CATEGORIES[0].category);
 
-  const countries = Country.getAllCountries();
-  const states = State.getStatesOfCountry(country);
-  const cities = State.getStateByCodeAndCountry(state, country) ? City.getCitiesOfState(country, state) : [];
+  // country-state-city embute um city.json de 7,7 MB. Importado de forma
+  // estatica, ele sozinho respondia por ~9 MB do bundle inicial e travava
+  // o primeiro carregamento. Agora entra como chunk separado, sob demanda.
+  const [geo, setGeo] = useState<typeof import('country-state-city') | null>(null);
+  const [countries, setCountries] = useState<ICountry[]>([]);
+  const [states, setStates] = useState<IState[]>([]);
+  const [cities, setCities] = useState<ICity[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    import('country-state-city').then(mod => {
+      if (!active) return;
+      setGeo(mod);
+      setCountries(mod.Country.getAllCountries());
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!geo) return;
+    setStates(geo.State.getStatesOfCountry(country));
+  }, [geo, country]);
+
+  useEffect(() => {
+    if (!geo || !state) { setCities([]); return; }
+    const exists = geo.State.getStateByCodeAndCountry(state, country);
+    setCities(exists ? geo.City.getCitiesOfState(country, state) : []);
+  }, [geo, country, state]);
 
   const handleSearch = async () => {
     if (!niche || !city || !state) {
@@ -155,6 +234,7 @@ export const NovaBuscaScreen: React.FC = () => {
                 }}
                 className="w-full pl-4 pr-10 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer"
               >
+                {countries.length === 0 && <option value="BR">Carregando países...</option>}
                 {countries.map(c => (
                   <option key={c.isoCode} value={c.isoCode}>{c.name}</option>
                 ))}
@@ -299,6 +379,38 @@ export const NovaBuscaScreen: React.FC = () => {
                 </div>
               )}
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+              Bairro <span className="text-slate-400 normal-case font-medium tracking-normal">(opcional)</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Ex: Pituba, Centro..."
+              value={neighborhood}
+              onChange={(e) => setNeighborhood(e.target.value)}
+              className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+              Quantidade de leads
+            </label>
+            <div className="relative">
+              <select
+                value={searchLimit}
+                onChange={(e) => setSearchLimit(Number(e.target.value))}
+                className="w-full pl-4 pr-10 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer"
+              >
+                {[10, 20, 30, 40, 60].map(n => (
+                  <option key={n} value={n}>{n} leads &middot; {n} cr&eacute;ditos</option>
+                ))}
+              </select>
+              <ChevronDown className="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+            <p className="text-xs text-slate-400 mt-1.5">Voc&ecirc; s&oacute; paga pelos leads realmente encontrados.</p>
           </div>
         </div>
       </div>

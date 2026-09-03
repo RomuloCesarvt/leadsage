@@ -35,6 +35,15 @@ class LeadItem(BaseModel):
     experience: Optional[str] = None
     opportunityScore: Optional[int] = None
     missingDigitalAssets: Optional[List[str]] = []
+    # Dados reais vindos do Google Maps
+    rating: Optional[float] = None
+    rating_count: Optional[int] = None
+    maps_url: Optional[str] = None
+    business_status: Optional[str] = None
+    opening_hours: Optional[str] = None
+    # Enriquecimento real (nunca inventado)
+    all_emails: Optional[List[str]] = []
+    contactability: Optional[int] = None
     outreach_status: str = "Pendente"
     last_contacted_at: Optional[str] = None
     last_message: Optional[str] = None
@@ -45,7 +54,8 @@ class LeadSearchRequest(BaseModel):
     niche: str
     location: str
     query: Optional[str] = ""
-    limit: Optional[int] = 10
+    limit: Optional[int] = Field(default=10, ge=1, le=60)
+    enrich: Optional[bool] = True
     filters: Optional[Dict[str, Any]] = None
 
 class LeadSearchResponse(BaseModel):

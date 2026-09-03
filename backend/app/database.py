@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy import Column, String, Integer, Boolean, JSON
+from sqlalchemy import Column, String, Integer, Boolean, JSON, Float
 
 import os
 
@@ -45,6 +45,16 @@ class DBLead(Base):
     last_message = Column(String, nullable=True)
     match_category = Column(String, nullable=True)
     pipeline_stage = Column(String, default="Novos")
+    # Dados reais do Google Maps
+    rating = Column(Float, nullable=True)
+    rating_count = Column(Integer, nullable=True)
+    maps_url = Column(String, nullable=True)
+    business_status = Column(String, nullable=True)
+    opening_hours = Column(String, nullable=True)
+    all_emails = Column(JSON, nullable=True)
+    contactability = Column(Integer, nullable=True)
+    owner_uid = Column(String, index=True, nullable=True)
+    search_id = Column(String, index=True, nullable=True)
 
 class DBSearchHistory(Base):
     __tablename__ = "search_history"
@@ -55,10 +65,30 @@ class DBSearchHistory(Base):
     total_leads = Column(Integer)
     timestamp = Column(String)
     leads_preview = Column(JSON, nullable=True)
+    owner_uid = Column(String, index=True, nullable=True)
+
+def _migrate(conn):
+    """Acrescenta colunas novas em bancos que ja existem.
+
+    create_all() cria tabelas ausentes mas nunca altera as existentes,
+    entao um leadsage.db antigo quebraria ao gravar os campos novos.
+    """
+    for table in (DBLead.__tablename__, DBSearchHistory.__tablename__):
+        rows = conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()
+        if not rows:
+            continue
+        existing = {r[1] for r in rows}
+        for column in Base.metadata.tables[table].columns:
+            if column.name in existing:
+                continue
+            ddl = column.type.compile(conn.dialect)
+            conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column.name} {ddl}")
+
 
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_migrate)
 
 async def get_db():
     async with AsyncSessionLocal() as session:

@@ -39,6 +39,15 @@ export interface LeadItem {
   opportunityScore?: number;
   missingDigitalAssets?: string[];
   pipeline_stage?: string;
+  // Dados reais do Google Maps
+  rating?: number;
+  rating_count?: number;
+  maps_url?: string;
+  business_status?: string;
+  opening_hours?: string;
+  // Enriquecimento real (nunca inventado)
+  all_emails?: string[];
+  contactability?: number;
 }
 
 export interface LeadSearchRequest {
@@ -46,6 +55,7 @@ export interface LeadSearchRequest {
   location: string;
   query?: string;
   limit?: number;
+  enrich?: boolean;
 }
 
 export interface LeadSearchResponse {
