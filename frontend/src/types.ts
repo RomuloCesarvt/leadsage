@@ -116,6 +116,13 @@ export interface UserProfile {
   credits: number;
   plan: string;
   avatar: string;
+  // Preferências de prospecção
+  services?: string[];
+  niches?: string[];
+  regions?: string;
+  preferred_channel?: string;
+  monthly_goal?: string;
+  language?: string;
 }
 
 export interface SearchHistoryItem {
@@ -140,4 +147,13 @@ export interface ChatMessage {
   sender: 'user' | 'agent';
   text: string;
   timestamp: string;
+}
+
+export interface SiteItem {
+  id: string;
+  company: string;
+  template?: string;
+  lead_id?: string;
+  created_at: string;
+  html?: string;
 }

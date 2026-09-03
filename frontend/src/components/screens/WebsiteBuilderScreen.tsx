@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { Globe, Wand2, LayoutTemplate, ArrowLeft, ArrowRight, Building2 } from 'lucide-react';
+import { Globe, Wand2, LayoutTemplate, ArrowLeft, ArrowRight, Building2, X, Copy, Check, Download } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
 
 type Step = 'choice' | 'select-lead' | 'form' | 'photos' | 'template' | 'preview';
 
 export const WebsiteBuilderScreen: React.FC = () => {
-  const { leads } = useApp() as any;
+  const { leads, setViewState } = useApp() as any;
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishError, setPublishError] = useState('');
+  const [showSource, setShowSource] = useState(false);
+  const [copiedSource, setCopiedSource] = useState(false);
   const [step, setStep] = useState<Step>('choice');
   const [selectedLead, setSelectedLead] = useState<any>(null);
   const [selectedTemplate, setSelectedTemplate] = useState('Moderno');
@@ -28,6 +32,45 @@ export const WebsiteBuilderScreen: React.FC = () => {
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [mapsUrl, setMapsUrl] = useState('');
+
+  // Salva o site gerado. Antes o botao "Publicar Site" nao fazia nada e
+  // o HTML se perdia ao sair da tela.
+  const handlePublish = async () => {
+    if (!generatedHtml) return;
+    setIsPublishing(true);
+    setPublishError('');
+    try {
+      await api.publishSite({
+        company: companyName || selectedLead?.company || 'Site sem nome',
+        html: generatedHtml,
+        template: selectedTemplate,
+        lead_id: selectedLead?.id || '',
+      });
+      setViewState('my-sites');
+    } catch (err: any) {
+      setPublishError(err?.message || 'Não foi possível publicar.');
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const handleCopySource = async () => {
+    await navigator.clipboard.writeText(generatedHtml);
+    setCopiedSource(true);
+    setTimeout(() => setCopiedSource(false), 2000);
+  };
+
+  const handleDownloadSource = () => {
+    const blob = new Blob([generatedHtml], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${(companyName || 'site').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.html`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -375,12 +418,29 @@ export const WebsiteBuilderScreen: React.FC = () => {
               A Inteligência Artificial está escrevendo o código do seu site...
             </div>
           ) : (
-            <div className="flex gap-4">
-              <button className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors">
+            <div className="flex gap-4 items-center">
+              {publishError && (
+                <span className="text-sm font-semibold text-red-600">{publishError}</span>
+              )}
+              <button
+                onClick={() => setShowSource(true)}
+                className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
+              >
                 Ver Código Fonte
               </button>
-              <button className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-sm transition-colors flex items-center gap-2">
-                <Globe className="w-4 h-4" /> Publicar Site
+              <button
+                onClick={handlePublish}
+                disabled={isPublishing || !generatedHtml}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-sm transition-colors flex items-center gap-2"
+              >
+                {isPublishing ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    Salvando...
+                  </>
+                ) : (
+                  <><Globe className="w-4 h-4" /> Publicar Site</>
+                )}
               </button>
             </div>
           )}
@@ -475,7 +535,7 @@ export const WebsiteBuilderScreen: React.FC = () => {
 
       {/* Floating Action Button */}
       <div className="fixed bottom-8 right-8 z-30">
-        <button 
+        <button
           onClick={handleGenerate}
           className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full shadow-xl shadow-blue-600/30 transition-all flex items-center gap-3 text-lg hover:scale-105 active:scale-95"
         >
@@ -483,6 +543,45 @@ export const WebsiteBuilderScreen: React.FC = () => {
           Gerar Site com IA
         </button>
       </div>
+
+      {showSource && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-6"
+          onClick={() => setShowSource(false)}
+        >
+          <div
+            className="bg-white rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h3 className="font-bold text-slate-800">Código-fonte do site</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCopySource}
+                  className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold flex items-center gap-1.5 transition-colors"
+                >
+                  {copiedSource ? <><Check className="w-4 h-4" /> Copiado</> : <><Copy className="w-4 h-4" /> Copiar</>}
+                </button>
+                <button
+                  onClick={handleDownloadSource}
+                  className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold flex items-center gap-1.5 transition-colors"
+                >
+                  <Download className="w-4 h-4" /> Baixar .html
+                </button>
+                <button
+                  onClick={() => setShowSource(false)}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <pre className="flex-1 overflow-auto p-6 text-xs leading-relaxed text-slate-700 bg-slate-50 font-mono whitespace-pre-wrap break-all">
+              {generatedHtml}
+            </pre>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

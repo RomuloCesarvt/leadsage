@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy import Column, String, Integer, Boolean, JSON, Float
+from sqlalchemy import Column, String, Integer, Boolean, JSON, Float, Text
 
 import os
 
@@ -83,6 +83,35 @@ def _migrate(conn):
                 continue
             ddl = column.type.compile(conn.dialect)
             conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column.name} {ddl}")
+
+
+class DBUserProfile(Base):
+    """Perfil por usuario para o dev local.
+
+    Em producao o perfil vai para o Firestore; aqui fica o fallback,
+    no lugar da variavel global que todos os usuarios compartilhavam.
+    """
+    __tablename__ = "user_profiles"
+
+    uid = Column(String, primary_key=True, index=True)
+    data = Column(JSON, nullable=True)
+
+
+class DBSite(Base):
+    """Sites gerados pelo usuario.
+
+    Antes o HTML gerado so existia no useState da tela: ao sair, sumia,
+    e "Meus Sites" era um estado vazio permanente.
+    """
+    __tablename__ = "sites"
+
+    id = Column(String, primary_key=True, index=True)
+    owner_uid = Column(String, index=True)
+    company = Column(String)
+    template = Column(String, nullable=True)
+    lead_id = Column(String, nullable=True)
+    html = Column(Text, nullable=True)
+    created_at = Column(String)
 
 
 async def init_db():

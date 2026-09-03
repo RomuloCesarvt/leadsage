@@ -1,9 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { History, Eye, Trash2, Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { api } from '../../services/api';
 
 export const HistoryScreen: React.FC = () => {
-  const { history, setViewState, performLeadSearch } = useApp() as any;
+  const { history, setHistory, setViewState, performLeadSearch } = useApp() as any;
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // O botão de excluir era decorativo: não tinha onClick nem rota.
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await api.deleteSearchHistory(id);
+      setHistory((prev: any[]) => prev.filter(h => h.id !== id));
+    } catch (err: any) {
+      alert(err?.message || 'Não foi possível excluir esta busca.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col h-full relative">
@@ -96,7 +111,12 @@ export const HistoryScreen: React.FC = () => {
                       >
                         <Eye className="w-3.5 h-3.5" /> Ver leads
                       </button>
-                      <button className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Excluir busca">
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        disabled={deletingId === item.id}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-40"
+                        title="Excluir busca"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>

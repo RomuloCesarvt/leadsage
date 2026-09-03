@@ -1,4 +1,5 @@
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import List, Dict, Any
 from fastapi import FastAPI, HTTPException, Query, Depends, Request
@@ -16,7 +17,8 @@ from app.models import (
     PitchGenerationRequest, PitchGenerationResponse,
     DispatchRequest, DispatchResponse,
     CreditTopUpRequest, UserProfile,
-    DemoSiteRequest, DemoSiteResponse
+    DemoSiteRequest, DemoSiteResponse,
+    SiteCreateRequest, SiteItem
 )
 from app.leads_engine import LeadsEngine
 from app.ai_generator import AIGenerator
@@ -24,11 +26,21 @@ from app.dispatcher import OutreachDispatcher
 from app.credit_system import check_and_deduct_credits, get_user_balance, add_credits
 import httpx
 from app.firebase_config import get_current_user
+from app.profile_store import get_profile, save_profile
+from app.sites_store import create_site, list_sites, get_site, delete_site
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # on_event("startup") esta deprecado e sera removido do FastAPI.
+    await init_db()
+    yield
+
 
 app = FastAPI(
     title="LeadSage API",
     description="Backend Python para busca de leads com IA, enriquecimento e disparo automatizado.",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -38,12 +50,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-CURRENT_USER = UserProfile()
-
-@app.on_event("startup")
-async def on_startup():
-    await init_db()
 
 @app.get("/")
 def read_root():
@@ -57,19 +63,24 @@ def read_root():
 @app.get("/api/profile", response_model=UserProfile)
 async def get_user_profile(user: dict = Depends(get_current_user)):
     uid = user.get("uid")
-    balance_data = await get_user_balance(uid)
-    CURRENT_USER.credits = balance_data.get("credits", 0)
-    return CURRENT_USER
+    profile = await get_profile(uid)
+    balance = await get_user_balance(uid)
+    profile.credits = balance.get("credits", 0)
+    return profile
+
 
 @app.put("/api/profile", response_model=UserProfile)
-def update_user_profile(profile: UserProfile):
-    global CURRENT_USER
-    CURRENT_USER.name = profile.name
-    CURRENT_USER.company_name = profile.company_name
-    CURRENT_USER.niche_focus = profile.niche_focus
-    CURRENT_USER.email = profile.email
-    CURRENT_USER.product_description = profile.product_description
-    return CURRENT_USER
+async def update_user_profile(profile: UserProfile, user: dict = Depends(get_current_user)):
+    """Salva o perfil do usuario autenticado.
+
+    Antes esta rota nao exigia token e escrevia numa global de modulo,
+    compartilhada por todos os usuarios.
+    """
+    uid = user.get("uid")
+    saved = await save_profile(uid, profile.model_dump())
+    balance = await get_user_balance(uid)
+    saved.credits = balance.get("credits", 0)
+    return saved
 
 @app.post("/api/search-leads", response_model=LeadSearchResponse)
 async def search_leads(request: Request, req: LeadSearchRequest, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -247,6 +258,37 @@ async def get_search_history(user: dict = Depends(get_current_user), db: AsyncSe
         })
     return out
 
+@app.post("/api/sites", response_model=SiteItem)
+async def publish_site(req: SiteCreateRequest, user: dict = Depends(get_current_user)):
+    """Salva o site gerado. Antes o HTML so existia no estado da tela."""
+    try:
+        return await create_site(
+            user.get("uid"), req.company, req.html, req.template or "", req.lead_id or ""
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/sites")
+async def get_sites(user: dict = Depends(get_current_user)):
+    return await list_sites(user.get("uid"))
+
+
+@app.get("/api/sites/{site_id}", response_model=SiteItem)
+async def get_single_site(site_id: str, user: dict = Depends(get_current_user)):
+    site = await get_site(user.get("uid"), site_id)
+    if not site:
+        raise HTTPException(status_code=404, detail="Site nao encontrado.")
+    return site
+
+
+@app.delete("/api/sites/{site_id}")
+async def remove_site(site_id: str, user: dict = Depends(get_current_user)):
+    if not await delete_site(user.get("uid"), site_id):
+        raise HTTPException(status_code=404, detail="Site nao encontrado.")
+    return {"status": "deleted", "id": site_id}
+
+
 @app.get("/api/place-photo")
 async def place_photo(name: str):
     """Serve a foto do Google Maps sem expor a chave da API.
@@ -275,6 +317,37 @@ async def place_photo(name: str):
         media_type=resp.headers.get("content-type", "image/jpeg"),
         headers={"Cache-Control": "public, max-age=86400"},
     )
+
+
+@app.delete("/api/history/{search_id}")
+async def delete_search_history(
+    search_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Apaga uma busca do historico e os leads que vieram dela.
+
+    O filtro por owner_uid impede apagar o historico de outro usuario.
+    """
+    uid = user.get("uid")
+    result = await db.execute(
+        select(DBSearchHistory).where(
+            DBSearchHistory.id == search_id, DBSearchHistory.owner_uid == uid
+        )
+    )
+    entry = result.scalar_one_or_none()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Busca nao encontrada.")
+
+    leads = await db.execute(
+        select(DBLead).where(DBLead.search_id == search_id, DBLead.owner_uid == uid)
+    )
+    for lead in leads.scalars().all():
+        await db.delete(lead)
+
+    await db.delete(entry)
+    await db.commit()
+    return {"status": "deleted", "id": search_id}
 
 
 @app.get("/api/suggested-niches")

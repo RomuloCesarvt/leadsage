@@ -7,7 +7,8 @@ import type {
   DispatchResponse,
   UserProfile,
   SearchHistoryItem,
-  SuggestedNiche
+  SuggestedNiche,
+  SiteItem
 } from '../types';
 import { auth } from '../lib/firebase';
 
@@ -116,6 +117,33 @@ export const api = {
     } catch {
       return [];
     }
+  },
+
+  async publishSite(payload: { company: string; html: string; template?: string; lead_id?: string }): Promise<SiteItem> {
+    return await fetchWithToken('/sites', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async getSites(): Promise<SiteItem[]> {
+    try {
+      return await fetchWithToken('/sites');
+    } catch {
+      return [];
+    }
+  },
+
+  async getSite(id: string): Promise<SiteItem> {
+    return await fetchWithToken(`/sites/${id}`);
+  },
+
+  async deleteSite(id: string): Promise<void> {
+    await fetchWithToken(`/sites/${id}`, { method: 'DELETE' });
+  },
+
+  async deleteSearchHistory(id: string): Promise<void> {
+    await fetchWithToken(`/history/${id}`, { method: 'DELETE' });
   },
 
   async getSuggestedNiches(): Promise<SuggestedNiche[]> {

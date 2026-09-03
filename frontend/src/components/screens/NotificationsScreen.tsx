@@ -1,7 +1,9 @@
 import React from 'react';
 import { Bell, ArrowRight, Sparkles } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
 
 export const NotificationsScreen: React.FC = () => {
+  const { setViewState } = useApp() as any;
   return (
     <div className="flex-1 flex flex-col h-full relative max-w-4xl mx-auto w-full">
       
@@ -23,7 +25,10 @@ export const NotificationsScreen: React.FC = () => {
               <span className="inline-block px-3 py-1 bg-white/20 rounded-full text-xs font-bold uppercase tracking-widest mb-3">Novo Recurso</span>
               <h2 className="text-2xl font-bold mb-2">Conheça o novo Precificador!</h2>
               <p className="text-blue-100 max-w-xl mb-6">Acabamos de liberar uma calculadora inteligente para você nunca mais ter dúvidas de quanto cobrar pelos seus serviços. Baseado em dados reais do mercado.</p>
-              <button className="px-5 py-2.5 bg-white text-blue-600 font-bold rounded-xl shadow-sm hover:bg-blue-50 transition-colors">
+              <button
+                onClick={() => setViewState('calculator')}
+                className="px-5 py-2.5 bg-white text-blue-600 font-bold rounded-xl shadow-sm hover:bg-blue-50 transition-colors"
+              >
                 Testar Precificador
               </button>
             </div>
@@ -38,7 +43,10 @@ export const NotificationsScreen: React.FC = () => {
             <h3 className="text-lg font-bold text-slate-800 mb-1">Aprenda a criar e vender sites com IA</h3>
             <p className="text-slate-500 text-sm">Participe do nosso grupo VIP no WhatsApp onde enviamos estratégias diárias de fechamento de contratos de web design usando nossa IA.</p>
           </div>
-          <button className="px-5 py-2.5 w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors whitespace-nowrap">
+          <button
+            onClick={() => setViewState('help')}
+            className="px-5 py-2.5 w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors whitespace-nowrap"
+          >
             Quero entrar no grupo
           </button>
         </div>
@@ -51,7 +59,10 @@ export const NotificationsScreen: React.FC = () => {
             <h3 className="text-lg font-bold text-slate-800 mb-1">Terceirize o desenvolvimento conosco</h3>
             <p className="text-slate-500 text-sm">Fechou um site complexo ou sistema que nossa IA não cobre? Nossa equipe de experts desenvolve para você (White Label).</p>
           </div>
-          <button className="px-5 py-2.5 w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors whitespace-nowrap">
+          <button
+            onClick={() => setViewState('help')}
+            className="px-5 py-2.5 w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors whitespace-nowrap"
+          >
             Solicitar orçamento
           </button>
         </div>

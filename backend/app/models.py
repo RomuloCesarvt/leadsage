@@ -116,6 +116,14 @@ class UserProfile(BaseModel):
     credits: int = 450
     plan: str = "Pro Builder"
     avatar: str = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
+    # Preferencias de prospeccao. Ficavam so no useState da tela de
+    # Configuracoes e se perdiam a cada reload.
+    services: List[str] = Field(default_factory=lambda: ["Sites"])
+    niches: List[str] = Field(default_factory=list)
+    regions: str = ""
+    preferred_channel: str = "WhatsApp"
+    monthly_goal: str = "4 a 10"
+    language: str = "pt"
 
 class DemoSiteRequest(BaseModel):
     lead: LeadItem
@@ -126,3 +134,19 @@ class DemoSiteResponse(BaseModel):
     html_content: str = ""
     generation_time: float = 0.0
 
+
+
+class SiteCreateRequest(BaseModel):
+    company: str = ""
+    html: str
+    template: Optional[str] = ""
+    lead_id: Optional[str] = ""
+
+
+class SiteItem(BaseModel):
+    id: str
+    company: str
+    template: Optional[str] = ""
+    lead_id: Optional[str] = ""
+    created_at: str
+    html: Optional[str] = None
