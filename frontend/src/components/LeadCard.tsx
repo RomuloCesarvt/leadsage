@@ -10,12 +10,11 @@ import {
   Check, 
   Building2, 
   MapPin, 
-  Star,
-  Camera,
-  Share2
+  Star
 } from 'lucide-react';
 import type { LeadItem } from '../types';
 import { useApp } from '../context/AppContext';
+import { InstagramIcon, LinkedInIcon } from './BrandIcons';
 
 export const LeadCard: React.FC<{ lead: LeadItem }> = ({ lead }) => {
   const { setSelectedLeadForMessage } = useApp();
@@ -147,7 +146,7 @@ export const LeadCard: React.FC<{ lead: LeadItem }> = ({ lead }) => {
                 className="p-1 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors flex items-center gap-1 font-semibold text-[10px]"
                 title="LinkedIn"
               >
-                <Share2 className="w-3.5 h-3.5 text-blue-400" /> LinkedIn
+                <LinkedInIcon className="w-3.5 h-3.5" title="LinkedIn" /> LinkedIn
               </a>
             )}
             {lead.socials.instagram && (
@@ -158,7 +157,7 @@ export const LeadCard: React.FC<{ lead: LeadItem }> = ({ lead }) => {
                 className="p-1 rounded bg-pink-500/10 text-pink-400 hover:bg-pink-500/20 transition-colors flex items-center gap-1 font-semibold text-[10px]"
                 title="Instagram"
               >
-                <Camera className="w-3.5 h-3.5 text-pink-400" /> Instagram
+                <InstagramIcon className="w-3.5 h-3.5" title="Instagram" /> Instagram
               </a>
             )}
             {lead.socials.website && (

@@ -1,5 +1,8 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
+import {
+  InstagramIcon, WhatsAppIcon, FacebookIcon, LinkedInIcon, TikTokIcon, XIcon, GoogleMapsIcon,
+} from './BrandIcons';
 import { 
   X, 
   MapPin, 
@@ -10,8 +13,7 @@ import {
   Target,
   UserPlus,
   Send,
-  Globe,
-  MessageCircle
+  Globe
 } from 'lucide-react';
 
 export const LeadProfilePanel: React.FC = () => {
@@ -90,40 +92,52 @@ export const LeadProfilePanel: React.FC = () => {
               )}
             </div>
 
-            <div className="flex items-center gap-2 pt-2 notranslate" translate="no">
-              {lead.socials.linkedin && (
-                <a href={lead.socials.linkedin} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-[#0077b5] flex items-center justify-center text-white text-[10px] font-bold shadow-sm transition-transform hover:scale-110">
-                  in
-                </a>
-              )}
-              {lead.socials.instagram && (
-                <a href={lead.socials.instagram} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 flex items-center justify-center text-white text-[10px] font-bold shadow-sm transition-transform hover:scale-110">
-                  ig
-                </a>
-              )}
-              {lead.socials.facebook && (
-                <a href={lead.socials.facebook} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-[#1877f2] flex items-center justify-center text-white text-[10px] font-bold shadow-sm transition-transform hover:scale-110">
-                  fb
-                </a>
-              )}
-              {lead.whatsapp && lead.phone && (
-                <a href={`https://wa.me/${lead.phone}`} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-[#25D366] flex items-center justify-center text-white transition-transform hover:scale-110">
-                  <MessageCircle className="w-4 h-4" />
-                </a>
-              )}
+            {/* Redes do lead. Antes eram as letras "in", "ig", "fb", "tk"
+                dentro de circulos coloridos; agora sao os glifos reais. */}
+            <div className="flex items-center gap-2 pt-2">
+              {[
+                { url: lead.socials.linkedin, Icone: LinkedInIcon, cor: 'bg-[#0A66C2]', nome: 'LinkedIn' },
+                { url: lead.socials.instagram, Icone: InstagramIcon, cor: 'bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600', nome: 'Instagram' },
+                { url: lead.socials.facebook, Icone: FacebookIcon, cor: 'bg-[#0866FF]', nome: 'Facebook' },
+                { url: lead.whatsapp && lead.phone ? `https://wa.me/${lead.phone}` : null, Icone: WhatsAppIcon, cor: 'bg-[#25D366]', nome: 'WhatsApp' },
+                { url: lead.socials.x_twitter, Icone: XIcon, cor: 'bg-black', nome: 'X' },
+                { url: lead.socials.tiktok, Icone: TikTokIcon, cor: 'bg-black', nome: 'TikTok' },
+              ]
+                .filter(r => r.url)
+                .map(({ url, Icone, cor, nome }) => (
+                  <a
+                    key={nome}
+                    href={url as string}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={nome}
+                    className={`w-8 h-8 rounded-full ${cor} flex items-center justify-center text-white shadow-sm transition-transform hover:scale-110`}
+                  >
+                    <Icone className="w-4 h-4" title={nome} />
+                  </a>
+                ))}
+
               {lead.socials.website && (
-                <a href={lead.socials.website} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 flex items-center justify-center text-zinc-300 transition-transform hover:scale-110">
+                <a
+                  href={lead.socials.website}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Site oficial"
+                  className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 flex items-center justify-center text-zinc-300 transition-transform hover:scale-110"
+                >
                   <Globe className="w-4 h-4" />
                 </a>
               )}
-              {lead.socials.twitter && (
-                <a href={lead.socials.twitter} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white text-[10px] font-bold shadow-sm transition-transform hover:scale-110">
-                  𝕏
-                </a>
-              )}
-              {lead.socials.tiktok && (
-                <a href={lead.socials.tiktok} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white text-[10px] font-bold shadow-sm transition-transform hover:scale-110">
-                  tk
+
+              {lead.maps_url && (
+                <a
+                  href={lead.maps_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Ver no Google Maps"
+                  className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[#4285F4] transition-transform hover:scale-110"
+                >
+                  <GoogleMapsIcon className="w-4 h-4" title="Google Maps" />
                 </a>
               )}
             </div>

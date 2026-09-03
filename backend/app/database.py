@@ -127,6 +127,26 @@ class DBIntegration(Base):
     data = Column(JSON, nullable=True)
 
 
+class DBDocument(Base):
+    """Documentos do usuario criados a partir dos modelos.
+
+    Antes as telas de Propostas e Contratos so exibiam texto com um botao
+    de copiar: nao dava para preencher, salvar nem voltar depois.
+    """
+    __tablename__ = "documents"
+
+    id = Column(String, primary_key=True, index=True)
+    owner_uid = Column(String, index=True)
+    kind = Column(String, index=True)        # proposta | contrato
+    template_id = Column(String, nullable=True)
+    title = Column(String)
+    content = Column(Text)
+    fields = Column(JSON, nullable=True)     # valores preenchidos nos [CAMPOS]
+    lead_id = Column(String, nullable=True)
+    created_at = Column(String)
+    updated_at = Column(String)
+
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

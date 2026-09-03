@@ -9,7 +9,8 @@ import type {
   SearchHistoryItem,
   SuggestedNiche,
   SiteItem,
-  IntegrationSettings
+  IntegrationSettings,
+  DocumentItem
 } from '../types';
 import { auth } from '../lib/firebase';
 
@@ -160,6 +161,41 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(cfg)
     });
+  },
+
+  async listarDocumentos(kind?: string): Promise<DocumentItem[]> {
+    try {
+      return await fetchWithToken(`/documents${kind ? `?kind=${kind}` : ''}`);
+    } catch {
+      return [];
+    }
+  },
+
+  async obterDocumento(id: string): Promise<DocumentItem> {
+    return await fetchWithToken(`/documents/${id}`);
+  },
+
+  async criarDocumento(payload: {
+    kind: string; title: string; content: string;
+    fields?: Record<string, string>; template_id?: string; lead_id?: string;
+  }): Promise<DocumentItem> {
+    return await fetchWithToken('/documents', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async atualizarDocumento(id: string, payload: {
+    title: string; content: string; fields?: Record<string, string>;
+  }): Promise<DocumentItem> {
+    return await fetchWithToken(`/documents/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async excluirDocumento(id: string): Promise<void> {
+    await fetchWithToken(`/documents/${id}`, { method: 'DELETE' });
   },
 
   async getSuggestedNiches(): Promise<SuggestedNiche[]> {

@@ -19,7 +19,8 @@ from app.models import (
     DispatchRequest, DispatchResponse,
     CreditTopUpRequest, UserProfile,
     DemoSiteRequest, DemoSiteResponse,
-    SiteCreateRequest, SiteItem, IntegrationSettings
+    SiteCreateRequest, SiteItem, IntegrationSettings,
+    DocumentCreateRequest, DocumentUpdateRequest, DocumentItem
 )
 from app.leads_engine import LeadsEngine
 from app.ai_generator import AIGenerator
@@ -30,6 +31,9 @@ from app.firebase_config import get_current_user
 from app.profile_store import get_profile, save_profile
 from app.sites_store import create_site, list_sites, get_site, delete_site
 from app.integrations_store import get_integrations, save_integrations, public_view
+from app.documents_store import (
+    create_document, update_document, list_documents, get_document, delete_document,
+)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -330,6 +334,51 @@ async def remove_site(site_id: str, user: dict = Depends(get_current_user)):
     if not await delete_site(user.get("uid"), site_id):
         raise HTTPException(status_code=404, detail="Site nao encontrado.")
     return {"status": "deleted", "id": site_id}
+
+
+@app.post("/api/documents", response_model=DocumentItem)
+async def criar_documento(req: DocumentCreateRequest, user: dict = Depends(get_current_user)):
+    """Salva a versao preenchida de um modelo de proposta ou contrato."""
+    try:
+        return await create_document(
+            user.get("uid"), req.kind, req.title, req.content,
+            req.fields, req.template_id or "", req.lead_id or "",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/documents")
+async def listar_documentos(kind: str = None, user: dict = Depends(get_current_user)):
+    return await list_documents(user.get("uid"), kind)
+
+
+@app.get("/api/documents/{doc_id}", response_model=DocumentItem)
+async def obter_documento(doc_id: str, user: dict = Depends(get_current_user)):
+    doc = await get_document(user.get("uid"), doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Documento nao encontrado.")
+    return doc
+
+
+@app.put("/api/documents/{doc_id}", response_model=DocumentItem)
+async def atualizar_documento(
+    doc_id: str, req: DocumentUpdateRequest, user: dict = Depends(get_current_user)
+):
+    try:
+        doc = await update_document(user.get("uid"), doc_id, req.title, req.content, req.fields)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not doc:
+        raise HTTPException(status_code=404, detail="Documento nao encontrado.")
+    return doc
+
+
+@app.delete("/api/documents/{doc_id}")
+async def remover_documento(doc_id: str, user: dict = Depends(get_current_user)):
+    if not await delete_document(user.get("uid"), doc_id):
+        raise HTTPException(status_code=404, detail="Documento nao encontrado.")
+    return {"status": "deleted", "id": doc_id}
 
 
 @app.get("/api/place-photo")

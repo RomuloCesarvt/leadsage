@@ -167,3 +167,30 @@ class SiteItem(BaseModel):
     lead_id: Optional[str] = ""
     created_at: str
     html: Optional[str] = None
+
+
+class DocumentCreateRequest(BaseModel):
+    kind: str                      # proposta | contrato
+    title: str
+    content: str
+    fields: Optional[Dict[str, str]] = None
+    template_id: Optional[str] = ""
+    lead_id: Optional[str] = ""
+
+
+class DocumentUpdateRequest(BaseModel):
+    title: str
+    content: str
+    fields: Optional[Dict[str, str]] = None
+
+
+class DocumentItem(BaseModel):
+    id: str
+    kind: str
+    title: str
+    template_id: Optional[str] = ""
+    lead_id: Optional[str] = ""
+    created_at: str
+    updated_at: str
+    content: Optional[str] = None
+    fields: Optional[Dict[str, str]] = None

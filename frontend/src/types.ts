@@ -172,3 +172,15 @@ export interface IntegrationSettings {
   webhook_url?: string;
   has_password?: boolean;
 }
+
+export interface DocumentItem {
+  id: string;
+  kind: 'proposta' | 'contrato';
+  title: string;
+  template_id?: string;
+  lead_id?: string;
+  created_at: string;
+  updated_at: string;
+  content?: string;
+  fields?: Record<string, string>;
+}

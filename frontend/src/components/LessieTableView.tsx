@@ -4,11 +4,12 @@ import {
   Kanban,
   Trash2,
   Globe,
-  MessageCircle,
   Filter
 } from 'lucide-react';
 import type { LeadItem } from '../types';
 import { useApp } from '../context/AppContext';
+import { DigitalPresence } from './DigitalPresence';
+import { WhatsAppIcon, InstagramIcon } from './BrandIcons';
 
 export const LessieTableView: React.FC = () => {
   const { leads, setSelectedProfileLead, updateLeadStage } = useApp() as any;
@@ -33,6 +34,8 @@ export const LessieTableView: React.FC = () => {
     filteredLeads = filteredLeads.filter((l: LeadItem) => l.missingDigitalAssets && l.missingDigitalAssets.includes('website'));
   } else if (activeTag === 'com-whatsapp') {
     filteredLeads = filteredLeads.filter((l: LeadItem) => l.whatsapp);
+  } else if (activeTag === 'sem-instagram') {
+    filteredLeads = filteredLeads.filter((l: LeadItem) => !l.socials?.instagram);
   } else if (activeTag === 'alta-oportunidade') {
     filteredLeads = filteredLeads.filter((l: LeadItem) => (l.opportunityScore || 0) >= 70);
   }
@@ -78,7 +81,6 @@ export const LessieTableView: React.FC = () => {
           <select className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
             <option>Todos nichos</option>
           </select>
-          <input type="text" placeholder="Cidade..." className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 w-28 focus:outline-none focus:ring-2 focus:ring-blue-500" />
           
           <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 cursor-pointer">
             <input type="checkbox" checked={filterSemSite} onChange={() => setFilterSemSite(!filterSemSite)} className="rounded border-slate-300" />
@@ -99,7 +101,8 @@ export const LessieTableView: React.FC = () => {
           {[
             { key: 'favoritos', icon: <Star className="w-3 h-3" />, label: 'Favoritos' },
             { key: 'sem-site', icon: <Globe className="w-3 h-3" />, label: 'Sem Site' },
-            { key: 'com-whatsapp', icon: <MessageCircle className="w-3 h-3" />, label: 'Com WhatsApp' },
+            { key: 'com-whatsapp', icon: <WhatsAppIcon className="w-3 h-3" />, label: 'Com WhatsApp' },
+            { key: 'sem-instagram', icon: <InstagramIcon className="w-3 h-3" />, label: 'Sem Instagram' },
             { key: 'alta-oportunidade', icon: <Star className="w-3 h-3" />, label: 'Alta Oportunidade' },
           ].map(tag => (
             <button
@@ -173,23 +176,10 @@ export const LessieTableView: React.FC = () => {
                     </span>
                   </td>
                   <td className="py-4 px-4">
-                    <div className="flex flex-col gap-1">
-                      {lead.socials?.instagram ? (
-                        <span className="text-xs font-bold text-emerald-600">Instagram ✅</span>
-                      ) : (
-                        <span className="text-xs font-bold text-rose-600">Sem IG ❌</span>
-                      )}
-                      
-                      {!lead.missingDigitalAssets?.includes('website') ? (
-                        <span className="text-xs font-bold text-emerald-600">Website ✅</span>
-                      ) : (
-                        <span className="text-xs font-bold text-rose-600">Sem Site ❌</span>
-                      )}
-                      
-                      {lead.whatsapp && (
-                        <span className="text-xs font-bold text-emerald-600">WhatsApp ✅</span>
-                      )}
-                    </div>
+                    <DigitalPresence
+                      lead={lead}
+                      canais={['website', 'instagram', 'whatsapp', 'facebook', 'email']}
+                    />
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
