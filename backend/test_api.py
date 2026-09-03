@@ -8,52 +8,16 @@ busca que era decorativo.
 Cada bloco checa tambem o isolamento entre contas: um usuario nao pode
 ler nem apagar o que e de outro.
 
+Fixtures (`client`, `as_user`) vem de conftest.py.
+
 Rodar:  cd backend && python -m pytest test_api.py -v
 """
 import os
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
-
-import app.database as database
-
-TEST_DB = "./test_api_tmp.db"
-
-# Redireciona o banco antes de importar quem abre sessao
-database.engine = create_async_engine(f"sqlite+aiosqlite:///{TEST_DB}")
-database.AsyncSessionLocal = sessionmaker(
-    database.engine, class_=AsyncSession, expire_on_commit=False
-)
-
-import app.profile_store as profile_store  # noqa: E402
-import app.sites_store as sites_store  # noqa: E402
-from app.firebase_config import get_current_user  # noqa: E402
-from app.main import app  # noqa: E402
-
-profile_store.AsyncSessionLocal = database.AsyncSessionLocal
-sites_store.AsyncSessionLocal = database.AsyncSessionLocal
-
-CURRENT_UID = {"value": "alice"}
-app.dependency_overrides[get_current_user] = lambda: {"uid": CURRENT_UID["value"]}
 
 HTML = "<!DOCTYPE html><html><body><h1>Padaria Teste</h1></body></html>"
 
-
-@pytest.fixture
-def client():
-    if os.path.exists(TEST_DB):
-        os.remove(TEST_DB)
-    CURRENT_UID["value"] = "alice"
-    with TestClient(app) as c:
-        yield c
-    if os.path.exists(TEST_DB):
-        os.remove(TEST_DB)
-
-
-def as_user(uid):
-    CURRENT_UID["value"] = uid
 
 
 def base_profile(**overrides):
@@ -79,7 +43,7 @@ def test_perfil_persiste(client):
     assert saved["regions"] == "Salvador, BA"
 
 
-def test_perfil_nao_vaza_entre_usuarios(client):
+def test_perfil_nao_vaza_entre_usuarios(client, as_user):
     """CURRENT_USER era uma global de modulo: um perfil para todo mundo."""
     client.put("/api/profile", json=base_profile())
 
@@ -117,7 +81,7 @@ def test_site_vazio_e_rejeitado(client):
     assert client.post("/api/sites", json={"company": "X", "html": "   "}).status_code == 400
 
 
-def test_sites_sao_isolados_por_usuario(client):
+def test_sites_sao_isolados_por_usuario(client, as_user):
     site_id = client.post("/api/sites", json={"company": "Padaria", "html": HTML}).json()["id"]
 
     as_user("bob")
@@ -137,7 +101,7 @@ def test_sites_sao_isolados_por_usuario(client):
     not os.getenv("GOOGLE_MAPS_API_KEY"),
     reason="precisa da GOOGLE_MAPS_API_KEY para gerar uma busca real",
 )
-def test_historico_pode_ser_excluido_e_e_isolado(client):
+def test_historico_pode_ser_excluido_e_e_isolado(client, as_user):
     """O botao de excluir busca nao tinha onClick nem rota."""
     body = {"niche": "Padarias", "location": "Botucatu, SP, Brazil", "limit": 3}
     search_id = client.post("/api/search-leads", json=body).json()["search_id"]

@@ -18,16 +18,17 @@ from app.models import (
     DispatchRequest, DispatchResponse,
     CreditTopUpRequest, UserProfile,
     DemoSiteRequest, DemoSiteResponse,
-    SiteCreateRequest, SiteItem
+    SiteCreateRequest, SiteItem, IntegrationSettings
 )
 from app.leads_engine import LeadsEngine
 from app.ai_generator import AIGenerator
-from app.dispatcher import OutreachDispatcher
+from app.dispatcher import OutreachDispatcher, DispatchError
 from app.credit_system import check_and_deduct_credits, get_user_balance, add_credits
 import httpx
 from app.firebase_config import get_current_user
 from app.profile_store import get_profile, save_profile
 from app.sites_store import create_site, list_sites, get_site, delete_site
+from app.integrations_store import get_integrations, save_integrations, public_view
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -198,29 +199,57 @@ async def generate_demo_site(request: Request, req: DemoSiteRequest, user: dict 
     return await AIGenerator.generate_demo_site(req, api_key=gemini_key)
 
 @app.post("/api/dispatch", response_model=DispatchResponse)
-async def dispatch_outreach(req: DispatchRequest, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def dispatch_outreach(
+    req: DispatchRequest,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Dispara a mensagem e so cobra o que foi de fato entregue.
+
+    Antes o credito era debitado sempre, inclusive quando o SMTP falhava
+    ou quando o canal nem tinha envio real, e o lead era marcado como
+    "Enviado" de qualquer jeito.
+    """
     uid = user.get("uid")
-    balance_data = await get_user_balance(uid)
-    current_credits = balance_data.get("credits", 0)
+    balance = await get_user_balance(uid)
+    current_credits = balance.get("credits", 0)
+    config = await get_integrations(uid)
 
     try:
-        response, remaining = await OutreachDispatcher.dispatch_message(req, current_credits)
+        response = await OutreachDispatcher.dispatch_message(req, current_credits, config)
     except ValueError as e:
         raise HTTPException(status_code=402, detail=str(e))
+    except DispatchError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
-    # Update lead status in DB
     result = await db.execute(select(DBLead).where(DBLead.id == req.lead_id))
     lead = result.scalar_one_or_none()
     if lead:
-        lead.outreach_status = "Enviado"
+        # Um link gerado nao e uma mensagem entregue
+        lead.outreach_status = "Enviado" if response.delivered else "Aguardando envio manual"
         lead.last_contacted_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         lead.last_message = req.body
         await db.commit()
 
-    # Log deduction
-    await check_and_deduct_credits(uid, 2)
+    if response.credits_consumed:
+        remaining = await check_and_deduct_credits(uid, response.credits_consumed)
+        if remaining is not None:
+            response.remaining_credits = remaining
 
     return response
+
+
+@app.get("/api/integrations")
+async def read_integrations(user: dict = Depends(get_current_user)):
+    """Nunca devolve a senha SMTP: so `has_password`."""
+    return public_view(await get_integrations(user.get("uid")))
+
+
+@app.put("/api/integrations")
+async def update_integrations(
+    req: IntegrationSettings, user: dict = Depends(get_current_user)
+):
+    return await save_integrations(user.get("uid"), req.model_dump())
 
 @app.get("/api/credits/balance")
 async def get_credits_balance(user: dict = Depends(get_current_user)):

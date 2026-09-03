@@ -8,7 +8,8 @@ import type {
   UserProfile,
   SearchHistoryItem,
   SuggestedNiche,
-  SiteItem
+  SiteItem,
+  IntegrationSettings
 } from '../types';
 import { auth } from '../lib/firebase';
 
@@ -144,6 +145,21 @@ export const api = {
 
   async deleteSearchHistory(id: string): Promise<void> {
     await fetchWithToken(`/history/${id}`, { method: 'DELETE' });
+  },
+
+  async getIntegrations(): Promise<IntegrationSettings> {
+    try {
+      return await fetchWithToken('/integrations');
+    } catch {
+      return { smtp_port: 587, has_password: false };
+    }
+  },
+
+  async saveIntegrations(cfg: IntegrationSettings): Promise<IntegrationSettings> {
+    return await fetchWithToken('/integrations', {
+      method: 'PUT',
+      body: JSON.stringify(cfg)
+    });
   },
 
   async getSuggestedNiches(): Promise<SuggestedNiche[]> {

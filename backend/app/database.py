@@ -114,6 +114,19 @@ class DBSite(Base):
     created_at = Column(String)
 
 
+class DBIntegration(Base):
+    """Credenciais de envio por usuario (SMTP, webhook).
+
+    Antes o modal de Integracoes so exibia "Configuracoes salvas com
+    sucesso!" e fechava, sem gravar nada: o SMTP do usuario nunca chegava
+    ao backend e todo e-mail caia no modo simulado.
+    """
+    __tablename__ = "integrations"
+
+    uid = Column(String, primary_key=True, index=True)
+    data = Column(JSON, nullable=True)
+
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

@@ -88,9 +88,11 @@ export interface PitchGenerationResponse {
 export interface DispatchRequest {
   lead_id: string;
   lead_name: string;
-  lead_email: string;
+  lead_email?: string;
   lead_instagram?: string;
-  channel: 'email' | 'instagram_direct' | 'linkedin_msg' | 'webhook';
+  lead_linkedin?: string;
+  lead_phone?: string;
+  channel: 'email' | 'whatsapp' | 'instagram_direct' | 'linkedin_msg' | 'webhook';
   subject?: string;
   body: string;
 }
@@ -100,6 +102,9 @@ export interface DispatchResponse {
   lead_id: string;
   channel: string;
   status: string;
+  delivered: boolean;
+  requires_manual_send: boolean;
+  action_url: string;
   delivered_at: string;
   credits_consumed: number;
   remaining_credits: number;
@@ -156,4 +161,14 @@ export interface SiteItem {
   lead_id?: string;
   created_at: string;
   html?: string;
+}
+
+export interface IntegrationSettings {
+  smtp_host?: string;
+  smtp_port?: number;
+  smtp_user?: string;
+  smtp_password?: string;
+  from_email?: string;
+  webhook_url?: string;
+  has_password?: boolean;
 }

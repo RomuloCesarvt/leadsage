@@ -9,7 +9,9 @@ import {
   Loader2, 
   Coins, 
   Bot,
-  Camera
+  Camera,
+  MessageCircle,
+  Webhook
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../context/AppContext';
@@ -25,7 +27,8 @@ export const MessageEditorModal: React.FC = () => {
   } = useApp();
 
   const [tone, setTone] = useState<string>('Consultivo');
-  const [channel, setChannel] = useState<'email' | 'instagram_direct' | 'linkedin_msg' | 'webhook'>('email');
+  const [channel, setChannel] = useState<'email' | 'whatsapp' | 'instagram_direct' | 'linkedin_msg' | 'webhook'>('email');
+  const [dispatchError, setDispatchError] = useState<string | null>(null);
   const [subject, setSubject] = useState<string>('');
   const [body, setBody] = useState<string>('');
   const [customInstructions, setCustomInstructions] = useState<string>('');
@@ -34,6 +37,10 @@ export const MessageEditorModal: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const lead = selectedLeadForMessage;
+
+  // WhatsApp, Instagram e LinkedIn não têm API de envio: a plataforma
+  // abre com a mensagem copiada e nada é cobrado.
+  const isManualChannel = ['whatsapp', 'instagram_direct', 'linkedin_msg'].includes(channel);
 
   const handleGeneratePitch = async () => {
     if (!lead) return;
@@ -66,6 +73,7 @@ export const MessageEditorModal: React.FC = () => {
     if (!lead || !body.trim()) return;
     setIsSending(true);
     setSuccessMessage(null);
+    setDispatchError(null);
 
     try {
       const res = await api.dispatchMessage({
@@ -73,6 +81,8 @@ export const MessageEditorModal: React.FC = () => {
         lead_name: lead.name,
         lead_email: lead.email,
         lead_instagram: lead.socials.instagram,
+        lead_linkedin: lead.socials.linkedin,
+        lead_phone: lead.phone,
         channel,
         subject,
         body
@@ -81,18 +91,31 @@ export const MessageEditorModal: React.FC = () => {
       setUser(prev => prev ? { ...prev, credits: res.remaining_credits } : prev);
 
       setLeads(prevLeads =>
-        prevLeads.map(l => (l.id === lead.id ? { ...l, outreach_status: 'Enviado' } : l))
+        prevLeads.map(l => (l.id === lead.id
+          ? { ...l, outreach_status: res.delivered ? 'Enviado' : 'Aguardando envio manual' }
+          : l))
       );
 
       setSuccessMessage(res.status);
 
-      confetti({
-        particleCount: 70,
-        spread: 60,
-        origin: { y: 0.6 }
-      });
+      // Canais sem API de envio: copia a mensagem e abre o destino, em
+      // vez de fingir que a plataforma foi acionada.
+      if (res.requires_manual_send && res.action_url) {
+        try {
+          await navigator.clipboard.writeText(body);
+        } catch {
+          /* a área de transferência pode estar bloqueada */
+        }
+        window.open(res.action_url, '_blank', 'noopener,noreferrer');
+      }
+
+      // Confete só para entrega real. Antes ele disparava até quando a
+      // resposta era "Erro no Envio: ..." ou "(Simulado)".
+      if (res.delivered) {
+        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+      }
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Erro ao realizar disparo automatizado.");
+      setDispatchError(err?.message || 'Erro ao realizar o disparo.');
     } finally {
       setIsSending(false);
     }
@@ -127,14 +150,25 @@ export const MessageEditorModal: React.FC = () => {
 
         <div className="p-6 overflow-y-auto space-y-5 flex-1">
           {successMessage && (
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center justify-between animate-fadeIn">
+            <div className={`p-4 rounded-xl border text-xs font-semibold flex items-center justify-between animate-fadeIn ${
+              isManualChannel
+                ? 'bg-amber-500/10 border-amber-500/40 text-amber-300'
+                : 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
+            }`}>
               <span className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                Mensagem disparada com sucesso! Status: {successMessage}
+                <CheckCircle2 className={`w-4 h-4 shrink-0 ${isManualChannel ? 'text-amber-400' : 'text-emerald-400'}`} />
+                {successMessage}
               </span>
-              <span className="bg-emerald-500/20 px-2 py-0.5 rounded text-[10px]">
-                -2 Créditos
+              <span className={`px-2 py-0.5 rounded text-[10px] ${isManualChannel ? 'bg-amber-500/20' : 'bg-emerald-500/20'}`}>
+                {isManualChannel ? 'Sem custo' : '-2 Créditos'}
               </span>
+            </div>
+          )}
+
+          {dispatchError && (
+            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/40 text-red-300 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
+              <X className="w-4 h-4 text-red-400 shrink-0" />
+              {dispatchError}
             </div>
           )}
 
@@ -174,16 +208,49 @@ export const MessageEditorModal: React.FC = () => {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setChannel('whatsapp')}
+                  disabled={!lead.phone}
+                  title={lead.phone ? 'Abre o WhatsApp com a mensagem pronta' : 'Este lead não tem telefone'}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                    channel === 'whatsapp'
+                      ? 'bg-emerald-600 border-emerald-500 text-white'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                </button>
+                <button
+                  type="button"
                   onClick={() => setChannel('instagram_direct')}
-                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border transition-all ${
+                  disabled={!lead.socials.instagram}
+                  title={lead.socials.instagram ? 'Abre o perfil com a mensagem copiada' : 'Este lead não tem Instagram'}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                     channel === 'instagram_direct'
                       ? 'bg-pink-600 border-pink-500 text-white'
                       : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <Camera className="w-3.5 h-3.5" /> Direct Bot
+                  <Camera className="w-3.5 h-3.5" /> Instagram
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChannel('webhook')}
+                  title="Envia o payload para a automação configurada em Integrações"
+                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border transition-all ${
+                    channel === 'webhook'
+                      ? 'bg-amber-600 border-amber-500 text-white'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Webhook className="w-3.5 h-3.5" /> Webhook
                 </button>
               </div>
+              {isManualChannel && (
+                <p className="text-[11px] text-amber-400/90 leading-snug">
+                  Não existe API pública para enviar por aqui. A LeadSage copia a
+                  mensagem e abre a conversa para você concluir — sem gastar créditos.
+                </p>
+              )}
             </div>
           </div>
 

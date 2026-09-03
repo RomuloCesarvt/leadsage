@@ -1,27 +1,67 @@
-import React, { useState } from 'react';
-import { X, Mail, Check, Server, Key, Globe } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Mail, Check, Server, Key, Globe, AlertCircle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { api } from '../services/api';
 
 export const IntegrationsModal: React.FC = () => {
   const { isIntegrationsModalOpen, setIsIntegrationsModalOpen } = useApp();
 
   const [activeTab, setActiveTab] = useState<'smtp' | 'snov' | 'webhook'>('smtp');
-  const [smtpHost, setSmtpHost] = useState('smtp.gmail.com');
+  const [smtpHost, setSmtpHost] = useState('');
   const [smtpPort, setSmtpPort] = useState('587');
-  const [smtpUser, setSmtpUser] = useState('seu-email@gmail.com');
-  const [snovApiKey, setSnovApiKey] = useState('snov_live_839210491823901283');
-  const [webhookUrl, setWebhookUrl] = useState('https://hooks.zapier.com/hooks/catch/12345/abcde/');
+  const [smtpUser, setSmtpUser] = useState('');
+  const [smtpPassword, setSmtpPassword] = useState('');
+  const [hasPassword, setHasPassword] = useState(false);
+  const [snovApiKey, setSnovApiKey] = useState('');
+  const [webhookUrl, setWebhookUrl] = useState('');
   const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+
+  // Carrega a configuração real. Antes os campos abriam com valores
+  // fictícios e o formulário não gravava nada em lugar nenhum.
+  useEffect(() => {
+    if (!isIntegrationsModalOpen) return;
+    let active = true;
+    setSaveError('');
+    setSmtpPassword('');
+    api.getIntegrations().then(cfg => {
+      if (!active) return;
+      setSmtpHost(cfg.smtp_host || '');
+      setSmtpPort(String(cfg.smtp_port || 587));
+      setSmtpUser(cfg.smtp_user || '');
+      setWebhookUrl(cfg.webhook_url || '');
+      setHasPassword(Boolean(cfg.has_password));
+    });
+    return () => { active = false; };
+  }, [isIntegrationsModalOpen]);
 
   if (!isIntegrationsModalOpen) return null;
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaved(true);
-    setTimeout(() => {
-      setIsSaved(false);
-      setIsIntegrationsModalOpen(false);
-    }, 1200);
+    setIsSaving(true);
+    setSaveError('');
+    try {
+      await api.saveIntegrations({
+        smtp_host: smtpHost,
+        smtp_port: Number(smtpPort) || 587,
+        smtp_user: smtpUser,
+        // Em branco significa "manter a senha atual"
+        smtp_password: smtpPassword,
+        from_email: smtpUser,
+        webhook_url: webhookUrl,
+      });
+      setIsSaved(true);
+      setTimeout(() => {
+        setIsSaved(false);
+        setIsIntegrationsModalOpen(false);
+      }, 1200);
+    } catch (err: any) {
+      setSaveError(err?.message || 'Não foi possível salvar.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -113,10 +153,15 @@ export const IntegrationsModal: React.FC = () => {
                 <label className="text-xs font-semibold text-slate-300">Senha de App / API Key</label>
                 <input
                   type="password"
-                  value="••••••••••••••••"
-                  readOnly
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-400 font-mono"
+                  value={smtpPassword}
+                  onChange={(e) => setSmtpPassword(e.target.value)}
+                  placeholder={hasPassword ? 'Senha salva — deixe em branco para manter' : 'Cole aqui a Senha de App'}
+                  autoComplete="new-password"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 font-mono placeholder-slate-600"
                 />
+                <p className="text-[11px] text-slate-400">
+                  No Gmail é preciso uma Senha de App (a senha normal da conta é recusada).
+                </p>
               </div>
             </div>
           )}
@@ -161,6 +206,12 @@ export const IntegrationsModal: React.FC = () => {
             </div>
           )}
 
+          {saveError && (
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" /> {saveError}
+            </div>
+          )}
+
           <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-800">
             <button
               type="button"
@@ -171,9 +222,17 @@ export const IntegrationsModal: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/30"
+              disabled={isSaving}
+              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/30"
             >
-              <Check className="w-4 h-4" /> Salvar Integração
+              {isSaving ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  Salvando...
+                </>
+              ) : (
+                <><Check className="w-4 h-4" /> Salvar Integração</>
+              )}
             </button>
           </div>
         </form>

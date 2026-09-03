@@ -85,22 +85,39 @@ class PitchGenerationResponse(BaseModel):
 class DispatchRequest(BaseModel):
     lead_id: str
     lead_name: str
-    lead_email: str
+    lead_email: str = ""
     lead_instagram: Optional[str] = None
-    channel: str = "email" # email, instagram_direct, linkedin_msg, webhook
+    lead_linkedin: Optional[str] = None
+    lead_phone: Optional[str] = ""
+    # email e webhook enviam de verdade; whatsapp, instagram_direct e
+    # linkedin_msg nao tem API de envio e devolvem link de acao
+    channel: str = "email"
     subject: Optional[str] = ""
     body: str
-    smtp_setting_id: Optional[str] = "default"
 
 class DispatchResponse(BaseModel):
     dispatch_id: str
     lead_id: str
     channel: str
     status: str
+    # Antes toda resposta era 200 com texto de sucesso, mesmo quando o
+    # envio falhava ou nem existia. A interface comemorava por engano.
+    delivered: bool = False
+    requires_manual_send: bool = False
+    action_url: str = ""
     delivered_at: str
     credits_consumed: int
     remaining_credits: int
     message_preview: str
+
+
+class IntegrationSettings(BaseModel):
+    smtp_host: Optional[str] = ""
+    smtp_port: Optional[int] = 587
+    smtp_user: Optional[str] = ""
+    smtp_password: Optional[str] = ""
+    from_email: Optional[str] = ""
+    webhook_url: Optional[str] = ""
 
 class CreditTopUpRequest(BaseModel):
     amount: int
