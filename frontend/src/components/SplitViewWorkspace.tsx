@@ -85,7 +85,7 @@ function leadsToTSV(leads: LeadItem[]): string {
 }
 
 export const SplitViewWorkspace: React.FC = () => {
-  const { leads } = useApp() as any;
+  const { leads, isLoading } = useApp() as any;
 
   const handleExportCSV = () => {
     if (leads.length === 0) return alert('Nenhum lead para exportar.');

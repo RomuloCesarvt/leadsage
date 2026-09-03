@@ -96,9 +96,8 @@ export const NovaBuscaScreen: React.FC = () => {
   const [country, setCountry] = useState('BR');
   const [state, setState] = useState('');
   const [city, setCity] = useState('');
-  const [neighborhood, setNeighborhood] = useState('');
-  const [radius, setRadius] = useState('10');
-  const [searchLimit, setSearchLimit] = useState(10);
+  const [neighborhood] = useState('');
+  const [searchLimit] = useState(10);
   const [isSearching, setIsSearching] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(NICHE_CATEGORIES[0].category);
 
@@ -301,7 +300,8 @@ export const NovaBuscaScreen: React.FC = () => {
               )}
             </div>
           </div>
-
+        </div>
+      </div>
       {/* Floating Action Button */}
       <div className="fixed bottom-8 right-8 z-30">
         <button 
