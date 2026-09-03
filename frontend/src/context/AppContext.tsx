@@ -119,6 +119,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const performLeadSearch = async (niche: string, location: string, limit: number = 10) => {
     setIsLoading(true);
+    setLeads([]);
     setViewState('workspace');
     try {
       const res = await api.searchLeads({ niche, location, limit });

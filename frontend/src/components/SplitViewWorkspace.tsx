@@ -115,13 +115,15 @@ export const SplitViewWorkspace: React.FC = () => {
         <div className="flex items-center gap-3">
           <button 
             onClick={handleExportCSV}
-            className="flex items-center gap-2 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600 transition-colors"
+            disabled={isLoading || leads.length === 0}
+            className="flex items-center gap-2 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600 transition-colors disabled:opacity-50"
           >
             <Download className="w-4 h-4" /> CSV
           </button>
           <button 
             onClick={handleExportExcel}
-            className="flex items-center gap-2 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600 transition-colors"
+            disabled={isLoading || leads.length === 0}
+            className="flex items-center gap-2 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600 transition-colors disabled:opacity-50"
           >
             <Download className="w-4 h-4" /> Excel
           </button>
@@ -130,7 +132,22 @@ export const SplitViewWorkspace: React.FC = () => {
 
       {/* Main Table Area */}
       <div className="flex-1 flex flex-col overflow-hidden w-full relative">
-        <LessieTableView />
+        {isLoading ? (
+          <div className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-8 animate-pulse">
+            <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-6"></div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">Buscando oportunidades no Google Maps...</h3>
+            <p className="text-slate-500 text-center max-w-md">
+              A inteligência artificial está varrendo a região, coletando dados de empresas, contatos e analisando a presença digital de cada uma. Isso pode levar alguns segundos.
+            </p>
+            <div className="w-full max-w-2xl mt-10 space-y-3">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="h-16 w-full bg-slate-100 rounded-xl"></div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <LessieTableView />
+        )}
       </div>
       
     </div>
