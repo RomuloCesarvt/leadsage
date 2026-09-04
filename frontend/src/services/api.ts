@@ -11,7 +11,8 @@ import type {
   SiteItem,
   IntegrationSettings,
   DocumentItem,
-  CreditPackage
+  CreditPackage,
+  PlanoAtual
 } from '../types';
 import { auth } from '../lib/firebase';
 
@@ -150,6 +151,38 @@ export const api = {
     } catch {
       return [];
     }
+  },
+
+  async meuPlano(): Promise<PlanoAtual> {
+    try {
+      return await fetchWithToken('/plan');
+    } catch {
+      return { plan_id: 'previa', nome: 'Prévia Gratuita', credits: 5, sites: 1,
+               paises: ['BR'], recursos: [], admin: false };
+    }
+  },
+
+  // A exportação passou a ser rota do backend: no navegador não havia
+  // como controlar o plano.
+  async exportarLeads(): Promise<void> {
+    const user = auth.currentUser;
+    const token = user ? await user.getIdToken() : '';
+    const resp = await fetch(`${API_BASE_URL}/leads/export`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!resp.ok) {
+      const erro = await resp.json().catch(() => ({}));
+      throw new Error(erro.detail || 'Não foi possível exportar.');
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'leads-leadsage.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   },
 
   async cotaDeSites(): Promise<{ usados: number; cota: number | null; ilimitado: boolean }> {

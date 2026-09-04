@@ -33,7 +33,7 @@ EDITABLE_FIELDS = (
 # Concedidos pela compra: sao LIDOS do armazenamento, mas nunca aceitos
 # vindos do usuario. Separar leitura de escrita e o ponto: filtrar os
 # dois lados faria a cota sumir logo apos ser concedida.
-SYSTEM_FIELDS = ("plan", "sites_quota")
+SYSTEM_FIELDS = ("plan", "plan_id", "sites_quota")
 
 
 def _clean(payload: Dict[str, Any], sistema: bool = False) -> Dict[str, Any]:
@@ -106,7 +106,7 @@ async def save_profile(uid: str, payload: Dict[str, Any]) -> UserProfile:
     return await get_profile(uid)
 
 
-async def conceder_plano(uid: str, plano: str, sites: int) -> None:
+async def conceder_plano(uid: str, plano: str, sites: int, plan_id: str = "") -> None:
     """Aplica o plano comprado. Chamado apenas pela confirmacao de pagamento.
 
     Passa por fora de EDITABLE_FIELDS: estes campos existem justamente
@@ -114,6 +114,8 @@ async def conceder_plano(uid: str, plano: str, sites: int) -> None:
     """
     atual = await get_profile(uid)
     dados = {"plan": plano, "sites_quota": (atual.sites_quota or 0) + sites}
+    if plan_id:
+        dados["plan_id"] = plan_id
 
     if firestore_db is not None:
         try:

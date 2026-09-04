@@ -49,6 +49,52 @@ def client():
 
 
 @pytest.fixture
+def com_plano():
+    """Concede um plano ao usuario do teste.
+
+    Com o gating por plano, a maioria dos testes precisa declarar de qual
+    plano esta falando — o padrao de quem nunca comprou e a Previa
+    Gratuita, que quase nada libera.
+
+    Escreve direto no SQLite em vez de chamar conceder_plano(): a funcao
+    e async e o engine do SQLAlchemy fica preso ao loop que o TestClient
+    ja esta usando, o que dava RuntimeError.
+    """
+    import json as _json
+    import sqlite3
+
+    from app.payments import plano_de
+
+    def _dar(plan_id="agencia", uid=None):
+        plano = plano_de(plan_id)
+        alvo = uid or CURRENT_UID["value"]
+        con = sqlite3.connect(TEST_DB)
+        try:
+            con.execute(
+                "CREATE TABLE IF NOT EXISTS user_profiles (uid TEXT PRIMARY KEY, data JSON)"
+            )
+            linha = con.execute(
+                "SELECT data FROM user_profiles WHERE uid = ?", (alvo,)
+            ).fetchone()
+            dados = _json.loads(linha[0]) if linha and linha[0] else {}
+            dados.update({
+                "plan": plano["nome"],
+                "plan_id": plan_id,
+                "sites_quota": (dados.get("sites_quota") or 0) + plano["sites"],
+            })
+            con.execute(
+                "INSERT INTO user_profiles (uid, data) VALUES (?, ?) "
+                "ON CONFLICT(uid) DO UPDATE SET data = excluded.data",
+                (alvo, _json.dumps(dados)),
+            )
+            con.commit()
+        finally:
+            con.close()
+
+    return _dar
+
+
+@pytest.fixture
 def as_user():
     """Troca a identidade no meio do teste, para checar isolamento."""
     def _switch(uid: str):

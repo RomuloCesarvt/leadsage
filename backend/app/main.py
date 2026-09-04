@@ -35,6 +35,7 @@ from app.integrations_store import get_integrations, save_integrations, public_v
 from app.payments import (
     catalogo, criar_pedido, obter_pedido, listar_pedidos,
     confirmar_pagamento, achar_pacote, vincular_cobranca,
+    tem_recurso, paises_do_plano, plano_de,
 )
 from app import mercadopago
 from app.documents_store import (
@@ -66,6 +67,44 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+async def exigir_recurso(user: dict, recurso: str, o_que: str) -> str:
+    """Barra o acesso quando o plano do usuario nao inclui o recurso.
+
+    Admin passa direto — voce precisa testar tudo sem comprar plano.
+    Devolve o plan_id para quem precisar dele em seguida.
+    """
+    if is_admin(user.get("email")):
+        return "agencia"
+
+    perfil = await get_profile(user.get("uid"))
+    plan_id = perfil.plan_id or "previa"
+    if not tem_recurso(plan_id, recurso):
+        raise HTTPException(
+            status_code=402,
+            detail=(
+                f"{o_que} não está disponível no plano {plano_de(plan_id)['nome']}. "
+                "Faça um upgrade em Assinatura."
+            ),
+        )
+    return plan_id
+
+
+NOMES_PAIS = {"BR": "Brasil", "PT": "Portugal", "US": "Estados Unidos"}
+
+
+def detectar_pais(location: str) -> str:
+    """Deduz o pais do texto de localizacao vindo do seletor da tela."""
+    texto = (location or "").lower()
+    if "portugal" in texto:
+        return "PT"
+    if "united states" in texto or "estados unidos" in texto or texto.strip().endswith(", usa"):
+        return "US"
+    if "brazil" in texto or "brasil" in texto or not texto:
+        return "BR"
+    # Pais nao mapeado: trata como internacional, que exige plano pago
+    return "OUTRO"
+
 
 # Formato real da referencia de foto da Places API: places/<id>/photos/<id>
 PLACE_PHOTO_RE = re.compile(r"places/[A-Za-z0-9_-]+/photos/[A-Za-z0-9_-]+")
@@ -123,6 +162,20 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
                 "Reduza a quantidade de leads ou recarregue em Assinatura."
             )
         )
+
+    # Previa e Start buscam so no Brasil; Portugal e EUA a partir do Pro.
+    if not is_admin(email):
+        perfil_busca = await get_profile(uid)
+        permitidos = paises_do_plano(perfil_busca.plan_id or "previa")
+        pais = detectar_pais(req.location)
+        if pais not in permitidos:
+            raise HTTPException(
+                status_code=402,
+                detail=(
+                    f"Buscar em {NOMES_PAIS.get(pais, pais)} exige o plano Pro ou superior. "
+                    "Seu plano atual busca apenas no Brasil."
+                ),
+            )
 
     try:
         leads = await LeadsEngine.search_leads(
@@ -213,6 +266,7 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
 
 @app.post("/api/generate-pitch", response_model=PitchGenerationResponse)
 async def generate_pitch(request: Request, req: PitchGenerationRequest, user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "ia_abordagem", "A IA de abordagem")
     gemini_key = settings.GEMINI_API_KEY
     return await AIGenerator.generate_pitch(req, api_key=gemini_key)
 
@@ -233,6 +287,7 @@ async def dispatch_outreach(
     ou quando o canal nem tinha envio real, e o lead era marcado como
     "Enviado" de qualquer jeito.
     """
+    await exigir_recurso(user, "ia_abordagem", "O disparo")
     uid = user.get("uid")
     email = user.get("email")
     balance = await get_user_balance(uid, email)
@@ -452,6 +507,7 @@ async def publish_site(req: SiteCreateRequest, user: dict = Depends(get_current_
     creditos.
     """
     uid = user.get("uid")
+    await exigir_recurso(user, "publicar_site", "Publicar o site")
 
     if not is_admin(user.get("email")):
         perfil = await get_profile(uid)
@@ -472,6 +528,60 @@ async def publish_site(req: SiteCreateRequest, user: dict = Depends(get_current_
         return await create_site(uid, req.company, req.html, req.template or "", req.lead_id or "")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/leads/export")
+async def exportar_leads(user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Exporta os leads do usuario em CSV.
+
+    A exportacao acontecia so no navegador, sem passar pelo backend, o
+    que impedia qualquer controle de plano.
+    """
+    await exigir_recurso(user, "exportar_leads", "Exportar leads")
+
+    result = await db.execute(select(DBLead).where(DBLead.owner_uid == user.get("uid")))
+    leads = result.scalars().all()
+
+    colunas = [
+        "Empresa", "Categoria", "Cidade", "Endereco", "Telefone", "WhatsApp",
+        "E-mail", "Site", "Instagram", "Facebook", "Nota", "Avaliacoes",
+        "Oportunidade", "Falta", "Google Maps",
+    ]
+
+    def escapar(valor) -> str:
+        texto = "" if valor is None else str(valor)
+        return '"' + texto.replace('"', '""') + '"'
+
+    linhas = [",".join(colunas)]
+    for l in leads:
+        redes = l.socials or {}
+        linhas.append(",".join(escapar(v) for v in [
+            l.company, l.role, l.city, l.address, l.phone,
+            "sim" if l.whatsapp else "nao", l.email, l.website,
+            redes.get("instagram", ""), redes.get("facebook", ""),
+            l.rating, l.rating_count, l.opportunityScore,
+            "; ".join(l.missingDigitalAssets or []), l.maps_url,
+        ]))
+
+    # BOM para o Excel abrir os acentos corretamente
+    conteudo = chr(65279) + chr(10).join(linhas)   # BOM: Excel abre os acentos
+    return Response(
+        content=conteudo,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="leads-leadsage.csv"'},
+    )
+
+
+@app.get("/api/plan")
+async def meu_plano(user: dict = Depends(get_current_user)):
+    """O que o plano do usuario libera, para a tela nao oferecer o que
+    vai ser barrado depois."""
+    if is_admin(user.get("email")):
+        plano = plano_de("agencia")
+        return {**plano, "plan_id": "agencia", "admin": True}
+    perfil = await get_profile(user.get("uid"))
+    plano = plano_de(perfil.plan_id or "previa")
+    return {**plano, "plan_id": plano["id"], "admin": False}
 
 
 @app.get("/api/sites/quota")
@@ -508,6 +618,8 @@ async def remove_site(site_id: str, user: dict = Depends(get_current_user)):
 @app.post("/api/documents", response_model=DocumentItem)
 async def criar_documento(req: DocumentCreateRequest, user: dict = Depends(get_current_user)):
     """Salva a versao preenchida de um modelo de proposta ou contrato."""
+    recurso = "propostas" if req.kind == "proposta" else "contratos"
+    await exigir_recurso(user, recurso, f"Criar {req.kind}s")
     try:
         return await create_document(
             user.get("uid"), req.kind, req.title, req.content,

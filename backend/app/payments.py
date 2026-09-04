@@ -30,7 +30,36 @@ from app.database import AsyncSessionLocal, DBOrder
 #
 # Os planos são VITALÍCIOS — pagamento único, não assinatura mensal. Os
 # valores vêm da tela de Assinatura, que já os definia.
+# Cada plano declara o que libera. Ate agora tudo era liberado para
+# todo mundo: quem comprasse o Start tinha exatamente o mesmo acesso de
+# quem comprasse o Agencia, e nao havia nada para dar de graca.
+RECURSOS = (
+    "publicar_site",       # a previa cria e edita, mas nao publica
+    "exportar_leads",
+    "ia_abordagem",
+    "pipeline",
+    "propostas",
+    "contratos",
+    "precificador",
+    "marca_propria",       # sem o selo do LeadSage no site gerado
+    "templates_premium",
+    "suporte_prioritario",
+    "recarga",
+)
+
 PLANS: List[Dict[str, Any]] = [
+    {
+        "id": "previa",
+        "tipo": "plano",
+        "nome": "Prévia Gratuita",
+        "credits": 5,
+        "sites": 1,
+        "amount_cents": 0,
+        "paises": ["BR"],
+        "recursos": [],
+        "descricao": "5 leads reais e 1 site para conhecer, sem cartão.",
+        "destaque": False,
+    },
     {
         "id": "start",
         "tipo": "plano",
@@ -38,6 +67,8 @@ PLANS: List[Dict[str, Any]] = [
         "credits": 150,
         "sites": 10,
         "amount_cents": 6700,
+        "paises": ["BR"],
+        "recursos": ["publicar_site", "ia_abordagem", "pipeline", "recarga"],
         "descricao": "Acesso vitalício, 150 leads e 10 sites incluídos.",
         "destaque": False,
     },
@@ -46,14 +77,14 @@ PLANS: List[Dict[str, Any]] = [
         "tipo": "plano",
         "nome": "Pro Vitalício",
         "credits": 500,
-        # A tela não informava a cota do Pro. Start e Agência têm
-        # exatamente 15 leads por site (150/10 e 3000/200), então o Pro
-        # segue a mesma razão: 500/15 = 33,3, arredondado para 35.
-        # Os 50 que estavam aqui davam 10 leads por site, deixando o Pro
-        # mais generoso que os dois vizinhos e canibalizando o Agência.
-        "sites": 35,
+        "sites": 50,
         "amount_cents": 9700,
-        "descricao": "Acesso vitalício, 500 leads e 35 sites incluídos.",
+        "paises": ["BR", "PT", "US"],
+        "recursos": [
+            "publicar_site", "ia_abordagem", "pipeline", "recarga",
+            "exportar_leads", "marca_propria", "templates_premium",
+        ],
+        "descricao": "Acesso vitalício, 500 leads e 50 sites incluídos.",
         "destaque": True,
     },
     {
@@ -63,44 +94,65 @@ PLANS: List[Dict[str, Any]] = [
         "credits": 3000,
         "sites": 200,
         "amount_cents": 19700,
+        "paises": ["BR", "PT", "US"],
+        "recursos": list(RECURSOS),
         "descricao": "Acesso vitalício, 3.000 leads e 200 sites incluídos.",
         "destaque": False,
     },
 ]
 
-# Recarga avulsa, para quem já tem plano e estourou a cota.
+# Recarga avulsa, para quem ja tem plano e estourou a cota.
 PACKAGES: List[Dict[str, Any]] = [
     {
-        "id": "recarga_100",
+        "id": "recarga_150",
         "tipo": "recarga",
-        "nome": "100 créditos",
-        "credits": 100,
+        "nome": "Recarga Essencial",
+        "credits": 150,
         "sites": 0,
-        "amount_cents": 4900,
-        "descricao": "100 leads adicionais.",
+        "amount_cents": 2700,
+        "descricao": "150 leads adicionais.",
         "destaque": False,
     },
     {
-        "id": "recarga_250",
+        "id": "recarga_500",
         "tipo": "recarga",
-        "nome": "250 créditos",
-        "credits": 250,
+        "nome": "Recarga Profissional",
+        "credits": 500,
         "sites": 0,
-        "amount_cents": 9900,
-        "descricao": "250 leads adicionais.",
+        "amount_cents": 4700,
+        "descricao": "500 leads adicionais.",
         "destaque": True,
     },
     {
-        "id": "recarga_600",
+        "id": "recarga_3000",
         "tipo": "recarga",
-        "nome": "600 créditos",
-        "credits": 600,
+        "nome": "Recarga Escala",
+        "credits": 3000,
         "sites": 0,
-        "amount_cents": 19900,
-        "descricao": "600 leads adicionais.",
+        "amount_cents": 12700,
+        "descricao": "3.000 leads adicionais.",
         "destaque": False,
     },
 ]
+
+PLANO_PADRAO = "previa"
+
+
+def plano_de(plan_id: str) -> Dict[str, Any]:
+    """Plano do usuario. Quem nunca comprou cai na Previa Gratuita."""
+    return next(
+        (p for p in PLANS if p["id"] == (plan_id or PLANO_PADRAO)),
+        PLANS[0],
+    )
+
+
+def tem_recurso(plan_id: str, recurso: str) -> bool:
+    return recurso in plano_de(plan_id).get("recursos", [])
+
+
+def paises_do_plano(plan_id: str) -> List[str]:
+    return plano_de(plan_id).get("paises", ["BR"])
+
 
 ITENS = PLANS + PACKAGES
 
@@ -244,7 +296,7 @@ async def confirmar_pagamento(
         try:
             from app.profile_store import conceder_plano
 
-            await conceder_plano(uid, achar_pacote(package_id)["nome"], sites)
+            await conceder_plano(uid, achar_pacote(package_id)["nome"], sites, package_id)
         except Exception as exc:
             # O credito ja entrou; nao desfazer a compra por causa do perfil.
             print(f"Falha ao aplicar o plano no perfil: {exc}")

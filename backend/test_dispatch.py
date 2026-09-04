@@ -33,7 +33,8 @@ BASE = {
 
 # ------------------------------------------------- canais sem API de envio
 
-def test_whatsapp_gera_link_e_nao_cobra(client):
+def test_whatsapp_gera_link_e_nao_cobra(client, com_plano):
+    com_plano()
     resp = client.post(
         "/api/dispatch", json={**BASE, "channel": "whatsapp", "lead_phone": "5571999417483"}
     )
@@ -46,7 +47,8 @@ def test_whatsapp_gera_link_e_nao_cobra(client):
     assert data["delivered"] is False
 
 
-def test_instagram_abre_a_conversa_sem_cobrar(client):
+def test_instagram_abre_a_conversa_sem_cobrar(client, com_plano):
+    com_plano()
     """Antes abria o PERFIL, e o usuário ainda tinha que achar o botão de
     mensagem. Agora vai direto para a DM via ig.me/m/<usuário>."""
     resp = client.post(
@@ -62,13 +64,15 @@ def test_instagram_abre_a_conversa_sem_cobrar(client):
     {"channel": "whatsapp"},
     {"channel": "linkedin_msg"},
 ])
-def test_canal_manual_sem_destino_falha(client, payload):
+def test_canal_manual_sem_destino_falha(client, com_plano, payload):
+    com_plano()
     assert client.post("/api/dispatch", json={**BASE, **payload}).status_code == 422
 
 
 # ----------------------------------------------------------------- e-mail
 
-def test_sem_smtp_configurado_falha_em_vez_de_simular(client):
+def test_sem_smtp_configurado_falha_em_vez_de_simular(client, com_plano):
+    com_plano()
     resp = client.post(
         "/api/dispatch", json={**BASE, "channel": "email", "lead_email": "contato@exemplo.com"}
     )
@@ -77,12 +81,14 @@ def test_sem_smtp_configurado_falha_em_vez_de_simular(client):
 
 
 @pytest.mark.parametrize("email", ["", "nao-eh-email"])
-def test_email_invalido_e_recusado(client, email):
+def test_email_invalido_e_recusado(client, com_plano, email):
+    com_plano()
     resp = client.post("/api/dispatch", json={**BASE, "channel": "email", "lead_email": email})
     assert resp.status_code == 422
 
 
-def test_canal_desconhecido(client):
+def test_canal_desconhecido(client, com_plano):
+    com_plano()
     assert client.post("/api/dispatch", json={**BASE, "channel": "telepatia"}).status_code == 422
 
 

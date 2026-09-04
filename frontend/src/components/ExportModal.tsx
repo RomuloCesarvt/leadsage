@@ -1,39 +1,30 @@
 import React from 'react';
 import { X, Download, FileSpreadsheet, FileJson } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { api } from '../services/api';
+import { useState } from 'react';
 
 export const ExportModal: React.FC = () => {
   const { isExportModalOpen, setIsExportModalOpen, leads, currentNiche, currentLocation } = useApp();
 
   if (!isExportModalOpen) return null;
 
-  const exportToCSV = () => {
-    const headers = ["Nome", "Cargo", "Nicho", "Empresa", "Cidade", "E-mail", "Telefone", "LinkedIn", "Instagram", "Website", "Score", "Status"];
-    const rows = leads.map(l => [
-      `"${l.name}"`,
-      `"${l.role}"`,
-      `"${l.niche}"`,
-      `"${l.company}"`,
-      `"${l.location}"`,
-      `"${l.email}"`,
-      `"${l.phone}"`,
-      `"${l.socials.linkedin || ''}"`,
-      `"${l.socials.instagram || ''}"`,
-      `"${l.socials.website || ''}"`,
-      l.quality_score,
-      `"${l.outreach_status}"`
-    ]);
+  const [erro, setErro] = useState('');
+  const [exportando, setExportando] = useState(false);
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `leads_${currentNiche.toLowerCase()}_${currentLocation.split(',')[0].toLowerCase()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    setIsExportModalOpen(false);
+  const exportToCSV = async () => {
+    setExportando(true);
+    setErro('');
+    try {
+      // Passa pelo backend: a exportação é recurso do plano Pro, e no
+      // navegador não havia como conferir isso.
+      await api.exportarLeads();
+      setIsExportModalOpen(false);
+    } catch (err: any) {
+      setErro(err?.message || 'Não foi possível exportar.');
+    } finally {
+      setExportando(false);
+    }
   };
 
   const exportToJSON = () => {
@@ -71,13 +62,21 @@ export const ExportModal: React.FC = () => {
             Selecione o formato para baixar todos os contatos com telefones, e-mails, links de redes e score de qualidade:
           </p>
 
+          {erro && (
+            <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] font-semibold">
+              {erro}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={exportToCSV}
-              className="p-4 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 hover:border-indigo-500 text-left transition-all flex flex-col items-center justify-center text-center gap-2 group"
+              disabled={exportando}
+              className="p-4 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 hover:border-indigo-500 disabled:opacity-50 text-left transition-all flex flex-col items-center justify-center text-center gap-2 group"
             >
               <FileSpreadsheet className="w-8 h-8 text-emerald-400 group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-bold text-slate-100">Planilha CSV</span>
+              <span className="text-xs font-bold text-slate-100">
+                {exportando ? 'Exportando...' : 'Planilha CSV'}
+              </span>
               <span className="text-[10px] text-slate-400">Compatível com Excel & Google Sheets</span>
             </button>
 

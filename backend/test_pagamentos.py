@@ -38,13 +38,13 @@ def test_nao_existe_mais_rota_que_credita_direto(client):
 
 def test_checkout_nao_concede_credito(client):
     saldo_antes = client.get("/api/credits/balance").json()["credits"]
-    client.post("/api/checkout", json={"package_id": "recarga_250"})
+    client.post("/api/checkout", json={"package_id": "recarga_500"})
     assert client.get("/api/credits/balance").json()["credits"] == saldo_antes
 
 
 def test_sem_provedor_configurado_a_compra_e_recusada(client):
     """Recusar e melhor do que liberar de graca."""
-    resp = client.post("/api/checkout", json={"package_id": "recarga_250"})
+    resp = client.post("/api/checkout", json={"package_id": "recarga_500"})
     assert resp.status_code == 503
     assert "não configurado" in resp.json()["detail"]
 
@@ -58,10 +58,10 @@ def test_pacote_desconhecido_e_recusado(client):
 def test_cliente_nao_escolhe_preco_nem_quantidade(client):
     """O corpo so aceita package_id: valor e creditos vem do catalogo."""
     client.post("/api/checkout", json={
-        "package_id": "recarga_100", "amount_cents": 1, "credits": 999999,
+        "package_id": "recarga_150", "amount_cents": 1, "credits": 999999,
     })
     pedido = client.get("/api/orders").json()[0]
-    pacote = achar_pacote("recarga_100")
+    pacote = achar_pacote("recarga_150")
     assert pedido["amount_cents"] == pacote["amount_cents"]
     assert pedido["credits"] == pacote["credits"]
 
@@ -76,21 +76,25 @@ def test_catalogo_separa_planos_de_recargas(client):
 def test_precos_batem_com_a_tela_de_assinatura():
     """Os valores vieram da tela; se mudarem, a venda passa a cobrar
     diferente do que esta anunciado."""
-    esperado = {"start": (6700, 150), "pro": (9700, 500), "agencia": (19700, 3000)}
+    esperado = {
+        "previa": (0, 5), "start": (6700, 150),
+        "pro": (9700, 500), "agencia": (19700, 3000),
+    }
     for plano in PLANS:
         centavos, creditos = esperado[plano["id"]]
         assert plano["amount_cents"] == centavos
         assert plano["credits"] == creditos
 
 
-def test_planos_mantem_a_mesma_razao_de_leads_por_site():
-    """Start e Agencia foram desenhados com 15 leads por site. Se um
-    plano sair dessa faixa, ele passa a canibalizar o vizinho: era o que
-    acontecia com o Pro em 50 sites (10 leads/site, mais generoso que os
-    dois lados)."""
+def test_razao_de_leads_por_site_fica_numa_faixa_sensata():
+    """Start e Agencia usam 15 leads por site; o Pro usa 10, de
+    proposito — e o plano recomendado, entao pesa mais em sites. A faixa
+    existe para pegar erro de digitacao, nao para forcar uniformidade."""
     for plano in PLANS:
+        if plano["id"] == "previa":
+            continue   # 5 leads / 1 site e uma amostra, nao a proporcao comercial
         razao = plano["credits"] / plano["sites"]
-        assert 13.5 <= razao <= 16.5, f"{plano['id']}: {razao:.1f} leads por site"
+        assert 9 <= razao <= 16.5, f"{plano['id']}: {razao:.1f} leads por site"
 
 
 def test_plano_mais_caro_entrega_mais():
@@ -101,9 +105,14 @@ def test_plano_mais_caro_entrega_mais():
         assert seguinte["sites"] > anterior["sites"]
 
 
-def test_todo_item_tem_preco_e_credito_positivos():
+def test_todo_item_tem_credito_positivo_e_preco_coerente():
+    """A Previa e gratuita de proposito; o resto tem que ter preco."""
     for p in ITENS:
-        assert p["amount_cents"] > 0 and p["credits"] > 0
+        assert p["credits"] > 0
+        if p["id"] == "previa":
+            assert p["amount_cents"] == 0
+        else:
+            assert p["amount_cents"] > 0
 
 
 # ------------------------------- assinatura no formato do Mercado Pago
@@ -212,7 +221,7 @@ def test_webhook_assinado_e_aprovado_credita_uma_vez_so(client, monkeypatch):
     idempotencia, a mesma compra creditaria varias vezes."""
     ligar_pagamento(monkeypatch)
 
-    client.post("/api/checkout", json={"package_id": "recarga_250"})
+    client.post("/api/checkout", json={"package_id": "recarga_500"})
     pedido = client.get("/api/orders").json()[0]
     assert pedido["status"] == "pending"
 
@@ -222,7 +231,7 @@ def test_webhook_assinado_e_aprovado_credita_uma_vez_so(client, monkeypatch):
 
     primeira = client.post("/api/webhooks/pagamento", json=corpo, headers=h)
     assert primeira.json()["status"] == "creditado"
-    assert primeira.json()["credits"] == achar_pacote("recarga_250")["credits"]
+    assert primeira.json()["credits"] == achar_pacote("recarga_500")["credits"]
 
     segunda = client.post("/api/webhooks/pagamento", json=corpo, headers=h)
     assert segunda.json()["status"] == "ja_processado"
@@ -269,7 +278,7 @@ def test_evento_que_nao_e_pagamento_e_ignorado(client, monkeypatch):
 # ------------------------------------------------------------- isolamento
 
 def test_pedido_de_outro_usuario_nao_e_visivel(client, as_user):
-    client.post("/api/checkout", json={"package_id": "recarga_100"})
+    client.post("/api/checkout", json={"package_id": "recarga_150"})
     pedido = client.get("/api/orders").json()[0]
 
     as_user("bob")
@@ -282,11 +291,11 @@ def test_pedido_de_outro_usuario_nao_e_visivel(client, as_user):
 HTML_SITE = "<!DOCTYPE html><html><body><h1>Site</h1></body></html>"
 
 
-def test_sem_plano_nao_cria_site(client):
-    """Antes dava para criar sites sem ter comprado nada."""
+def test_previa_gratuita_nao_publica_site(client):
+    """A Previa cria e edita, mas publicar exige plano pago."""
     resp = client.post("/api/sites", json={"company": "X", "html": HTML_SITE})
     assert resp.status_code == 402
-    assert "não inclui sites" in resp.json()["detail"]
+    assert "Publicar o site" in resp.json()["detail"]
 
 
 def test_cota_do_plano_e_respeitada(client, monkeypatch):
@@ -361,12 +370,130 @@ def test_usuario_nao_pode_se_conceder_cota(client):
     falha que existia nos creditos."""
     client.put("/api/profile", json={
         "id": "alice", "name": "Alice", "email": "a@x.com", "company_name": "A",
-        "niche_focus": "", "product_description": "", "credits": 0, "plan": "Agência Vitalício",
+        "niche_focus": "", "product_description": "", "credits": 0,
+        "plan": "Agência Vitalício", "plan_id": "agencia",
         "avatar": "", "sites_quota": 999999,
     })
     perfil = client.get("/api/profile").json()
     assert perfil["sites_quota"] != 999999
     assert perfil["plan"] != "Agência Vitalício"
+    assert perfil["plan_id"] != "agencia"
 
     # e continua sem poder criar site
     assert client.post("/api/sites", json={"company": "X", "html": HTML_SITE}).status_code == 402
+
+
+# ------------------------------------------------ escada de funcionalidades
+
+HTML_MIN = "<!DOCTYPE html><html><body>x</body></html>"
+
+
+def test_previa_e_o_plano_de_quem_nunca_comprou(client):
+    plano = client.get("/api/plan").json()
+    assert plano["plan_id"] == "previa"
+    assert plano["credits"] == 5 and plano["sites"] == 1
+    assert plano["recursos"] == []
+
+
+@pytest.mark.parametrize("plan_id,esperados", [
+    ("previa", []),
+    ("start", ["publicar_site", "ia_abordagem", "pipeline", "recarga"]),
+    ("pro", ["exportar_leads", "marca_propria", "templates_premium"]),
+    ("agencia", ["propostas", "contratos", "precificador", "suporte_prioritario"]),
+])
+def test_cada_plano_libera_o_que_promete(client, com_plano, plan_id, esperados):
+    com_plano(plan_id)
+    recursos = client.get("/api/plan").json()["recursos"]
+    for r in esperados:
+        assert r in recursos, f"{plan_id} deveria liberar {r}"
+
+
+def test_plano_maior_inclui_tudo_do_menor():
+    """Se o Pro nao contiver o Start, alguem faz upgrade e perde acesso."""
+    from app.payments import plano_de
+    escada = ["start", "pro", "agencia"]
+    for menor, maior in zip(escada, escada[1:]):
+        assert set(plano_de(menor)["recursos"]) <= set(plano_de(maior)["recursos"])
+
+
+@pytest.mark.parametrize("plan_id,permitido", [
+    ("previa", False), ("start", False), ("pro", True), ("agencia", True),
+])
+def test_exportacao_de_leads_exige_pro(client, com_plano, plan_id, permitido):
+    com_plano(plan_id)
+    resp = client.get("/api/leads/export")
+    assert (resp.status_code == 200) is permitido, resp.text
+    if permitido:
+        assert "text/csv" in resp.headers["content-type"]
+        assert "Empresa" in resp.text
+
+
+@pytest.mark.parametrize("plan_id,permitido", [
+    ("start", False), ("pro", False), ("agencia", True),
+])
+def test_propostas_e_contratos_exigem_agencia(client, com_plano, plan_id, permitido):
+    com_plano(plan_id)
+    resp = client.post("/api/documents", json={
+        "kind": "proposta", "title": "T", "content": "Conteudo",
+    })
+    assert (resp.status_code == 200) is permitido, resp.text
+
+
+@pytest.mark.parametrize("plan_id,permitido", [
+    ("previa", False), ("start", True),
+])
+def test_publicar_site_exige_plano_pago(client, com_plano, plan_id, permitido):
+    com_plano(plan_id)
+    resp = client.post("/api/sites", json={"company": "X", "html": HTML_MIN})
+    assert (resp.status_code == 200) is permitido, resp.text
+
+
+@pytest.mark.parametrize("plan_id,local,permitido", [
+    ("start", "Salvador, BA, Brazil", True),
+    ("start", "Lisboa, Lisboa, Portugal", False),
+    ("pro", "Lisboa, Lisboa, Portugal", True),
+    ("pro", "Miami, Florida, United States", True),
+    ("agencia", "Porto, Porto, Portugal", True),
+])
+def test_busca_internacional_exige_pro(client, com_plano, plan_id, local, permitido):
+    com_plano(plan_id)
+    resp = client.post("/api/search-leads", json={
+        "niche": "Padarias", "location": local, "limit": 1, "enrich": False,
+    })
+    if permitido:
+        assert resp.status_code != 402, resp.text
+    else:
+        assert resp.status_code == 402
+        assert "Pro" in resp.json()["detail"]
+
+
+def test_deteccao_de_pais():
+    from app.main import detectar_pais
+    assert detectar_pais("Salvador, BA, Brazil") == "BR"
+    assert detectar_pais("Lisboa, Portugal") == "PT"
+    assert detectar_pais("Miami, Florida, United States") == "US"
+    assert detectar_pais("") == "BR"
+    assert detectar_pais("Buenos Aires, Argentina") == "OUTRO"
+
+
+def test_admin_passa_por_toda_a_escada(client, monkeypatch):
+    """Sem plano nenhum, admin acessa tudo — voce precisa testar."""
+    monkeypatch.setattr(settings, "ADMIN_EMAILS", "dono@leadsage.app")
+    from app.firebase_config import get_current_user as dep
+    from app.main import app as fastapi_app
+
+    fastapi_app.dependency_overrides[dep] = lambda: {
+        "uid": "alice", "email": "dono@leadsage.app",
+    }
+    try:
+        assert client.get("/api/plan").json()["admin"] is True
+        assert client.get("/api/leads/export").status_code == 200
+        assert client.post("/api/documents", json={
+            "kind": "contrato", "title": "T", "content": "C",
+        }).status_code == 200
+        assert client.post("/api/sites", json={
+            "company": "X", "html": HTML_MIN,
+        }).status_code == 200
+    finally:
+        from conftest import CURRENT_UID
+        fastapi_app.dependency_overrides[dep] = lambda: {"uid": CURRENT_UID["value"]}

@@ -135,6 +135,7 @@ export interface UserProfile {
   brand_accent?: string;
   brand_contact?: string;
   sites_quota?: number;
+  plan_id?: string;
 }
 
 export interface SearchHistoryItem {
@@ -208,4 +209,14 @@ export interface CreditPackage {
   preco: string;
   descricao: string;
   destaque: boolean;
+}
+
+export interface PlanoAtual {
+  plan_id: string;
+  nome: string;
+  credits: number;
+  sites: number;
+  paises: string[];
+  recursos: string[];
+  admin: boolean;
 }

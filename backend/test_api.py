@@ -69,7 +69,8 @@ def dar_cota(uid="alice", sites=10):
     asyncio.get_event_loop().run_until_complete(conceder_plano(uid, "Teste", sites))
 
 
-def test_site_publicado_aparece_na_listagem(client):
+def test_site_publicado_aparece_na_listagem(client, com_plano):
+    com_plano()
     """O HTML so existia no useState: ao sair da tela, sumia."""
     dar_cota()
     assert client.get("/api/sites").json() == []
@@ -86,12 +87,14 @@ def test_site_publicado_aparece_na_listagem(client):
     assert client.get(f"/api/sites/{site_id}").json()["html"] == HTML
 
 
-def test_site_vazio_e_rejeitado(client):
+def test_site_vazio_e_rejeitado(client, com_plano):
+    com_plano()
     dar_cota()
     assert client.post("/api/sites", json={"company": "X", "html": "   "}).status_code == 400
 
 
-def test_sites_sao_isolados_por_usuario(client, as_user):
+def test_sites_sao_isolados_por_usuario(client, as_user, com_plano):
+    com_plano()
     dar_cota("alice")
     dar_cota("bob")
     site_id = client.post("/api/sites", json={"company": "Padaria", "html": HTML}).json()["id"]

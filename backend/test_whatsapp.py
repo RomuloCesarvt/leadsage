@@ -136,7 +136,8 @@ def test_telefone_invalido(telefone, trecho):
 
 # ------------------------------------------ o modo link segue disponível
 
-def test_canal_link_continua_gratuito_e_sem_envio(client):
+def test_canal_link_continua_gratuito_e_sem_envio(client, com_plano):
+    com_plano()
     resp = client.post("/api/dispatch", json={
         "lead_id": "L1", "lead_name": "X", "body": "oi",
         "channel": "whatsapp", "lead_phone": "5571999182820",
@@ -201,7 +202,8 @@ def test_instagram_abre_a_conversa_e_nao_o_perfil():
     assert "/m/" in url
 
 
-def test_instagram_sem_perfil_utilizavel_falha(client):
+def test_instagram_sem_perfil_utilizavel_falha(client, com_plano):
+    com_plano()
     resp = client.post("/api/dispatch", json={
         "lead_id": "L1", "lead_name": "X", "body": "oi",
         "channel": "instagram_direct", "lead_instagram": "https://instagram.com/p/ABC",
@@ -223,7 +225,8 @@ def test_linkedin_de_empresa_avisa_que_nao_recebe_dm():
     assert "não recebe mensagem direta" in aviso
 
 
-def test_status_do_instagram_menciona_a_colagem(client):
+def test_status_do_instagram_menciona_a_colagem(client, com_plano):
+    com_plano()
     resp = client.post("/api/dispatch", json={
         "lead_id": "L1", "lead_name": "X", "body": "oi",
         "channel": "instagram_direct", "lead_instagram": "https://instagram.com/padariafavorita",
