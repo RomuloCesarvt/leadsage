@@ -119,6 +119,9 @@ async def _banco_fora(request: Request, exc: BancoDeCreditosIndisponivel):
     return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
+# Na Vercel so /api/* chega ate a funcao, entao a raiz e inalcancavel
+# em producao. O mesmo corpo responde nos dois caminhos.
+@app.get("/api/status")
 @app.get("/")
 def read_root():
     """Estado do servico.

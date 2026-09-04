@@ -82,7 +82,9 @@ async def test_a_rota_devolve_503_e_nao_um_saldo(client, monkeypatch):
 
 def test_a_raiz_mostra_se_o_armazenamento_subiu(client):
     """O Firestore falhava em silencio: so uma linha de log denunciava."""
-    corpo = client.get("/").json()
+    # /api/status e o caminho que existe em producao; / so vale local
+    corpo = client.get("/api/status").json()
+    assert client.get("/").json()["armazenamento"] == corpo["armazenamento"]
     assert corpo["armazenamento"] in ("firestore", "indisponivel")
     # a rota e publica: nao pode vazar credencial nem nome de projeto
     texto = str(corpo).lower()
