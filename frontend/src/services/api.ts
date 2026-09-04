@@ -10,7 +10,8 @@ import type {
   SuggestedNiche,
   SiteItem,
   IntegrationSettings,
-  DocumentItem
+  DocumentItem,
+  CreditPackage
 } from '../types';
 import { auth } from '../lib/firebase';
 
@@ -103,14 +104,29 @@ export const api = {
     }
   },
 
-  async topUpCredits(amount: number, paymentMethod: string = 'pix'): Promise<any> {
-    return await fetchWithToken('/credits/topup', {
+  async listarPacotes(): Promise<{ packages: CreditPackage[]; provider: string | null }> {
+    try {
+      return await fetchWithToken('/packages');
+    } catch {
+      return { packages: [], provider: null };
+    }
+  },
+
+  // O cliente manda só o id do pacote: o preço mora no servidor. E o
+  // crédito não entra aqui — só pelo webhook do provedor.
+  async iniciarCompra(packageId: string): Promise<{ order: any; checkout_url: string | null }> {
+    return await fetchWithToken('/checkout', {
       method: 'POST',
-      body: JSON.stringify({
-        amount,
-        payment_method: paymentMethod
-      })
+      body: JSON.stringify({ package_id: packageId })
     });
+  },
+
+  async listarPedidos(): Promise<any[]> {
+    try {
+      return await fetchWithToken('/orders');
+    } catch {
+      return [];
+    }
   },
 
   async getSearchHistory(): Promise<SearchHistoryItem[]> {

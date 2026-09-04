@@ -196,3 +196,13 @@ export interface DocumentItem {
   content?: string;
   fields?: Record<string, string>;
 }
+
+export interface CreditPackage {
+  id: string;
+  nome: string;
+  credits: number;
+  amount_cents: number;
+  preco: string;
+  descricao: string;
+  destaque: boolean;
+}

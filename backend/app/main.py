@@ -17,7 +17,7 @@ from app.models import (
     LeadSearchRequest, LeadSearchResponse, LeadItem, LeadSocialLinks,
     PitchGenerationRequest, PitchGenerationResponse,
     DispatchRequest, DispatchResponse,
-    CreditTopUpRequest, UserProfile,
+    CreditTopUpRequest, CheckoutRequest, UserProfile,
     DemoSiteRequest, DemoSiteResponse,
     SiteCreateRequest, SiteItem, IntegrationSettings,
     DocumentCreateRequest, DocumentUpdateRequest, DocumentItem
@@ -25,12 +25,16 @@ from app.models import (
 from app.leads_engine import LeadsEngine
 from app.ai_generator import AIGenerator
 from app.dispatcher import OutreachDispatcher, DispatchError
-from app.credit_system import check_and_deduct_credits, get_user_balance, add_credits
+from app.credit_system import check_and_deduct_credits, get_user_balance
 import httpx
 from app.firebase_config import get_current_user
 from app.profile_store import get_profile, save_profile
 from app.sites_store import create_site, list_sites, get_site, delete_site
 from app.integrations_store import get_integrations, save_integrations, public_view
+from app.payments import (
+    catalogo, criar_pedido, obter_pedido, listar_pedidos,
+    confirmar_pagamento, assinatura_confere,
+)
 from app.documents_store import (
     create_document, update_document, list_documents, get_document, delete_document,
 )
@@ -302,15 +306,85 @@ async def update_integrations(
 async def get_credits_balance(user: dict = Depends(get_current_user)):
     return await get_user_balance(user.get("uid"), user.get("email"))
 
-@app.post("/api/credits/topup")
-async def topup_credits(req: CreditTopUpRequest, user: dict = Depends(get_current_user)):
-    new_balance = await add_credits(user.get("uid"), req.amount, f"Recarga de {req.amount} créditos via {req.payment_method.upper()}")
-    return {
-        "status": "success",
-        "added": req.amount,
-        "new_balance": new_balance,
-        "timestamp": datetime.now().isoformat()
-    }
+@app.get("/api/packages")
+def listar_pacotes():
+    """Catalogo com os precos. O cliente manda so o id na compra."""
+    return {"packages": catalogo(), "provider": settings.PAYMENT_PROVIDER or None}
+
+
+@app.post("/api/checkout")
+async def iniciar_compra(req: CheckoutRequest, user: dict = Depends(get_current_user)):
+    """Cria o pedido pendente. NAO concede credito.
+
+    O credito so entra pelo webhook, depois de o provedor confirmar o
+    pagamento. Enquanto nao houver provedor configurado, a rota recusa em
+    vez de liberar de graca.
+    """
+    try:
+        pedido = await criar_pedido(user.get("uid"), req.package_id, settings.PAYMENT_PROVIDER)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not settings.PAYMENT_PROVIDER:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Pagamento ainda não configurado. O pedido foi registrado, mas "
+                "nenhum crédito é liberado até a cobrança ser confirmada."
+            ),
+        )
+
+    # A criacao da cobranca no provedor entra aqui quando ele for escolhido.
+    return {"order": pedido, "checkout_url": None}
+
+
+@app.get("/api/orders")
+async def meus_pedidos(user: dict = Depends(get_current_user)):
+    return await listar_pedidos(user.get("uid"))
+
+
+@app.get("/api/orders/{order_id}")
+async def ver_pedido(order_id: str, user: dict = Depends(get_current_user)):
+    pedido = await obter_pedido(user.get("uid"), order_id)
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido nao encontrado.")
+    return pedido
+
+
+@app.post("/api/webhooks/pagamento")
+async def webhook_pagamento(request: Request):
+    """Unico caminho que concede credito.
+
+    Nao tem `Depends(get_current_user)` de proposito: quem chama e o
+    provedor, nao o usuario. A autenticacao e a assinatura HMAC do corpo
+    cru — sem ela, qualquer um que descobrisse a URL ganharia creditos.
+    """
+    if not settings.PAYMENT_WEBHOOK_SECRET:
+        raise HTTPException(status_code=503, detail="Webhook nao configurado.")
+
+    corpo = await request.body()
+    assinatura = (
+        request.headers.get("x-signature")
+        or request.headers.get("x-hub-signature-256")
+        or request.headers.get("stripe-signature")
+        or ""
+    )
+    if not assinatura_confere(corpo, assinatura, settings.PAYMENT_WEBHOOK_SECRET):
+        raise HTTPException(status_code=401, detail="Assinatura invalida.")
+
+    try:
+        evento = json.loads(corpo or b"{}")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Corpo invalido.")
+
+    if not evento.get("paid", evento.get("status") == "paid"):
+        return {"status": "ignorado"}
+
+    return await confirmar_pagamento(
+        provider_ref=str(evento.get("reference") or evento.get("id") or ""),
+        provider_event=str(evento.get("event_id") or ""),
+        order_id=str(evento.get("order_id") or ""),
+    )
 
 @app.get("/api/history")
 async def get_search_history(user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):

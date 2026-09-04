@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Coins, 
@@ -6,42 +6,51 @@ import {
   QrCode, 
   ShieldCheck, 
   Zap, 
-  Loader2 
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
+import type { CreditPackage } from '../types';
 
 export const CreditModal: React.FC = () => {
-  const { isCreditModalOpen, setIsCreditModalOpen, user, setUser } = useApp();
-  const [selectedPackage, setSelectedPackage] = useState<number>(250);
+  const { isCreditModalOpen, setIsCreditModalOpen, user } = useApp();
+  const [packages, setPackages] = useState<CreditPackage[]>([]);
+  const [selectedPackage, setSelectedPackage] = useState<string>('pro');
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('pix');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [erro, setErro] = useState('');
+  const [provider, setProvider] = useState<string | null>(null);
+
+  // O catálogo vem do servidor: preço que viaja pelo request é preço que
+  // o cliente escolhe.
+  useEffect(() => {
+    if (!isCreditModalOpen) return;
+    setErro('');
+    api.listarPacotes().then(({ packages: lista, provider: prov }) => {
+      setPackages(lista);
+      setProvider(prov);
+      const destaque = lista.find(p => p.destaque);
+      if (destaque) setSelectedPackage(destaque.id);
+    });
+  }, [isCreditModalOpen]);
 
   if (!isCreditModalOpen) return null;
 
-  const packages = [
-    { amount: 100, price: 'R$ 49', bonus: '100 Leads', popular: false },
-    { amount: 250, price: 'R$ 99', bonus: '250 Leads + IA Copy', popular: true },
-    { amount: 600, price: 'R$ 199', bonus: '600 Leads + Envio Ilimitado', popular: false },
-  ];
-
   const handleTopUp = async () => {
     setIsProcessing(true);
+    setErro('');
     try {
-      const res = await api.topUpCredits(selectedPackage, paymentMethod);
-      setUser(prev => prev ? { ...prev, credits: res.new_balance } : prev);
-
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.5 }
-      });
-
-      alert(`Recarga realizada com sucesso! Saldo atual: ${res.new_balance} Créditos.`);
-      setIsCreditModalOpen(false);
-    } catch (err) {
-      alert("Erro ao realizar recarga de créditos.");
+      const { checkout_url } = await api.iniciarCompra(selectedPackage);
+      // O crédito NÃO entra aqui. O pedido nasce pendente e só é
+      // liberado pelo webhook, depois do provedor confirmar.
+      if (checkout_url) {
+        window.location.href = checkout_url;
+      } else {
+        setErro('Pagamento ainda não está ativo. Nenhuma cobrança foi feita.');
+      }
+    } catch (err: any) {
+      setErro(err?.message || 'Não foi possível iniciar a compra.');
     } finally {
       setIsProcessing(false);
     }
@@ -78,22 +87,22 @@ export const CreditModal: React.FC = () => {
             <div className="grid grid-cols-3 gap-3">
               {packages.map((pkg) => (
                 <button
-                  key={pkg.amount}
-                  onClick={() => setSelectedPackage(pkg.amount)}
+                  key={pkg.id}
+                  onClick={() => setSelectedPackage(pkg.id)}
                   className={`p-4 rounded-xl border flex flex-col items-center text-center transition-all relative ${
-                    selectedPackage === pkg.amount
+                    selectedPackage === pkg.id
                       ? 'bg-indigo-950/40 border-indigo-500 ring-2 ring-indigo-500/30'
                       : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
                   }`}
                 >
-                  {pkg.popular && (
+                  {pkg.destaque && (
                     <span className="absolute -top-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-indigo-600 text-white text-[9px] font-extrabold tracking-wider uppercase">
                       Mais Vendido
                     </span>
                   )}
-                  <span className="text-lg font-extrabold text-amber-400 mt-1">{pkg.amount} CR</span>
-                  <span className="text-sm font-bold text-slate-100">{pkg.price}</span>
-                  <span className="text-[10px] text-slate-400 mt-1">{pkg.bonus}</span>
+                  <span className="text-lg font-extrabold text-amber-400 mt-1">{pkg.credits} CR</span>
+                  <span className="text-sm font-bold text-slate-100">{pkg.preco}</span>
+                  <span className="text-[10px] text-slate-400 mt-1">{pkg.descricao}</span>
                 </button>
               ))}
             </div>
@@ -133,7 +142,16 @@ export const CreditModal: React.FC = () => {
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between">
+        {/* Estado do pagamento */}
+          {(erro || !provider) && (
+            <div className="w-full mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] font-semibold flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
+              <span>
+                {erro || 'A cobrança ainda não está ativa. Nenhum crédito é liberado sem pagamento confirmado.'}
+              </span>
+            </div>
+          )}
+          <div className="px-6 py-4 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between">
           <button
             onClick={() => setIsCreditModalOpen(false)}
             className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200"
@@ -142,18 +160,19 @@ export const CreditModal: React.FC = () => {
           </button>
           <button
             onClick={handleTopUp}
-            disabled={isProcessing}
+            disabled={isProcessing || !provider}
+            title={provider ? '' : 'Pagamento ainda não configurado'}
             className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all"
           >
             {isProcessing ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Confirmando...</span>
+                <span>Abrindo pagamento...</span>
               </>
             ) : (
               <>
                 <Zap className="w-4 h-4" />
-                <span>Confirmar Recarga de {selectedPackage} CR</span>
+                <span>Comprar {packages.find(p => p.id === selectedPackage)?.credits ?? ''} créditos</span>
               </>
             )}
           </button>

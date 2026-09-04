@@ -20,6 +20,11 @@ class Settings(BaseModel):
     # com role="user"). Esta lista nao se perde.
     ADMIN_EMAILS: str = os.getenv("ADMIN_EMAILS", "")
 
+    # Pagamentos. Enquanto PAYMENT_PROVIDER estiver vazio, a compra fica
+    # indisponivel — o que e melhor do que conceder credito sem cobrar.
+    PAYMENT_PROVIDER: str = os.getenv("PAYMENT_PROVIDER", "")
+    PAYMENT_WEBHOOK_SECRET: str = os.getenv("PAYMENT_WEBHOOK_SECRET", "")
+
     # Origens autorizadas do frontend, separadas por virgula.
     # Vazio mantem o comportamento permissivo antigo para nao quebrar
     # o dev local sem configuracao.

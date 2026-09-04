@@ -208,3 +208,8 @@ class DocumentItem(BaseModel):
     updated_at: str
     content: Optional[str] = None
     fields: Optional[Dict[str, str]] = None
+
+
+class CheckoutRequest(BaseModel):
+    """So o id do pacote. O preco fica no servidor, em payments.PACKAGES."""
+    package_id: str

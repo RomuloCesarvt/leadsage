@@ -147,6 +147,33 @@ class DBDocument(Base):
     updated_at = Column(String)
 
 
+class DBOrder(Base):
+    """Pedido de compra de creditos.
+
+    Existe para que o credito NUNCA seja concedido pelo frontend. O
+    pedido nasce pendente, o provedor confirma por webhook assinado, e so
+    entao o saldo muda.
+
+    `provider_event` guarda o id do evento do provedor: webhook e
+    reenviado quando falha, e sem isso a mesma compra creditaria duas
+    vezes.
+    """
+    __tablename__ = "orders"
+
+    id = Column(String, primary_key=True, index=True)
+    owner_uid = Column(String, index=True)
+    package_id = Column(String)
+    credits = Column(Integer)
+    amount_cents = Column(Integer)
+    currency = Column(String, default="BRL")
+    status = Column(String, default="pending", index=True)   # pending|paid|failed|expired
+    provider = Column(String, nullable=True)
+    provider_ref = Column(String, index=True, nullable=True)  # id da cobranca
+    provider_event = Column(String, index=True, nullable=True)
+    created_at = Column(String)
+    paid_at = Column(String, nullable=True)
+
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
