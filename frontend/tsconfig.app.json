@@ -22,5 +22,7 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "//": "Os *.test.ts rodam no Node (npm run test:templates), fora do bundle do app.",
+  "exclude": ["src/**/*.test.ts"]
 }
