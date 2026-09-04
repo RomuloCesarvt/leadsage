@@ -21,7 +21,7 @@ import { DashboardScreen } from './components/screens/DashboardScreen';
 import { AIOutreachScreen } from './components/screens/AIOutreachScreen';
 import { ContractsScreen } from './components/screens/ContractsScreen';
 import { CalculatorScreen } from './components/screens/CalculatorScreen';
-import { WebsiteBuilderScreen } from './components/screens/WebsiteBuilderScreen';
+import { SiteBuilder } from './components/SiteBuilder';
 import { MySitesScreen } from './components/screens/MySitesScreen';
 import { TutorialsScreen } from './components/screens/TutorialsScreen';
 import { NotificationsScreen } from './components/screens/NotificationsScreen';
@@ -78,7 +78,7 @@ const MainApp: React.FC = () => {
           {viewState === 'calculator' && <CalculatorScreen />}
 
           {/* Construtor */}
-          {viewState === 'create-site' && <WebsiteBuilderScreen />}
+          {viewState === 'create-site' && <SiteBuilder />}
           {viewState === 'my-sites' && <MySitesScreen />}
 
           {/* Ajuda e Conta */}
