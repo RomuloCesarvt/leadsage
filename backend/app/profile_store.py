@@ -22,6 +22,7 @@ EDITABLE_FIELDS = (
     "name", "email", "company_name", "niche_focus", "product_description",
     "avatar", "services", "niches", "regions", "preferred_channel",
     "monthly_goal", "language",
+    "brand_logo", "brand_primary", "brand_accent", "brand_contact",
 )
 
 

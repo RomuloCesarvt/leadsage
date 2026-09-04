@@ -141,6 +141,12 @@ class UserProfile(BaseModel):
     preferred_channel: str = "WhatsApp"
     monthly_goal: str = "4 a 10"
     language: str = "pt"
+    # Identidade visual usada nas propostas e contratos. Fica no perfil
+    # para o usuario nao reenviar a logo a cada documento.
+    brand_logo: str = ""
+    brand_primary: str = "#2563eb"
+    brand_accent: str = "#f59e0b"
+    brand_contact: str = ""
 
 class DemoSiteRequest(BaseModel):
     lead: LeadItem

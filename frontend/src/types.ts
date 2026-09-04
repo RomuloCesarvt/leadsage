@@ -128,6 +128,11 @@ export interface UserProfile {
   preferred_channel?: string;
   monthly_goal?: string;
   language?: string;
+  // Identidade visual dos documentos
+  brand_logo?: string;
+  brand_primary?: string;
+  brand_accent?: string;
+  brand_contact?: string;
 }
 
 export interface SearchHistoryItem {

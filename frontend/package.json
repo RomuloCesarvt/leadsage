@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test:templates": "npx esbuild src/templates/sites/layouts.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/layouts.test.mjs && node node_modules/.cache/layouts.test.mjs"
+    "test:templates": "npx esbuild src/templates/sites/layouts.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/layouts.test.mjs && node node_modules/.cache/layouts.test.mjs",
+    "test:docs": "npx esbuild src/templates/docs/docs.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/docs.test.mjs && node node_modules/.cache/docs.test.mjs",
+    "test:front": "npm run test:templates && npm run test:docs"
   },
   "dependencies": {
     "axios": "^1.19.0",
