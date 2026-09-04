@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { Logo } from '../Logo';
 import { auth, db } from '../../lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
@@ -94,11 +95,8 @@ export const LoginScreen: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#000000] flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-[#050505] border border-[#18181b] rounded-2xl p-8 shadow-2xl">
-        <div className="flex items-center gap-2 mb-8 justify-center">
-          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center font-serif text-black font-extrabold text-2xl">
-            L
-          </div>
-          <span className="font-semibold text-white text-2xl tracking-tight">LeadSage</span>
+        <div className="flex items-center justify-center mb-8">
+          <Logo size={38} fundo="escuro" texto="text-2xl" />
         </div>
 
         <h2 className="text-xl font-bold text-white mb-2 text-center">

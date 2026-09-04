@@ -19,6 +19,7 @@ import {
   CreditCard
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { Logo } from './Logo';
 
 export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> = ({ isOpen, toggleSidebar }) => {
   const { viewState, setViewState } = useApp() as any;
@@ -47,12 +48,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> =
       }`}
     >
       <div className="h-16 px-6 border-b border-slate-100 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-serif text-white font-extrabold text-lg shadow-sm">
-            L
-          </div>
-          <span className="font-bold text-slate-800 text-xl tracking-tight">LeadSage</span>
-        </div>
+        <Logo size={30} />
         <button
           onClick={toggleSidebar}
           className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors md:hidden"
