@@ -69,12 +69,41 @@ const celulasDe = (l: string): string[] =>
     .filter((c, i, arr) => !(i === 0 && !c) && !(i === arr.length - 1 && !c));
 
 /**
+ * Secao onde mora o dinheiro. Numa proposta e o momento decisivo, e
+ * tinha o mesmo peso visual de "Prazo: 30 dias" — o cliente lia o valor
+ * de passagem. Aqui ela vira um bloco destacado.
+ */
+const eSecaoDeValor = (t: string) =>
+  /\b(INVESTIMENTO|VALORES?|HONORARIOS|HONORÁRIOS|PRECO|PREÇO|ORCAMENTO|ORÇAMENTO|CONDICOES COMERCIAIS|CONDIÇÕES COMERCIAIS|PROPOSTA DE VALOR)\b/i.test(t);
+
+/** "R$ 2.500,00", ou o campo ainda por preencher: "R$ [VALOR]". */
+const MOEDA = /R\$\s*(?:\[[^\]]{1,40}\]|\d[\d.,]*)/;
+
+/** Aumenta a primeira cifra do bloco; as demais ficam como estao. */
+const destacarCifra = (html: string): string => {
+  let usado = false;
+  return html.replace(/(<(?:dd|p)>)([^<]*)/g, (todo, tag: string, texto: string) => {
+    if (usado) return todo;
+    const achado = texto.match(MOEDA);
+    if (!achado) return todo;
+    usado = true;
+    return tag + texto.replace(MOEDA, '<strong class="cifra">' + achado[0] + '</strong>');
+  });
+};
+
+/** Linha de fechamento da tabela: "TOTAL", "Valor total", "Total geral". */
+const eLinhaTotal = (celulas: string[]) =>
+  /^(total|valor total|total geral|subtotal|investimento total)\b/i.test((celulas[0] || '').trim());
+
+/**
  * Converte o texto do modelo já preenchido em HTML estruturado.
  * O que sobrar vira parágrafo.
  */
 export function textoParaHtml(texto: string, tituloDoc = ''): string {
   const linhas = String(texto ?? '').split('\n');
   const saida: string[] = [];
+  // onde cada secao comeca, para envolver a do investimento no fim
+  const secoes: { inicio: number; valor: boolean }[] = [];
   let i = 0;
 
   // O cabeçalho do tema já mostra o título. Se o modelo começa repetindo
@@ -125,11 +154,21 @@ export function textoParaHtml(texto: string, tituloDoc = ''): string {
       }
       if (linhasTabela.length) {
         const [cabecalho, ...corpo] = linhasTabela;
+        // Ultima coluna com dinheiro alinha a direita, como em qualquer
+        // orcamento impresso.
+        const ultima = cabecalho[cabecalho.length - 1] || '';
+        const classes = ['tabela'];
+        if (/\b(valor|total|preco|preço|investimento|subtotal)\b/i.test(ultima)) classes.push('valores');
         saida.push(
-          `<table class="tabela"><thead><tr>${cabecalho
+          `<table class="${classes.join(' ')}"><thead><tr>${cabecalho
             .map(c => `<th>${esc(c)}</th>`)
             .join('')}</tr></thead><tbody>${corpo
-            .map(l => `<tr>${l.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`)
+            .map(
+              l =>
+                `<tr${eLinhaTotal(l) ? ' class="total"' : ''}>${l
+                  .map(c => `<td>${esc(c)}</td>`)
+                  .join('')}</tr>`
+            )
             .join('')}</tbody></table>`
         );
       }
@@ -139,6 +178,7 @@ export function textoParaHtml(texto: string, tituloDoc = ''): string {
     // Título antes de lista: "1. DIAGNÓSTICO" é numerado mas é seção,
     // não item. Na ordem inversa virava bullet.
     if (eTitulo(limpa)) {
+      secoes.push({ inicio: saida.length, valor: eSecaoDeValor(limpa) });
       saida.push(`<h2>${esc(limpa)}</h2>`);
       i++;
       continue;
@@ -173,6 +213,27 @@ export function textoParaHtml(texto: string, tituloDoc = ''): string {
 
     saida.push(`<p>${esc(limpa)}</p>`);
     i++;
+  }
+
+  // De tras para frente, para os indices nao escorregarem.
+  for (let s = secoes.length - 1; s >= 0; s--) {
+    if (!secoes[s].valor) continue;
+    const abre = secoes[s].inicio;
+    const fecha = s + 1 < secoes.length ? secoes[s + 1].inicio : saida.length;
+    const miolo = saida.slice(abre + 1, fecha);
+    if (!miolo.length) continue;
+    // Clausula de contrato sobre preco pode ter varios paragrafos; a
+    // caixa colorida so cabe quando a secao e curta. Nas longas, a
+    // cifra ganha destaque sozinha.
+    if (miolo.length > 4) {
+      saida.splice(abre + 1, fecha - abre - 1, destacarCifra(miolo.join('\n')));
+      continue;
+    }
+    saida.splice(
+      abre + 1,
+      fecha - abre - 1,
+      `<section class="bloco-valor">${destacarCifra(miolo.join('\n'))}</section>`
+    );
   }
 
   return saida.join('\n');
@@ -217,6 +278,17 @@ hr{border:0;border-top:1px solid var(--linha);margin:18px 0}
   text-transform:uppercase;letter-spacing:.5px}
 .tabela td{padding:9px 12px;border-bottom:1px solid var(--linha)}
 .tabela tr:last-child td{border-bottom:0}
+.tabela.valores td:last-child,.tabela.valores th:last-child{text-align:right;white-space:nowrap}
+.tabela tr.total td{background:color-mix(in srgb,var(--primaria) 8%,#fff);font-weight:800;
+  border-top:2px solid var(--primaria);border-bottom:0}
+.bloco-valor{background:color-mix(in srgb,var(--primaria) 5%,#fff);
+  border:1px solid color-mix(in srgb,var(--primaria) 20%,#fff);
+  border-left:4px solid var(--destaque);border-radius:10px;
+  padding:16px 20px;margin:0 0 18px;page-break-inside:avoid}
+.bloco-valor > :last-child{margin-bottom:0}
+.bloco-valor .definicoes{margin-bottom:0}
+.cifra{display:inline-block;font-size:26px;font-weight:800;color:var(--primaria);
+  letter-spacing:-.5px;line-height:1.25}
 .assinaturas{display:flex;gap:40px;margin-top:44px;page-break-inside:avoid}
 .assinatura{flex:1;text-align:center}
 .linha-assinatura{display:block;border-top:1px solid #9ca3af;margin-bottom:6px}
@@ -227,6 +299,7 @@ hr{border:0;border-top:1px solid var(--linha);margin:18px 0}
   .folha{width:auto;min-height:0;margin:0;box-shadow:none;padding:0}
   .corpo{padding:0}
   h2{page-break-after:avoid}
+  .bloco-valor,.tabela tr.total td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 `;
 

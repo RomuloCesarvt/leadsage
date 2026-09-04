@@ -90,5 +90,74 @@ checar('sem logo, usa as iniciais',
 console.log('\n--- tema desconhecido não quebra ---');
 checar('id inválido cai no primeiro tema', acharTheme('inexistente').id === DOC_THEMES[0].id);
 
+/* ------------------------------------------- o valor precisa saltar --- */
+
+console.log('\n--- a secao de investimento vira bloco destacado ---');
+const comValor = textoParaHtml(
+  [
+    'ESCOPO DO PROJETO',
+    'Criacao do site institucional.',
+    '',
+    'INVESTIMENTO',
+    'Valor total: R$ 2.500,00',
+    'Forma de pagamento: 50% na assinatura',
+    '',
+    'PRAZO',
+    'Entrega em 30 dias.',
+  ].join('\n'),
+  ''
+);
+checar('a secao de investimento ganha o bloco', comValor.includes('<section class="bloco-valor">'));
+checar('a cifra ganha destaque', comValor.includes('<strong class="cifra">R$ 2.500,00</strong>'));
+checar('o escopo nao entra no bloco', !/bloco-valor[^]*Criacao do site/.test(comValor));
+checar('a secao seguinte fecha o bloco',
+  comValor.indexOf('</section>') < comValor.indexOf('PRAZO'));
+checar('so a primeira cifra e ampliada',
+  (comValor.match(/class="cifra"/g) || []).length === 1);
+
+console.log('\n--- campo ainda por preencher tambem conta ---');
+const naoPreenchido = textoParaHtml('INVESTIMENTO\nValor total: R$ [VALOR]', '');
+checar('R$ [VALOR] e reconhecido', naoPreenchido.includes('<strong class="cifra">R$ [VALOR]</strong>'));
+
+console.log('\n--- secao longa nao vira caixa gigante ---');
+const clausula = textoParaHtml(
+  ['CLAUSULA QUARTA - DO PRECO']
+    .concat(Array.from({ length: 8 }, (_, k) => `Paragrafo ${k + 1} sobre o pagamento de R$ 900,00.`))
+    .join('\n'),
+  ''
+);
+checar('clausula longa fica sem a caixa', !clausula.includes('bloco-valor'));
+checar('mas a cifra continua destacada', clausula.includes('class="cifra"'));
+
+console.log('\n--- secao sem dinheiro fica intacta ---');
+const semDinheiro = textoParaHtml('PRAZO DE ENTREGA\nEntrega em 30 dias uteis.', '');
+checar('nao inventa bloco onde nao ha valor', !semDinheiro.includes('bloco-valor'));
+checar('nao inventa cifra', !semDinheiro.includes('class="cifra"'));
+
+console.log('\n--- a linha de total fecha a tabela ---');
+const tabelaComTotal = textoParaHtml(
+  [
+    '| Item | Quantidade | Valor |',
+    '| Landing page | 1 | R$ 1.800,00 |',
+    '| Manutencao | 3 | R$ 700,00 |',
+    '| Total | | R$ 2.500,00 |',
+  ].join('\n'),
+  ''
+);
+checar('a linha de total e marcada', tabelaComTotal.includes('<tr class="total">'));
+checar('as demais linhas nao sao', (tabelaComTotal.match(/<tr class="total">/g) || []).length === 1);
+checar('coluna de dinheiro alinha a direita', tabelaComTotal.includes('class="tabela valores"'));
+
+const semValores = textoParaHtml('| Etapa | Responsavel |\n| Briefing | Cliente |', '');
+checar('tabela sem dinheiro nao ganha alinhamento', !semValores.includes('valores'));
+
+console.log('\n--- o CSS acompanha ---');
+for (const t of DOC_THEMES) {
+  const html = t.render('INVESTIMENTO\nValor: R$ 1.000,00', marca, 'Proposta');
+  checar(`${t.nome}: estiliza o bloco de valor`, html.includes('.bloco-valor{'));
+  checar(`${t.nome}: estiliza a linha de total`, html.includes('.tabela tr.total td{'));
+  checar(`${t.nome}: imprime a cor do bloco`, html.includes('print-color-adjust:exact'));
+}
+
 console.log(`\n=========== ${falhas === 0 ? 'TUDO PASSOU' : falhas + ' FALHARAM'} ===========`);
 if (falhas) process.exit(1);

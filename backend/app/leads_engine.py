@@ -186,7 +186,14 @@ def extract_city(place: Dict[str, Any], fallback: str) -> str:
 
 
 def normalize_phone(national: str, international: str) -> Tuple[str, bool]:
-    """Normaliza para E.164 sem '+' e detecta celular brasileiro."""
+    """Normaliza para E.164 sem '+' e detecta celular brasileiro.
+
+    Devolve vazio quando o numero nao forma algo discavel. Isso acontece
+    de verdade: ha estabelecimento cadastrado no Google sem o DDD, e o
+    proprio Google devolve "+55 38159352". Repassando, o 38 viraria DDD
+    de Minas Gerais e o link de WhatsApp levaria a um desconhecido —
+    pior do que nao ter telefone.
+    """
     source = (international or national or "").strip()
     digits = re.sub(r"\D", "", source)
     if not digits:
@@ -195,9 +202,23 @@ def normalize_phone(national: str, international: str) -> Tuple[str, bool]:
     if not source.startswith("+") and not digits.startswith("55"):
         digits = "55" + digits
 
-    # BR: 55 + DDD(2) + 9 + 8 digitos = 13. O '9' de celular fica na posicao 4.
-    is_mobile = digits.startswith("55") and len(digits) == 13 and digits[4] == "9"
-    return digits, is_mobile
+    if digits.startswith("55"):
+        # BR: 55 + DDD(2) + 8 (fixo) ou + 9 + 8 (celular)
+        nacional = digits[2:]
+        if len(nacional) not in (10, 11):
+            return "", False
+        ddd = int(nacional[:2])
+        # DDD brasileiro vai de 11 a 99, e nenhum comeca com 0 ou 1 no
+        # segundo digito abaixo de 11
+        if not 11 <= ddd <= 99:
+            return "", False
+        is_mobile = len(nacional) == 11 and nacional[2] == "9"
+        return digits, is_mobile
+
+    # Numero de fora do Brasil: aceita o que veio, dentro do tamanho E.164
+    if not 8 <= len(digits) <= 15:
+        return "", False
+    return digits, False
 
 
 def score_lead(

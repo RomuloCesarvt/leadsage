@@ -55,9 +55,23 @@ def test_extract_city_usa_address_components():
     ("(71) 99941-7483", "+55 71 99941-7483", "5571999417483", True),
     ("(71) 3052-8402", "", "557130528402", False),
     ("", "", "", False),
+    # Caso real: "Paes E Doces Flor De Botucatu" esta cadastrado no Google
+    # sem o DDD, e o proprio Google devolve "+55 38159352". Prefixar 55 em
+    # cima disso daria 5538159352, lido como DDD 38 (Minas Gerais) — o link
+    # de WhatsApp cairia num desconhecido. Melhor devolver vazio.
+    ("3815-9352", "+55 38159352", "", False),
+    ("1234", "", "", False),
+    ("(1) 3052-8402", "", "", False),          # DDD invalido
 ])
 def test_normalize_phone(nacional, internacional, esperado, celular):
     assert normalize_phone(nacional, internacional) == (esperado, celular)
+
+
+def test_normalize_phone_preserva_numero_estrangeiro():
+    """Plano internacional existe; nao brasileiro nao pode virar vazio."""
+    numero, celular = normalize_phone("", "+351 912 345 678")
+    assert numero == "351912345678"
+    assert celular is False
 
 
 @pytest.mark.parametrize("url,tipo", [
