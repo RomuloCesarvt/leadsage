@@ -36,6 +36,20 @@ def _row_to_dict(row: DBSite, include_html: bool = True) -> Dict[str, Any]:
     return data
 
 
+async def contar_sites(uid: str) -> int:
+    """Quantos sites o usuario ja tem. Base para a cota do plano."""
+    if firestore_db is not None:
+        try:
+            docs = firestore_db.collection("users").document(uid).collection("sites").stream()
+            return sum(1 for _ in docs)
+        except Exception as exc:
+            print(f"Falha ao contar sites no Firestore: {exc}")
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(DBSite).where(DBSite.owner_uid == uid))
+        return len(result.scalars().all())
+
+
 async def create_site(uid: str, company: str, html: str, template: str = "", lead_id: str = "") -> Dict[str, Any]:
     if not html.strip():
         raise ValueError("O site não tem conteúdo para publicar.")

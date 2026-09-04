@@ -239,13 +239,9 @@ async def confirmar_pagamento(
     # Plano tambem concede cota de sites e marca o plano no perfil.
     if tipo == "plano":
         try:
-            from app.profile_store import get_profile, save_profile
+            from app.profile_store import conceder_plano
 
-            perfil = await get_profile(uid)
-            dados = perfil.model_dump()
-            dados["plan"] = achar_pacote(package_id)["nome"]
-            dados["sites_quota"] = (dados.get("sites_quota") or 0) + sites
-            await save_profile(uid, dados)
+            await conceder_plano(uid, achar_pacote(package_id)["nome"], sites)
         except Exception as exc:
             # O credito ja entrou; nao desfazer a compra por causa do perfil.
             print(f"Falha ao aplicar o plano no perfil: {exc}")

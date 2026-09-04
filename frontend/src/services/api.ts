@@ -152,6 +152,14 @@ export const api = {
     }
   },
 
+  async cotaDeSites(): Promise<{ usados: number; cota: number | null; ilimitado: boolean }> {
+    try {
+      return await fetchWithToken('/sites/quota');
+    } catch {
+      return { usados: 0, cota: 0, ilimitado: false };
+    }
+  },
+
   async getSite(id: string): Promise<SiteItem> {
     return await fetchWithToken(`/sites/${id}`);
   },

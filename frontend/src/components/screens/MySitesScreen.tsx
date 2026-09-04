@@ -10,6 +10,7 @@ export const MySitesScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [preview, setPreview] = useState<SiteItem | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [cota, setCota] = useState<{ usados: number; cota: number | null; ilimitado: boolean } | null>(null);
 
   // Antes esta tela era um estado vazio fixo: nunca listava nada porque
   // os sites gerados não chegavam a ser salvos em lugar nenhum.
@@ -18,6 +19,7 @@ export const MySitesScreen: React.FC = () => {
     api.getSites()
       .then(list => { if (active) setSites(list); })
       .finally(() => { if (active) setLoading(false); });
+    api.cotaDeSites().then(c => { if (active) setCota(c); });
     return () => { active = false; };
   }, []);
 
@@ -34,6 +36,8 @@ export const MySitesScreen: React.FC = () => {
     try {
       await api.deleteSite(id);
       setSites(prev => prev.filter(s => s.id !== id));
+      // Apagar libera a cota, então o contador precisa acompanhar.
+      setCota(c => (c ? { ...c, usados: Math.max(0, c.usados - 1) } : c));
     } finally {
       setDeletingId(null);
     }
@@ -79,7 +83,14 @@ export const MySitesScreen: React.FC = () => {
       <div className="mb-6">
         <span className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 font-medium">
           <Globe className="w-4 h-4 text-slate-400" />
-          Sites criados <span className="font-bold">{loading ? '—' : sites.length}</span>
+          Sites criados{' '}
+          <span className="font-bold">
+            {loading || !cota
+              ? '—'
+              : cota.ilimitado
+                ? `${cota.usados} · ilimitado`
+                : `${cota.usados} de ${cota.cota}`}
+          </span>
         </span>
       </div>
 

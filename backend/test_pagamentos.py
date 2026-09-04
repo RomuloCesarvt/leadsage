@@ -257,3 +257,98 @@ def test_pedido_de_outro_usuario_nao_e_visivel(client, as_user):
     as_user("bob")
     assert client.get("/api/orders").json() == []
     assert client.get(f"/api/orders/{pedido['id']}").status_code == 404
+
+
+# ------------------------------------------------------- cota de sites
+
+HTML_SITE = "<!DOCTYPE html><html><body><h1>Site</h1></body></html>"
+
+
+def test_sem_plano_nao_cria_site(client):
+    """Antes dava para criar sites sem ter comprado nada."""
+    resp = client.post("/api/sites", json={"company": "X", "html": HTML_SITE})
+    assert resp.status_code == 402
+    assert "não inclui sites" in resp.json()["detail"]
+
+
+def test_cota_do_plano_e_respeitada(client, monkeypatch):
+    ligar_pagamento(monkeypatch)
+
+    # compra o Start, que da 10 sites
+    client.post("/api/checkout", json={"package_id": "start"})
+    pedido = client.get("/api/orders").json()[0]
+    mp_falso(monkeypatch, aprovado=True, order_id=pedido["id"])
+    client.post(
+        "/api/webhooks/pagamento",
+        json={"type": "payment", "data": {"id": "PAY-1"}},
+        headers=assinar_mp("PAY-1"),
+    )
+
+    cota = client.get("/api/sites/quota").json()
+    assert cota["cota"] == 10 and cota["usados"] == 0
+
+    for i in range(10):
+        r = client.post("/api/sites", json={"company": f"Site {i}", "html": HTML_SITE})
+        assert r.status_code == 200, f"site {i}: {r.text}"
+
+    estourado = client.post("/api/sites", json={"company": "Extra", "html": HTML_SITE})
+    assert estourado.status_code == 402
+    assert "10 de 10" in estourado.json()["detail"]
+
+    assert client.get("/api/sites/quota").json()["usados"] == 10
+
+
+def test_apagar_site_libera_a_cota(client, monkeypatch):
+    ligar_pagamento(monkeypatch)
+    client.post("/api/checkout", json={"package_id": "start"})
+    pedido = client.get("/api/orders").json()[0]
+    mp_falso(monkeypatch, aprovado=True, order_id=pedido["id"])
+    client.post(
+        "/api/webhooks/pagamento",
+        json={"type": "payment", "data": {"id": "PAY-1"}},
+        headers=assinar_mp("PAY-1"),
+    )
+
+    site_id = client.post("/api/sites", json={"company": "A", "html": HTML_SITE}).json()["id"]
+    assert client.get("/api/sites/quota").json()["usados"] == 1
+
+    client.delete(f"/api/sites/{site_id}")
+    assert client.get("/api/sites/quota").json()["usados"] == 0
+
+
+def test_admin_nao_tem_cota(client, monkeypatch):
+    """Voce precisa testar sem esbarrar no limite dos clientes."""
+    monkeypatch.setattr(settings, "ADMIN_EMAILS", "dono@leadsage.app")
+    from app.main import app as fastapi_app
+    from app.firebase_config import get_current_user as dep
+
+    fastapi_app.dependency_overrides[dep] = lambda: {
+        "uid": "alice", "email": "dono@leadsage.app",
+    }
+    try:
+        cota = client.get("/api/sites/quota").json()
+        assert cota["ilimitado"] is True
+
+        # sem plano nenhum, cria varios
+        for i in range(12):
+            r = client.post("/api/sites", json={"company": f"S{i}", "html": HTML_SITE})
+            assert r.status_code == 200
+    finally:
+        from conftest import CURRENT_UID
+        fastapi_app.dependency_overrides[dep] = lambda: {"uid": CURRENT_UID["value"]}
+
+
+def test_usuario_nao_pode_se_conceder_cota(client):
+    """PUT /api/profile com sites_quota daria sites de graca — a mesma
+    falha que existia nos creditos."""
+    client.put("/api/profile", json={
+        "id": "alice", "name": "Alice", "email": "a@x.com", "company_name": "A",
+        "niche_focus": "", "product_description": "", "credits": 0, "plan": "Agência Vitalício",
+        "avatar": "", "sites_quota": 999999,
+    })
+    perfil = client.get("/api/profile").json()
+    assert perfil["sites_quota"] != 999999
+    assert perfil["plan"] != "Agência Vitalício"
+
+    # e continua sem poder criar site
+    assert client.post("/api/sites", json={"company": "X", "html": HTML_SITE}).status_code == 402

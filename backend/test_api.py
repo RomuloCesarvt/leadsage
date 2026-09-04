@@ -12,9 +12,12 @@ Fixtures (`client`, `as_user`) vem de conftest.py.
 
 Rodar:  cd backend && python -m pytest test_api.py -v
 """
+import asyncio
 import os
 
 import pytest
+
+from app.profile_store import conceder_plano
 
 HTML = "<!DOCTYPE html><html><body><h1>Padaria Teste</h1></body></html>"
 
@@ -61,8 +64,14 @@ def test_creditos_nao_sao_alteraveis_pelo_request(client):
 
 # ---------------------------------------------------------------- sites
 
+def dar_cota(uid="alice", sites=10):
+    """Concede a cota pelo caminho do sistema, como a compra faz."""
+    asyncio.get_event_loop().run_until_complete(conceder_plano(uid, "Teste", sites))
+
+
 def test_site_publicado_aparece_na_listagem(client):
     """O HTML so existia no useState: ao sair da tela, sumia."""
+    dar_cota()
     assert client.get("/api/sites").json() == []
 
     site_id = client.post(
@@ -78,10 +87,13 @@ def test_site_publicado_aparece_na_listagem(client):
 
 
 def test_site_vazio_e_rejeitado(client):
+    dar_cota()
     assert client.post("/api/sites", json={"company": "X", "html": "   "}).status_code == 400
 
 
 def test_sites_sao_isolados_por_usuario(client, as_user):
+    dar_cota("alice")
+    dar_cota("bob")
     site_id = client.post("/api/sites", json={"company": "Padaria", "html": HTML}).json()["id"]
 
     as_user("bob")

@@ -29,7 +29,8 @@ from app.credit_system import check_and_deduct_credits, get_user_balance
 import httpx
 from app.firebase_config import get_current_user
 from app.profile_store import get_profile, save_profile
-from app.sites_store import create_site, list_sites, get_site, delete_site
+from app.sites_store import create_site, list_sites, get_site, delete_site, contar_sites
+from app.credit_system import is_admin
 from app.integrations_store import get_integrations, save_integrations, public_view
 from app.payments import (
     catalogo, criar_pedido, obter_pedido, listar_pedidos,
@@ -444,13 +445,44 @@ async def get_search_history(user: dict = Depends(get_current_user), db: AsyncSe
 
 @app.post("/api/sites", response_model=SiteItem)
 async def publish_site(req: SiteCreateRequest, user: dict = Depends(get_current_user)):
-    """Salva o site gerado. Antes o HTML so existia no estado da tela."""
+    """Salva o site gerado, respeitando a cota do plano.
+
+    O plano concede 10, 50 ou 200 sites, mas ate agora nada era conferido:
+    dava para criar quantos quisesse. Admin passa direto, como nos
+    creditos.
+    """
+    uid = user.get("uid")
+
+    if not is_admin(user.get("email")):
+        perfil = await get_profile(uid)
+        cota = perfil.sites_quota or 0
+        usados = await contar_sites(uid)
+        if usados >= cota:
+            raise HTTPException(
+                status_code=402,
+                detail=(
+                    f"Você já usou {usados} de {cota} sites do seu plano. "
+                    "Faça um upgrade em Assinatura para criar mais."
+                    if cota
+                    else "Seu plano ainda não inclui sites. Escolha um plano em Assinatura."
+                ),
+            )
+
     try:
-        return await create_site(
-            user.get("uid"), req.company, req.html, req.template or "", req.lead_id or ""
-        )
+        return await create_site(uid, req.company, req.html, req.template or "", req.lead_id or "")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/sites/quota")
+async def cota_de_sites(user: dict = Depends(get_current_user)):
+    """Quanto da cota ja foi usado, para a tela mostrar."""
+    uid = user.get("uid")
+    usados = await contar_sites(uid)
+    if is_admin(user.get("email")):
+        return {"usados": usados, "cota": None, "ilimitado": True}
+    perfil = await get_profile(uid)
+    return {"usados": usados, "cota": perfil.sites_quota or 0, "ilimitado": False}
 
 
 @app.get("/api/sites")

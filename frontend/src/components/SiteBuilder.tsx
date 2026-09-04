@@ -158,6 +158,8 @@ export const SiteBuilder: React.FC = () => {
       });
       setViewState('my-sites');
     } catch (err: any) {
+      // A mensagem do backend já explica a cota; repassar é melhor do
+      // que trocar por um texto genérico.
       setErro(err?.message || 'Não foi possível publicar.');
     } finally {
       setSalvando(false);
