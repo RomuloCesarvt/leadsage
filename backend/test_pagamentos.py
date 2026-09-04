@@ -83,6 +83,24 @@ def test_precos_batem_com_a_tela_de_assinatura():
         assert plano["credits"] == creditos
 
 
+def test_planos_mantem_a_mesma_razao_de_leads_por_site():
+    """Start e Agencia foram desenhados com 15 leads por site. Se um
+    plano sair dessa faixa, ele passa a canibalizar o vizinho: era o que
+    acontecia com o Pro em 50 sites (10 leads/site, mais generoso que os
+    dois lados)."""
+    for plano in PLANS:
+        razao = plano["credits"] / plano["sites"]
+        assert 13.5 <= razao <= 16.5, f"{plano['id']}: {razao:.1f} leads por site"
+
+
+def test_plano_mais_caro_entrega_mais():
+    """Ordenado por preco, leads e sites nunca podem regredir."""
+    ordenados = sorted(PLANS, key=lambda p: p["amount_cents"])
+    for anterior, seguinte in zip(ordenados, ordenados[1:]):
+        assert seguinte["credits"] > anterior["credits"]
+        assert seguinte["sites"] > anterior["sites"]
+
+
 def test_todo_item_tem_preco_e_credito_positivos():
     for p in ITENS:
         assert p["amount_cents"] > 0 and p["credits"] > 0

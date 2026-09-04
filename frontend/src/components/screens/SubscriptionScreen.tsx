@@ -128,6 +128,12 @@ export const SubscriptionScreen: React.FC = () => {
               </div>
               500 leads incluídos
             </div>
+            <div className="flex items-center gap-4 text-[15px] font-medium text-slate-600">
+              <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                <Check className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              35 sites incluídos
+            </div>
           </div>
 
           <button onClick={() => comprar('pro')}

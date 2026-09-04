@@ -46,11 +46,14 @@ PLANS: List[Dict[str, Any]] = [
         "tipo": "plano",
         "nome": "Pro Vitalício",
         "credits": 500,
-        # A tela não informava a cota de sites do Pro — fica entre os 10
-        # do Start e os 200 da Agência até você definir.
-        "sites": 50,
+        # A tela não informava a cota do Pro. Start e Agência têm
+        # exatamente 15 leads por site (150/10 e 3000/200), então o Pro
+        # segue a mesma razão: 500/15 = 33,3, arredondado para 35.
+        # Os 50 que estavam aqui davam 10 leads por site, deixando o Pro
+        # mais generoso que os dois vizinhos e canibalizando o Agência.
+        "sites": 35,
         "amount_cents": 9700,
-        "descricao": "Acesso vitalício, 500 leads e 50 sites incluídos.",
+        "descricao": "Acesso vitalício, 500 leads e 35 sites incluídos.",
         "destaque": True,
     },
     {
