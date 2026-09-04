@@ -7,6 +7,7 @@ import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
 import { SITE_TEMPLATES, sugerirTemplate } from '../templates/sites/layouts';
 import type { SiteData, SiteTemplate } from '../templates/sites/base';
+import { prepararImagem, formatarBytes, TETO_SITE_BYTES } from '../lib/imagem';
 
 /**
  * Construtor visual de sites.
@@ -17,7 +18,10 @@ import type { SiteData, SiteTemplate } from '../templates/sites/base';
  * atualiza a cada tecla, sem chamar a IA e sem gastar crédito.
  */
 
-const LIMITE_LOGO = 200 * 1024; // 200 KB: a logo viaja embutida no HTML
+// Cada foto e reduzida no navegador antes de virar data URI; estes sao
+// os tetos DEPOIS da compressao.
+const TETO_LOGO = 120 * 1024;
+const TETO_FOTO = 260 * 1024;
 
 const dadosIniciais = (lead: any): SiteData => ({
   empresa: lead?.company || lead?.name || 'Minha Empresa',
@@ -29,6 +33,8 @@ const dadosIniciais = (lead: any): SiteData => ({
     { titulo: '', descricao: '' },
     { titulo: '', descricao: '' },
   ],
+  galeria: [],
+  depoimentos: [{ texto: '', autor: '' }],
   telefone: lead?.phone ? `+${lead.phone}` : '',
   whatsapp: lead?.whatsapp && lead?.phone ? lead.phone : '',
   email: lead?.email || '',
@@ -66,6 +72,11 @@ export const SiteBuilder: React.FC = () => {
     [template, dados]
   );
 
+  // O site publicado precisa caber no armazenamento; as fotos embutidas
+  // sao o que pesa.
+  const pesoDoSite = new Blob([html]).size;
+  const pesado = pesoDoSite > TETO_SITE_BYTES;
+
   const alterar = (campo: keyof SiteData, valor: any) =>
     setDados(d => ({ ...d, [campo]: valor }));
 
@@ -82,17 +93,34 @@ export const SiteBuilder: React.FC = () => {
     if (encontrado) setTemplate(sugerirTemplate(encontrado.niche || encontrado.role || ''));
   };
 
-  const enviarLogo = (arquivo: File) => {
-    if (arquivo.size > LIMITE_LOGO) {
-      setErro('A logo precisa ter no máximo 200 KB — ela é embutida no site.');
-      return;
+  /**
+   * Foto de celular tem 3 a 6 MB. Como as imagens viajam embutidas no
+   * HTML, cada uma e reduzida e recomprimida no navegador antes de
+   * entrar.
+   */
+  const enviarImagem = async (
+    arquivo: File,
+    destino: 'logo' | 'capa' | 'fotoSobre' | 'galeria',
+    indice = 0
+  ) => {
+    setErro('');
+    try {
+      const dataUri = await prepararImagem(arquivo, {
+        larguraMaxima: destino === 'logo' ? 600 : 1600,
+        tetoBytes: destino === 'logo' ? TETO_LOGO : TETO_FOTO,
+      });
+      if (destino === 'galeria') {
+        setDados(d => {
+          const lista = [...(d.galeria || [])];
+          lista[indice] = dataUri;
+          return { ...d, galeria: lista };
+        });
+      } else {
+        alterar(destino, dataUri);
+      }
+    } catch (err: any) {
+      setErro(err?.message || 'Não foi possível usar esta imagem.');
     }
-    const leitor = new FileReader();
-    leitor.onload = () => {
-      alterar('logo', String(leitor.result));
-      setErro('');
-    };
-    leitor.readAsDataURL(arquivo);
   };
 
   /** A IA escreve só os textos; o layout continua sendo o template. */
@@ -150,6 +178,12 @@ export const SiteBuilder: React.FC = () => {
     setSalvando(true);
     setErro('');
     try {
+      if (pesado) {
+        throw new Error(
+          `O site está com ${formatarBytes(pesoDoSite)} e o limite é ${formatarBytes(TETO_SITE_BYTES)}. ` +
+            'Remova uma foto da galeria e tente de novo.'
+        );
+      }
       await api.publishSite({
         company: dados.empresa,
         html,
@@ -346,32 +380,143 @@ export const SiteBuilder: React.FC = () => {
             {campo('Sobre', dados.sobre, v => alterar('sobre', v), true, 'Dois períodos sobre o negócio')}
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1.5">Logo</label>
-            <div className="flex items-center gap-3">
-              {dados.logo && (
-                <img src={dados.logo} alt="" className="h-10 w-auto object-contain border border-slate-200 rounded-lg p-1" />
-              )}
-              <button
-                onClick={() => inputLogo.current?.click()}
-                className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5"
-              >
-                <Upload className="w-3.5 h-3.5" /> {dados.logo ? 'Trocar' : 'Enviar logo'}
-              </button>
-              {dados.logo && (
-                <button onClick={() => alterar('logo', undefined)} className="p-2 text-slate-400 hover:text-red-600" title="Remover logo">
-                  <Trash2 className="w-4 h-4" />
+          {/* Imagens: sem foto o site fica com cara de rascunho — era o
+              principal motivo de os nossos parecerem todos iguais. */}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">Logo</label>
+              <div className="flex items-center gap-3">
+                {dados.logo && (
+                  <img src={dados.logo} alt="" className="h-10 w-auto object-contain border border-slate-200 rounded-lg p-1" />
+                )}
+                <button
+                  onClick={() => inputLogo.current?.click()}
+                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5"
+                >
+                  <Upload className="w-3.5 h-3.5" /> {dados.logo ? 'Trocar' : 'Enviar logo'}
+                </button>
+                {dados.logo && (
+                  <button onClick={() => alterar('logo', undefined)} className="p-2 text-slate-400 hover:text-red-600" title="Remover logo">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                <input
+                  ref={inputLogo}
+                  type="file"
+                  accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                  className="hidden"
+                  onChange={e => e.target.files?.[0] && enviarImagem(e.target.files[0], 'logo')}
+                />
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1.5">Sem logo, usamos as iniciais da empresa.</p>
+            </div>
+
+            {([
+              { chave: 'capa' as const, rotulo: 'Foto de capa', dica: 'A imagem grande do topo. É o que mais muda a cara do site.' },
+              { chave: 'fotoSobre' as const, rotulo: 'Foto do "Sobre"', dica: 'A equipe, a fachada, o ambiente.' },
+            ]).map(({ chave, rotulo, dica }) => (
+              <div key={chave}>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">{rotulo}</label>
+                <div className="flex items-center gap-3">
+                  {dados[chave] && (
+                    <img src={dados[chave]} alt="" className="h-12 w-20 object-cover rounded-lg border border-slate-200" />
+                  )}
+                  <label className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer">
+                    <Upload className="w-3.5 h-3.5" /> {dados[chave] ? 'Trocar' : 'Enviar foto'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={e => e.target.files?.[0] && enviarImagem(e.target.files[0], chave)}
+                    />
+                  </label>
+                  {dados[chave] && (
+                    <button onClick={() => alterar(chave, undefined)} className="p-2 text-slate-400 hover:text-red-600" title="Remover">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1.5">{dica}</p>
+              </div>
+            ))}
+
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">Galeria (até 4)</label>
+              <div className="grid grid-cols-4 gap-2">
+                {[0, 1, 2, 3].map(i => {
+                  const foto = (dados.galeria || [])[i];
+                  return (
+                    <label
+                      key={i}
+                      className="relative aspect-square rounded-xl border border-dashed border-slate-300 hover:border-blue-400 bg-slate-50 flex items-center justify-center cursor-pointer overflow-hidden"
+                    >
+                      {foto ? (
+                        <>
+                          <img src={foto} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                          <button
+                            onClick={e => {
+                              e.preventDefault();
+                              setDados(d => ({ ...d, galeria: (d.galeria || []).filter((_, k) => k !== i) }));
+                            }}
+                            className="absolute top-1 right-1 p-1 rounded-md bg-white/90 text-slate-500 hover:text-red-600"
+                            title="Remover"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </>
+                      ) : (
+                        <Plus className="w-4 h-4 text-slate-400" />
+                      )}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={e => e.target.files?.[0] && enviarImagem(e.target.files[0], 'galeria', i)}
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+              <p className={`text-[11px] mt-1.5 ${pesado ? 'text-red-600 font-semibold' : 'text-slate-400'}`}>
+                Peso do site: {formatarBytes(pesoDoSite)}
+                {pesado ? ' — acima do limite, remova uma foto' : ` de ${formatarBytes(TETO_SITE_BYTES)}`}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">Depoimento de cliente</label>
+              {(dados.depoimentos || []).map((dep, i) => (
+                <div key={i} className="space-y-2 mb-2">
+                  <textarea
+                    value={dep.texto}
+                    onChange={e => setDados(d => ({
+                      ...d,
+                      depoimentos: (d.depoimentos || []).map((x, k) => k === i ? { ...x, texto: e.target.value } : x),
+                    }))}
+                    rows={2}
+                    placeholder="O que o cliente disse"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <input
+                    value={dep.autor}
+                    onChange={e => setDados(d => ({
+                      ...d,
+                      depoimentos: (d.depoimentos || []).map((x, k) => k === i ? { ...x, autor: e.target.value } : x),
+                    }))}
+                    placeholder="Nome do cliente"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              ))}
+              {(dados.depoimentos || []).length < 3 && (
+                <button
+                  onClick={() => setDados(d => ({ ...d, depoimentos: [...(d.depoimentos || []), { texto: '', autor: '' }] }))}
+                  className="text-xs font-bold text-blue-600 flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Adicionar depoimento
                 </button>
               )}
-              <input
-                ref={inputLogo}
-                type="file"
-                accept="image/png,image/jpeg,image/svg+xml,image/webp"
-                className="hidden"
-                onChange={e => e.target.files?.[0] && enviarLogo(e.target.files[0])}
-              />
             </div>
-            <p className="text-[11px] text-slate-400 mt-1.5">PNG, JPG, SVG ou WebP até 200 KB. Sem logo, usamos as iniciais.</p>
           </div>
 
           <div>

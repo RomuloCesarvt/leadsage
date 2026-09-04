@@ -79,5 +79,53 @@ checar('mecânica sugere Serviço Local', sugerirTemplate('Mecânicas').id === '
 checar('nicho desconhecido cai num layout válido',
   SITE_TEMPLATES.some(t => t.id === sugerirTemplate('Alguma coisa').id));
 
+
+/* ------------------------------- imagens, galeria e prova social ------ */
+
+console.log('\n--- as fotos entram no site ---');
+const comFotos: SiteData = {
+  ...dados,
+  capa: 'data:image/jpeg;base64,CAPA',
+  fotoSobre: 'data:image/jpeg;base64,SOBRE',
+  galeria: ['data:image/jpeg;base64,G1', 'data:image/jpeg;base64,G2'],
+  depoimentos: [{ texto: 'Melhor padaria do bairro.', autor: 'Marina S.' }],
+};
+
+for (const t of SITE_TEMPLATES) {
+  const html = t.render(comFotos);
+  checar(`${t.nome}: usa a foto de capa`, html.includes('base64,CAPA'));
+  checar(`${t.nome}: mostra a galeria`, html.includes('base64,G1') && html.includes('base64,G2'));
+  checar(`${t.nome}: mostra o depoimento`,
+    html.includes('Melhor padaria do bairro.') && html.includes('Marina S.'));
+}
+
+console.log('\n--- sem foto, o site continua apresentável ---');
+for (const t of SITE_TEMPLATES) {
+  const html = t.render(dados);
+  checar(`${t.nome}: não deixa buraco de imagem`, !html.includes('<img src=""') && !html.includes('undefined'));
+  checar(`${t.nome}: seção de galeria some quando não há foto`, !html.includes('class="galeria"'));
+  checar(`${t.nome}: usa textura no lugar da foto`, html.includes('radial-gradient'));
+}
+
+console.log('\n--- cada layout tem composição própria ---');
+const assinaturas = SITE_TEMPLATES.map(t => {
+  const html = t.render(comFotos);
+  // as classes estruturais de cada um
+  return [...new Set((html.match(/class="([a-z-]+)"/g) || []))].sort().join('|');
+});
+checar('nenhum layout repete a estrutura de outro',
+  new Set(assinaturas).size === assinaturas.length);
+
+console.log('\n--- o depoimento do usuário também é escapado ---');
+const comScript = t0Render();
+function t0Render() {
+  return SITE_TEMPLATES[0].render({
+    ...comFotos,
+    depoimentos: [{ texto: '<script>alert(1)</script>', autor: '<b>x</b>' }],
+  });
+}
+checar('script no depoimento não vira script', !comScript.includes('<script>alert(1)</script>'));
+
+
 console.log(`\n=========== ${falhas === 0 ? 'TUDO PASSOU' : falhas + ' FALHARAM'} ===========`);
 if (falhas) process.exit(1);

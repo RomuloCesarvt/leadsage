@@ -15,6 +15,11 @@ export type Servico = {
   descricao: string;
 };
 
+export type Depoimento = {
+  texto: string;
+  autor: string;
+};
+
 export type SiteData = {
   empresa: string;
   categoria: string;
@@ -29,6 +34,13 @@ export type SiteData = {
   instagram: string;
   /** logo enviada pelo usuário, como data URI */
   logo?: string;
+  /** foto principal do topo, como data URI */
+  capa?: string;
+  /** foto da seção "sobre" */
+  fotoSobre?: string;
+  /** galeria: até 4 imagens */
+  galeria?: string[];
+  depoimentos?: Depoimento[];
   corPrimaria: string;
   corDestaque: string;
 };
@@ -221,3 +233,62 @@ export const rodape = (d: SiteData): string => {
   </div>
 </footer>`;
 };
+
+
+/* ------------------------------------------------------------ imagens */
+
+/**
+ * Sem foto, um site fica com cara de rascunho — e era o principal motivo
+ * de os nossos parecerem todos iguais. Quando o usuário não envia
+ * imagem, o lugar dela recebe uma textura gerada em CSS a partir da cor
+ * da marca: continua discreto, mas não fica um retângulo vazio.
+ */
+export const fundoDeCapa = (d: SiteData): string =>
+  d.capa
+    ? `background-image:linear-gradient(180deg,rgba(0,0,0,.25),rgba(0,0,0,.65)),url('${d.capa}');` +
+      'background-size:cover;background-position:center'
+    : `background-image:` +
+      `radial-gradient(circle at 15% 20%,${ajustarCor(d.corPrimaria, 40)} 0%,transparent 45%),` +
+      `radial-gradient(circle at 85% 75%,${d.corDestaque}55 0%,transparent 40%),` +
+      `linear-gradient(140deg,${d.corPrimaria},${ajustarCor(d.corPrimaria, -55)})`;
+
+export const temGaleria = (d: SiteData): boolean =>
+  Boolean(d.galeria && d.galeria.filter(Boolean).length);
+
+export const galeria = (d: SiteData, classe = 'galeria'): string => {
+  const fotos = (d.galeria || []).filter(Boolean).slice(0, 4);
+  if (!fotos.length) return '';
+  return `<div class="${classe}">${fotos
+    .map((src, i) => `<figure><img src="${src}" alt="${esc(d.empresa)} ${i + 1}" loading="lazy"></figure>`)
+    .join('')}</div>`;
+};
+
+export const depoimentos = (d: SiteData): string => {
+  const lista = (d.depoimentos || []).filter(x => x.texto.trim());
+  if (!lista.length) return '';
+  return `<div class="depoimentos">${lista
+    .slice(0, 3)
+    .map(
+      x => `<blockquote>
+      <p>${esc(x.texto)}</p>
+      <cite>${esc(x.autor)}</cite>
+    </blockquote>`
+    )
+    .join('')}</div>`;
+};
+
+/** Estilos comuns às peças visuais novas. */
+export const cssMidia = `
+figure{margin:0;overflow:hidden;border-radius:16px;background:#e5e7eb}
+figure img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s ease}
+figure:hover img{transform:scale(1.04)}
+.galeria{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.galeria figure{aspect-ratio:4/3}
+.depoimentos{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.depoimentos blockquote{margin:0;background:#fff;border:1px solid var(--linha);border-radius:18px;
+  padding:26px;position:relative;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.depoimentos blockquote::before{content:'"';position:absolute;top:6px;left:18px;
+  font-size:58px;line-height:1;color:var(--destaque);opacity:.35;font-family:Georgia,serif}
+.depoimentos p{margin:0 0 14px;position:relative;color:var(--tinta-suave);font-style:italic}
+.depoimentos cite{font-style:normal;font-weight:700;font-size:14px}
+`;
