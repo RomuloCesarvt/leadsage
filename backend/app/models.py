@@ -70,6 +70,9 @@ class LeadSearchResponse(BaseModel):
 
 class PitchGenerationRequest(BaseModel):
     lead: LeadItem
+    # O canal muda o tamanho e o tom: WhatsApp no celular nao comporta o
+    # mesmo texto de um e-mail.
+    channel: Optional[str] = "email"
     tone: str = "Consultivo" # Consultivo, Amigável, Direto, Autoridade, Promocional
     custom_instructions: Optional[str] = ""
     sender_name: Optional[str] = "Prospecção LeadSage"

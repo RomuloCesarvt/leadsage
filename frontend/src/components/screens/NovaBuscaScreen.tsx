@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Search, ChevronDown, ChevronRight, ChevronUp,
+  Search, ChevronDown, ChevronRight, ChevronUp, AlertCircle,
   Activity, Apple, Beer, Briefcase, Building, Building2,
   Calculator, Camera, Car, Code, Coffee, Croissant,
   Dog, Dumbbell, Flower2, GraduationCap, Hammer, HardHat,
@@ -153,6 +153,7 @@ export const NovaBuscaScreen: React.FC = () => {
   const [neighborhood, setNeighborhood] = useState('');
   const [searchLimit, setSearchLimit] = useState(20);
   const [isSearching, setIsSearching] = useState(false);
+  const [erroBusca, setErroBusca] = useState('');
   const [expandedCategory, setExpandedCategory] = useState<string | null>(NICHE_CATEGORIES[0].category);
 
   // country-state-city embute um city.json de 7,7 MB. Importado de forma
@@ -186,9 +187,10 @@ export const NovaBuscaScreen: React.FC = () => {
 
   const handleSearch = async () => {
     if (!niche || !city || !state) {
-      alert("Preencha Nicho, Estado e Cidade para buscar.");
+      setErroBusca('Preencha Nicho, Estado e Cidade para buscar.');
       return;
     }
+    setErroBusca('');
     const countryName = countries.find(c => c.isoCode === country)?.name || 'Brasil';
     const fullLocation = `${neighborhood ? neighborhood + ', ' : ''}${city}, ${state}, ${countryName}`;
     
@@ -196,9 +198,9 @@ export const NovaBuscaScreen: React.FC = () => {
     try {
       await performLeadSearch(niche, fullLocation, searchLimit);
       setViewState('workspace');
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert("Erro ao buscar leads. Verifique sua conexão e chave API.");
+      setErroBusca(e?.message || 'Não foi possível concluir a busca.');
     } finally {
       setIsSearching(false);
     }
@@ -217,6 +219,13 @@ export const NovaBuscaScreen: React.FC = () => {
         <h1 className="text-3xl font-bold tracking-tight text-slate-800">Nova Busca</h1>
         <p className="text-slate-500 mt-1">Encontre negócios locais com oportunidades de venda.</p>
       </div>
+
+      {erroBusca && (
+        <div className="mb-4 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm font-semibold flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{erroBusca}</span>
+        </div>
+      )}
 
       {/* Form Area */}
       <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm mb-8">

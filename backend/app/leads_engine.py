@@ -1,3 +1,4 @@
+import asyncio
 import re
 import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
@@ -28,6 +29,10 @@ FIELD_MASK = ",".join([
     "places.photos",
     "places.regularOpeningHours",
 ])
+
+# Prazo do enriquecimento. A busca inteira precisa caber no limite da
+# funcao serverless, entao o scraping trabalha com orcamento fixo.
+ORCAMENTO_ENRIQUECIMENTO = 18.0
 
 PAGE_SIZE = 20           # maximo que a Places API (New) aceita por requisicao
 MAX_PAGES_PER_QUERY = 3  # 3 x 20 = ate 60 resultados por variacao de consulta
@@ -458,12 +463,25 @@ class LeadsEngine:
 
         enrichments: List[Dict[str, Any]] = [{} for _ in leads]
         if enrich:
-            enrichments = await SocialScraper.enrich_many(
-                [
-                    {"company": l.company, "city": l.city, "website": raw}
-                    for l, raw in zip(leads, raw_sites)
-                ]
-            )
+            # O enriquecimento visita o site de cada lead, e um site lento
+            # trava a busca inteira. Com prazo, o que voltou a tempo é
+            # aproveitado e o resto sai sem as redes — melhor do que a
+            # requisição estourar o limite da Vercel e o usuário não
+            # receber lead nenhum.
+            try:
+                enrichments = await asyncio.wait_for(
+                    SocialScraper.enrich_many(
+                        [
+                            {"company": l.company, "city": l.city, "website": raw}
+                            for l, raw in zip(leads, raw_sites)
+                        ]
+                    ),
+                    timeout=ORCAMENTO_ENRIQUECIMENTO,
+                )
+            except asyncio.TimeoutError:
+                print("Enriquecimento excedeu o prazo; devolvendo leads sem as redes.")
+            except Exception as exc:
+                print(f"Enriquecimento falhou, seguindo sem ele: {exc}")
 
         for lead, data in zip(leads, enrichments):
             data = data or {}

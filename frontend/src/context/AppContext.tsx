@@ -131,7 +131,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentLocation(location);
       await refreshUserData();
     } catch (err: any) {
-      alert(err.message || err.response?.data?.detail || "Erro ao realizar busca de leads.");
+      // Repassa o motivo real para quem chamou mostrar na tela. Antes
+      // aparecia um alerta aqui e outro genérico na tela, culpando a
+      // chave de API independente da causa.
+      throw new Error(err?.message || 'Não foi possível concluir a busca.');
     } finally {
       setIsLoading(false);
     }

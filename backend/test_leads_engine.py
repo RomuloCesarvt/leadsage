@@ -106,3 +106,41 @@ def test_niche_variants_expande_sinonimos():
 
 def test_niche_variants_sem_sinonimo_conhecido():
     assert niche_variants("Chaveiros") == ["Chaveiros"]
+
+
+def test_orcamento_do_enriquecimento_existe():
+    """A busca precisa caber no limite da funcao serverless. Sem prazo,
+    um site lento trava tudo e o usuario nao recebe lead nenhum."""
+    from app.leads_engine import ORCAMENTO_ENRIQUECIMENTO
+    assert 5 <= ORCAMENTO_ENRIQUECIMENTO <= 30
+
+
+def test_enriquecimento_lento_nao_derruba_a_busca(monkeypatch):
+    """Enriquecimento que estoura o prazo devolve os leads sem as redes,
+    em vez de propagar o erro."""
+    import asyncio
+
+    import app.leads_engine as motor
+
+    async def travado(*a, **kw):
+        await asyncio.sleep(60)
+
+    monkeypatch.setattr(motor.SocialScraper, "enrich_many", travado)
+    monkeypatch.setattr(motor, "ORCAMENTO_ENRIQUECIMENTO", 0.2)
+
+    async def falsa_coleta(api_key, queries, target):
+        return [{
+            "id": "p1",
+            "displayName": {"text": "Padaria Teste"},
+            "formattedAddress": "R. X, 1 - Salvador - BA",
+            "nationalPhoneNumber": "(71) 99918-2820",
+        }]
+
+    monkeypatch.setattr(motor.LeadsEngine, "_collect_places", falsa_coleta)
+
+    leads = asyncio.run(motor.LeadsEngine.search_leads(
+        niche="Padarias", location="Salvador, BA", limit=1, api_key="CHAVE"
+    ))
+    assert len(leads) == 1
+    assert leads[0].name == "Padaria Teste"
+    assert leads[0].socials.instagram is None

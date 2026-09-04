@@ -1,10 +1,12 @@
 import json
+import time
 from typing import Optional
 
 from google import genai
 from google.genai import types
 
 from app.config import settings
+from app.copy_knowledge import bloco_de_mercado, lista_de_cliches, regras_do_canal
 from app.models import LeadItem, PitchGenerationRequest, PitchGenerationResponse
 
 # gemini-2.0-flash foi descontinuado e responde 404 NOT_FOUND: era por isso
@@ -34,33 +36,64 @@ def build_client(api_key: str) -> genai.Client:
     )
 
 
-def generate_with_fallback(client, prompt: str) -> str:
+def _e_transitorio(erro: Exception) -> bool:
+    """503 e 429 sao pico de demanda, nao defeito: vale tentar de novo.
+
+    404 (modelo removido) e 401 nao adianta repetir.
+    """
+    texto = str(erro)
+    return "503" in texto or "429" in texto or "UNAVAILABLE" in texto or "RESOURCE_EXHAUSTED" in texto
+
+
+def generate_with_fallback(client, prompt: str, tentativas: int = 2) -> str:
     """Tenta os modelos em ordem ate um responder. Memoriza o que funcionou.
 
     Sem o cache, um cold start pagava ~36s tentando modelos mortos antes
     de chegar ao que responde.
+
+    Quando TODOS respondem 503 — o Gemini tem picos de demanda em que isso
+    acontece com a familia inteira — espera e repete a rodada, em vez de
+    devolver erro na cara do usuario.
     """
     global _working_model
 
-    chain = list(MODEL_CHAIN)
-    if _working_model in chain:
-        chain.remove(_working_model)
-        chain.insert(0, _working_model)
+    ultimo: Optional[Exception] = None
+    houve_transitorio = False
 
-    last_error: Optional[Exception] = None
-    for model in chain:
-        try:
-            response = client.models.generate_content(model=model, contents=prompt)
-            text = (response.text or "").strip()
-            if text:
-                _working_model = model
-                return text
-            last_error = RuntimeError(f"{model} devolveu resposta vazia")
-        except Exception as exc:
-            last_error = exc
-            continue
+    for rodada in range(max(1, tentativas)):
+        if rodada:
+            time.sleep(1.5 * rodada)   # espera curta e crescente
 
-    raise RuntimeError(f"Nenhum modelo Gemini disponivel. Ultimo erro: {last_error}")
+        chain = list(MODEL_CHAIN)
+        if _working_model in chain:
+            chain.remove(_working_model)
+            chain.insert(0, _working_model)
+
+        houve_transitorio = False
+        for model in chain:
+            try:
+                response = client.models.generate_content(model=model, contents=prompt)
+                text = (response.text or "").strip()
+                if text:
+                    _working_model = model
+                    return text
+                ultimo = RuntimeError(f"{model} devolveu resposta vazia")
+            except Exception as exc:
+                ultimo = exc
+                if _e_transitorio(exc):
+                    houve_transitorio = True
+                continue
+
+        # Se nenhuma falha foi transitoria, repetir nao muda nada.
+        if not houve_transitorio:
+            break
+
+    if houve_transitorio:
+        raise RuntimeError(
+            "O Gemini está com alta demanda no momento e recusou as tentativas. "
+            "Aguarde alguns segundos e gere novamente."
+        )
+    raise RuntimeError(f"Nenhum modelo Gemini disponivel. Ultimo erro: {ultimo}")
 
 
 def strip_code_fence(text: str) -> str:
@@ -132,40 +165,72 @@ class AIGenerator:
                 channels.append("WhatsApp")
             presence = ", ".join(channels) if channels else "apenas o perfil no Google Maps"
 
+            cliches = lista_de_cliches()
             missing = lead.missingDigitalAssets or []
             gaps = ("não possui " + ", nem ".join(missing)) if missing else "nenhuma lacuna óbvia"
 
-            prompt = f"""
-Você é um especialista em cold e-mail B2B de altíssima conversão e um copywriter brilhante.
-Sua missão é escrever o primeiro contato para um Lead. 
+            mercado = bloco_de_mercado(lead.niche, lead.role)
+            canal = regras_do_canal(getattr(req, "channel", "") or "email")
 
-DADOS DO SEU PRODUTO/OFERTA:
-- O que você vende / Problema que resolve: {user_product_info}
+            prompt = f"""Você escreve o primeiro contato de um prestador de serviço para um
+negócio local. Não é marketing de massa: é uma mensagem por vez, para
+alguém que não pediu para ser contatado. Ela precisa parecer escrita por
+uma pessoa que olhou aquele negócio antes de escrever.
 
-DADOS DO LEAD (ALVO) — tudo verificado no Google Maps, pode citar:
-- Nome: {lead.name}
-- Tipo de negócio: {lead.role}
-- Localização: {lead.city} ({lead.location})
-- Nicho: {lead.niche}
+QUEM ESCREVE
+- Vende: {user_product_info}
+- Assina como: {sender}
+
+PARA QUEM (dados verificados no Google Maps — pode citar, são reais)
+- Negócio: {lead.name}
+- Ramo: {lead.role}
+- Cidade: {lead.city}
 - Reputação: {reputation}
-- Presença digital hoje: {presence}
-- Lacunas concretas: {gaps}
-- Resumo: {lead.ai_summary}
+- O que ele tem hoje: {presence}
+- O que falta: {gaps}
 
-DADOS DA MENSAGEM:
-- Tom: {tone}
-- Remetente: {sender}
-- Instruções Extras: {req.custom_instructions or "Nenhuma. Foco em gerar uma reunião rápida de 5 minutos."}
+COMO ESSE MERCADO FUNCIONA
+{mercado}
 
-INSTRUÇÕES ESTRATÉGICAS:
-1. Comece com um 'hook' (gancho) hiper-personalizado focado no nicho da empresa ({lead.company}) ou no seu resumo.
-2. Apresente de forma fluida como o seu produto/oferta ({user_product_info}) resolve uma dor latente desse mercado.
-3. Não seja genérico, não pareça um panfleto. Seja um consultor de negócios trazendo uma oportunidade.
-4. Finalize com um CTA (Call to Action) claro e de baixo atrito.
+CANAL: {canal['tom']}
+- Tamanho: {canal['limite']}
+- Estrutura: {canal['estrutura']}
 
-RETORNO ESPERADO:
-Retorne um JSON exato com duas chaves: "subject" (o assunto do email, chamativo e curto) e "body" (o corpo do e-mail com quebras de linha). 
-Não use blocos markdown (```json). Apenas as chaves em formato JSON puro.
+COMO ESCREVER
+
+1. Abra com um fato específico daquele negócio — a nota, o número de
+   avaliações, o bairro, o tempo de casa. Nunca com saudação genérica.
+   O leitor precisa perceber em três segundos que não é disparo em massa.
+
+2. Ligue esse fato à perda concreta descrita acima. Não diga "melhorar a
+   presença digital": diga o que ele deixa de ganhar, na moeda do negócio
+   dele.
+
+3. Ofereça uma coisa só, e pequena. Uma conversa de cinco minutos, ou ver
+   uma prévia pronta. Nunca peça reunião longa no primeiro contato.
+
+4. Termine com UMA pergunta que se responde em uma palavra.
+
+5. Tom: {tone}. {req.custom_instructions or "Sem instrução extra."}
+
+PROIBIDO
+- Estes clichês, em qualquer variação: {cliches}
+- Inventar dado que não está acima (faturamento, número de clientes,
+  nome do dono, concorrente)
+- Elogio vazio: "adorei o trabalho de vocês", "vi que vocês são referência"
+- Mais de uma pergunta
+- Emoji, a menos que o canal seja WhatsApp ou Instagram — e no máximo um
+- Prometer resultado numérico que você não pode garantir
+
+TESTE ANTES DE RESPONDER
+Se a mensagem servisse, trocando só o nome, para qualquer outro negócio
+da mesma cidade, ela está genérica. Reescreva usando algo que só vale
+para {lead.name}.
+
+RETORNO
+JSON puro, sem blocos markdown, com exatamente duas chaves:
+"subject" (assunto curto e concreto; string vazia se o canal não for
+e-mail) e "body" (o texto, com quebras de linha reais).
 """
             raw_text = strip_code_fence(generate_with_fallback(client, prompt))
             data = json.loads(raw_text)
