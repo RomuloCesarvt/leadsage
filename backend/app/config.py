@@ -14,6 +14,14 @@ class Settings(BaseModel):
     GOOGLE_MAPS_API_KEY: str = os.getenv("GOOGLE_MAPS_API_KEY", "")
     DEFAULT_USER_CREDITS: int = 500
 
+    # Sem Firestore o sistema nao tem onde contar credito. O padrao era
+    # liberar ilimitado "para dev local" — mas e o mesmo codigo que roda
+    # em producao, entao uma credencial errada num deploy transformava o
+    # produto em gratuito, gastando a cota paga do Google Places em
+    # silencio. Agora recusar e o padrao, e liberar exige dizer isso em
+    # voz alta.
+    CREDITO_SEM_BANCO: bool = os.getenv("LEADSAGE_CREDITO_SEM_BANCO", "") == "1"
+
     # E-mails com creditos ilimitados, separados por virgula.
     # O papel "admin" no Firestore continua valendo, mas some se o
     # documento do usuario for recriado (check_and_deduct_credits recria

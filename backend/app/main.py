@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import List, Dict, Any
 from fastapi import FastAPI, HTTPException, Query, Depends, Request
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -27,12 +27,12 @@ from app.ai_generator import AIGenerator
 from app.dispatcher import OutreachDispatcher, DispatchError
 from app.credit_system import check_and_deduct_credits, get_user_balance
 import httpx
-from app.firebase_config import get_current_user
+from app.firebase_config import get_current_user, db as firestore_db
 from app.profile_store import get_profile, save_profile
 from app.sites_store import (
     create_site, update_site, list_sites, get_site, delete_site, contar_sites,
 )
-from app.credit_system import is_admin
+from app.credit_system import is_admin, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
 from app.payments import (
     catalogo, criar_pedido, obter_pedido, listar_pedidos,
@@ -111,14 +111,50 @@ def detectar_pais(location: str) -> str:
 # Formato real da referencia de foto da Places API: places/<id>/photos/<id>
 PLACE_PHOTO_RE = re.compile(r"places/[A-Za-z0-9_-]+/photos/[A-Za-z0-9_-]+")
 
+@app.exception_handler(BancoDeCreditosIndisponivel)
+async def _banco_fora(request: Request, exc: BancoDeCreditosIndisponivel):
+    """503 em vez de liberar. O cliente sabe que e temporario e nos
+    sabemos, pelo log, que o Firestore nao subiu."""
+    print(f"CREDITO SEM BANCO: {request.url.path} recusado — Firestore indisponivel")
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+
 @app.get("/")
 def read_root():
+    """Estado do servico.
+
+    "armazenamento" existe porque o Firestore falha em silencio: uma
+    credencial errada so aparecia como uma linha de log. Como o controle
+    de credito agora recusa quando nao ha banco, da para ver aqui, sem
+    login e sem expor segredo, se o deploy subiu inteiro.
+    """
     return {
         "status": "online",
         "service": "LeadSage AI Prospecting Engine",
         "version": "1.0.0",
+        "armazenamento": "firestore" if firestore_db is not None else "indisponivel",
         "timestamp": datetime.now().isoformat()
     }
+
+def _identidade(profile: UserProfile, user: dict) -> UserProfile:
+    """Preenche o que o usuario ainda nao escreveu com o que veio do login.
+
+    O token do Firebase ja traz nome, e-mail e foto de quem entrou. Usar
+    isso e melhor do que default nenhum — e muito melhor do que o default
+    antigo, que era a identidade do dono do sistema.
+
+    O nome do plano vem sempre da tabela de precos: gravado no perfil ele
+    envelhecia e passava a mentir.
+    """
+    profile.name = profile.name or user.get("name") or ""
+    profile.email = profile.email or user.get("email") or ""
+    profile.avatar = profile.avatar or user.get("picture") or ""
+    if is_admin(user.get("email")):
+        profile.plan = plano_de("agencia")["nome"]
+    else:
+        profile.plan = plano_de(profile.plan_id or "previa")["nome"]
+    return profile
+
 
 @app.get("/api/profile", response_model=UserProfile)
 async def get_user_profile(user: dict = Depends(get_current_user)):
@@ -126,7 +162,7 @@ async def get_user_profile(user: dict = Depends(get_current_user)):
     profile = await get_profile(uid)
     balance = await get_user_balance(uid, user.get("email"))
     profile.credits = balance.get("credits", 0)
-    return profile
+    return _identidade(profile, user)
 
 
 @app.put("/api/profile", response_model=UserProfile)
@@ -140,7 +176,7 @@ async def update_user_profile(profile: UserProfile, user: dict = Depends(get_cur
     saved = await save_profile(uid, profile.model_dump())
     balance = await get_user_balance(uid, user.get("email"))
     saved.credits = balance.get("credits", 0)
-    return saved
+    return _identidade(saved, user)
 
 @app.post("/api/search-leads", response_model=LeadSearchResponse)
 async def search_leads(request: Request, req: LeadSearchRequest, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):

@@ -6,6 +6,21 @@ from app.config import settings
 UNLIMITED = 9999
 
 
+class BancoDeCreditosIndisponivel(RuntimeError):
+    """Nao da para saber quanto a pessoa tem, entao nada e cobrado nem
+    liberado. Falhar fechado: o prejuizo de recusar uma busca e menor do
+    que o de servir buscas pagas de graca para qualquer visitante."""
+
+
+def _sem_banco() -> None:
+    if settings.CREDITO_SEM_BANCO:
+        return
+    raise BancoDeCreditosIndisponivel(
+        "O controle de créditos está indisponível no momento. "
+        "Tente de novo em alguns minutos."
+    )
+
+
 def is_admin(email: Optional[str]) -> bool:
     """Admin pela lista de e-mails da configuracao.
 
@@ -29,8 +44,8 @@ async def check_and_deduct_credits(
         return UNLIMITED
 
     if db is None:
-        # Fallback para dev local sem Firestore
-        return 9999
+        _sem_banco()
+        return UNLIMITED
 
     user_ref = db.collection('users').document(uid)
     user_doc = user_ref.get()
@@ -71,6 +86,7 @@ async def get_user_balance(uid: str, email: Optional[str] = None) -> Dict[str, A
         return {"credits": UNLIMITED, "history": [], "is_admin": True}
 
     if db is None:
+        _sem_banco()
         return {"credits": UNLIMITED, "history": []}
 
     user_ref = db.collection('users').document(uid)
@@ -89,6 +105,7 @@ async def get_user_balance(uid: str, email: Optional[str] = None) -> Dict[str, A
 
 async def add_credits(uid: str, amount: int, reason: str = "Recarga de Créditos (Pix/Cartão)") -> int:
     if db is None:
+        _sem_banco()
         return UNLIMITED
         
     user_ref = db.collection('users').document(uid)

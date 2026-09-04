@@ -181,11 +181,62 @@ def test_edicao_tambem_recusa_site_vazio(client, com_plano):
     assert client.get(f"/api/sites/{site_id}").json()["html"] == HTML
 
 
+
+# ------------------------------------------------------------- identidade
+
+def test_usuario_novo_nao_herda_a_identidade_do_dono(client):
+    """Os defaults do perfil eram os dados reais do dono do sistema."""
+    perfil = client.get("/api/profile").json()
+
+    proibidos = ("Rômulo", "romulo@leadsage.ai", "LeadSage Corp",
+                 "Saúde & Farmacêutica", "unsplash")
+    texto = " ".join(str(v) for v in perfil.values())
+    for proibido in proibidos:
+        assert proibido not in texto, f"perfil novo ainda traz {proibido!r}"
+
+    assert perfil["company_name"] == ""
+    assert perfil["niche_focus"] == ""
+    assert perfil["product_description"] == ""
+
+
+def test_perfil_novo_e_semeado_pelo_login(client):
+    """Nome, e-mail e foto vem do token, nao de um default inventado."""
+    perfil = client.get("/api/profile").json()
+    assert perfil["email"] == "alice@example.com"
+
+
+def test_nome_do_plano_vem_da_tabela_de_precos(client, com_plano):
+    """Ficava gravado como "Pro Builder", um plano que nao existe."""
+    assert client.get("/api/profile").json()["plan"] == "Prévia Gratuita"
+
+    com_plano("start")
+    assert client.get("/api/profile").json()["plan"] == "Start Vitalício"
+
+
+def test_usuario_nao_consegue_gravar_o_nome_do_plano(client):
+    """plan e SYSTEM_FIELD: escrever nele daria um plano de mentira."""
+    client.put("/api/profile", json={"name": "Ana", "plan": "Agência Vitalício"})
+    perfil = client.get("/api/profile").json()
+    assert perfil["name"] == "Ana"
+    assert perfil["plan"] == "Prévia Gratuita"
+
+
+def test_o_que_o_usuario_escreve_vence_o_login(client):
+    """Semear nao pode sobrescrever o que a pessoa digitou."""
+    client.put("/api/profile", json={"name": "Ana Prospecta", "email": "ana@studio.com.br"})
+    perfil = client.get("/api/profile").json()
+    assert perfil["name"] == "Ana Prospecta"
+    assert perfil["email"] == "ana@studio.com.br"
+
+
 # ------------------------------------------------------------ historico
 
 @pytest.mark.skipif(
-    not os.getenv("GOOGLE_MAPS_API_KEY"),
-    reason="precisa da GOOGLE_MAPS_API_KEY para gerar uma busca real",
+    not os.getenv("GOOGLE_MAPS_API_KEY") or os.getenv("LEADSAGE_TESTES_REAIS") != "1",
+    reason=(
+        "chama a Places API de verdade e consome a cota diaria paga; "
+        "rode com LEADSAGE_TESTES_REAIS=1 quando quiser exercitar isso"
+    ),
 )
 def test_historico_pode_ser_excluido_e_e_isolado(client, as_user):
     """O botao de excluir busca nao tinha onClick nem rota."""

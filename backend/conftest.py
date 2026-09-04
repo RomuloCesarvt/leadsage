@@ -8,6 +8,11 @@ montagem acontece uma vez so.
 import os
 import socket
 
+# A suite roda sem Firestore. Isso precisa ser dito antes de app.config
+# ser importado: sem a declaracao, o sistema recusa credito em vez de
+# liberar — que e exatamente o comportamento que queremos em producao.
+os.environ.setdefault("LEADSAGE_CREDITO_SEM_BANCO", "1")
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -33,7 +38,15 @@ for module in (integrations_store, profile_store, sites_store):
 
 # Um unico dicionario de identidade para toda a suite
 CURRENT_UID = {"value": "alice"}
-app.dependency_overrides[get_current_user] = lambda: {"uid": CURRENT_UID["value"]}
+# O token do Firebase traz nome, e-mail e foto de quem entrou; o stub
+# antigo so tinha o uid, entao nada exercitava o caminho que semeia o
+# perfil a partir do login.
+app.dependency_overrides[get_current_user] = lambda: {
+    "uid": CURRENT_UID["value"],
+    "email": f"{CURRENT_UID['value']}@example.com",
+    "name": CURRENT_UID["value"].capitalize(),
+    "picture": f"https://exemplo.test/{CURRENT_UID['value']}.jpg",
+}
 
 
 @pytest.fixture

@@ -135,15 +135,25 @@ class CreditTopUpRequest(BaseModel):
     payment_method: str = "pix"
 
 class UserProfile(BaseModel):
+    """Perfil do usuario.
+
+    Os defaults eram os dados reais do dono do sistema: nome, e-mail,
+    empresa, nicho e ate a foto. Quem se cadastrasse abria o app com a
+    identidade de outra pessoa — e, como a IA assina as abordagens com
+    estes campos, o prospect recebia e-mail assinado por ele. Agora
+    nascem vazios e sao semeados com o que veio do login.
+    """
     id: str = "usr_default"
-    name: str = "Dr. Rômulo Leite"
-    email: str = "romulo@leadsage.ai"
-    company_name: str = "LeadSage Corp"
-    niche_focus: str = "Saúde & Farmacêutica"
-    product_description: str = "Ajudo empresas do setor de saúde a captarem mais clientes com automação de marketing."
-    credits: int = 450
-    plan: str = "Pro Builder"
-    avatar: str = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
+    name: str = ""
+    email: str = ""
+    company_name: str = ""
+    niche_focus: str = ""
+    product_description: str = ""
+    credits: int = 0
+    # Derivado de plan_id na leitura; nunca um nome fixo. Antes dizia
+    # "Pro Builder", um plano que nem existe na tabela de precos.
+    plan: str = ""
+    avatar: str = ""
     # Preferencias de prospeccao. Ficavam so no useState da tela de
     # Configuracoes e se perdiam a cada reload.
     services: List[str] = Field(default_factory=lambda: ["Sites"])
