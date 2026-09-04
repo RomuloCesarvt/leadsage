@@ -103,10 +103,16 @@ export const MessageEditorModal: React.FC = () => {
       // Canais sem API de envio: copia a mensagem e abre o destino, em
       // vez de fingir que a plataforma foi acionada.
       if (res.requires_manual_send && res.action_url) {
+        let copiou = true;
         try {
           await navigator.clipboard.writeText(body);
         } catch {
-          /* a área de transferência pode estar bloqueada */
+          // Alguns navegadores bloqueiam a área de transferência; sem
+          // avisar, o usuário colaria o conteúdo errado.
+          copiou = false;
+        }
+        if (!copiou) {
+          setDispatchError('A conversa foi aberta, mas não consegui copiar a mensagem. Copie pelo botão acima.');
         }
         window.open(res.action_url, '_blank', 'noopener,noreferrer');
       }
@@ -263,8 +269,8 @@ export const MessageEditorModal: React.FC = () => {
               {isManualChannel && (
                 <p className="text-[11px] text-amber-400/90 leading-snug">
                   {channel === 'whatsapp'
-                    ? 'Modo link: abre o WhatsApp com a mensagem pronta, sem gastar créditos.'
-                    : 'Não existe API pública para enviar por aqui. A LeadSage copia a mensagem e abre a conversa para você concluir — sem gastar créditos.'}
+                    ? 'Modo link: abre o WhatsApp com a mensagem já preenchida. Sem custo.'
+                    : 'Abre a conversa e copia a mensagem — é só colar com Ctrl+V e enviar. Instagram e LinkedIn não permitem preencher o texto por link. Sem custo.'}
                 </p>
               )}
 

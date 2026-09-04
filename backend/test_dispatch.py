@@ -46,12 +46,14 @@ def test_whatsapp_gera_link_e_nao_cobra(client):
     assert data["delivered"] is False
 
 
-def test_instagram_devolve_o_perfil_sem_cobrar(client):
+def test_instagram_abre_a_conversa_sem_cobrar(client):
+    """Antes abria o PERFIL, e o usuário ainda tinha que achar o botão de
+    mensagem. Agora vai direto para a DM via ig.me/m/<usuário>."""
     resp = client.post(
         "/api/dispatch",
         json={**BASE, "channel": "instagram_direct", "lead_instagram": "https://instagram.com/padariax"},
     )
-    assert resp.json()["action_url"] == "https://instagram.com/padariax"
+    assert resp.json()["action_url"] == "https://ig.me/m/padariax"
     assert resp.json()["credits_consumed"] == 0
 
 

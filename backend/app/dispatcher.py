@@ -267,6 +267,65 @@ async def _send_webhook(req: DispatchRequest, config: Dict[str, Any]) -> str:
     return f"Webhook chamado ({resp.status_code})"
 
 
+def handle_instagram(bruto: str) -> str:
+    """Extrai o @usuario de uma URL ou de um handle solto."""
+    valor = (bruto or "").strip()
+    if not valor:
+        return ""
+    if "instagram.com" in valor.lower():
+        caminho = urlparse(valor if valor.startswith("http") else f"https://{valor}").path
+        partes = [p for p in caminho.split("/") if p]
+        # /p/... e /reel/... sao posts, nao perfis
+        if not partes or partes[0] in ("p", "reel", "explore", "stories"):
+            return ""
+        return partes[0]
+    return valor.lstrip("@/")
+
+
+def link_instagram_dm(bruto: str) -> str:
+    """Link que abre a CONVERSA, nao o perfil.
+
+    ig.me/m/<usuario> e o deep link oficial de mensagem da Meta (o mesmo
+    usado nos anuncios "Click to Message") e redireciona para
+    instagram.com/m/<usuario>, que abre a DM ja aberta com a pessoa.
+
+    O texto nao pode ir junto: o Instagram descarta parametros de query
+    nesse redirect. Por isso a mensagem vai para a area de transferencia.
+    """
+    usuario = handle_instagram(bruto)
+    return f"https://ig.me/m/{usuario}" if usuario else ""
+
+
+def link_linkedin_dm(bruto: str) -> Tuple[str, str]:
+    """Devolve (url, aviso) para o LinkedIn.
+
+    Pagina de empresa nao recebe mensagem direta no LinkedIn — so perfil
+    de pessoa. Quando o lead so tem a pagina da empresa, isso e dito em
+    vez de abrir uma tela onde nao da para escrever.
+    """
+    valor = (bruto or "").strip()
+    if not valor:
+        return "", ""
+
+    url = valor if valor.startswith("http") else f"https://{valor.lstrip('/')}"
+    caminho = urlparse(url).path.lower()
+
+    if "/company/" in caminho or "/school/" in caminho:
+        return (
+            url,
+            "Página de empresa não recebe mensagem direta no LinkedIn — "
+            "abrimos a página para você encontrar um responsável",
+        )
+
+    partes = [p for p in urlparse(url).path.split("/") if p]
+    if len(partes) >= 2 and partes[0] == "in":
+        # Rota de composicao do LinkedIn: logado, cai direto na janela
+        # de nova mensagem para esse perfil.
+        return f"https://www.linkedin.com/messaging/compose/?recipient={partes[1]}", ""
+
+    return url, ""
+
+
 def _manual_channel(req: DispatchRequest) -> Tuple[str, str]:
     """Canais sem API: devolve (texto de status, link de acao)."""
     if req.channel == "whatsapp":
@@ -276,15 +335,19 @@ def _manual_channel(req: DispatchRequest) -> Tuple[str, str]:
         )
 
     if req.channel == "instagram_direct":
-        url = _profile_url(req.lead_instagram or "", "https://instagram.com/")
+        url = link_instagram_dm(req.lead_instagram or "")
         if not url:
-            raise DispatchError("Este lead não tem Instagram.")
-        return ("Perfil aberto — a mensagem foi copiada para você colar na DM", url)
+            raise DispatchError(
+                "Este lead não tem um perfil de Instagram utilizável para mensagem."
+            )
+        return ("Conversa aberta no Instagram — a mensagem foi copiada, cole com Ctrl+V", url)
 
-    url = _profile_url(req.lead_linkedin or "", "https://linkedin.com/in/")
+    url, aviso = link_linkedin_dm(req.lead_linkedin or "")
     if not url:
         raise DispatchError("Este lead não tem LinkedIn.")
-    return ("Perfil aberto — a mensagem foi copiada para você colar", url)
+    if aviso:
+        return (f"{aviso}. A mensagem foi copiada.", url)
+    return ("Janela de mensagem aberta no LinkedIn — a mensagem foi copiada, cole com Ctrl+V", url)
 
 
 class OutreachDispatcher:

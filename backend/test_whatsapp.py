@@ -173,3 +173,62 @@ def test_credenciais_da_meta_sao_isoladas_por_usuario(client, as_user):
 
 def test_teste_de_credencial_exige_configuracao(client):
     assert client.post("/api/integrations/test-whatsapp").status_code == 400
+
+
+# ------------------------------------ abrir direto na conversa (IG/LinkedIn)
+
+from app.dispatcher import handle_instagram, link_instagram_dm, link_linkedin_dm
+
+
+@pytest.mark.parametrize("entrada,esperado", [
+    ("https://instagram.com/padariafavorita", "padariafavorita"),
+    ("https://www.instagram.com/padaria.favorita/", "padaria.favorita"),
+    ("http://www.instagram.com/paodavilaoficial", "paodavilaoficial"),
+    ("@padariafavorita", "padariafavorita"),
+    ("padariafavorita", "padariafavorita"),
+    ("https://instagram.com/p/ABC123", ""),      # post, nao perfil
+    ("https://instagram.com/reel/XYZ", ""),      # reel, nao perfil
+    ("", ""),
+])
+def test_extrai_o_usuario_do_instagram(entrada, esperado):
+    assert handle_instagram(entrada) == esperado
+
+
+def test_instagram_abre_a_conversa_e_nao_o_perfil():
+    """ig.me/m/<usuario> cai na DM; instagram.com/<usuario> cai no perfil."""
+    url = link_instagram_dm("https://instagram.com/padariafavorita")
+    assert url == "https://ig.me/m/padariafavorita"
+    assert "/m/" in url
+
+
+def test_instagram_sem_perfil_utilizavel_falha(client):
+    resp = client.post("/api/dispatch", json={
+        "lead_id": "L1", "lead_name": "X", "body": "oi",
+        "channel": "instagram_direct", "lead_instagram": "https://instagram.com/p/ABC",
+    })
+    assert resp.status_code == 422
+
+
+def test_linkedin_de_pessoa_abre_a_janela_de_mensagem():
+    url, aviso = link_linkedin_dm("https://www.linkedin.com/in/romulo-leite")
+    assert url == "https://www.linkedin.com/messaging/compose/?recipient=romulo-leite"
+    assert aviso == ""
+
+
+def test_linkedin_de_empresa_avisa_que_nao_recebe_dm():
+    """Pagina de empresa nao aceita mensagem direta — dizer isso e melhor
+    do que abrir uma tela onde nao da para escrever."""
+    url, aviso = link_linkedin_dm("https://www.linkedin.com/company/padaria-favorita")
+    assert "company" in url
+    assert "não recebe mensagem direta" in aviso
+
+
+def test_status_do_instagram_menciona_a_colagem(client):
+    resp = client.post("/api/dispatch", json={
+        "lead_id": "L1", "lead_name": "X", "body": "oi",
+        "channel": "instagram_direct", "lead_instagram": "https://instagram.com/padariafavorita",
+    })
+    dados = resp.json()
+    assert dados["action_url"] == "https://ig.me/m/padariafavorita"
+    assert "Ctrl+V" in dados["status"]
+    assert dados["credits_consumed"] == 0
