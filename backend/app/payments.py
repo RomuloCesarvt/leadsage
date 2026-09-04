@@ -16,8 +16,6 @@ saldo:
 O passo 3 é assinado porque, sem isso, qualquer um poderia enviar um
 POST fingindo ser o provedor.
 """
-import hashlib
-import hmac
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -29,46 +27,97 @@ from app.database import AsyncSessionLocal, DBOrder
 
 # Catálogo no servidor. O cliente manda só o `id`: preço que viaja pelo
 # request é preço que o cliente escolhe.
-PACKAGES: List[Dict[str, Any]] = [
+#
+# Os planos são VITALÍCIOS — pagamento único, não assinatura mensal. Os
+# valores vêm da tela de Assinatura, que já os definia.
+PLANS: List[Dict[str, Any]] = [
     {
         "id": "start",
-        "nome": "Start",
-        "credits": 100,
-        "amount_cents": 4900,
-        "descricao": "100 leads. Para testar o processo numa cidade.",
+        "tipo": "plano",
+        "nome": "Start Vitalício",
+        "credits": 150,
+        "sites": 10,
+        "amount_cents": 6700,
+        "descricao": "Acesso vitalício, 150 leads e 10 sites incluídos.",
         "destaque": False,
     },
     {
         "id": "pro",
-        "nome": "Pro",
-        "credits": 250,
-        "amount_cents": 9900,
-        "descricao": "250 leads e mensagens com IA. O mais usado.",
+        "tipo": "plano",
+        "nome": "Pro Vitalício",
+        "credits": 500,
+        # A tela não informava a cota de sites do Pro — fica entre os 10
+        # do Start e os 200 da Agência até você definir.
+        "sites": 50,
+        "amount_cents": 9700,
+        "descricao": "Acesso vitalício, 500 leads e 50 sites incluídos.",
         "destaque": True,
     },
     {
-        "id": "escala",
-        "nome": "Escala",
-        "credits": 600,
-        "amount_cents": 19900,
-        "descricao": "600 leads. Para quem prospecta em várias cidades.",
+        "id": "agencia",
+        "tipo": "plano",
+        "nome": "Agência Vitalício",
+        "credits": 3000,
+        "sites": 200,
+        "amount_cents": 19700,
+        "descricao": "Acesso vitalício, 3.000 leads e 200 sites incluídos.",
         "destaque": False,
     },
 ]
+
+# Recarga avulsa, para quem já tem plano e estourou a cota.
+PACKAGES: List[Dict[str, Any]] = [
+    {
+        "id": "recarga_100",
+        "tipo": "recarga",
+        "nome": "100 créditos",
+        "credits": 100,
+        "sites": 0,
+        "amount_cents": 4900,
+        "descricao": "100 leads adicionais.",
+        "destaque": False,
+    },
+    {
+        "id": "recarga_250",
+        "tipo": "recarga",
+        "nome": "250 créditos",
+        "credits": 250,
+        "sites": 0,
+        "amount_cents": 9900,
+        "descricao": "250 leads adicionais.",
+        "destaque": True,
+    },
+    {
+        "id": "recarga_600",
+        "tipo": "recarga",
+        "nome": "600 créditos",
+        "credits": 600,
+        "sites": 0,
+        "amount_cents": 19900,
+        "descricao": "600 leads adicionais.",
+        "destaque": False,
+    },
+]
+
+ITENS = PLANS + PACKAGES
 
 STATUS_VALIDOS = ("pending", "paid", "failed", "expired")
 
 
 def achar_pacote(package_id: str) -> Optional[Dict[str, Any]]:
-    return next((p for p in PACKAGES if p["id"] == package_id), None)
+    return next((p for p in ITENS if p["id"] == package_id), None)
 
 
-def catalogo() -> List[Dict[str, Any]]:
-    """Catálogo com o preço já formatado, para a tela não fazer conta."""
-    return [
-        {**p, "preco": f"R$ {p['amount_cents'] / 100:.2f}".replace(".", ",")}
-        for p in PACKAGES
-    ]
+def _com_preco(item: Dict[str, Any]) -> Dict[str, Any]:
+    return {**item, "preco": f"R$ {item['amount_cents'] / 100:.2f}".replace(".", ",")}
+
+
+def catalogo() -> Dict[str, List[Dict[str, Any]]]:
+    """Preço já formatado, para a tela não fazer conta."""
+    return {
+        "planos": [_com_preco(p) for p in PLANS],
+        "recargas": [_com_preco(p) for p in PACKAGES],
+    }
 
 
 def _agora() -> str:
@@ -80,6 +129,8 @@ def _para_dict(row: DBOrder) -> Dict[str, Any]:
         "id": row.id,
         "package_id": row.package_id,
         "credits": row.credits,
+        "sites": row.sites,
+        "tipo": row.tipo,
         "amount_cents": row.amount_cents,
         "currency": row.currency,
         "status": row.status,
@@ -100,6 +151,8 @@ async def criar_pedido(uid: str, package_id: str, provider: str = "") -> Dict[st
         owner_uid=uid,
         package_id=pacote["id"],
         credits=pacote["credits"],
+        sites=pacote.get("sites", 0),
+        tipo=pacote.get("tipo", "recarga"),
         amount_cents=pacote["amount_cents"],
         currency="BRL",
         status="pending",
@@ -173,11 +226,34 @@ async def confirmar_pagamento(
         pedido.status = "paid"
         pedido.paid_at = _agora()
         pedido.provider_event = provider_event or None
-        uid, creditos, pid = pedido.owner_uid, pedido.credits, pedido.id
+        uid = pedido.owner_uid
+        creditos = pedido.credits
+        pid = pedido.id
+        sites = pedido.sites or 0
+        tipo = pedido.tipo or "recarga"
+        package_id = pedido.package_id
         await session.commit()
 
-    novo_saldo = await add_credits(uid, creditos, f"Compra do pacote {pedido.package_id}")
-    return {"status": "creditado", "order_id": pid, "credits": creditos, "saldo": novo_saldo}
+    novo_saldo = await add_credits(uid, creditos, f"Compra: {package_id}")
+
+    # Plano tambem concede cota de sites e marca o plano no perfil.
+    if tipo == "plano":
+        try:
+            from app.profile_store import get_profile, save_profile
+
+            perfil = await get_profile(uid)
+            dados = perfil.model_dump()
+            dados["plan"] = achar_pacote(package_id)["nome"]
+            dados["sites_quota"] = (dados.get("sites_quota") or 0) + sites
+            await save_profile(uid, dados)
+        except Exception as exc:
+            # O credito ja entrou; nao desfazer a compra por causa do perfil.
+            print(f"Falha ao aplicar o plano no perfil: {exc}")
+
+    return {
+        "status": "creditado", "order_id": pid,
+        "credits": creditos, "sites": sites, "saldo": novo_saldo,
+    }
 
 
 async def marcar_falha(provider_ref: str, motivo: str = "") -> None:
@@ -187,22 +263,3 @@ async def marcar_falha(provider_ref: str, motivo: str = "") -> None:
         if pedido and pedido.status == "pending":
             pedido.status = "failed"
             await session.commit()
-
-
-def assinatura_confere(corpo: bytes, assinatura: str, segredo: str) -> bool:
-    """Confere HMAC-SHA256 do corpo cru do webhook.
-
-    Sem isso, qualquer pessoa que descobrisse a URL poderia enviar um
-    "pagamento aprovado" e ganhar créditos de graça — exatamente o buraco
-    que este módulo veio fechar.
-
-    `compare_digest` evita vazar informação pelo tempo de comparação.
-    """
-    if not (assinatura and segredo):
-        return False
-    esperado = hmac.new(segredo.encode(), corpo, hashlib.sha256).hexdigest()
-    enviado = assinatura.strip()
-    # Alguns provedores prefixam o algoritmo
-    if "=" in enviado:
-        enviado = enviado.split("=", 1)[1].strip()
-    return hmac.compare_digest(esperado, enviado)

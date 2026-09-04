@@ -23,6 +23,7 @@ EDITABLE_FIELDS = (
     "avatar", "services", "niches", "regions", "preferred_channel",
     "monthly_goal", "language",
     "brand_logo", "brand_primary", "brand_accent", "brand_contact",
+    "plan", "sites_quota",
 )
 
 

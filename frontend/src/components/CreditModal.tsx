@@ -27,7 +27,8 @@ export const CreditModal: React.FC = () => {
   useEffect(() => {
     if (!isCreditModalOpen) return;
     setErro('');
-    api.listarPacotes().then(({ packages: lista, provider: prov }) => {
+    api.listarPacotes().then(({ recargas, provider: prov }) => {
+      const lista = recargas;
       setPackages(lista);
       setProvider(prov);
       const destaque = lista.find(p => p.destaque);

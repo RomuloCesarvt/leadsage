@@ -163,7 +163,9 @@ class DBOrder(Base):
     id = Column(String, primary_key=True, index=True)
     owner_uid = Column(String, index=True)
     package_id = Column(String)
+    tipo = Column(String, default="recarga")   # plano | recarga
     credits = Column(Integer)
+    sites = Column(Integer, default=0)
     amount_cents = Column(Integer)
     currency = Column(String, default="BRL")
     status = Column(String, default="pending", index=True)   # pending|paid|failed|expired

@@ -134,6 +134,7 @@ export interface UserProfile {
   brand_primary?: string;
   brand_accent?: string;
   brand_contact?: string;
+  sites_quota?: number;
 }
 
 export interface SearchHistoryItem {
@@ -199,8 +200,10 @@ export interface DocumentItem {
 
 export interface CreditPackage {
   id: string;
+  tipo: 'plano' | 'recarga';
   nome: string;
   credits: number;
+  sites: number;
   amount_cents: number;
   preco: string;
   descricao: string;

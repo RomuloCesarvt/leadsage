@@ -155,6 +155,7 @@ class UserProfile(BaseModel):
     brand_primary: str = "#2563eb"
     brand_accent: str = "#f59e0b"
     brand_contact: str = ""
+    sites_quota: int = 0
 
 class DemoSiteRequest(BaseModel):
     lead: LeadItem

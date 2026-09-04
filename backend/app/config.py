@@ -24,6 +24,9 @@ class Settings(BaseModel):
     # indisponivel — o que e melhor do que conceder credito sem cobrar.
     PAYMENT_PROVIDER: str = os.getenv("PAYMENT_PROVIDER", "")
     PAYMENT_WEBHOOK_SECRET: str = os.getenv("PAYMENT_WEBHOOK_SECRET", "")
+    MERCADOPAGO_TOKEN: str = os.getenv("MERCADOPAGO_TOKEN", "")
+    # Para onde o comprador volta e onde o MP avisa o pagamento
+    APP_URL: str = os.getenv("APP_URL", "https://leadsageofc.vercel.app")
 
     # Origens autorizadas do frontend, separadas por virgula.
     # Vazio mantem o comportamento permissivo antigo para nao quebrar

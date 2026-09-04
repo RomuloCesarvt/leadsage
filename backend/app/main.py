@@ -33,8 +33,9 @@ from app.sites_store import create_site, list_sites, get_site, delete_site
 from app.integrations_store import get_integrations, save_integrations, public_view
 from app.payments import (
     catalogo, criar_pedido, obter_pedido, listar_pedidos,
-    confirmar_pagamento, assinatura_confere,
+    confirmar_pagamento, achar_pacote, vincular_cobranca,
 )
+from app import mercadopago
 from app.documents_store import (
     create_document, update_document, list_documents, get_document, delete_document,
 )
@@ -309,7 +310,7 @@ async def get_credits_balance(user: dict = Depends(get_current_user)):
 @app.get("/api/packages")
 def listar_pacotes():
     """Catalogo com os precos. O cliente manda so o id na compra."""
-    return {"packages": catalogo(), "provider": settings.PAYMENT_PROVIDER or None}
+    return {**catalogo(), "provider": settings.PAYMENT_PROVIDER or None}
 
 
 @app.post("/api/checkout")
@@ -325,7 +326,7 @@ async def iniciar_compra(req: CheckoutRequest, user: dict = Depends(get_current_
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    if not settings.PAYMENT_PROVIDER:
+    if settings.PAYMENT_PROVIDER != "mercadopago" or not settings.MERCADOPAGO_TOKEN:
         raise HTTPException(
             status_code=503,
             detail=(
@@ -334,8 +335,22 @@ async def iniciar_compra(req: CheckoutRequest, user: dict = Depends(get_current_
             ),
         )
 
-    # A criacao da cobranca no provedor entra aqui quando ele for escolhido.
-    return {"order": pedido, "checkout_url": None}
+    item = achar_pacote(req.package_id)
+    try:
+        cobranca = await mercadopago.criar_preferencia(
+            token=settings.MERCADOPAGO_TOKEN,
+            order_id=pedido["id"],
+            titulo=f"LeadSage — {item['nome']}",
+            valor_centavos=item["amount_cents"],
+            url_retorno=f"{settings.APP_URL}/",
+            url_webhook=f"{settings.APP_URL}/api/webhooks/pagamento",
+            email_comprador=user.get("email", ""),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    await vincular_cobranca(pedido["id"], "mercadopago", cobranca["preference_id"])
+    return {"order": pedido, "checkout_url": cobranca["checkout_url"]}
 
 
 @app.get("/api/orders")
@@ -356,35 +371,54 @@ async def webhook_pagamento(request: Request):
     """Unico caminho que concede credito.
 
     Nao tem `Depends(get_current_user)` de proposito: quem chama e o
-    provedor, nao o usuario. A autenticacao e a assinatura HMAC do corpo
-    cru — sem ela, qualquer um que descobrisse a URL ganharia creditos.
+    Mercado Pago, nao o usuario. A autenticacao e a assinatura.
+
+    O corpo do aviso do MP so traz o id — ele NAO diz que esta aprovado.
+    Por isso, depois de conferir a assinatura, o estado real e consultado
+    na API deles. Confiar no corpo seria o mesmo buraco de antes.
     """
-    if not settings.PAYMENT_WEBHOOK_SECRET:
+    if not settings.PAYMENT_WEBHOOK_SECRET or not settings.MERCADOPAGO_TOKEN:
         raise HTTPException(status_code=503, detail="Webhook nao configurado.")
 
     corpo = await request.body()
-    assinatura = (
-        request.headers.get("x-signature")
-        or request.headers.get("x-hub-signature-256")
-        or request.headers.get("stripe-signature")
-        or ""
-    )
-    if not assinatura_confere(corpo, assinatura, settings.PAYMENT_WEBHOOK_SECRET):
-        raise HTTPException(status_code=401, detail="Assinatura invalida.")
-
     try:
         evento = json.loads(corpo or b"{}")
     except Exception:
         raise HTTPException(status_code=400, detail="Corpo invalido.")
 
-    if not evento.get("paid", evento.get("status") == "paid"):
-        return {"status": "ignorado"}
+    # O MP manda o id ora na query, ora no corpo.
+    data_id = str(
+        request.query_params.get("data.id")
+        or (evento.get("data") or {}).get("id")
+        or evento.get("id")
+        or ""
+    )
+    tipo = request.query_params.get("type") or evento.get("type") or evento.get("action", "")
+    if "payment" not in str(tipo):
+        return {"status": "ignorado", "motivo": "evento nao e de pagamento"}
+
+    if not mercadopago.assinatura_confere(
+        x_signature=request.headers.get("x-signature", ""),
+        x_request_id=request.headers.get("x-request-id", ""),
+        data_id=data_id,
+        segredo=settings.PAYMENT_WEBHOOK_SECRET,
+    ):
+        raise HTTPException(status_code=401, detail="Assinatura invalida.")
+
+    try:
+        pagamento = await mercadopago.consultar_pagamento(settings.MERCADOPAGO_TOKEN, data_id)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    if not pagamento["aprovado"]:
+        return {"status": "ignorado", "motivo": f"pagamento {pagamento['status']}"}
 
     return await confirmar_pagamento(
-        provider_ref=str(evento.get("reference") or evento.get("id") or ""),
-        provider_event=str(evento.get("event_id") or ""),
-        order_id=str(evento.get("order_id") or ""),
+        provider_ref=pagamento["id"],
+        provider_event=pagamento["id"],
+        order_id=pagamento["order_id"],
     )
+
 
 @app.get("/api/history")
 async def get_search_history(user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):

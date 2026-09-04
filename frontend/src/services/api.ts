@@ -104,11 +104,11 @@ export const api = {
     }
   },
 
-  async listarPacotes(): Promise<{ packages: CreditPackage[]; provider: string | null }> {
+  async listarPacotes(): Promise<{ planos: CreditPackage[]; recargas: CreditPackage[]; provider: string | null }> {
     try {
       return await fetchWithToken('/packages');
     } catch {
-      return { packages: [], provider: null };
+      return { planos: [], recargas: [], provider: null };
     }
   },
 
