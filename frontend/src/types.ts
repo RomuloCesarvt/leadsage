@@ -168,7 +168,10 @@ export interface SiteItem {
   template?: string;
   lead_id?: string;
   created_at: string;
+  updated_at?: string;
   html?: string;
+  /** os campos do construtor, para reabrir o site e editar */
+  builder_data?: string;
 }
 
 export interface IntegrationSettings {

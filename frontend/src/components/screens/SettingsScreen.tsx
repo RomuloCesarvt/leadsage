@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Save, User, Target, Globe, Check, AlertCircle } from 'lucide-react';
+import { Save, User, Target, Globe, Check, AlertCircle, Image as ImageIcon, Palette } from 'lucide-react';
+import { prepararImagem } from '../../lib/imagem';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
 
@@ -16,6 +17,21 @@ export const SettingsScreen: React.FC = () => {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveError, setSaveError] = useState('');
 
+  // Aba Perfil: antes era so aparencia — os campos usavam defaultValue,
+  // nao havia estado nem botao de salvar, e "Alterar foto" nao fazia nada.
+  const [nome, setNome] = useState('');
+  const [empresa, setEmpresa] = useState('');
+  const [emailComercial, setEmailComercial] = useState('');
+  const [nicho, setNicho] = useState('');
+  const [oferta, setOferta] = useState('');
+  const [avatar, setAvatar] = useState('');
+  const [logo, setLogo] = useState('');
+  const [corPrimaria, setCorPrimaria] = useState('#2563eb');
+  const [corDestaque, setCorDestaque] = useState('#f59e0b');
+  const [contatoMarca, setContatoMarca] = useState('');
+  const [perfilState, setPerfilState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [perfilErro, setPerfilErro] = useState('');
+
   // Carrega o que já foi salvo. Antes a tela sempre abria nos valores
   // fixos do useState e o botão Salvar não gravava nada.
   useEffect(() => {
@@ -26,6 +42,17 @@ export const SettingsScreen: React.FC = () => {
     if (user.preferred_channel) setSelectedChannel(user.preferred_channel);
     if (user.monthly_goal) setSelectedGoal(user.monthly_goal);
     if (user.language) setLang(user.language);
+
+    setNome(user.name || '');
+    setEmpresa(user.company_name || '');
+    setEmailComercial(user.email || '');
+    setNicho(user.niche_focus || '');
+    setOferta(user.product_description || '');
+    setAvatar(user.avatar || '');
+    setLogo(user.brand_logo || '');
+    setCorPrimaria(user.brand_primary || '#2563eb');
+    setCorDestaque(user.brand_accent || '#f59e0b');
+    setContatoMarca(user.brand_contact || '');
   }, [user]);
 
   const toggleService = (s: string) => {
@@ -66,6 +93,53 @@ export const SettingsScreen: React.FC = () => {
       setSaveState('error');
     }
   };
+
+  const escolherImagem = async (
+    arquivo: File | undefined,
+    aplicar: (dataUri: string) => void,
+    larguraMaxima: number,
+    tetoBytes: number
+  ) => {
+    if (!arquivo) return;
+    setPerfilErro('');
+    try {
+      aplicar(await prepararImagem(arquivo, { larguraMaxima, tetoBytes }));
+      setPerfilState('idle');
+    } catch (err: any) {
+      setPerfilErro(err?.message || 'Nao foi possivel usar esta imagem.');
+      setPerfilState('error');
+    }
+  };
+
+  const salvarPerfil = async () => {
+    setPerfilState('saving');
+    setPerfilErro('');
+    try {
+      const saved = await api.updateProfile({
+        ...user,
+        name: nome,
+        company_name: empresa,
+        email: emailComercial,
+        niche_focus: nicho,
+        product_description: oferta,
+        avatar,
+        brand_logo: logo,
+        brand_primary: corPrimaria,
+        brand_accent: corDestaque,
+        brand_contact: contatoMarca,
+      });
+      setUser(saved);
+      setPerfilState('saved');
+    } catch (err: any) {
+      setPerfilErro(err?.message || 'Nao foi possivel salvar.');
+      setPerfilState('error');
+    }
+  };
+
+  const rotulo = 'block text-sm font-bold text-slate-700 mb-1.5';
+  const campo =
+    'w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 ' +
+    'placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors';
 
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar max-w-5xl mx-auto w-full">
@@ -228,32 +302,221 @@ export const SettingsScreen: React.FC = () => {
 
           {/* Perfil Form */}
           {activeTab === 'perfil' && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                <User className="w-5 h-5 text-blue-600" /> Dados da Conta
-              </h2>
+            <div className="space-y-8">
 
-              <div className="flex items-center gap-6 mb-8">
-                <div className="w-20 h-20 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
-                  <img src={user?.avatar} alt="Avatar" className="w-full h-full object-cover" />
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                  <User className="w-5 h-5 text-blue-600" /> Dados da conta
+                </h2>
+
+                <div className="flex items-center gap-6 mb-8">
+                  <div className="w-20 h-20 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                    {avatar
+                      ? <img src={avatar} alt="Sua foto" className="w-full h-full object-cover" />
+                      : <span className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-xl">
+                          {(nome || '?').trim().charAt(0).toUpperCase()}
+                        </span>}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-lg">{nome || 'Sem nome'}</h3>
+                    <p className="text-slate-500 text-sm">{emailComercial}</p>
+                    <div className="mt-2 flex items-center gap-3">
+                      <label className="text-sm font-bold text-blue-600 hover:underline cursor-pointer">
+                        Alterar foto
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={e => {
+                            escolherImagem(e.target.files?.[0], setAvatar, 400, 120 * 1024);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                      {avatar && (
+                        <button
+                          type="button"
+                          onClick={() => { setAvatar(''); setPerfilState('idle'); }}
+                          className="text-sm font-semibold text-slate-500 hover:text-red-600"
+                        >
+                          Remover
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-slate-800 text-lg">{user?.name}</h3>
-                  <p className="text-slate-500">{user?.email}</p>
-                  <button className="mt-2 text-sm font-bold text-blue-600 hover:underline">Alterar foto</button>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className={rotulo}>Nome completo</label>
+                    <input
+                      type="text"
+                      value={nome}
+                      onChange={e => { setNome(e.target.value); setPerfilState('idle'); }}
+                      className={campo}
+                    />
+                  </div>
+                  <div>
+                    <label className={rotulo}>E-mail comercial</label>
+                    <input
+                      type="email"
+                      value={emailComercial}
+                      onChange={e => { setEmailComercial(e.target.value); setPerfilState('idle'); }}
+                      className={campo}
+                    />
+                  </div>
+                  <div>
+                    <label className={rotulo}>Empresa ou marca</label>
+                    <input
+                      type="text"
+                      value={empresa}
+                      onChange={e => { setEmpresa(e.target.value); setPerfilState('idle'); }}
+                      className={campo}
+                    />
+                  </div>
+                  <div>
+                    <label className={rotulo}>Nicho principal</label>
+                    <input
+                      type="text"
+                      value={nicho}
+                      onChange={e => { setNicho(e.target.value); setPerfilState('idle'); }}
+                      placeholder="Padarias, clinicas, advocacia..."
+                      className={campo}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className={rotulo}>Seu produto ou oferta</label>
+                    <textarea
+                      rows={3}
+                      value={oferta}
+                      onChange={e => { setOferta(e.target.value); setPerfilState('idle'); }}
+                      placeholder="O que voce vende, que problema resolve e o seu diferencial. A IA escreve as abordagens a partir disto."
+                      className={`${campo} resize-none custom-scrollbar`}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Nome Completo</label>
-                  <input type="text" defaultValue={user?.name} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none" />
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                <h2 className="text-lg font-bold text-slate-800 mb-1 flex items-center gap-2">
+                  <Palette className="w-5 h-5 text-blue-600" /> Sua marca nos documentos
+                </h2>
+                <p className="text-slate-500 text-sm mb-6">
+                  É o que aparece no cabeçalho das propostas e dos contratos que você envia.
+                </p>
+
+                <div className="flex items-start gap-6 mb-6">
+                  <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-50 border border-slate-200 shrink-0 flex items-center justify-center">
+                    {logo
+                      ? <img src={logo} alt="Sua logo" className="w-full h-full object-contain p-2" />
+                      : <ImageIcon className="w-7 h-7 text-slate-300" />}
+                  </div>
+                  <div>
+                    <label className="inline-flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 cursor-pointer transition-colors">
+                      <ImageIcon className="w-4 h-4" /> Enviar logo
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={e => {
+                          escolherImagem(e.target.files?.[0], setLogo, 600, 200 * 1024);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    {logo && (
+                      <button
+                        type="button"
+                        onClick={() => { setLogo(''); setPerfilState('idle'); }}
+                        className="ml-3 text-sm font-semibold text-slate-500 hover:text-red-600"
+                      >
+                        Remover
+                      </button>
+                    )}
+                    <p className="text-xs text-slate-500 mt-2 max-w-xs">
+                      PNG, JPG ou SVG. Sem logo, usamos as iniciais da empresa.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">E-mail</label>
-                  <input type="email" defaultValue={user?.email} readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-500 cursor-not-allowed" />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className={rotulo}>Cor principal</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={corPrimaria}
+                        onChange={e => { setCorPrimaria(e.target.value); setPerfilState('idle'); }}
+                        className="w-12 h-11 rounded-xl border border-slate-200 bg-white cursor-pointer shrink-0"
+                        aria-label="Cor principal"
+                      />
+                      <input
+                        type="text"
+                        value={corPrimaria}
+                        onChange={e => { setCorPrimaria(e.target.value); setPerfilState('idle'); }}
+                        className={campo}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={rotulo}>Cor de destaque</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={corDestaque}
+                        onChange={e => { setCorDestaque(e.target.value); setPerfilState('idle'); }}
+                        className="w-12 h-11 rounded-xl border border-slate-200 bg-white cursor-pointer shrink-0"
+                        aria-label="Cor de destaque"
+                      />
+                      <input
+                        type="text"
+                        value={corDestaque}
+                        onChange={e => { setCorDestaque(e.target.value); setPerfilState('idle'); }}
+                        className={campo}
+                      />
+                    </div>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className={rotulo}>Contato no rodapé</label>
+                    <textarea
+                      rows={2}
+                      value={contatoMarca}
+                      onChange={e => { setContatoMarca(e.target.value); setPerfilState('idle'); }}
+                      placeholder={`${emailComercial || 'seu@email.com.br'}\n(00) 90000-0000`}
+                      className={`${campo} resize-none`}
+                    />
+                    <p className="text-xs text-slate-500 mt-1.5">Uma linha por informação.</p>
+                  </div>
                 </div>
               </div>
+
+              <div className="pt-2 flex justify-end items-center gap-4">
+                {perfilState === 'saved' && (
+                  <span className="text-sm font-semibold text-emerald-600 flex items-center gap-1.5">
+                    <Check className="w-4 h-4" /> Perfil salvo
+                  </span>
+                )}
+                {perfilState === 'error' && (
+                  <span className="text-sm font-semibold text-red-600 flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4" /> {perfilErro}
+                  </span>
+                )}
+                <button
+                  onClick={salvarPerfil}
+                  disabled={perfilState === 'saving'}
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-sm transition-colors flex items-center gap-2"
+                >
+                  {perfilState === 'saving' ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      Salvando...
+                    </>
+                  ) : (
+                    <><Save className="w-4 h-4" /> Salvar perfil</>
+                  )}
+                </button>
+              </div>
+
             </div>
           )}
 

@@ -110,6 +110,77 @@ def test_sites_sao_isolados_por_usuario(client, as_user, com_plano):
     assert client.get("/api/sites").json() == []
 
 
+
+def test_editar_site_nao_gasta_outra_vaga_da_cota(client, com_plano):
+    """Publicar de novo criava um duplicado e cobrava mais uma vaga."""
+    com_plano()
+    dar_cota(sites=2)
+
+    site = client.post(
+        "/api/sites",
+        json={"company": "Padaria", "html": HTML, "template": "Vitrine",
+              "builder_data": '{"empresa":"Padaria"}'},
+    ).json()
+
+    novo_html = HTML.replace("</body>", "<p>editado</p></body>")
+    atualizado = client.post(
+        "/api/sites",
+        json={"site_id": site["id"], "company": "Padaria Nova", "html": novo_html,
+              "template": "Vitrine", "builder_data": '{"empresa":"Padaria Nova"}'},
+    )
+    assert atualizado.status_code == 200
+    assert atualizado.json()["id"] == site["id"]
+
+    listagem = client.get("/api/sites").json()
+    assert len(listagem) == 1, "editar nao pode criar um segundo site"
+
+    guardado = client.get(f"/api/sites/{site['id']}").json()
+    assert guardado["html"] == novo_html
+    assert guardado["company"] == "Padaria Nova"
+    assert guardado["builder_data"] == '{"empresa":"Padaria Nova"}'
+    assert guardado["updated_at"]
+
+    # a vaga nao foi consumida de novo
+    assert client.get("/api/sites/quota").json()["usados"] == 1
+
+
+def test_editar_site_de_outro_usuario_da_404(client, as_user, com_plano):
+    com_plano()
+    com_plano(uid="bob")
+    dar_cota("alice")
+    dar_cota("bob")
+    site_id = client.post("/api/sites", json={"company": "Padaria", "html": HTML}).json()["id"]
+
+    as_user("bob")
+    resposta = client.post(
+        "/api/sites", json={"site_id": site_id, "company": "Roubado", "html": HTML}
+    )
+    assert resposta.status_code == 404
+    assert client.get("/api/sites").json() == []
+
+    as_user("alice")
+    assert client.get(f"/api/sites/{site_id}").json()["company"] == "Padaria"
+
+
+def test_editar_site_inexistente_nao_cria_registro(client, com_plano):
+    com_plano()
+    dar_cota()
+    assert client.post(
+        "/api/sites", json={"site_id": "site_naoexiste", "company": "X", "html": HTML}
+    ).status_code == 404
+    assert client.get("/api/sites").json() == []
+
+
+def test_edicao_tambem_recusa_site_vazio(client, com_plano):
+    com_plano()
+    dar_cota()
+    site_id = client.post("/api/sites", json={"company": "P", "html": HTML}).json()["id"]
+    assert client.post(
+        "/api/sites", json={"site_id": site_id, "company": "P", "html": "  "}
+    ).status_code == 400
+    assert client.get(f"/api/sites/{site_id}").json()["html"] == HTML
+
+
 # ------------------------------------------------------------ historico
 
 @pytest.mark.skipif(

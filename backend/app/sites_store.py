@@ -30,9 +30,11 @@ def _row_to_dict(row: DBSite, include_html: bool = True) -> Dict[str, Any]:
         "template": row.template,
         "lead_id": row.lead_id,
         "created_at": row.created_at,
+        "updated_at": row.updated_at,
     }
     if include_html:
         data["html"] = row.html or ""
+        data["builder_data"] = row.builder_data or ""
     return data
 
 
@@ -50,11 +52,20 @@ async def contar_sites(uid: str) -> int:
         return len(result.scalars().all())
 
 
-async def create_site(uid: str, company: str, html: str, template: str = "", lead_id: str = "") -> Dict[str, Any]:
+def _validar(html: str, builder_data: str) -> None:
     if not html.strip():
         raise ValueError("O site não tem conteúdo para publicar.")
     if len(html.encode("utf-8")) > MAX_HTML_BYTES:
         raise ValueError("O site gerado é grande demais para ser salvo.")
+    if len(builder_data.encode("utf-8")) > MAX_HTML_BYTES:
+        raise ValueError("As fotos do site ocupam espaço demais para serem guardadas.")
+
+
+async def create_site(
+    uid: str, company: str, html: str, template: str = "", lead_id: str = "",
+    builder_data: str = "",
+) -> Dict[str, Any]:
+    _validar(html, builder_data)
 
     site = {
         "id": f"site_{uuid.uuid4().hex[:10]}",
@@ -62,7 +73,9 @@ async def create_site(uid: str, company: str, html: str, template: str = "", lea
         "template": template,
         "lead_id": lead_id,
         "html": html,
+        "builder_data": builder_data,
         "created_at": _now(),
+        "updated_at": "",
     }
 
     if firestore_db is not None:
@@ -78,6 +91,54 @@ async def create_site(uid: str, company: str, html: str, template: str = "", lea
         session.add(DBSite(owner_uid=uid, **site))
         await session.commit()
     return site
+
+
+async def update_site(
+    uid: str, site_id: str, company: str, html: str, template: str = "",
+    builder_data: str = "",
+) -> Optional[Dict[str, Any]]:
+    """Regrava um site que ja existe.
+
+    Antes so havia create_site: quem ajustava um site e publicava de novo
+    ganhava um duplicado em "Meus Sites" e perdia mais uma vaga da cota.
+    Editar nao deve custar uma vaga — a vaga foi paga na criacao.
+
+    Devolve None quando o site nao e do usuario, para o endpoint responder
+    404 em vez de criar um registro solto.
+    """
+    _validar(html, builder_data)
+    atual = await get_site(uid, site_id)
+    if atual is None:
+        return None
+
+    mudancas = {
+        "company": company or atual.get("company") or "Site sem nome",
+        "template": template or atual.get("template") or "",
+        "html": html,
+        "builder_data": builder_data,
+        "updated_at": _now(),
+    }
+
+    if firestore_db is not None:
+        try:
+            firestore_db.collection("users").document(uid).collection("sites").document(
+                site_id
+            ).update(mudancas)
+            return {**atual, **mudancas}
+        except Exception as exc:
+            print(f"Falha ao atualizar site no Firestore: {exc}")
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(DBSite).where(DBSite.id == site_id, DBSite.owner_uid == uid)
+        )
+        row = result.scalar_one_or_none()
+        if row is None:
+            return None
+        for campo, valor in mudancas.items():
+            setattr(row, campo, valor)
+        await session.commit()
+        return _row_to_dict(row)
 
 
 async def list_sites(uid: str) -> List[Dict[str, Any]]:

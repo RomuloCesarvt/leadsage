@@ -73,7 +73,7 @@ def _migrate(conn):
     create_all() cria tabelas ausentes mas nunca altera as existentes,
     entao um leadsage.db antigo quebraria ao gravar os campos novos.
     """
-    for table in (DBLead.__tablename__, DBSearchHistory.__tablename__):
+    for table in (DBLead.__tablename__, DBSearchHistory.__tablename__, DBSite.__tablename__):
         rows = conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()
         if not rows:
             continue
@@ -111,7 +111,11 @@ class DBSite(Base):
     template = Column(String, nullable=True)
     lead_id = Column(String, nullable=True)
     html = Column(Text, nullable=True)
+    # Os campos do construtor, para reabrir o site e editar. O HTML
+    # sozinho nao da: ele e o resultado, nao a fonte.
+    builder_data = Column(Text, nullable=True)
     created_at = Column(String)
+    updated_at = Column(String, nullable=True)
 
 
 class DBIntegration(Base):

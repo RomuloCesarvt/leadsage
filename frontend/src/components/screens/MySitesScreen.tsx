@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Plus, Trash2, Eye, Download, X } from 'lucide-react';
+import { Globe, Plus, Trash2, Eye, Download, X, Pencil } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
 import type { SiteItem } from '../../types';
 
 export const MySitesScreen: React.FC = () => {
-  const { setViewState } = useApp() as any;
+  const { setViewState, setSiteEmEdicao } = useApp() as any;
   const [sites, setSites] = useState<SiteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [preview, setPreview] = useState<SiteItem | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
   const [cota, setCota] = useState<{ usados: number; cota: number | null; ilimitado: boolean } | null>(null);
 
   // Antes esta tela era um estado vazio fixo: nunca listava nada porque
@@ -28,6 +29,18 @@ export const MySitesScreen: React.FC = () => {
       setPreview(await api.getSite(id));
     } catch {
       /* o site pode ter sido removido em outra aba */
+    }
+  };
+
+  // Reabre o site no construtor. Republicar grava por cima, sem
+  // consumir outra vaga da cota — a vaga foi paga quando o site nasceu.
+  const handleEdit = async (id: string) => {
+    setEditandoId(id);
+    try {
+      setSiteEmEdicao(await api.getSite(id));
+      setViewState('create-site');
+    } catch {
+      setEditandoId(null);
     }
   };
 
@@ -145,16 +158,25 @@ export const MySitesScreen: React.FC = () => {
               <div className="flex-1">
                 <h3 className="font-bold text-slate-800 line-clamp-2">{site.company}</h3>
                 <p className="text-sm text-slate-500 mt-1">
-                  {site.template ? `${site.template} · ` : ''}{formatDate(site.created_at)}
+                  {site.template ? `${site.template} · ` : ''}
+                  {site.updated_at ? `editado em ${formatDate(site.updated_at)}` : formatDate(site.created_at)}
                 </p>
               </div>
 
               <div className="pt-4 border-t border-slate-100 flex gap-2">
                 <button
-                  onClick={() => handleOpen(site.id)}
-                  className="flex-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold flex items-center justify-center gap-1.5 transition-colors"
+                  onClick={() => handleEdit(site.id)}
+                  disabled={editandoId === site.id}
+                  className="flex-1 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-bold flex items-center justify-center gap-1.5 transition-colors"
                 >
-                  <Eye className="w-4 h-4" /> Ver
+                  <Pencil className="w-4 h-4" /> {editandoId === site.id ? 'Abrindo...' : 'Editar'}
+                </button>
+                <button
+                  onClick={() => handleOpen(site.id)}
+                  title="Ver o site"
+                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                >
+                  <Eye className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleDownload(site)}

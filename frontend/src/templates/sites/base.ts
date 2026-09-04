@@ -43,6 +43,12 @@ export type SiteData = {
   depoimentos?: Depoimento[];
   corPrimaria: string;
   corDestaque: string;
+  /**
+   * Assinatura discreta do LeadSage no fim da pagina. Sai nos planos
+   * que incluem marca propria; nos demais o site sai assinado, como
+   * fazem os construtores de plano gratuito.
+   */
+  selo?: boolean;
 };
 
 export type SiteTemplate = {
@@ -191,6 +197,20 @@ export const botaoZap = (d: SiteData): string => {
 };
 
 /** Envelope HTML final. */
+/** Fica fora do rodape do cliente, numa faixa propria no fim da pagina. */
+export const selo = (d: SiteData): string =>
+  d.selo
+    ? '<div class="selo-leadsage">Site criado com ' +
+      '<a href="https://leadsageofc.vercel.app" target="_blank" rel="noopener">LeadSage</a></div>'
+    : '';
+
+export const cssSelo = `
+.selo-leadsage{background:#0f172a;color:#94a3b8;text-align:center;
+  padding:10px 16px;font-size:12.5px;letter-spacing:.2px}
+.selo-leadsage a{color:#e2e8f0;font-weight:700;text-decoration:none}
+.selo-leadsage a:hover{text-decoration:underline}
+`;
+
 export const documento = (d: SiteData, css: string, corpo: string): string =>
   `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -199,10 +219,11 @@ export const documento = (d: SiteData, css: string, corpo: string): string =>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(d.empresa)}${d.categoria ? ` — ${esc(d.categoria)}` : ''}</title>
 <meta name="description" content="${esc(d.slogan || d.sobre).slice(0, 155)}">
-<style>${cssBase(d)}${css}</style>
+<style>${cssBase(d)}${css}${d.selo ? cssSelo : ''}</style>
 </head>
 <body>
 ${corpo}
+${selo(d)}
 ${botaoZap(d)}
 </body>
 </html>`;

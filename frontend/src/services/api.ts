@@ -138,7 +138,16 @@ export const api = {
     }
   },
 
-  async publishSite(payload: { company: string; html: string; template?: string; lead_id?: string }): Promise<SiteItem> {
+  async publishSite(payload: {
+    company: string;
+    html: string;
+    template?: string;
+    lead_id?: string;
+    /** preenchido ao reeditar: regrava no lugar, sem gastar outra vaga */
+    site_id?: string;
+    /** os campos do construtor, para reabrir o site depois */
+    builder_data?: string;
+  }): Promise<SiteItem> {
     return await fetchWithToken('/sites', {
       method: 'POST',
       body: JSON.stringify(payload)

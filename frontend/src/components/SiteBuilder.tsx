@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   ArrowLeft, Monitor, Smartphone, Save, Code, Download, Upload,
   Plus, Trash2, Check, AlertCircle, Sparkles,
@@ -55,9 +55,12 @@ const PALETAS = [
 ];
 
 export const SiteBuilder: React.FC = () => {
-  const { leads, setViewState } = useApp() as any;
+  const { leads, setViewState, siteEmEdicao, setSiteEmEdicao } = useApp() as any;
 
   const [lead, setLead] = useState<any>(null);
+  // Id do site sendo reeditado. Enquanto ficava nulo, cada Publicar
+  // criava um site novo e queimava mais uma vaga da cota.
+  const [siteId, setSiteId] = useState('');
   const [template, setTemplate] = useState<SiteTemplate | null>(null);
   const [dados, setDados] = useState<SiteData>(dadosIniciais(null));
   const [dispositivo, setDispositivo] = useState<'desktop' | 'mobile'>('desktop');
@@ -67,9 +70,36 @@ export const SiteBuilder: React.FC = () => {
   const [gerandoTextos, setGerandoTextos] = useState(false);
   const inputLogo = useRef<HTMLInputElement>(null);
 
+  // Sem marca propria no plano, o site sai assinado pelo LeadSage.
+  // Comeca ligado: se a consulta do plano falhar, o padrao seguro e
+  // assinar, nunca entregar um site sem selo por engano.
+  const [selo, setSelo] = useState(true);
+  useEffect(() => {
+    let vivo = true;
+    api.meuPlano()
+      .then(p => { if (vivo) setSelo(!(p.recursos || []).includes('marca_propria')); })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, []);
+
+  // Reabre um site publicado com os campos que o geraram.
+  useEffect(() => {
+    if (!siteEmEdicao) return;
+    try {
+      const salvos = JSON.parse(siteEmEdicao.builder_data || '{}');
+      if (salvos && salvos.empresa) setDados({ ...dadosIniciais(null), ...salvos });
+    } catch {
+      // builder_data corrompido nao pode impedir a edicao do resto
+    }
+    const achado = SITE_TEMPLATES.find(t => t.nome === siteEmEdicao.template);
+    setTemplate(achado || SITE_TEMPLATES[0]);
+    setSiteId(siteEmEdicao.id);
+    setSiteEmEdicao(null);
+  }, [siteEmEdicao, setSiteEmEdicao]);
+
   const html = useMemo(
-    () => (template ? template.render(dados) : ''),
-    [template, dados]
+    () => (template ? template.render({ ...dados, selo }) : ''),
+    [template, dados, selo]
   );
 
   // O site publicado precisa caber no armazenamento; as fotos embutidas
@@ -189,6 +219,8 @@ export const SiteBuilder: React.FC = () => {
         html,
         template: template.nome,
         lead_id: lead?.id || '',
+        site_id: siteId,
+        builder_data: JSON.stringify(dados),
       });
       setViewState('my-sites');
     } catch (err: any) {
@@ -346,7 +378,7 @@ export const SiteBuilder: React.FC = () => {
             className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-bold flex items-center gap-2"
           >
             {salvando ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
-            Publicar
+            {siteId ? 'Salvar alterações' : 'Publicar'}
           </button>
         </div>
       </div>

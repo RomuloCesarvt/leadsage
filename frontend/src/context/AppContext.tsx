@@ -48,6 +48,9 @@ interface AppContextType {
   resetWorkspace: () => void;
   viewState: string;
   setViewState: (viewState: string) => void;
+  // Site que o construtor deve reabrir. Nulo = criar do zero.
+  siteEmEdicao: any | null;
+  setSiteEmEdicao: (site: any | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -85,6 +88,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedProfileLead, setSelectedProfileLead] = useState<LeadItem | null>(null);
 
   const [viewState, setViewState] = useState<string>('dashboard');
+  const [siteEmEdicao, setSiteEmEdicao] = useState<any | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -197,7 +201,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         resetWorkspace,
         updateLeadStage,
         viewState,
-        setViewState
+        setViewState,
+        siteEmEdicao,
+        setSiteEmEdicao
       } as any}
     >
       {children}

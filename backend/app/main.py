@@ -29,7 +29,9 @@ from app.credit_system import check_and_deduct_credits, get_user_balance
 import httpx
 from app.firebase_config import get_current_user
 from app.profile_store import get_profile, save_profile
-from app.sites_store import create_site, list_sites, get_site, delete_site, contar_sites
+from app.sites_store import (
+    create_site, update_site, list_sites, get_site, delete_site, contar_sites,
+)
 from app.credit_system import is_admin
 from app.integrations_store import get_integrations, save_integrations, public_view
 from app.payments import (
@@ -509,6 +511,19 @@ async def publish_site(req: SiteCreateRequest, user: dict = Depends(get_current_
     uid = user.get("uid")
     await exigir_recurso(user, "publicar_site", "Publicar o site")
 
+    # Reeditar nao gasta vaga: a vaga foi cobrada quando o site nasceu.
+    if req.site_id:
+        try:
+            atualizado = await update_site(
+                uid, req.site_id, req.company, req.html,
+                req.template or "", req.builder_data or "",
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        if atualizado is None:
+            raise HTTPException(status_code=404, detail="Site não encontrado.")
+        return atualizado
+
     if not is_admin(user.get("email")):
         perfil = await get_profile(uid)
         cota = perfil.sites_quota or 0
@@ -525,7 +540,10 @@ async def publish_site(req: SiteCreateRequest, user: dict = Depends(get_current_
             )
 
     try:
-        return await create_site(uid, req.company, req.html, req.template or "", req.lead_id or "")
+        return await create_site(
+            uid, req.company, req.html, req.template or "", req.lead_id or "",
+            req.builder_data or "",
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

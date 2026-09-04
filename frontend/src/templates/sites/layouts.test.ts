@@ -127,5 +127,19 @@ function t0Render() {
 checar('script no depoimento não vira script', !comScript.includes('<script>alert(1)</script>'));
 
 
+console.log('\n--- selo do LeadSage nos planos sem marca propria ---');
+for (const t of SITE_TEMPLATES) {
+  const assinado = t.render({ ...dados, selo: true });
+  const limpo = t.render({ ...dados, selo: false });
+  checar(`${t.nome}: plano sem marca propria sai assinado`,
+    assinado.includes('selo-leadsage') && assinado.includes('LeadSage'));
+  checar(`${t.nome}: plano com marca propria sai limpo`, !limpo.includes('selo-leadsage'));
+  checar(`${t.nome}: sem a flag, nao assina`, !t.render(dados).includes('selo-leadsage'));
+  checar(`${t.nome}: o selo fica fora do rodape do cliente`,
+    assinado.indexOf('</footer>') < assinado.indexOf('<div class="selo-leadsage">'));
+  checar(`${t.nome}: o selo nao rouba a cor da marca`,
+    !assinado.includes('selo-leadsage" style'));
+}
+
 console.log(`\n=========== ${falhas === 0 ? 'TUDO PASSOU' : falhas + ' FALHARAM'} ===========`);
 if (falhas) process.exit(1);

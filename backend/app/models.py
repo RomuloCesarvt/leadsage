@@ -177,6 +177,11 @@ class SiteCreateRequest(BaseModel):
     html: str
     template: Optional[str] = ""
     lead_id: Optional[str] = ""
+    # Preenchido ao reeditar um site ja publicado: regrava no lugar,
+    # sem consumir outra vaga da cota.
+    site_id: Optional[str] = ""
+    # Os campos do construtor, para poder reabrir e editar depois.
+    builder_data: Optional[str] = ""
 
 
 class SiteItem(BaseModel):
@@ -185,7 +190,9 @@ class SiteItem(BaseModel):
     template: Optional[str] = ""
     lead_id: Optional[str] = ""
     created_at: str
+    updated_at: Optional[str] = ""
     html: Optional[str] = None
+    builder_data: Optional[str] = None
 
 
 class DocumentCreateRequest(BaseModel):
