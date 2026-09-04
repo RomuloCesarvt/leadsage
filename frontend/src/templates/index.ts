@@ -15,8 +15,8 @@ export type Template = {
 
 export const PROPOSALS: Omit<Template, 'id'>[] = [
   {
-    title: 'Minimalista',
-    desc: 'Design limpo e direto. Ideal para freelancers e consultores.',
+    title: 'Enxuta',
+    desc: 'Uma página, direto ao ponto. Ideal para freelancers e consultores.',
     content: `PROPOSTA COMERCIAL
 
 Para: [NOME DO CLIENTE]

@@ -257,6 +257,35 @@ async def dispatch_outreach(
     return response
 
 
+@app.post("/api/integrations/test-whatsapp")
+async def testar_whatsapp(user: dict = Depends(get_current_user)):
+    """Confere as credenciais da Meta sem enviar mensagem para ninguem."""
+    config = await get_integrations(user.get("uid"))
+    token = (config.get("wa_token") or "").strip()
+    phone_id = (config.get("wa_phone_id") or "").strip()
+    if not (token and phone_id):
+        raise HTTPException(status_code=400, detail="Informe o Token e o Phone Number ID primeiro.")
+
+    url = f"https://graph.facebook.com/v21.0/{phone_id}"
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.get(url, headers={"Authorization": f"Bearer {token}"})
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Nao foi possivel falar com a Meta: {e}")
+
+    dados = resp.json() if resp.content else {}
+    if resp.status_code >= 400:
+        motivo = (dados.get("error") or {}).get("message", "credenciais recusadas")
+        raise HTTPException(status_code=400, detail=f"Meta recusou: {motivo}")
+
+    return {
+        "status": "ok",
+        "numero": dados.get("display_phone_number", ""),
+        "nome": dados.get("verified_name", ""),
+        "qualidade": dados.get("quality_rating", ""),
+    }
+
+
 @app.get("/api/integrations")
 async def read_integrations(user: dict = Depends(get_current_user)):
     """Nunca devolve a senha SMTP: so `has_password`."""

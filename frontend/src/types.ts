@@ -92,9 +92,10 @@ export interface DispatchRequest {
   lead_instagram?: string;
   lead_linkedin?: string;
   lead_phone?: string;
-  channel: 'email' | 'whatsapp' | 'instagram_direct' | 'linkedin_msg' | 'webhook';
+  channel: 'email' | 'whatsapp' | 'whatsapp_api' | 'instagram_direct' | 'linkedin_msg' | 'webhook';
   subject?: string;
   body: string;
+  use_template?: boolean;
 }
 
 export interface DispatchResponse {
@@ -169,6 +170,12 @@ export interface SiteItem {
 }
 
 export interface IntegrationSettings {
+  // WhatsApp Cloud API (Meta)
+  wa_token?: string;
+  wa_phone_id?: string;
+  wa_template?: string;
+  wa_language?: string;
+  has_wa_token?: boolean;
   smtp_host?: string;
   smtp_port?: number;
   smtp_user?: string;

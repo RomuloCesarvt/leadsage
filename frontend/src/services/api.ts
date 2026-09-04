@@ -198,6 +198,10 @@ export const api = {
     await fetchWithToken(`/documents/${id}`, { method: 'DELETE' });
   },
 
+  async testarWhatsapp(): Promise<{ status: string; numero: string; nome: string; qualidade: string }> {
+    return await fetchWithToken('/integrations/test-whatsapp', { method: 'POST' });
+  },
+
   async getSuggestedNiches(): Promise<SuggestedNiche[]> {
     try {
       return await fetchWithToken('/suggested-niches');

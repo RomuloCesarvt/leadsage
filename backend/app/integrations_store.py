@@ -14,8 +14,12 @@ from sqlalchemy import select
 from app.database import AsyncSessionLocal, DBIntegration
 from app.firebase_config import db as firestore_db
 
-FIELDS = ("smtp_host", "smtp_port", "smtp_user", "smtp_password", "from_email", "webhook_url")
-SECRET_FIELDS = ("smtp_password",)
+FIELDS = (
+    "smtp_host", "smtp_port", "smtp_user", "smtp_password", "from_email", "webhook_url",
+    # WhatsApp Cloud API (Meta). O token e secreto e nunca volta ao cliente.
+    "wa_token", "wa_phone_id", "wa_template", "wa_language",
+)
+SECRET_FIELDS = ("smtp_password", "wa_token")
 
 
 def _clean(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -38,11 +42,15 @@ def public_view(data: Dict[str, Any]) -> Dict[str, Any]:
     """Versao segura para o frontend: sem a senha em texto claro."""
     out = {k: v for k, v in (data or {}).items() if k not in SECRET_FIELDS}
     out["has_password"] = bool((data or {}).get("smtp_password"))
+    out["has_wa_token"] = bool((data or {}).get("wa_token"))
     out.setdefault("smtp_host", "")
     out.setdefault("smtp_port", 587)
     out.setdefault("smtp_user", "")
     out.setdefault("from_email", "")
     out.setdefault("webhook_url", "")
+    out.setdefault("wa_phone_id", "")
+    out.setdefault("wa_template", "")
+    out.setdefault("wa_language", "pt_BR")
     return out
 
 
@@ -92,6 +100,8 @@ async def save_integrations(uid: str, payload: Dict[str, Any]) -> Dict[str, Any]
     # o frontend nunca recebe a senha de volta para reenviar.
     if not data.get("smtp_password"):
         data.pop("smtp_password", None)
+    if not data.get("wa_token"):
+        data.pop("wa_token", None)
 
     written = False
     if firestore_db is not None:

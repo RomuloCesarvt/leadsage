@@ -27,8 +27,9 @@ export const MessageEditorModal: React.FC = () => {
   } = useApp();
 
   const [tone, setTone] = useState<string>('Consultivo');
-  const [channel, setChannel] = useState<'email' | 'whatsapp' | 'instagram_direct' | 'linkedin_msg' | 'webhook'>('email');
+  const [channel, setChannel] = useState<'email' | 'whatsapp' | 'whatsapp_api' | 'instagram_direct' | 'linkedin_msg' | 'webhook'>('email');
   const [dispatchError, setDispatchError] = useState<string | null>(null);
+  const [usarTemplate, setUsarTemplate] = useState(false);
   const [subject, setSubject] = useState<string>('');
   const [body, setBody] = useState<string>('');
   const [customInstructions, setCustomInstructions] = useState<string>('');
@@ -85,7 +86,8 @@ export const MessageEditorModal: React.FC = () => {
         lead_phone: lead.phone,
         channel,
         subject,
-        body
+        body,
+        use_template: channel === 'whatsapp_api' ? usarTemplate : undefined,
       });
 
       setUser(prev => prev ? { ...prev, credits: res.remaining_credits } : prev);
@@ -208,6 +210,19 @@ export const MessageEditorModal: React.FC = () => {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setChannel('whatsapp_api')}
+                  disabled={!lead.phone}
+                  title={lead.phone ? 'Envia de verdade pela Cloud API da Meta' : 'Este lead não tem telefone'}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                    channel === 'whatsapp_api'
+                      ? 'bg-emerald-700 border-emerald-600 text-white'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <MessageCircle className="w-3.5 h-3.5" /> WhatsApp API
+                </button>
+                <button
+                  type="button"
                   onClick={() => setChannel('whatsapp')}
                   disabled={!lead.phone}
                   title={lead.phone ? 'Abre o WhatsApp com a mensagem pronta' : 'Este lead não tem telefone'}
@@ -217,7 +232,7 @@ export const MessageEditorModal: React.FC = () => {
                       : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                  <MessageCircle className="w-3.5 h-3.5" /> WhatsApp (link)
                 </button>
                 <button
                   type="button"
@@ -247,9 +262,31 @@ export const MessageEditorModal: React.FC = () => {
               </div>
               {isManualChannel && (
                 <p className="text-[11px] text-amber-400/90 leading-snug">
-                  Não existe API pública para enviar por aqui. A LeadSage copia a
-                  mensagem e abre a conversa para você concluir — sem gastar créditos.
+                  {channel === 'whatsapp'
+                    ? 'Modo link: abre o WhatsApp com a mensagem pronta, sem gastar créditos.'
+                    : 'Não existe API pública para enviar por aqui. A LeadSage copia a mensagem e abre a conversa para você concluir — sem gastar créditos.'}
                 </p>
+              )}
+
+              {channel === 'whatsapp_api' && (
+                <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 space-y-2">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={usarTemplate}
+                      onChange={e => setUsarTemplate(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span className="text-[11px] text-emerald-300 leading-snug">
+                      Usar template aprovado — obrigatório para quem <strong>não</strong> te
+                      respondeu nas últimas 24h.
+                    </span>
+                  </label>
+                  <p className="text-[11px] text-amber-400/90 leading-snug">
+                    Enviar para quem não pediu contato viola a política da Meta e pode
+                    banir seu número. Use com quem já te procurou ou deu opt-in.
+                  </p>
+                </div>
               )}
             </div>
           </div>

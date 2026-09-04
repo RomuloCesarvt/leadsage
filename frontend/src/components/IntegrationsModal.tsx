@@ -6,13 +6,18 @@ import { api } from '../services/api';
 export const IntegrationsModal: React.FC = () => {
   const { isIntegrationsModalOpen, setIsIntegrationsModalOpen } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'smtp' | 'snov' | 'webhook'>('smtp');
+  const [activeTab, setActiveTab] = useState<'smtp' | 'whatsapp' | 'webhook'>('smtp');
   const [smtpHost, setSmtpHost] = useState('');
   const [smtpPort, setSmtpPort] = useState('587');
   const [smtpUser, setSmtpUser] = useState('');
   const [smtpPassword, setSmtpPassword] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
-  const [snovApiKey, setSnovApiKey] = useState('');
+  const [waPhoneId, setWaPhoneId] = useState('');
+  const [waToken, setWaToken] = useState('');
+  const [waTemplate, setWaTemplate] = useState('');
+  const [hasWaToken, setHasWaToken] = useState(false);
+  const [testando, setTestando] = useState(false);
+  const [resultadoTeste, setResultadoTeste] = useState<string | null>(null);
   const [webhookUrl, setWebhookUrl] = useState('');
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -25,6 +30,8 @@ export const IntegrationsModal: React.FC = () => {
     let active = true;
     setSaveError('');
     setSmtpPassword('');
+    setWaToken('');
+    setResultadoTeste(null);
     api.getIntegrations().then(cfg => {
       if (!active) return;
       setSmtpHost(cfg.smtp_host || '');
@@ -32,9 +39,30 @@ export const IntegrationsModal: React.FC = () => {
       setSmtpUser(cfg.smtp_user || '');
       setWebhookUrl(cfg.webhook_url || '');
       setHasPassword(Boolean(cfg.has_password));
+      setWaPhoneId(cfg.wa_phone_id || '');
+      setWaTemplate(cfg.wa_template || '');
+      setHasWaToken(Boolean(cfg.has_wa_token));
     });
     return () => { active = false; };
   }, [isIntegrationsModalOpen]);
+
+  const testarCredenciais = async () => {
+    setTestando(true);
+    setResultadoTeste(null);
+    setSaveError('');
+    try {
+      // Salva antes: o teste roda no backend, com o que está gravado.
+      await api.saveIntegrations({ wa_phone_id: waPhoneId, wa_token: waToken, wa_template: waTemplate });
+      setWaToken('');
+      setHasWaToken(true);
+      const r = await api.testarWhatsapp();
+      setResultadoTeste(`Conectado: ${r.nome || 'conta verificada'} · ${r.numero}${r.qualidade ? ` · qualidade ${r.qualidade}` : ''}`);
+    } catch (err: any) {
+      setSaveError(err?.message || 'Não foi possível validar as credenciais.');
+    } finally {
+      setTestando(false);
+    }
+  };
 
   if (!isIntegrationsModalOpen) return null;
 
@@ -51,6 +79,9 @@ export const IntegrationsModal: React.FC = () => {
         smtp_password: smtpPassword,
         from_email: smtpUser,
         webhook_url: webhookUrl,
+        wa_phone_id: waPhoneId,
+        wa_token: waToken,
+        wa_template: waTemplate,
       });
       setIsSaved(true);
       setTimeout(() => {
@@ -74,7 +105,7 @@ export const IntegrationsModal: React.FC = () => {
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-100">Canais de Disparo & Integrações</h3>
-              <p className="text-xs text-slate-400">Configure SMTP próprio, Snov.io API ou Webhooks de envio</p>
+              <p className="text-xs text-slate-400">Configure SMTP, WhatsApp da Meta ou Webhook de envio</p>
             </div>
           </div>
           <button onClick={() => setIsIntegrationsModalOpen(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-white">
@@ -94,14 +125,14 @@ export const IntegrationsModal: React.FC = () => {
             <Server className="w-3.5 h-3.5" /> SMTP Personalizado
           </button>
           <button
-            onClick={() => setActiveTab('snov')}
+            onClick={() => setActiveTab('whatsapp')}
             className={`flex-1 py-3 text-xs font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === 'snov'
+              activeTab === 'whatsapp'
                 ? 'border-indigo-400 text-indigo-400 bg-slate-900/60'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Key className="w-3.5 h-3.5" /> API Snov.io / Outreach
+            <Key className="w-3.5 h-3.5" /> WhatsApp (Meta)
           </button>
           <button
             onClick={() => setActiveTab('webhook')}
@@ -166,20 +197,72 @@ export const IntegrationsModal: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'snov' && (
+          {activeTab === 'whatsapp' && (
             <div className="space-y-3">
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                <p className="text-[11px] text-amber-300 leading-snug">
+                  A Meta só permite <strong>iniciar</strong> conversa com template aprovado.
+                  Mensagem livre chega apenas a quem te escreveu nas últimas 24h. Enviar
+                  para quem não pediu contato viola a política e pode banir seu número.
+                </p>
+              </div>
+
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Chave de API Snov.io / Outreach Hub</label>
+                <label className="text-xs font-semibold text-slate-300">Phone Number ID</label>
                 <input
                   type="text"
-                  value={snovApiKey}
-                  onChange={(e) => setSnovApiKey(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 font-mono"
+                  value={waPhoneId}
+                  onChange={(e) => setWaPhoneId(e.target.value)}
+                  placeholder="Ex: 109876543210987"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 font-mono placeholder-slate-600"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Painel da Meta → WhatsApp → Configuração da API.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Token de acesso</label>
+                <input
+                  type="password"
+                  value={waToken}
+                  onChange={(e) => setWaToken(e.target.value)}
+                  placeholder={hasWaToken ? 'Token salvo — deixe em branco para manter' : 'Cole o token permanente'}
+                  autoComplete="new-password"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 font-mono placeholder-slate-600"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Use um token permanente de usuário do sistema. O temporário expira em 24h.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Nome do template aprovado</label>
+                <input
+                  type="text"
+                  value={waTemplate}
+                  onChange={(e) => setWaTemplate(e.target.value)}
+                  placeholder="Ex: primeiro_contato"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 font-mono placeholder-slate-600"
                 />
               </div>
-              <p className="text-[11px] text-slate-400">
-                Permite verificar caixas de e-mail ativas e sincronizar sequências de cold mail automaticamente.
-              </p>
+
+              <button
+                type="button"
+                onClick={testarCredenciais}
+                disabled={testando || !waPhoneId}
+                className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 border border-slate-700"
+              >
+                {testando
+                  ? <><span className="w-3.5 h-3.5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" /> Verificando...</>
+                  : 'Testar credenciais'}
+              </button>
+
+              {resultadoTeste && (
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5" /> {resultadoTeste}
+                </div>
+              )}
             </div>
           )}
 

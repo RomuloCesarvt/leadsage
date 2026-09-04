@@ -29,6 +29,14 @@ DISPATCH_COST = 2
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
 
 # Canais sem API de envio automatico. Geram link para o usuario concluir.
+#
+# Instagram e LinkedIn ficam aqui por limitacao das plataformas, nao por
+# falta de implementacao: a Instagram Messaging API so permite responder
+# quem escreveu nas ultimas 24h, e o LinkedIn nao tem API publica de
+# mensagens. Automatizar por fora dos Termos derruba a conta do usuario.
+#
+# "whatsapp" e o modo link (gratuito, sem risco). "whatsapp_api" envia de
+# verdade pela Cloud API oficial da Meta.
 MANUAL_CHANNELS = ("whatsapp", "instagram_direct", "linkedin_msg")
 
 
@@ -94,6 +102,106 @@ async def _send_email(req: DispatchRequest, config: Dict[str, Any]) -> str:
         raise DispatchError(f"Falha no envio SMTP: {exc}")
 
     return f"Enviado para {recipient}"
+
+
+GRAPH_VERSAO = "v21.0"
+
+# Os códigos que a Meta devolve são numéricos e a mensagem vem em inglês.
+# Traduzir importa: quase todos significam "a política foi violada" ou
+# "a janela de 24h fechou", e o usuário precisa saber qual é.
+ERROS_WHATSAPP = {
+    131047: (
+        "A conversa está fora da janela de 24 horas. Para falar com quem não te "
+        "respondeu recentemente, é preciso usar um template aprovado pela Meta."
+    ),
+    131026: (
+        "A Meta não conseguiu entregar: o número pode não ter WhatsApp ou não "
+        "aceitar mensagens de empresas."
+    ),
+    131051: "Tipo de mensagem não suportado por este número.",
+    132000: "O template existe, mas o número de variáveis enviadas não bate com o aprovado.",
+    132001: "Template não encontrado. Confira o nome e o idioma cadastrados na Meta.",
+    132007: "O template foi rejeitado pela Meta e não pode ser enviado.",
+    190: "O token de acesso expirou ou foi revogado. Gere um novo no painel da Meta.",
+    10: "Sua conta não tem permissão para enviar por este número.",
+    100: "Parâmetro inválido na chamada à Meta. Confira o Phone Number ID.",
+    80007: "Limite de envio atingido. A Meta libera conforme sua conta ganha reputação.",
+    131056: "Muitas mensagens para o mesmo número em pouco tempo.",
+}
+
+
+async def _enviar_whatsapp_api(req: DispatchRequest, config: Dict[str, Any]) -> str:
+    """Envia de verdade pela WhatsApp Cloud API (Meta).
+
+    Duas formas de mensagem, e a diferença é regra da Meta, não nossa:
+
+    - texto livre: só chega se a pessoa te escreveu nas últimas 24h
+    - template aprovado: única forma de iniciar conversa
+
+    Mandar para quem nunca pediu contato viola a política de mensagens da
+    Meta e leva o número ao banimento, então o erro correspondente é
+    devolvido em português, sem tentar contornar.
+    """
+    token = (config.get("wa_token") or "").strip()
+    phone_id = (config.get("wa_phone_id") or "").strip()
+
+    if not (token and phone_id):
+        raise DispatchError(
+            "WhatsApp não configurado. Abra Integrações e informe o Token e o "
+            "Phone Number ID da sua conta Meta Business."
+        )
+
+    destino = re.sub(r"\D", "", req.lead_phone or "")
+    if not destino:
+        raise DispatchError("Este lead não tem telefone.")
+    if len(destino) < 12:
+        raise DispatchError(f"Telefone incompleto para envio internacional: {destino}")
+
+    if req.use_template:
+        nome_template = (config.get("wa_template") or "").strip()
+        if not nome_template:
+            raise DispatchError(
+                "Nenhum template configurado. Cadastre um na Meta e informe o nome em Integrações."
+            )
+        payload: Dict[str, Any] = {
+            "messaging_product": "whatsapp",
+            "to": destino,
+            "type": "template",
+            "template": {
+                "name": nome_template,
+                "language": {"code": config.get("wa_language") or "pt_BR"},
+            },
+        }
+    else:
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": destino,
+            "type": "text",
+            "text": {"preview_url": False, "body": req.body[:4096]},
+        }
+
+    url = f"https://graph.facebook.com/{GRAPH_VERSAO}/{phone_id}/messages"
+    try:
+        async with httpx.AsyncClient(timeout=25.0) as client:
+            resp = await client.post(
+                url, headers={"Authorization": f"Bearer {token}"}, json=payload
+            )
+    except Exception as exc:
+        raise DispatchError(f"Não foi possível falar com a Meta: {exc}")
+
+    dados = resp.json() if resp.content else {}
+
+    if resp.status_code >= 400:
+        erro = dados.get("error", {}) or {}
+        codigo = erro.get("code")
+        detalhe = ERROS_WHATSAPP.get(codigo)
+        if not detalhe:
+            detalhe = erro.get("error_user_msg") or erro.get("message") or "erro desconhecido"
+        raise DispatchError(f"WhatsApp: {detalhe}")
+
+    contatos = dados.get("messages") or []
+    identificador = contatos[0].get("id", "") if contatos else ""
+    return f"Enviado pelo WhatsApp para +{destino}" + (f" ({identificador[:18]}…)" if identificador else "")
 
 
 def _validar_destino_webhook(url: str) -> None:
@@ -202,6 +310,8 @@ class OutreachDispatcher:
         action_url = ""
         if channel == "email":
             status_text = await _send_email(req, config)
+        elif channel == "whatsapp_api":
+            status_text = await _enviar_whatsapp_api(req, config)
         elif channel == "webhook":
             status_text = await _send_webhook(req, config)
         elif channel in MANUAL_CHANNELS:

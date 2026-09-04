@@ -94,6 +94,9 @@ class DispatchRequest(BaseModel):
     channel: str = "email"
     subject: Optional[str] = ""
     body: str
+    # Usado no canal whatsapp_api quando a conversa esta fora da janela
+    # de 24h e so template aprovado pela Meta e aceito.
+    use_template: Optional[bool] = False
 
 class DispatchResponse(BaseModel):
     dispatch_id: str
@@ -112,6 +115,11 @@ class DispatchResponse(BaseModel):
 
 
 class IntegrationSettings(BaseModel):
+    # WhatsApp Cloud API
+    wa_token: Optional[str] = ""
+    wa_phone_id: Optional[str] = ""
+    wa_template: Optional[str] = ""
+    wa_language: Optional[str] = "pt_BR"
     smtp_host: Optional[str] = ""
     smtp_port: Optional[int] = 587
     smtp_user: Optional[str] = ""
