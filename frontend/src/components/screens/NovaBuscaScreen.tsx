@@ -10,7 +10,8 @@ import {
   Users, Utensils, Wrench, HelpCircle
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import type { ICountry, IState, ICity } from 'country-state-city';
+import { carregarGeo, montarGeo } from '../../lib/geo';
+import type { Geo, Pais, Estado, Cidade } from '../../lib/geo';
 
 const NICHE_CATEGORIES = [
   {
@@ -156,33 +157,34 @@ export const NovaBuscaScreen: React.FC = () => {
   const [erroBusca, setErroBusca] = useState('');
   const [expandedCategory, setExpandedCategory] = useState<string | null>(NICHE_CATEGORIES[0].category);
 
-  // country-state-city embute um city.json de 7,7 MB. Importado de forma
-  // estatica, ele sozinho respondia por ~9 MB do bundle inicial e travava
-  // o primeiro carregamento. Agora entra como chunk separado, sob demanda.
-  const [geo, setGeo] = useState<typeof import('country-state-city') | null>(null);
-  const [countries, setCountries] = useState<ICountry[]>([]);
-  const [states, setStates] = useState<IState[]>([]);
-  const [cities, setCities] = useState<ICity[]>([]);
+  // Antes vinha de country-state-city, com as cidades do mundo inteiro:
+  // 8,3 MB (2,4 MB comprimidos) baixados so para preencher estes tres
+  // <select>, na tela mais usada do app. Agora e um recorte de Brasil,
+  // Portugal e EUA — 121 KB comprimidos, ainda sob demanda.
+  const [geo, setGeo] = useState<Geo | null>(null);
+  const [countries, setCountries] = useState<Pais[]>([]);
+  const [states, setStates] = useState<Estado[]>([]);
+  const [cities, setCities] = useState<Cidade[]>([]);
 
   useEffect(() => {
     let active = true;
-    import('country-state-city').then(mod => {
+    carregarGeo().then(dados => {
       if (!active) return;
-      setGeo(mod);
-      setCountries(mod.Country.getAllCountries());
+      const montado = montarGeo(dados);
+      setGeo(montado);
+      setCountries(montado.paises());
     });
     return () => { active = false; };
   }, []);
 
   useEffect(() => {
     if (!geo) return;
-    setStates(geo.State.getStatesOfCountry(country));
+    setStates(geo.estadosDe(country));
   }, [geo, country]);
 
   useEffect(() => {
     if (!geo || !state) { setCities([]); return; }
-    const exists = geo.State.getStateByCodeAndCountry(state, country);
-    setCities(exists ? geo.City.getCitiesOfState(country, state) : []);
+    setCities(geo.temEstado(country, state) ? geo.cidadesDe(country, state) : []);
   }, [geo, country, state]);
 
   const handleSearch = async () => {
