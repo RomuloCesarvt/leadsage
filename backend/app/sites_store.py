@@ -6,6 +6,9 @@ tela "Meus Sites" ficava num estado vazio permanente.
 Mesma estrategia do perfil: Firestore quando ha credencial (no Vercel o
 SQLite fica em /tmp e e efemero) e SQLite no dev local.
 """
+import re
+import secrets
+import unicodedata
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -17,6 +20,20 @@ from app.firebase_config import db as firestore_db
 
 # Firestore recusa documentos acima de ~1 MB.
 MAX_HTML_BYTES = 900_000
+
+
+def apelido(company: str) -> str:
+    """Nome legivel + sufixo aleatorio.
+
+    O legivel e para o dono do negocio reconhecer o proprio link quando
+    receber. O sufixo e para o endereco nao ser adivinhavel: sem ele,
+    qualquer um digitaria /s/padaria-central e leria a proposta visual
+    montada para outra pessoa.
+    """
+    base = unicodedata.normalize("NFKD", company or "")
+    base = base.encode("ascii", "ignore").decode("ascii").lower()
+    base = re.sub(r"[^a-z0-9]+", "-", base).strip("-")[:40].strip("-")
+    return f"{base or 'site'}-{secrets.token_hex(4)}"
 
 
 def _now() -> str:
@@ -31,6 +48,7 @@ def _row_to_dict(row: DBSite, include_html: bool = True) -> Dict[str, Any]:
         "lead_id": row.lead_id,
         "created_at": row.created_at,
         "updated_at": row.updated_at,
+        "slug": row.slug or "",
     }
     if include_html:
         data["html"] = row.html or ""
@@ -61,6 +79,98 @@ def _validar(html: str, builder_data: str) -> None:
         raise ValueError("As fotos do site ocupam espaço demais para serem guardadas.")
 
 
+def _registrar_apelido(slug: str, uid: str, site_id: str) -> None:
+    """Indice plano de apelido -> dono.
+
+    O site mora em users/<uid>/sites/<id>, entao servir /s/<apelido> sem
+    saber o uid exigiria varrer todos os usuarios. Este indice resolve em
+    uma leitura. Guarda so o ponteiro: o conteudo continua num lugar so.
+    """
+    if firestore_db is None or not slug:
+        return
+    try:
+        firestore_db.collection("sites_publicos").document(slug).set(
+            {"uid": uid, "site_id": site_id}
+        )
+    except Exception as exc:
+        print(f"Falha ao registrar apelido do site: {exc}")
+
+
+def _esquecer_apelido(slug: str) -> None:
+    if firestore_db is None or not slug:
+        return
+    try:
+        firestore_db.collection("sites_publicos").document(slug).delete()
+    except Exception as exc:
+        print(f"Falha ao remover apelido do site: {exc}")
+
+
+async def html_publico(slug: str) -> Optional[str]:
+    """O HTML de um site pelo apelido, sem login.
+
+    E o que faz a venda acontecer: o dono da padaria abre o link no
+    celular e ve o site pronto. Devolve so o HTML — nada de dono, lead
+    ou data.
+    """
+    if not slug:
+        return None
+
+    if firestore_db is not None:
+        try:
+            ponteiro = firestore_db.collection("sites_publicos").document(slug).get()
+            if not ponteiro.exists:
+                return None
+            dados = ponteiro.to_dict() or {}
+            doc = (
+                firestore_db.collection("users")
+                .document(dados.get("uid", ""))
+                .collection("sites")
+                .document(dados.get("site_id", ""))
+                .get()
+            )
+            return (doc.to_dict() or {}).get("html") if doc.exists else None
+        except Exception as exc:
+            print(f"Falha ao ler site publico no Firestore: {exc}")
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(DBSite).where(DBSite.slug == slug))
+        row = result.scalar_one_or_none()
+        return (row.html or "") if row else None
+
+
+async def garantir_apelido(uid: str, site: Dict[str, Any]) -> Dict[str, Any]:
+    """Da apelido a um site criado antes desta funcionalidade existir.
+
+    Sem isso os sites que o usuario ja tinha ficariam sem link para
+    sempre, e ele teria de refazer cada um so para conseguir mandar.
+    """
+    if site.get("slug"):
+        return site
+
+    novo = apelido(site.get("company", ""))
+    site["slug"] = novo
+
+    if firestore_db is not None:
+        try:
+            firestore_db.collection("users").document(uid).collection("sites").document(
+                site["id"]
+            ).update({"slug": novo})
+            _registrar_apelido(novo, uid, site["id"])
+            return site
+        except Exception as exc:
+            print(f"Falha ao dar apelido a site antigo: {exc}")
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(DBSite).where(DBSite.id == site["id"], DBSite.owner_uid == uid)
+        )
+        row = result.scalar_one_or_none()
+        if row is not None:
+            row.slug = novo
+            await session.commit()
+    return site
+
+
 async def create_site(
     uid: str, company: str, html: str, template: str = "", lead_id: str = "",
     builder_data: str = "",
@@ -74,6 +184,7 @@ async def create_site(
         "lead_id": lead_id,
         "html": html,
         "builder_data": builder_data,
+        "slug": apelido(company),
         "created_at": _now(),
         "updated_at": "",
     }
@@ -83,6 +194,7 @@ async def create_site(
             firestore_db.collection("users").document(uid).collection("sites").document(
                 site["id"]
             ).set(site)
+            _registrar_apelido(site["slug"], uid, site["id"])
             return site
         except Exception as exc:
             print(f"Falha ao gravar site no Firestore: {exc}")
@@ -193,7 +305,11 @@ async def delete_site(uid: str, site_id: str) -> bool:
                 .collection("sites")
                 .document(site_id)
             )
-            if ref.get().exists:
+            doc = ref.get()
+            if doc.exists:
+                # O apelido tem de morrer junto: um link vivo apontando
+                # para site apagado e pior do que link quebrado.
+                _esquecer_apelido((doc.to_dict() or {}).get("slug", ""))
                 ref.delete()
                 return True
             return False

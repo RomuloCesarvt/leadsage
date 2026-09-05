@@ -169,6 +169,8 @@ export interface SiteItem {
   lead_id?: string;
   created_at: string;
   updated_at?: string;
+  /** endereco publico do site, com sufixo aleatorio */
+  slug?: string;
   html?: string;
   /** os campos do construtor, para reabrir o site e editar */
   builder_data?: string;

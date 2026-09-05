@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Plus, Trash2, Eye, Download, X, Pencil } from 'lucide-react';
+import { Globe, Plus, Trash2, Eye, Download, X, Pencil, Link2, Check } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
 import type { SiteItem } from '../../types';
@@ -11,6 +11,7 @@ export const MySitesScreen: React.FC = () => {
   const [preview, setPreview] = useState<SiteItem | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [copiadoId, setCopiadoId] = useState<string | null>(null);
   const [cota, setCota] = useState<{ usados: number; cota: number | null; ilimitado: boolean } | null>(null);
 
   // Antes esta tela era um estado vazio fixo: nunca listava nada porque
@@ -34,6 +35,25 @@ export const MySitesScreen: React.FC = () => {
 
   // Reabre o site no construtor. Republicar grava por cima, sem
   // consumir outra vaga da cota — a vaga foi paga quando o site nasceu.
+  /** O endereco que o dono do negocio vai abrir no celular. */
+  const linkPublico = (site: SiteItem) =>
+    site.slug ? `${window.location.origin}/s/${site.slug}` : '';
+
+  const copiarLink = async (site: SiteItem) => {
+    const url = linkPublico(site);
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // navegador sem permissao de area de transferencia: abre o link
+      // para a pessoa copiar da barra de endereco
+      window.open(url, '_blank', 'noopener');
+      return;
+    }
+    setCopiadoId(site.id);
+    setTimeout(() => setCopiadoId(atual => (atual === site.id ? null : atual)), 2000);
+  };
+
   const handleEdit = async (id: string) => {
     setEditandoId(id);
     try {
@@ -161,6 +181,16 @@ export const MySitesScreen: React.FC = () => {
                   {site.template ? `${site.template} · ` : ''}
                   {site.updated_at ? `editado em ${formatDate(site.updated_at)}` : formatDate(site.created_at)}
                 </p>
+                {site.slug && (
+                  <a
+                    href={linkPublico(site)}
+                    target="_blank"
+                    rel="noopener"
+                    className="mt-2 inline-block text-xs font-semibold text-blue-600 hover:underline break-all"
+                  >
+                    /s/{site.slug}
+                  </a>
+                )}
               </div>
 
               <div className="pt-4 border-t border-slate-100 flex gap-2">
@@ -177,6 +207,16 @@ export const MySitesScreen: React.FC = () => {
                   className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
                 >
                   <Eye className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => copiarLink(site)}
+                  disabled={!site.slug}
+                  title={site.slug ? 'Copiar o link para mandar ao cliente' : 'Sem link ainda'}
+                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors disabled:opacity-40"
+                >
+                  {copiadoId === site.id
+                    ? <Check className="w-4 h-4 text-emerald-600" />
+                    : <Link2 className="w-4 h-4" />}
                 </button>
                 <button
                   onClick={() => handleDownload(site)}

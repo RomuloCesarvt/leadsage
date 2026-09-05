@@ -31,6 +31,7 @@ from app.firebase_config import get_current_user, db as firestore_db
 from app.profile_store import get_profile, save_profile
 from app.sites_store import (
     create_site, update_site, list_sites, get_site, delete_site, contar_sites,
+    html_publico, garantir_apelido,
 )
 from app.credit_system import is_admin, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
@@ -641,6 +642,34 @@ async def meu_plano(user: dict = Depends(get_current_user)):
     return {**plano, "plan_id": plano["id"], "admin": False}
 
 
+@app.get("/api/s/{slug}", include_in_schema=False)
+@app.get("/s/{slug}")
+async def site_publico(slug: str):
+    """Serve o site gerado para quem recebeu o link.
+
+    Sem isto o site publicado nao existia para ninguem de fora: dava para
+    baixar um .html e mandar anexo. Mas a venda depende de o dono do
+    negocio abrir no celular e ver a propria loja no ar — anexo nao faz
+    isso.
+
+    Aberto de proposito, e sem sessao: nenhum dado do usuario sai daqui,
+    so o HTML que ele mesmo montou para mostrar. O apelido carrega um
+    sufixo aleatorio, entao o endereco nao se adivinha, e o noindex
+    mantem o site fora do Google enquanto e so uma amostra de venda.
+    """
+    html = await html_publico(slug)
+    if not html:
+        raise HTTPException(status_code=404, detail="Site não encontrado.")
+    return Response(
+        content=html,
+        media_type="text/html; charset=utf-8",
+        headers={
+            "X-Robots-Tag": "noindex, nofollow",
+            "Cache-Control": "public, max-age=300",
+        },
+    )
+
+
 @app.get("/api/sites/quota")
 async def cota_de_sites(user: dict = Depends(get_current_user)):
     """Quanto da cota ja foi usado, para a tela mostrar."""
@@ -654,7 +683,14 @@ async def cota_de_sites(user: dict = Depends(get_current_user)):
 
 @app.get("/api/sites")
 async def get_sites(user: dict = Depends(get_current_user)):
-    return await list_sites(user.get("uid"))
+    """Lista os sites, dando apelido aos que nasceram antes do link publico.
+
+    Sem esse remendo, quem ja tinha sites ficaria sem link para sempre e
+    teria de refazer cada um so para conseguir mandar ao cliente.
+    """
+    uid = user.get("uid")
+    sites = await list_sites(uid)
+    return [await garantir_apelido(uid, site) for site in sites]
 
 
 @app.get("/api/sites/{site_id}", response_model=SiteItem)

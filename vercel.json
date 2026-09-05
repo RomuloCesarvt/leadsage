@@ -23,6 +23,10 @@
       "dest": "/api/index.py"
     },
     {
+      "src": "/s/(.*)",
+      "dest": "/api/index.py"
+    },
+    {
       "handle": "filesystem"
     },
     {

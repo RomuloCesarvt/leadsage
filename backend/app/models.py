@@ -201,6 +201,8 @@ class SiteItem(BaseModel):
     lead_id: Optional[str] = ""
     created_at: str
     updated_at: Optional[str] = ""
+    # Endereco publico, com sufixo aleatorio para nao ser adivinhavel
+    slug: Optional[str] = ""
     html: Optional[str] = None
     builder_data: Optional[str] = None
 

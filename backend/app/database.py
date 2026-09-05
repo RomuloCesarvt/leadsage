@@ -114,6 +114,10 @@ class DBSite(Base):
     # Os campos do construtor, para reabrir o site e editar. O HTML
     # sozinho nao da: ele e o resultado, nao a fonte.
     builder_data = Column(Text, nullable=True)
+    # Endereco publico do site. Leva um sufixo aleatorio: da para
+    # mandar o link para o prospect, mas nao para adivinhar o do
+    # concorrente.
+    slug = Column(String, index=True, nullable=True)
     created_at = Column(String)
     updated_at = Column(String, nullable=True)
 
