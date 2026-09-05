@@ -117,22 +117,22 @@ def test_apagar_o_site_mata_o_link(client, com_plano):
     assert client.get(f"/s/{site['slug']}").status_code == 404
 
 
-def test_site_antigo_ganha_link_ao_listar(client, com_plano, as_user):
+def test_site_antigo_ganha_link_ao_listar(client, com_plano):
     """Quem ja tinha sites nao pode precisar refazer para ter link."""
     site = publicar(client, com_plano)
 
-    # simula o site de antes desta funcionalidade
-    import asyncio
-    from app.database import AsyncSessionLocal, DBSite
-    from sqlalchemy import select
+    # Simula um site de antes desta funcionalidade. Direto no sqlite3, e
+    # nao por AsyncSessionLocal: o engine fica preso ao loop que o
+    # TestClient ja esta usando, e run_until_complete estoura ali.
+    import sqlite3
+    from conftest import TEST_DB
 
-    async def zerar():
-        async with AsyncSessionLocal() as s:
-            linha = (await s.execute(select(DBSite).where(DBSite.id == site["id"]))).scalar_one()
-            linha.slug = None
-            await s.commit()
-
-    asyncio.get_event_loop().run_until_complete(zerar())
+    con = sqlite3.connect(TEST_DB)
+    try:
+        con.execute("UPDATE sites SET slug = NULL WHERE id = ?", (site["id"],))
+        con.commit()
+    finally:
+        con.close()
 
     listagem = client.get("/api/sites").json()
     assert listagem[0]["slug"], "site antigo continuou sem link"
