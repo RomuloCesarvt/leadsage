@@ -137,7 +137,19 @@ def test_cors_nao_libera_credenciais_para_qualquer_origem():
 
 def test_cors_usa_origens_configuradas(monkeypatch):
     monkeypatch.setattr(settings, "ALLOWED_ORIGINS", "https://leadsageofc.vercel.app, http://localhost:5173")
-    assert settings.allowed_origins == [
+    origens = settings.allowed_origins
+
+    # As configuradas continuam valendo, na ordem em que foram escritas.
+    assert origens[:2] == [
         "https://leadsageofc.vercel.app",
         "http://localhost:5173",
     ]
+    # E nenhuma origem web alheia entra por acidente.
+    for origem in origens:
+        assert origem.startswith("https://leadsageofc") or "localhost" in origem
+
+    # As nativas do app empacotado sao acrescentadas de proposito; sem
+    # elas o app instalado tomaria erro de CORS em toda chamada. Ver
+    # test_app_nativo.py.
+    from app.config import ORIGENS_NATIVAS
+    assert set(ORIGENS_NATIVAS) <= set(origens)

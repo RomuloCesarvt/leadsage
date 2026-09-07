@@ -1,0 +1,50 @@
+{
+  "name": "LeadSage — prospecção com IA",
+  "short_name": "LeadSage",
+  "description": "Encontre negócios locais com oportunidades de venda e gere a abordagem com IA.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nova busca",
+      "short_name": "Buscar",
+      "description": "Procurar negócios em uma cidade",
+      "url": "/?tela=nova-busca",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Meus leads",
+      "short_name": "Leads",
+      "description": "Os negócios já encontrados",
+      "url": "/?tela=leads",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

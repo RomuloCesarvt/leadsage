@@ -4,6 +4,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# O app empacotado (Capacitor) nao roda em https://<dominio>: o conteudo
+# vem do proprio pacote, com esquema proprio. Android usa https://localhost,
+# iOS usa capacitor://localhost, e ionic:// aparece em versoes mais antigas.
+ORIGENS_NATIVAS = ("capacitor://localhost", "ionic://localhost", "https://localhost")
+
+
 class Settings(BaseModel):
     APP_NAME: str = "LeadSage AI Prospecting Engine"
     API_PREFIX: str = "/api"
@@ -54,7 +60,18 @@ class Settings(BaseModel):
 
     @property
     def allowed_origins(self) -> list:
-        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+        """Origens autorizadas a chamar a API.
+
+        As origens nativas entram sempre que a lista e restrita: dentro do
+        app empacotado o conteudo e servido de capacitor://localhost, e sem
+        elas o app instalado tomaria erro de CORS em toda chamada — falha
+        que so aparece no aparelho, nunca no navegador.
+
+        Nao ha risco em liberar essas tres: nenhuma pagina web consegue ter
+        esses esquemas como origem.
+        """
+        listadas = [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+        return (listadas + list(ORIGENS_NATIVAS)) if listadas else []
 
 
 settings = Settings()

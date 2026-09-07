@@ -16,7 +16,30 @@ import type {
 } from '../types';
 import { auth } from '../lib/firebase';
 
+/**
+ * Onde o backend responde.
+ *
+ * Na web, '/api' relativo funciona: o front e a API saem do mesmo
+ * dominio na Vercel. Dentro do invólucro nativo, nao — o conteudo e
+ * servido de capacitor://localhost, e '/api' passa a apontar para o
+ * proprio aparelho, onde nao ha servidor nenhum. Por isso o build do app
+ * precisa de VITE_API_URL absoluto (veja .env.production.example).
+ *
+ * O aviso abaixo existe porque essa falha e silenciosa e confusa: o app
+ * abre normalmente e so as chamadas morrem, sem dizer por que.
+ */
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
+if (
+  typeof window !== 'undefined' &&
+  !/^https?:$/.test(window.location.protocol) &&
+  API_BASE_URL.startsWith('/')
+) {
+  console.error(
+    'LeadSage: rodando fora do navegador com VITE_API_URL relativo. ' +
+      'Refaca o build do app definindo VITE_API_URL com a URL completa do backend.'
+  );
+}
 
 async function fetchWithToken(endpoint: string, options: RequestInit = {}) {
   const user = auth.currentUser;

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { entrarComGoogle } from '../../lib/autenticacao';
 import { Logo } from '../Logo';
 import { auth, db } from '../../lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
-const googleProvider = new GoogleAuthProvider();
 
 export const LoginScreen: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -59,7 +59,10 @@ export const LoginScreen: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      const result = await entrarComGoogle();
+      // No app empacotado a entrada e por redirecionamento: o app sai da
+      // tela agora e o resultado chega quando ele volta.
+      if (!result) return;
       const user = result.user;
 
       // Criar documento no Firestore se for a primeira vez

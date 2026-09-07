@@ -3,6 +3,8 @@ import { api } from '../services/api';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { rodandoNativo } from '../lib/pwa';
+import { colherRedirecionamento } from '../lib/autenticacao';
 import type { LeadItem, SearchHistoryItem, SuggestedNiche, UserProfile } from '../types';
 
 interface AppContextType {
@@ -91,6 +93,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [siteEmEdicao, setSiteEmEdicao] = useState<any | null>(null);
 
   useEffect(() => {
+    // No app empacotado a entrada com Google e por redirecionamento: sem
+    // recolher o resultado aqui, o usuario volta do Google para a tela de
+    // login em branco, como se nada tivesse acontecido. Na web nao roda.
+    if (rodandoNativo()) void colherRedirecionamento();
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setFirebaseUser(currentUser);
       if (currentUser) {
