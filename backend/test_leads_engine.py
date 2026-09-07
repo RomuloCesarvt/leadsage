@@ -13,6 +13,7 @@ from app.leads_engine import (
     extract_city,
     niche_variants,
     normalize_phone,
+    traduzir_erro_do_google,
     parse_location,
     score_lead,
     whatsapp_from_url,
@@ -158,3 +159,36 @@ def test_enriquecimento_lento_nao_derruba_a_busca(monkeypatch):
     assert len(leads) == 1
     assert leads[0].name == "Padaria Teste"
     assert leads[0].socials.instagram is None
+
+
+# --------------------------------------------------- erro do Google na tela
+
+@pytest.mark.parametrize("bruta,status", [
+    ("Quota exceeded for quota metric 'SearchTextRequest' and limit "
+     "'SearchTextRequest per day' of service 'places.googleapis.com' for "
+     "consumer 'project_number:610092181255'.", 429),
+    ("Places API has not been used in project 610092181255 before or it is disabled.", 403),
+    ("API key not valid. Please pass a valid API key.", 400),
+    ("This API method requires billing to be enabled.", 403),
+])
+def test_erro_do_google_nao_vaza_a_nossa_infraestrutura(bruta, status):
+    """A mensagem crua ia inteira para a tela — inclusive o numero do
+    nosso projeto no Google Cloud, em ingles, falando de coisa que so o
+    dono do sistema resolve."""
+    visivel = traduzir_erro_do_google(bruta, status)
+    assert "610092181255" not in visivel
+    assert "googleapis" not in visivel.lower()
+    assert "api key" not in visivel.lower()
+    assert "quota metric" not in visivel.lower()
+    assert len(visivel) < 200
+
+
+def test_limite_diario_explica_o_que_acontece():
+    """O usuario precisa saber que zera sozinho, senao acha que quebrou."""
+    visivel = traduzir_erro_do_google("Quota exceeded for quota metric 'x'", 429)
+    assert "amanh" in visivel.lower()
+
+
+def test_erro_desconhecido_ainda_diz_algo_util():
+    visivel = traduzir_erro_do_google("alguma coisa nova que o Google inventou", 400)
+    assert visivel and "tente de novo" in visivel.lower()

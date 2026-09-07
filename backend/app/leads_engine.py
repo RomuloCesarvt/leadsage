@@ -139,6 +139,32 @@ def niche_variants(niche: str) -> List[str]:
     return out or [base or "empresa"]
 
 
+def traduzir_erro_do_google(bruta: str, status: int = 0) -> str:
+    """Transforma a recusa da Places API em algo acionavel.
+
+    O usuario nao pode fazer nada com "Quota exceeded for quota metric
+    \'SearchTextRequest\'" — e nao deveria ler o numero do nosso projeto
+    do Google Cloud. Quem precisa do texto tecnico e o log.
+    """
+    texto = (bruta or "").lower()
+
+    if "quota" in texto or status == 429:
+        return (
+            "O limite diario de buscas foi atingido. Ele zera automaticamente "
+            "amanha; se precisar de mais hoje, fale com o suporte."
+        )
+    if "api key" in texto or "api_key" in texto or "unregistered" in texto:
+        return "A busca esta indisponivel por um problema de configuracao. Ja estamos vendo isso."
+    if "has not been used" in texto or "is disabled" in texto or "permission" in texto:
+        return "A busca esta temporariamente indisponivel. Ja estamos vendo isso."
+    if "billing" in texto:
+        return "A busca esta temporariamente indisponivel. Ja estamos vendo isso."
+    if status >= 500:
+        return "O Google nao respondeu agora. Tente de novo em alguns instantes."
+
+    return "Nao foi possivel concluir a busca agora. Tente de novo em alguns instantes."
+
+
 def parse_location(location: str) -> Tuple[str, str, str]:
     """Separa 'Bairro, Cidade, UF, Pais' em (consulta, cidade, uf).
 
@@ -331,8 +357,12 @@ class LeadsEngine:
         )
         data = resp.json()
         if resp.status_code != 200:
-            message = data.get("error", {}).get("message", "erro desconhecido")
-            raise ValueError(f"Erro na API do Google Maps: {message}")
+            bruta = data.get("error", {}).get("message", "erro desconhecido")
+            # O texto do Google vai inteiro para a tela: ja mandou o
+            # numero do projeto do Google Cloud para o usuario final, e
+            # em ingles, dizendo coisa que so o dono do sistema resolve.
+            print(f"Places API recusou ({resp.status_code}): {bruta}")
+            raise ValueError(traduzir_erro_do_google(bruta, resp.status_code))
         return data
 
     @staticmethod
