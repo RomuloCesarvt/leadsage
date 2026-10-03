@@ -42,7 +42,9 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
-from app import robo_store, robo_service, meta_canais
+from app import robo_store, robo_service, meta_canais, meta_oauth, robo_conexao
+from fastapi.responses import RedirectResponse
+from urllib.parse import quote as _quote
 from app.ai_robo import decidir as robo_decidir
 from app.payments import (
     catalogo, criar_pedido, obter_pedido, listar_pedidos,
@@ -1042,6 +1044,149 @@ async def robo_testar(req: RoboTesteRequest, user: dict = Depends(get_current_us
         "motivo": decisao.motivo,
         "optout": decisao.optout,
     }
+
+
+# ------------------------------------------- conexao com um clique
+
+class MetaPaginaRequest(BaseModel):
+    page_id: str = Field(min_length=1, max_length=40)
+
+
+class MetaWhatsAppRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=2000)
+    waba_id: str = Field(min_length=1, max_length=40)
+    phone_number_id: str = Field(min_length=1, max_length=40)
+
+
+class MetaDesconectarRequest(BaseModel):
+    alvo: str
+
+
+@app.get("/api/robo/meta/disponivel")
+async def meta_disponivel(user: dict = Depends(get_current_user)):
+    """Diz a tela quais botoes mostrar. Sem app da Meta configurado no
+    sistema, so o modo manual existe."""
+    return {
+        **meta_oauth.disponivel(),
+        "app_id": settings.META_APP_ID,
+        "wa_config_id": settings.META_WA_CONFIG_ID,
+    }
+
+
+@app.get("/api/robo/meta/conectar")
+async def meta_conectar(user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    if not meta_oauth.disponivel()["facebook"]:
+        raise HTTPException(status_code=503, detail="A conexão com o Facebook ainda não foi ativada no sistema.")
+    return {"url": meta_oauth.url_de_login(user.get("uid"))}
+
+
+@app.get("/api/robo/meta/retorno")
+async def meta_retorno(request: Request):
+    """Para onde o Facebook devolve o navegador depois do login.
+
+    Sem login nosso: quem chega aqui e o navegador vindo do Facebook. Quem
+    e o usuario sai do `state` assinado — e por isso ele tem assinatura e
+    validade. A resposta e sempre um redirecionamento de volta ao app,
+    com o resultado na URL, porque a pessoa esta olhando para esta tela.
+    """
+    q = request.query_params
+    destino = f"{settings.APP_URL}/?tela=robo&meta="
+
+    if q.get("error"):
+        motivo = q.get("error_description") or "A conexão foi cancelada."
+        return RedirectResponse(destino + "erro&msg=" + _quote(motivo[:200]))
+    try:
+        uid = meta_oauth.ler_state(q.get("state", ""))
+        token = await meta_oauth.trocar_codigo(q.get("code", ""))
+        paginas = await meta_oauth.listar_paginas(token)
+        if not paginas:
+            return RedirectResponse(destino + "erro&msg=" + _quote(
+                "Nenhuma página do Facebook foi autorizada. Conecte de novo e marque a página da sua empresa."))
+        canal = await robo_conexao.guardar_paginas(uid, paginas)
+    except (meta_oauth.MetaRecusou, LookupError) as exc:
+        return RedirectResponse(destino + "erro&msg=" + _quote(str(exc)[:200]))
+
+    return RedirectResponse(destino + ("escolher" if canal.get("paginas_pendentes") else "ok"))
+
+
+@app.post("/api/robo/meta/pagina")
+async def meta_escolher_pagina(req: MetaPaginaRequest, user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    try:
+        canal = await robo_conexao.escolher_pagina(user.get("uid"), req.page_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except meta_oauth.MetaRecusou as exc:
+        raise HTTPException(status_code=502, detail=f"A Meta recusou: {exc}")
+    return robo_store.visao_publica(canal, settings.APP_URL)
+
+
+@app.post("/api/robo/meta/whatsapp")
+async def meta_conectar_whatsapp(req: MetaWhatsAppRequest, user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    if not meta_oauth.disponivel()["whatsapp"]:
+        raise HTTPException(status_code=503, detail="A conexão do WhatsApp ainda não foi ativada no sistema.")
+    try:
+        dados = await meta_oauth.concluir_whatsapp(req.code, req.waba_id, req.phone_number_id)
+    except meta_oauth.MetaRecusou as exc:
+        raise HTTPException(status_code=502, detail=f"A Meta recusou: {exc}")
+    canal = await robo_conexao.conectar_whatsapp(user.get("uid"), user.get("email", ""), dados)
+    return robo_store.visao_publica(canal, settings.APP_URL)
+
+
+@app.post("/api/robo/meta/desconectar")
+async def meta_desconectar(req: MetaDesconectarRequest, user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    try:
+        canal = await robo_conexao.desconectar(user.get("uid"), req.alvo)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return robo_store.visao_publica(canal, settings.APP_URL)
+
+
+@app.get("/api/robo/meta/webhook")
+async def meta_webhook_verificacao(request: Request):
+    """Aperto de mao do webhook do app do LeadSage (um so, para todos)."""
+    q = request.query_params
+    if (
+        settings.META_VERIFY_TOKEN
+        and q.get("hub.mode") == "subscribe"
+        and hmac_igual(q.get("hub.verify_token", ""), settings.META_VERIFY_TOKEN)
+    ):
+        return Response(content=q.get("hub.challenge", ""), media_type="text/plain")
+    raise HTTPException(status_code=403, detail="Verificação recusada.")
+
+
+@app.post("/api/robo/meta/webhook")
+async def meta_webhook(request: Request):
+    """Todas as mensagens de todos os clientes conectados pelo app.
+
+    Assinado com o segredo do app do sistema. Cada pedaco e roteado pelo
+    ativo que recebeu a mensagem (pagina, Instagram ou numero) ate o
+    cliente dono dele; ativo desconhecido e ignorado em silencio — pode
+    ser alguem que desconectou e a Meta ainda nao parou de mandar.
+    """
+    corpo = await request.body()
+    if not meta_canais.assinatura_confere(
+        corpo, request.headers.get("x-hub-signature-256", ""), settings.META_APP_SECRET
+    ):
+        raise HTTPException(status_code=401, detail="Assinatura inválida.")
+    try:
+        dados = json.loads(corpo or b"{}")
+    except ValueError:
+        return {"ok": True}
+
+    for tipo, ativo_id, pedaco in robo_conexao.dividir_por_ativo(dados):
+        canal = await robo_store.canal_por_ativo(tipo, ativo_id)
+        if not canal:
+            continue
+        for msg in meta_canais.ler_eventos(pedaco, canal):
+            try:
+                await robo_service.processar(canal, msg)
+            except Exception as exc:
+                print(f"Robo: falha ao processar {msg.canal}/{msg.meta_id}: {exc}")
+    return {"ok": True}
 
 
 @app.get("/api/place-photo")

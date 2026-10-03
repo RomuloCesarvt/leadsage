@@ -37,8 +37,10 @@ CAMPOS_CANAL = (
     "page_id", "page_token", "ig_id",
     # comportamento do robo
     "ativo", "objetivo", "instrucoes", "link_agenda", "nome_assistente",
+    # preenchidos pela conexao com um clique (app do LeadSage)
+    "page_nome", "ig_usuario", "waba_id", "wa_pin",
 )
-SEGREDOS = ("app_secret", "wa_token", "page_token")
+SEGREDOS = ("app_secret", "wa_token", "page_token", "wa_pin")
 
 
 def agora() -> str:
@@ -158,8 +160,18 @@ def visao_publica(canal: Optional[Dict[str, Any]], url_base: str) -> Dict[str, A
         saida[f"tem_{segredo}"] = bool(c.get(segredo))
     saida["webhook_url"] = f"{url_base}/api/robo/webhook/{c['gancho']}" if c.get("gancho") else ""
     saida["verify_token"] = c.get("verify_token", "")
-    saida["whatsapp_pronto"] = bool(c.get("wa_token") and c.get("wa_phone_id") and c.get("app_secret"))
-    saida["meta_pronto"] = bool(c.get("page_token") and c.get("page_id") and c.get("app_secret"))
+    # Pelo app do LeadSage a assinatura e conferida com o segredo do app
+    # do sistema; no modo manual, com o segredo do app do proprio cliente.
+    pelo_sistema = c.get("modo") == "app"
+    assinatura_ok = pelo_sistema or bool(c.get("app_secret"))
+    saida["modo"] = c.get("modo") or "manual"
+    saida["whatsapp_pronto"] = bool(c.get("wa_token") and c.get("wa_phone_id") and assinatura_ok)
+    saida["meta_pronto"] = bool(c.get("page_token") and c.get("page_id") and assinatura_ok)
+    # paginas autorizadas aguardando escolha: so nome e id, nunca o token
+    saida["paginas_pendentes"] = [
+        {"id": p.get("id", ""), "nome": p.get("nome", ""), "ig_usuario": p.get("ig_usuario", "")}
+        for p in c.get("paginas_pendentes") or []
+    ]
     return saida
 
 
@@ -217,3 +229,84 @@ async def listar_conversas(uid: str) -> List[Dict[str, Any]]:
         resumo.append(r)
     resumo.sort(key=lambda c: c.get("atualizado") or "", reverse=True)
     return resumo
+
+
+# ------------------------------------------------------------- ativos
+#
+# Com o app do LeadSage, todas as mensagens de todos os clientes chegam no
+# mesmo webhook. O que diz de quem e cada uma e o ativo que a recebeu: o
+# id da pagina, da conta do Instagram ou do numero do WhatsApp. Este
+# indice resolve isso em uma leitura.
+
+TIPOS_DE_ATIVO = ("pagina", "instagram", "whatsapp")
+
+
+def _chave_ativo(tipo: str, ativo_id: str) -> str:
+    return f"{tipo}_{re.sub(r'[^0-9A-Za-z]', '', ativo_id or '')}"
+
+
+async def registrar_ativo(tipo: str, ativo_id: str, uid: str, gancho: str) -> None:
+    if tipo not in TIPOS_DE_ATIVO or not ativo_id:
+        return
+    chave = _chave_ativo(tipo, ativo_id)
+    dados = {"uid": uid, "gancho": gancho, "tipo": tipo, "id": ativo_id}
+    if firestore_db is not None:
+        try:
+            firestore_db.collection("robo_ativos").document(chave).set(dados)
+            return
+        except Exception as exc:
+            print(f"Falha ao registrar ativo do robo: {exc}")
+    await _sql_put(f"ativo:{chave}", uid, "ativo", dados)
+
+
+async def esquecer_ativo(tipo: str, ativo_id: str) -> None:
+    if not ativo_id:
+        return
+    chave = _chave_ativo(tipo, ativo_id)
+    if firestore_db is not None:
+        try:
+            firestore_db.collection("robo_ativos").document(chave).delete()
+            return
+        except Exception as exc:
+            print(f"Falha ao remover ativo do robo: {exc}")
+    async with AsyncSessionLocal() as s:
+        row = (await s.execute(select(DBRobo).where(DBRobo.chave == f"ativo:{chave}"))).scalar_one_or_none()
+        if row:
+            await s.delete(row)
+            await s.commit()
+
+
+async def canal_por_ativo(tipo: str, ativo_id: str) -> Optional[Dict[str, Any]]:
+    """A configuracao do cliente dono daquela pagina, conta ou numero."""
+    if not ativo_id:
+        return None
+    chave = _chave_ativo(tipo, ativo_id)
+    dados = None
+    if firestore_db is not None:
+        try:
+            doc = firestore_db.collection("robo_ativos").document(chave).get()
+            dados = doc.to_dict() if doc.exists else None
+        except Exception as exc:
+            print(f"Falha ao ler ativo do robo: {exc}")
+    if dados is None:
+        dados = await _sql_get(f"ativo:{chave}")
+    if not dados:
+        return None
+    return await canal_por_gancho(dados.get("gancho", ""))
+
+
+async def substituir_canal(uid: str, canal: Dict[str, Any]) -> Dict[str, Any]:
+    """Grava o canal inteiro, inclusive apagando campos.
+
+    `salvar_canal` nunca apaga segredo (o formulario chega vazio). Ao
+    desconectar uma pagina, apagar e exatamente o que se quer.
+    """
+    canal["atualizado"] = agora()
+    if firestore_db is not None:
+        try:
+            firestore_db.collection("robo_canais").document(canal["gancho"]).set(canal)
+            return canal
+        except Exception as exc:
+            print(f"Falha ao gravar canal do robo: {exc}")
+    await _sql_put(f"canal:{canal['gancho']}", uid, "canal", canal)
+    return canal

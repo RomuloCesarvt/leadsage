@@ -42,6 +42,16 @@ class Settings(BaseModel):
     # Para onde o comprador volta e onde o MP avisa o pagamento
     APP_URL: str = os.getenv("APP_URL", "https://leadsageofc.vercel.app")
 
+    # App da Meta do LeadSage. Com ele, o cliente conecta pagina,
+    # Instagram e WhatsApp com um clique ("Conectar com Facebook"), sem
+    # criar app proprio — como no ManyChat. Vazio: so o modo manual.
+    META_APP_ID: str = os.getenv("META_APP_ID", "")
+    META_APP_SECRET: str = os.getenv("META_APP_SECRET", "")
+    META_VERIFY_TOKEN: str = os.getenv("META_VERIFY_TOKEN", "")
+    # Configuracao do Embedded Signup do WhatsApp (Facebook Login for
+    # Business). Sem ela, o botao do WhatsApp nao aparece.
+    META_WA_CONFIG_ID: str = os.getenv("META_WA_CONFIG_ID", "")
+
     # Origens autorizadas do frontend, separadas por virgula.
     # Vazio mantem o comportamento permissivo antigo para nao quebrar
     # o dev local sem configuracao.
