@@ -45,6 +45,7 @@ RECURSOS = (
     "templates_premium",
     "suporte_prioritario",
     "recarga",
+    "robo_ia",             # robo que responde no WhatsApp, Instagram e Messenger
 )
 
 PLANS: List[Dict[str, Any]] = [
@@ -82,7 +83,7 @@ PLANS: List[Dict[str, Any]] = [
         "paises": ["BR", "PT", "US"],
         "recursos": [
             "publicar_site", "ia_abordagem", "pipeline", "recarga",
-            "exportar_leads", "marca_propria", "templates_premium",
+            "exportar_leads", "marca_propria", "templates_premium", "robo_ia",
         ],
         "descricao": "Acesso vitalício, 500 leads e 50 sites incluídos.",
         "destaque": True,

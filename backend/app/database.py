@@ -188,6 +188,23 @@ class DBDocument(Base):
     updated_at = Column(String)
 
 
+class DBRobo(Base):
+    """Robo de atendimento: conexao com a Meta e conversas.
+
+    Um registro por documento, como no Firestore. `tipo` separa os dois:
+    'canal' (chave = gancho da URL do webhook) e 'conversa' (chave =
+    uid:conversa). Tabela unica porque no dev local isto so precisa
+    espelhar o Firestore, nao ser consultado de forma relacional.
+    """
+    __tablename__ = "robo"
+
+    chave = Column(String, primary_key=True, index=True)
+    uid = Column(String, index=True)
+    tipo = Column(String, index=True)
+    data = Column(JSON)
+    atualizado = Column(String, index=True)
+
+
 class DBOrder(Base):
     """Pedido de compra de creditos.
 

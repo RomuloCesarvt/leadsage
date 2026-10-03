@@ -2,7 +2,10 @@ import re
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import List, Dict, Any
+import asyncio
+from typing import List, Dict, Any, Optional
+
+from pydantic import BaseModel, Field
 from fastapi import FastAPI, HTTPException, Query, Depends, Request
 from fastapi.responses import Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,6 +42,8 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
+from app import robo_store, robo_service, meta_canais
+from app.ai_robo import decidir as robo_decidir
 from app.payments import (
     catalogo, criar_pedido, obter_pedido, listar_pedidos,
     confirmar_pagamento, achar_pacote, vincular_cobranca,
@@ -833,6 +838,210 @@ async def remover_documento(doc_id: str, user: dict = Depends(get_current_user))
     if not await delete_document(user.get("uid"), doc_id):
         raise HTTPException(status_code=404, detail="Documento nao encontrado.")
     return {"status": "deleted", "id": doc_id}
+
+
+# ======================================================================
+# Robo de atendimento (WhatsApp, Instagram, Messenger)
+# ======================================================================
+
+class RoboConfigRequest(BaseModel):
+    app_secret: Optional[str] = None
+    wa_token: Optional[str] = None
+    wa_phone_id: Optional[str] = None
+    page_id: Optional[str] = None
+    page_token: Optional[str] = None
+    ig_id: Optional[str] = None
+    ativo: Optional[bool] = None
+    objetivo: Optional[str] = None
+    instrucoes: Optional[str] = Field(default=None, max_length=3000)
+    link_agenda: Optional[str] = None
+    nome_assistente: Optional[str] = Field(default=None, max_length=60)
+
+
+class RoboTextoRequest(BaseModel):
+    texto: str = Field(min_length=1, max_length=2000)
+
+
+class RoboAtivoRequest(BaseModel):
+    ativo: bool
+
+
+class RoboTesteRequest(BaseModel):
+    """Conversa simulada: o historico vem da tela, nada e gravado."""
+    mensagens: List[Dict[str, str]] = Field(default_factory=list, max_length=40)
+    canal: str = "whatsapp"
+    lead_id: Optional[str] = None
+
+
+@app.get("/api/robo/config")
+async def robo_config(user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    canal = await robo_store.canal_do_usuario(user.get("uid"))
+    return robo_store.visao_publica(canal, settings.APP_URL)
+
+
+@app.put("/api/robo/config")
+async def robo_salvar_config(req: RoboConfigRequest, user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    if req.objetivo and req.objetivo not in ("agendar", "site", "qualificar"):
+        raise HTTPException(status_code=400, detail="Objetivo inválido.")
+    canal = await robo_store.salvar_canal(
+        user.get("uid"), user.get("email", ""), req.model_dump(exclude_none=True)
+    )
+    return robo_store.visao_publica(canal, settings.APP_URL)
+
+
+@app.get("/api/robo/webhook/{gancho}")
+async def robo_webhook_verificacao(gancho: str, request: Request):
+    """O aperto de mao da Meta ao cadastrar o webhook.
+
+    Ela manda hub.verify_token e espera de volta hub.challenge, em texto
+    puro. Qualquer outra coisa — inclusive JSON — e recusada pela Meta.
+    """
+    canal = await robo_store.canal_por_gancho(gancho)
+    q = request.query_params
+    if (
+        canal
+        and q.get("hub.mode") == "subscribe"
+        and q.get("hub.verify_token")
+        and hmac_igual(q.get("hub.verify_token", ""), canal.get("verify_token", ""))
+    ):
+        return Response(content=q.get("hub.challenge", ""), media_type="text/plain")
+    raise HTTPException(status_code=403, detail="Verificação recusada.")
+
+
+def hmac_igual(a: str, b: str) -> bool:
+    import hmac as _hmac
+    return bool(a) and bool(b) and _hmac.compare_digest(a, b)
+
+
+@app.post("/api/robo/webhook/{gancho}")
+async def robo_webhook(gancho: str, request: Request):
+    """Mensagem chegando da Meta.
+
+    Sem login, de proposito: quem chama e a Meta. O que autentica e a
+    assinatura HMAC com o segredo do app daquele usuario — sem ela, a
+    requisicao e descartada antes de ler qualquer coisa.
+
+    Depois de autenticada, a resposta e sempre 200, mesmo se algo falhar
+    no meio: a Meta reenvia o que nao recebeu 200, e um erro nosso viraria
+    uma enxurrada de reenvios. A falha fica registrada na conversa.
+    """
+    canal = await robo_store.canal_por_gancho(gancho)
+    corpo = await request.body()
+    if not canal or not meta_canais.assinatura_confere(
+        corpo, request.headers.get("x-hub-signature-256", ""), canal.get("app_secret", "")
+    ):
+        raise HTTPException(status_code=401, detail="Assinatura inválida.")
+
+    try:
+        dados = json.loads(corpo or b"{}")
+    except ValueError:
+        return {"ok": True}
+
+    for msg in meta_canais.ler_eventos(dados, canal):
+        try:
+            await robo_service.processar(canal, msg)
+        except Exception as exc:
+            print(f"Robo: falha ao processar {msg.canal}/{msg.meta_id}: {exc}")
+    return {"ok": True}
+
+
+@app.get("/api/robo/conversas")
+async def robo_conversas(user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    return await robo_store.listar_conversas(user.get("uid"))
+
+
+@app.get("/api/robo/conversas/{cid}")
+async def robo_conversa(cid: str, user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    conversa = await robo_store.obter_conversa(user.get("uid"), cid)
+    if not conversa:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada.")
+    return conversa
+
+
+@app.post("/api/robo/conversas/{cid}/robo")
+async def robo_ligar_desligar(cid: str, req: RoboAtivoRequest, user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    uid = user.get("uid")
+    conversa = await robo_store.obter_conversa(uid, cid)
+    if not conversa:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada.")
+    if req.ativo and conversa.get("optout"):
+        # Religar o robo para quem pediu para sair e o caminho mais curto
+        # para denuncia e banimento do numero.
+        raise HTTPException(
+            status_code=409,
+            detail="Esta pessoa pediu para não receber mais mensagens. O robô não pode ser religado.",
+        )
+    conversa["robo_ativo"] = req.ativo
+    if req.ativo:
+        conversa["precisa_humano"] = False
+        conversa["motivo"] = ""
+    conversa["atualizado"] = robo_store.agora()
+    await robo_store.salvar_conversa(uid, conversa)
+    return conversa
+
+
+@app.post("/api/robo/conversas/{cid}/responder")
+async def robo_responder(cid: str, req: RoboTextoRequest, user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    try:
+        return await robo_service.responder_como_humano(user.get("uid"), cid, req.texto)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except meta_canais.EnvioFalhou as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.post("/api/robo/testar")
+async def robo_testar(req: RoboTesteRequest, user: dict = Depends(get_current_user)):
+    """Simulador: o robo responde sem Meta, sem envio e sem gravar.
+
+    Serve para o dono ajustar as instrucoes antes de ligar o robo para
+    clientes de verdade. Cobra o mesmo credito de uma resposta real: e a
+    mesma chamada de IA.
+    """
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    uid, email = user.get("uid"), user.get("email", "")
+    canal = await robo_store.canal_do_usuario(uid) or {}
+    perfil = await get_profile(uid)
+
+    mensagens = [
+        {"de": "contato" if m.get("de") == "contato" else "robo", "texto": str(m.get("texto", ""))[:2000]}
+        for m in req.mensagens
+    ]
+    if not mensagens or mensagens[-1]["de"] != "contato":
+        raise HTTPException(status_code=400, detail="A última mensagem precisa ser do contato.")
+
+    lead = None
+    if req.lead_id:
+        lead = await robo_service._lead_por_id(uid, req.lead_id)
+
+    if await check_and_deduct_credits(uid, robo_service.CUSTO_RESPOSTA, email) is None:
+        raise HTTPException(status_code=402, detail="Créditos insuficientes para testar o robô.")
+
+    try:
+        decisao = await asyncio.wait_for(
+            asyncio.to_thread(
+                robo_decidir, mensagens, req.canal, perfil.model_dump(), canal, lead,
+                robo_service._gerador_padrao(),
+            ),
+            timeout=robo_service.PRAZO_IA + 6,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="A IA demorou demais. Tente de novo.")
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"A IA não respondeu: {exc}")
+
+    return {
+        "resposta": decisao.resposta,
+        "passar_para_humano": decisao.passar_para_humano,
+        "motivo": decisao.motivo,
+        "optout": decisao.optout,
+    }
 
 
 @app.get("/api/place-photo")
