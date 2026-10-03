@@ -348,6 +348,13 @@ export interface RoboConfig extends Omit<RoboConfigEntrada, 'app_secret' | 'wa_t
   verify_token: string;
   whatsapp_pronto: boolean;
   meta_pronto: boolean;
+  /** 'app': conectado com um clique pelo app do LeadSage; 'manual': app proprio */
+  modo: 'app' | 'manual';
+  page_nome: string;
+  ig_usuario: string;
+  waba_id: string;
+  /** paginas autorizadas no login, aguardando escolha (sem token) */
+  paginas_pendentes: { id: string; nome: string; ig_usuario: string }[];
 }
 
 export interface RoboMensagem {

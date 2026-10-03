@@ -89,7 +89,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedLeadForMessage, setSelectedLeadForMessage] = useState<LeadItem | null>(null);
   const [selectedProfileLead, setSelectedProfileLead] = useState<LeadItem | null>(null);
 
-  const [viewState, setViewState] = useState<string>('dashboard');
+  // A URL pode pedir uma tela: os atalhos do app instalado (?tela=leads)
+  // e a volta do login do Facebook (?tela=robo&meta=ok). Sem ler isso,
+  // os dois caiam no painel inicial como se nada tivesse acontecido.
+  const [viewState, setViewState] = useState<string>(() => {
+    const pedida = new URLSearchParams(window.location.search).get('tela') || '';
+    const telas: Record<string, string> = { 'nova-busca': 'hero', leads: 'workspace', robo: 'robo' };
+    return telas[pedida] || 'dashboard';
+  });
   const [siteEmEdicao, setSiteEmEdicao] = useState<any | null>(null);
 
   useEffect(() => {

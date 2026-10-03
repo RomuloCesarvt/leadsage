@@ -15,6 +15,7 @@ import {
 import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { WhatsAppIcon, InstagramIcon, FacebookIcon } from '../BrandIcons';
+import { ConexaoMeta } from '../ConexaoMeta';
 import type {
   RoboCanal, RoboConfig, RoboConfigEntrada, RoboConversa, RoboConversaResumo, RoboMensagem,
 } from '../../types';
@@ -50,8 +51,19 @@ const rotulo = 'block text-sm font-bold text-slate-700 mb-1.5';
 // ===================================================================
 
 export const RoboScreen: React.FC = () => {
-  const [aba, setAba] = useState<Aba>('conversas');
+  // A volta do login do Facebook chega com ?meta=ok|escolher|erro na URL.
+  const retornoMeta = useMemo(() => {
+    const q = new URLSearchParams(window.location.search);
+    const estado = q.get('meta');
+    return estado ? { estado, msg: q.get('msg') || '' } : null;
+  }, []);
+  const [aba, setAba] = useState<Aba>(retornoMeta ? 'configurar' : 'conversas');
   const [bloqueado, setBloqueado] = useState('');
+
+  useEffect(() => {
+    // limpa a URL: recarregar a pagina nao deve repetir o aviso
+    if (retornoMeta) window.history.replaceState({}, '', window.location.pathname);
+  }, [retornoMeta]);
   const { setViewState } = useApp() as any;
 
   if (bloqueado) {
@@ -105,6 +117,17 @@ export const RoboScreen: React.FC = () => {
 
       {aba === 'conversas' && <Conversas onBloqueio={setBloqueado} irConfigurar={() => setAba('configurar')} />}
       {aba === 'simulador' && <Simulador />}
+      {aba === 'configurar' && retornoMeta && (
+        <div className={`mb-4 p-3 rounded-xl text-sm border ${
+          retornoMeta.estado === 'erro'
+            ? 'bg-red-50 border-red-100 text-red-700'
+            : 'bg-emerald-50 border-emerald-100 text-emerald-700'
+        }`}>
+          {retornoMeta.estado === 'ok' && 'Página conectada. Ligue o robô e mande uma mensagem para ela para testar.'}
+          {retornoMeta.estado === 'escolher' && 'Login feito. Escolha abaixo qual página o robô vai atender.'}
+          {retornoMeta.estado === 'erro' && (retornoMeta.msg || 'A conexão com o Facebook não foi concluída.')}
+        </div>
+      )}
       {aba === 'configurar' && <Configurar onBloqueio={setBloqueado} />}
     </div>
   );
@@ -459,11 +482,14 @@ const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio 
   const [estado, setEstado] = useState<'idle' | 'salvando' | 'salvo' | 'erro'>('idle');
   const [erro, setErro] = useState('');
   const [copiado, setCopiado] = useState('');
+  // Modo avancado: app proprio da Meta. Aberto so para quem ja usa.
+  const [avancado, setAvancado] = useState(false);
 
   useEffect(() => {
     api.roboConfig()
       .then(c => {
         setCfg(c);
+        setAvancado(c.modo === 'manual' && c.tem_app_secret);
         setForm({
           ativo: c.ativo, objetivo: (c.objetivo || 'agendar') as any, instrucoes: c.instrucoes,
           link_agenda: c.link_agenda, nome_assistente: c.nome_assistente,
@@ -527,7 +553,9 @@ const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio 
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 pb-8">
-      <div className="lg:col-span-2 space-y-5">
+      <div className={`${avancado ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-5`}>
+
+        <ConexaoMeta cfg={cfg} aoMudar={setCfg} />
 
         {/* comportamento */}
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
@@ -572,9 +600,13 @@ const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio 
           </div>
         </div>
 
-        {/* conexoes */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-          <h2 className="text-lg font-bold text-slate-800">Conexão com a Meta</h2>
+        {/* conexao manual: app proprio da Meta */}
+        <details open={avancado} onToggle={e => setAvancado((e.target as HTMLDetailsElement).open)}
+          className="bg-white border border-slate-200 rounded-2xl shadow-sm group">
+          <summary className="px-6 py-4 cursor-pointer text-sm font-bold text-slate-600 select-none">
+            Modo avançado: usar meu próprio app da Meta
+          </summary>
+        <div className="px-6 pb-6 space-y-6">
 
           <Segredo k="app_secret" tem={cfg.tem_app_secret} label="Chave secreta do app (App Secret)"
             dica="Meta for Developers → seu app → Configurações → Básico" />
@@ -615,7 +647,10 @@ const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio 
             </div>
           </div>
 
-          <div className="pt-2 flex justify-end items-center gap-4">
+        </div>
+        </details>
+
+        <div className="pt-2 flex justify-end items-center gap-4">
             {estado === 'salvo' && <span className="text-sm font-semibold text-emerald-600 flex items-center gap-1.5"><Check className="w-4 h-4" /> Salvo</span>}
             {estado === 'erro' && <span className="text-sm font-semibold text-red-600">{erro}</span>}
             <button onClick={salvar} disabled={estado === 'salvando'}
@@ -623,11 +658,10 @@ const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio 
               {estado === 'salvando' ? 'Salvando…' : 'Salvar'}
             </button>
           </div>
-        </div>
       </div>
 
-      {/* passo a passo */}
-      <div className="space-y-5">
+      {/* passo a passo do modo manual */}
+      <div className={`space-y-5 ${avancado ? '' : 'hidden'}`}>
         <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
           <h3 className="font-bold text-slate-800 mb-3">Cole isto na Meta</h3>
           {!cfg.webhook_url ? (

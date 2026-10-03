@@ -259,6 +259,28 @@ export const api = {
     });
   },
 
+  async metaDisponivel(): Promise<{ facebook: boolean; whatsapp: boolean; app_id: string; wa_config_id: string }> {
+    return await fetchWithToken('/robo/meta/disponivel');
+  },
+
+  async metaConectar(): Promise<{ url: string }> {
+    return await fetchWithToken('/robo/meta/conectar');
+  },
+
+  async metaEscolherPagina(page_id: string): Promise<RoboConfig> {
+    return await fetchWithToken('/robo/meta/pagina', { method: 'POST', body: JSON.stringify({ page_id }) });
+  },
+
+  async metaWhatsApp(code: string, waba_id: string, phone_number_id: string): Promise<RoboConfig> {
+    return await fetchWithToken('/robo/meta/whatsapp', {
+      method: 'POST', body: JSON.stringify({ code, waba_id, phone_number_id }),
+    });
+  },
+
+  async metaDesconectar(alvo: 'facebook' | 'whatsapp'): Promise<RoboConfig> {
+    return await fetchWithToken('/robo/meta/desconectar', { method: 'POST', body: JSON.stringify({ alvo }) });
+  },
+
   async meuPlano(): Promise<PlanoAtual> {
     try {
       return await fetchWithToken('/plan');
