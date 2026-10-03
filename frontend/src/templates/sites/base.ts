@@ -44,11 +44,78 @@ export type SiteData = {
   corPrimaria: string;
   corDestaque: string;
   /**
+   * Identidade tipográfica e forma dos cantos.
+   *
+   * Duas padarias na mesma cidade pegavam o mesmo layout, e como o
+   * layout é o mesmo arquivo, os dois sites saíam gêmeos. Estes dois
+   * campos são escolhidos por negócio (nome + ramo + cidade) no
+   * servidor: mudam a voz visual da página sem trocar o layout, e sem
+   * baixar fonte nenhuma da internet.
+   *
+   * Vazio = comportamento antigo, sem nenhuma sobreposição.
+   */
+  tipografia?: Tipografia;
+  cantos?: Cantos;
+  /**
    * Assinatura discreta do LeadSage no fim da pagina. Sai nos planos
    * que incluem marca propria; nos demais o site sai assinado, como
    * fazem os construtores de plano gratuito.
    */
   selo?: boolean;
+};
+
+export type Tipografia = 'editorial' | 'moderna' | 'classica' | 'tecnica' | 'acolhedora';
+export type Cantos = 'reto' | 'suave' | 'redondo';
+
+/**
+ * Pares tipográficos montados só com fontes que já existem no aparelho.
+ * O site publicado precisa abrir sem internet — inclusive no celular do
+ * cliente do usuário, dentro da loja, com sinal ruim.
+ */
+export const TIPOGRAFIAS: Record<Tipografia, {
+  nome: string; titulos: string; corpo: string; espacamento: string; caixa: string;
+}> = {
+  editorial: {
+    nome: 'Editorial',
+    titulos: 'Georgia,"Times New Roman",serif',
+    corpo: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif',
+    espacamento: '-0.5px',
+    caixa: 'none',
+  },
+  moderna: {
+    nome: 'Moderna',
+    titulos: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif',
+    corpo: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif',
+    espacamento: '-1.2px',
+    caixa: 'none',
+  },
+  classica: {
+    nome: 'Clássica',
+    titulos: '"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif',
+    corpo: '"Segoe UI",Tahoma,Geneva,Verdana,sans-serif',
+    espacamento: '0px',
+    caixa: 'none',
+  },
+  tecnica: {
+    nome: 'Técnica',
+    titulos: '"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif',
+    corpo: '"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif',
+    espacamento: '1.5px',
+    caixa: 'uppercase',
+  },
+  acolhedora: {
+    nome: 'Acolhedora',
+    titulos: '"Trebuchet MS","Lucida Grande",Verdana,sans-serif',
+    corpo: '"Trebuchet MS","Lucida Grande",Verdana,sans-serif',
+    espacamento: '-0.3px',
+    caixa: 'none',
+  },
+};
+
+export const CANTOS: Record<Cantos, { nome: string; caixa: string; botao: string }> = {
+  reto: { nome: 'Reto', caixa: '2px', botao: '4px' },
+  suave: { nome: 'Suave', caixa: '14px', botao: '10px' },
+  redondo: { nome: 'Redondo', caixa: '22px', botao: '999px' },
 };
 
 export type SiteTemplate = {
@@ -152,8 +219,15 @@ export const cssBase = (d: SiteData): string => `
   --fundo-suave:#f9fafb;
 }
 *,*::before,*::after{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-  color:var(--tinta);line-height:1.6;-webkit-font-smoothing:antialiased}
+/* O fundo precisa ser declarado. Sem isto a pagina herda o padrao do
+   navegador, e em ambiente com tema escuro forcado as secoes sem cor
+   propria saem pretas — com texto escuro por cima, ilegivel. Apareceu
+   na previa: a capa (que tem fundo proprio) abria certo e o resto da
+   pagina sumia. */
+body{margin:0;background:#ffffff;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  color:var(--tinta);line-height:1.6;-webkit-font-smoothing:antialiased;
+  color-scheme:light}
 img{max-width:100%;display:block}
 a{color:inherit}
 h1,h2,h3{line-height:1.2;margin:0 0 .5em}
@@ -211,6 +285,28 @@ export const cssSelo = `
 .selo-leadsage a:hover{text-decoration:underline}
 `;
 
+/**
+ * A camada de identidade. Vai DEPOIS do CSS do layout, de propósito:
+ * precisa vencer as regras dele para trocar a voz visual da página.
+ *
+ * Sem os campos preenchidos não emite nada — site antigo continua
+ * saindo exatamente igual ao que já estava publicado.
+ */
+export const cssIdentidade = (d: SiteData): string => {
+  if (!d.tipografia && !d.cantos) return '';
+  const t = TIPOGRAFIAS[d.tipografia || 'moderna'];
+  const c = CANTOS[d.cantos || 'suave'];
+  return `
+body{font-family:${t.corpo}}
+h1,h2,h3,.marca,.marca-iniciais,.btn{font-family:${t.titulos}}
+h1,h2{letter-spacing:${t.espacamento}}
+h3,.titulo-secao,.etiqueta{text-transform:${t.caixa}}
+.btn{border-radius:${c.botao}}
+figure,blockquote,.galeria figure,[class*="cart"],[class*="card"],[class*="caixa"],
+[class*="bloco"],[class*="item"],[class*="servico"]{border-radius:${c.caixa}}
+`;
+};
+
 export const documento = (d: SiteData, css: string, corpo: string): string =>
   `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -219,7 +315,7 @@ export const documento = (d: SiteData, css: string, corpo: string): string =>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(d.empresa)}${d.categoria ? ` — ${esc(d.categoria)}` : ''}</title>
 <meta name="description" content="${esc(d.slogan || d.sobre).slice(0, 155)}">
-<style>${cssBase(d)}${css}${d.selo ? cssSelo : ''}</style>
+<style>${cssBase(d)}${css}${cssIdentidade(d)}${d.selo ? cssSelo : ''}</style>
 </head>
 <body>
 ${corpo}

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Plus, Trash2, Pencil, Clock, LayoutTemplate } from 'lucide-react';
+import { FileText, Plus, Trash2, Pencil, Clock, LayoutTemplate, Wand2, Sparkles, Info } from 'lucide-react';
 import { api } from '../services/api';
 import { TemplateEditor } from './TemplateEditor';
+import { DocumentBriefingModal } from './DocumentBriefingModal';
 import type { Template } from '../templates';
-import type { DocumentItem } from '../types';
+import type { DocumentItem, DocumentAIResponse } from '../types';
 
 /**
  * Biblioteca de modelos, usada por Propostas e Contratos.
@@ -27,6 +28,10 @@ export const TemplateLibrary: React.FC<Props> = ({ kind, titulo, subtitulo, temp
   const [editandoTemplate, setEditandoTemplate] = useState<Template | null>(null);
   const [editandoDoc, setEditandoDoc] = useState<DocumentItem | null>(null);
   const [excluindo, setExcluindo] = useState<string | null>(null);
+  const [briefing, setBriefing] = useState(false);
+  // O que a IA respondeu junto do texto: a logica que ela usou e o que
+  // ficou para o usuario preencher. Fica visivel enquanto ele edita.
+  const [notaDaIA, setNotaDaIA] = useState<DocumentAIResponse | null>(null);
 
   const recarregar = () => {
     setCarregando(true);
@@ -104,6 +109,31 @@ export const TemplateLibrary: React.FC<Props> = ({ kind, titulo, subtitulo, temp
       </div>
 
       {aba === 'modelos' ? (
+        <div className="space-y-4">
+
+        {/* O caminho principal: documento escrito para aquele cliente, a
+            partir do que a busca ja descobriu sobre ele. Os modelos
+            abaixo continuam para quem prefere preencher colchetes. */}
+        <button
+          onClick={() => setBriefing(true)}
+          className="w-full text-left bg-gradient-to-r from-indigo-600 to-blue-600 rounded-2xl p-5 shadow-sm hover:shadow-lg transition-all flex items-center gap-4"
+        >
+          <div className="w-12 h-12 rounded-xl bg-white/15 border border-white/25 flex items-center justify-center shrink-0">
+            <Wand2 className="w-6 h-6 text-white" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold text-white flex items-center gap-2">
+              Escrever {kind === 'proposta' ? 'uma proposta' : 'um contrato'} com IA
+              <Sparkles className="w-4 h-4 text-amber-300" />
+            </h3>
+            <p className="text-sm text-white/80 leading-snug mt-0.5">
+              {kind === 'proposta'
+                ? 'Diagnostico com os dados reais do lead, escopo, cronograma, investimento e o que nao esta incluido.'
+                : 'Clausulas adaptadas ao servico, com LGPD, propriedade intelectual, garantia e rescisao.'}
+            </p>
+          </div>
+        </button>
+
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {templates.map(t => (
             <div
@@ -123,6 +153,7 @@ export const TemplateLibrary: React.FC<Props> = ({ kind, titulo, subtitulo, temp
               </button>
             </div>
           ))}
+        </div>
         </div>
       ) : carregando ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -187,14 +218,47 @@ export const TemplateLibrary: React.FC<Props> = ({ kind, titulo, subtitulo, temp
         </div>
       )}
 
-      {(editandoTemplate || editandoDoc) && (
-        <TemplateEditor
+      {briefing && (
+        <DocumentBriefingModal
           kind={kind}
-          template={editandoTemplate}
-          documento={editandoDoc}
-          onFechar={() => { setEditandoTemplate(null); setEditandoDoc(null); }}
-          onSalvo={aoSalvar}
+          onFechar={() => setBriefing(false)}
+          onPronto={doc => {
+            setBriefing(false);
+            setNotaDaIA(doc);
+            // O documento gerado entra no editor como um modelo: os
+            // [CAMPOS] que sobraram viram formulario, e o tema visual
+            // monta o PDF com a marca do usuario.
+            setEditandoTemplate({ id: 'ia', title: doc.title, desc: '', content: doc.content });
+          }}
         />
+      )}
+
+      {(editandoTemplate || editandoDoc) && (
+        <>
+          {notaDaIA && editandoTemplate?.id === 'ia' && (
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] max-w-xl w-[92vw] bg-slate-900 text-slate-200 rounded-xl px-4 py-3 shadow-2xl text-xs flex items-start gap-2">
+              <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p>{notaDaIA.aviso}</p>
+                {!!notaDaIA.campos_faltando?.length && (
+                  <p className="text-slate-400">
+                    Para preencher: {notaDaIA.campos_faltando.join(', ')}
+                  </p>
+                )}
+              </div>
+              <button onClick={() => setNotaDaIA(null)} className="ml-auto text-slate-500 hover:text-white">
+                dispensar
+              </button>
+            </div>
+          )}
+          <TemplateEditor
+            kind={kind}
+            template={editandoTemplate}
+            documento={editandoDoc}
+            onFechar={() => { setEditandoTemplate(null); setEditandoDoc(null); setNotaDaIA(null); }}
+            onSalvo={aoSalvar}
+          />
+        </>
       )}
     </div>
   );

@@ -7,6 +7,7 @@ import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
 import { SITE_TEMPLATES, sugerirTemplate } from '../templates/sites/layouts';
 import type { SiteData, SiteTemplate } from '../templates/sites/base';
+import type { SiteIdentity } from '../types';
 import { prepararImagem, formatarBytes, TETO_SITE_BYTES } from '../lib/imagem';
 
 /**
@@ -55,7 +56,7 @@ const PALETAS = [
 ];
 
 export const SiteBuilder: React.FC = () => {
-  const { leads, setViewState, siteEmEdicao, setSiteEmEdicao } = useApp() as any;
+  const { leads, user, setViewState, siteEmEdicao, setSiteEmEdicao } = useApp() as any;
 
   const [lead, setLead] = useState<any>(null);
   // Id do site sendo reeditado. Enquanto ficava nulo, cada Publicar
@@ -68,6 +69,12 @@ export const SiteBuilder: React.FC = () => {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const [gerandoTextos, setGerandoTextos] = useState(false);
+  // A identidade que a IA calculou para este negócio, para a tela poder
+  // dizer POR QUE o site ficou com essa cara.
+  const [identidade, setIdentidade] = useState<SiteIdentity | null>(null);
+  // Quando o usuário escolhe um layout na galeria, a sugestão automática
+  // para de mexer nele.
+  const [escolheuLayout, setEscolheuLayout] = useState(false);
   const inputLogo = useRef<HTMLInputElement>(null);
 
   // Sem marca propria no plano, o site sai assinado pelo LeadSage.
@@ -153,49 +160,60 @@ export const SiteBuilder: React.FC = () => {
     }
   };
 
-  /** A IA escreve só os textos; o layout continua sendo o template. */
+  /**
+   * O projeto do site: texto E identidade visual.
+   *
+   * Antes isto era um pedido disfarçado ao endpoint de abordagem — um
+   * "responda um JSON" enfiado no prompt de e-mail, com o resultado
+   * garimpado por expressão regular no corpo da mensagem. Quando a
+   * garimpagem falhava, o usuário lia "A IA não devolveu textos
+   * utilizáveis" sem saber por quê.
+   *
+   * Agora o servidor devolve o conteúdo já estruturado e, junto, a
+   * identidade daquele negócio: paleta, tipografia, cantos e o layout
+   * que combina com o ramo. É isso que faz dois clientes do mesmo
+   * usuário receberem sites diferentes, e não a mesma página azul com o
+   * nome trocado.
+   */
   const gerarTextos = async () => {
     if (!template) return;
     setGerandoTextos(true);
     setErro('');
+    setIdentidade(null);
     try {
-      const resposta = await api.generatePitch({
-        lead: {
-          ...(lead || {}),
-          id: lead?.id || 'novo',
-          name: dados.empresa,
-          company: dados.empresa,
-          role: dados.categoria,
-          niche: dados.categoria,
-          city: dados.endereco,
-          socials: lead?.socials || {},
-        } as any,
-        tone: 'Direto',
-        custom_instructions:
-          'Responda APENAS um JSON com as chaves "slogan" (frase curta de no maximo 12 palavras), ' +
-          '"sobre" (um paragrafo de 2 frases sobre a empresa) e "servicos" ' +
-          '(lista de 3 objetos com "titulo" e "descricao" de uma frase). ' +
-          'Escreva em portugues do Brasil, sem inventar dados de contato.',
-        sender_name: dados.empresa,
-        user_product: dados.categoria,
+      const r = await api.generateSiteCopy({
+        lead: lead || undefined,
+        empresa: dados.empresa,
+        categoria: dados.categoria,
+        cidade: lead?.city || dados.endereco,
+        servico_do_usuario: user?.product_description || '',
       });
-
-      const bruto = `${resposta.subject}\n${resposta.body}`;
-      const json = bruto.match(/\{[\s\S]*\}/);
-      if (!json) throw new Error('A IA não devolveu textos utilizáveis.');
-      const conteudo = JSON.parse(json[0]);
 
       setDados(d => ({
         ...d,
-        slogan: conteudo.slogan || d.slogan,
-        sobre: conteudo.sobre || d.sobre,
-        servicos: Array.isArray(conteudo.servicos) && conteudo.servicos.length
-          ? conteudo.servicos.slice(0, 6).map((s: any) => ({
+        categoria: r.categoria || d.categoria,
+        slogan: r.slogan || d.slogan,
+        sobre: r.sobre || d.sobre,
+        servicos: r.servicos?.length
+          ? r.servicos.slice(0, 6).map(s => ({
               titulo: String(s.titulo || ''),
               descricao: String(s.descricao || ''),
             }))
           : d.servicos,
+        corPrimaria: r.identidade?.primaria || d.corPrimaria,
+        corDestaque: r.identidade?.destaque || d.corDestaque,
+        tipografia: (r.identidade?.tipografia as SiteData['tipografia']) || d.tipografia,
+        cantos: (r.identidade?.cantos as SiteData['cantos']) || d.cantos,
       }));
+
+      // O layout sugerido só entra quando o usuário ainda não escolheu
+      // um de propósito: trocar o template debaixo da mão de quem já
+      // estava editando seria pior do que manter o que ele escolheu.
+      if (r.identidade?.layout && !escolheuLayout) {
+        const achado = SITE_TEMPLATES.find(t => t.id === r.identidade.layout);
+        if (achado) setTemplate(achado);
+      }
+      setIdentidade(r.identidade || null);
     } catch (err: any) {
       setErro(err?.message || 'Não foi possível gerar os textos.');
     } finally {
@@ -281,7 +299,7 @@ export const SiteBuilder: React.FC = () => {
           {SITE_TEMPLATES.map(t => (
             <button
               key={t.id}
-              onClick={() => setTemplate(t)}
+              onClick={() => { setTemplate(t); setEscolheuLayout(true); }}
               className="group text-left bg-white border border-slate-200 rounded-2xl overflow-hidden hover:border-blue-400 hover:shadow-lg transition-all"
             >
               <div
@@ -402,8 +420,22 @@ export const SiteBuilder: React.FC = () => {
               : <><Sparkles className="w-4 h-4" /> Escrever textos com IA</>}
           </button>
           <p className="text-[11px] text-slate-400 -mt-3">
-            A IA preenche slogan, descrição e serviços. O layout continua sendo o template.
+            A IA escreve o conteúdo e monta a identidade deste negócio: paleta,
+            tipografia e acabamento. Cada cliente recebe uma combinação diferente.
           </p>
+
+          {identidade && (
+            <div className="-mt-2 p-3 rounded-xl bg-indigo-50/60 border border-indigo-100 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-md border border-white shadow-sm" style={{ background: identidade.primaria }} />
+                <span className="w-5 h-5 rounded-md border border-white shadow-sm" style={{ background: identidade.destaque }} />
+                <span className="text-[11px] font-bold text-indigo-900">
+                  {identidade.tipografia_nome} · cantos {String(identidade.cantos_nome || '').toLowerCase()}
+                </span>
+              </div>
+              <p className="text-[11px] text-indigo-800/80 leading-snug">{identidade.motivo}</p>
+            </div>
+          )}
 
           <div className="space-y-3">
             {campo('Nome da empresa', dados.empresa, v => alterar('empresa', v))}

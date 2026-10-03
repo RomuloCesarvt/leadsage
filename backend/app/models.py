@@ -43,7 +43,43 @@ class LeadItem(BaseModel):
     opening_hours: Optional[str] = None
     # Enriquecimento real (nunca inventado)
     all_emails: Optional[List[str]] = []
+    phones_extra: Optional[List[str]] = []
     contactability: Optional[int] = None
+    # --- Dados ricos do Google (camada opcional da field mask) ---
+    # Chegam vazios quando a conta do Google nao libera esses campos; a
+    # busca continua funcionando sem eles.
+    opening_hours_week: Optional[List[str]] = []
+    open_now: Optional[bool] = None
+    neighborhood: Optional[str] = None
+    postal_code: Optional[str] = None
+    street: Optional[str] = None
+    short_address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    place_types: Optional[List[str]] = []
+    google_description: Optional[str] = None
+    price_level: Optional[str] = None
+    price_tier: Optional[int] = None
+    reviews_sample: Optional[List[Dict[str, Any]]] = []
+    review_highlight: Optional[str] = None
+    praise_count: Optional[int] = None
+    complaint_count: Optional[int] = None
+    # --- Diagnostico do site atual ---
+    # site_status: own | social | aggregator | whatsapp | none
+    site_status: Optional[str] = None
+    site_quality: Optional[int] = None
+    site_issues: Optional[List[str]] = []
+    site_platform: Optional[str] = None
+    site_responsive: Optional[bool] = None
+    site_https: Optional[bool] = None
+    site_load_ms: Optional[int] = None
+    site_has_booking: Optional[bool] = None
+    site_has_form: Optional[bool] = None
+    site_title: Optional[str] = None
+    # --- Leitura comercial (deterministica, nunca gerada por IA) ---
+    hooks: Optional[List[str]] = []
+    diagnosis: Optional[str] = None
+    best_channel: Optional[str] = None
     outreach_status: str = "Pendente"
     last_contacted_at: Optional[str] = None
     last_message: Optional[str] = None
@@ -84,6 +120,20 @@ class PitchGenerationResponse(BaseModel):
     body: str
     tone: str
     placeholders: Dict[str, str]
+    # O canal em que este texto foi escrito. Sem ele a tela nao sabia que
+    # a copy na caixa era de e-mail enquanto o usuario ja tinha trocado
+    # para WhatsApp — e mandava 130 palavras num canal de 60.
+    channel: str = "email"
+    # Qual fato abriu a mensagem e qual perda concreta ela ataca. Aparece
+    # na tela: o usuario precisa poder discordar do argumento antes de
+    # mandar em nome dele.
+    hook: str = ""
+    reasoning: str = ""
+    # A cadencia que aquece: dois seguimentos ja escritos, com o momento
+    # de cada um. Um contato frio raramente responde no primeiro toque.
+    follow_ups: List[Dict[str, str]] = Field(default_factory=list)
+    # O que a revisao encontrou e o modelo nao corrigiu. Vazio = limpo.
+    warnings: List[str] = Field(default_factory=list)
 
 class DispatchRequest(BaseModel):
     lead_id: str
@@ -170,6 +220,59 @@ class UserProfile(BaseModel):
     brand_contact: str = ""
     sites_quota: int = 0
     plan_id: str = "previa"
+
+class SiteCopyRequest(BaseModel):
+    """Conteudo do site escrito pela IA, a partir do lead ou do que o
+    usuario ja digitou no construtor.
+
+    Antes o construtor pedia isso ao endpoint de abordagem, embutindo um
+    "responda um JSON com slogan e servicos" dentro do prompt de e-mail
+    e depois garimpando chaves no meio do texto. Funcionava quase sempre
+    — e quando nao funcionava, o usuario via "A IA nao devolveu textos
+    utilizaveis" sem entender por que.
+    """
+    lead: Optional[LeadItem] = None
+    empresa: str = ""
+    categoria: str = ""
+    cidade: str = ""
+    servico_do_usuario: str = ""
+
+
+class SiteCopyResponse(BaseModel):
+    categoria: str = ""
+    slogan: str = ""
+    sobre: str = ""
+    servicos: List[Dict[str, str]] = Field(default_factory=list)
+    diferenciais: List[str] = Field(default_factory=list)
+    cta: str = ""
+    seo_titulo: str = ""
+    seo_descricao: str = ""
+    # Paleta, tipografia, cantos e layout escolhidos para ESTE negocio.
+    # Calculado no servidor a partir do nome + ramo + cidade: dois
+    # clientes do mesmo usuario nunca recebem a mesma identidade.
+    identidade: Dict[str, Any] = Field(default_factory=dict)
+
+
+class DocumentAIRequest(BaseModel):
+    """Briefing para a IA redigir a proposta ou o contrato."""
+    kind: str                       # proposta | contrato
+    lead_id: Optional[str] = ""
+    servico: Optional[str] = ""
+    escopo: Optional[str] = ""
+    valor: Optional[str] = ""
+    condicoes: Optional[str] = ""
+    prazo: Optional[str] = ""
+    observacoes: Optional[str] = ""
+
+
+class DocumentAIResponse(BaseModel):
+    kind: str
+    title: str
+    content: str
+    resumo: str = ""
+    campos_faltando: List[str] = Field(default_factory=list)
+    aviso: str = ""
+
 
 class DemoSiteRequest(BaseModel):
     lead: LeadItem

@@ -1,4 +1,5 @@
 import asyncio
+import os
 import re
 import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
@@ -6,13 +7,30 @@ from urllib.parse import quote_plus
 
 import httpx
 
+from app.lead_intel import (
+    faixa_de_preco,
+    ler_avaliacoes,
+    melhor_canal,
+    montar_diagnostico,
+    montar_ganchos,
+)
 from app.models import LeadItem, LeadSocialLinks
 from app.social_scraper import SocialScraper
 
 PLACES_URL = "https://places.googleapis.com/v1/places:searchText"
 
-# Campos pedidos ao Google. Manter enxuto: cada campo entra no SKU cobrado.
-FIELD_MASK = ",".join([
+# Campos pedidos ao Google, em duas camadas.
+#
+# A camada essencial e o que a busca nao pode perder: sem ela nao ha
+# lead. A camada rica traz o que transforma uma linha de lista em uma
+# conversa — o que o Google escreveu sobre o negocio, a faixa de preco,
+# as avaliacoes com texto, o horario de hoje, a coordenada.
+#
+# Cada campo entra no SKU cobrado, e alguns exigem faturamento ativo.
+# Por isso a camada rica e opcional em tempo de execucao: se o Google
+# recusar a mascara, a busca refaz a chamada so com o essencial em vez
+# de devolver erro.
+CAMPOS_ESSENCIAIS = [
     "nextPageToken",
     "places.id",
     "places.displayName",
@@ -28,7 +46,57 @@ FIELD_MASK = ",".join([
     "places.userRatingCount",
     "places.photos",
     "places.regularOpeningHours",
-])
+]
+
+CAMPOS_RICOS = [
+    "places.shortFormattedAddress",
+    "places.location",
+    "places.types",
+    "places.primaryType",
+    "places.currentOpeningHours",
+    "places.editorialSummary",
+    "places.priceLevel",
+]
+
+# O texto das avaliacoes e o melhor material de abordagem que existe:
+# citar o que um cliente escreveu no Google e a mensagem que mais recebe
+# resposta. Mas `places.reviews` cai no SKU Enterprise + Atmosphere, o
+# mais caro da Places API.
+#
+# Medido nesta conta em 2026-09-21: o Google ACEITA o campo na mascara e
+# devolve a lista vazia em todos os resultados — mesmo comportamento de
+# `places.photos`, que tambem volta vazio aqui. Pedir um campo que nao
+# vem e so risco de cobranca, entao ele fica desligado por padrao.
+#
+# `LEADSAGE_PLACES_REVIEWS=1` liga quando o faturamento da conta estiver
+# ativo; o codigo que le as avaliacoes (lead_intel.ler_avaliacoes) ja
+# esta pronto e passa a produzir destaque e amostra na hora.
+PEDIR_AVALIACOES = os.getenv("LEADSAGE_PLACES_REVIEWS", "") == "1"
+
+FIELD_MASK = ",".join(CAMPOS_ESSENCIAIS)
+MASCARA_RICA = ",".join(
+    CAMPOS_ESSENCIAIS + CAMPOS_RICOS + (["places.reviews"] if PEDIR_AVALIACOES else [])
+)
+
+# Uma recusa vale para o processo inteiro: se a conta nao tem direito ao
+# campo agora, nao vai ter na proxima pagina. Sem esta memoria, cada
+# chamada pagaria uma tentativa perdida.
+_mascara_rica_ativa = True
+
+
+class MascaraRecusada(Exception):
+    """O Google recusou a mascara rica. Refazer a chamada com a basica."""
+
+
+def _e_recusa_de_mascara(bruta: str, status: int) -> bool:
+    texto = (bruta or "").lower()
+    if status not in (400, 403):
+        return False
+    return any(
+        marca in texto
+        for marca in ("field mask", "fieldmask", "unknown name", "invalid field",
+                      "not supported", "unsupported", "enterprise", "sku")
+    )
 
 # Prazo do enriquecimento. A busca inteira precisa caber no limite da
 # funcao serverless, entao o scraping trabalha com orcamento fixo.
@@ -256,11 +324,20 @@ def score_lead(
     has_whatsapp: bool,
     rating: float,
     rating_count: int,
+    *,
+    site_quality: Optional[int] = None,
+    tem_avaliacao_com_texto: bool = False,
 ) -> Tuple[int, int, List[str]]:
     """Pontuacao deterministica. Substitui random.uniform(50, 80).
 
     opportunity = o quanto o lead PRECISA do servico (lacunas digitais).
     quality     = o quanto ele e acionavel (da para falar com ele?).
+
+    `site_quality` e a nota do diagnostico do site (0-100). Quem TEM site
+    deixava de ser oportunidade no modelo antigo, o que e falso: site que
+    nao abre no celular ou nao tem telefone na pagina e venda de reforma,
+    muitas vezes mais facil do que venda de construcao — o dono ja
+    aceitou que precisa de site, so nao sabe que o dele nao funciona.
     """
     missing: List[str] = []
     opportunity = 40
@@ -268,6 +345,16 @@ def score_lead(
     if not has_own_website:
         opportunity += 25
         missing.append("website")
+    elif isinstance(site_quality, int):
+        # Site existe: o tamanho da oportunidade e o tamanho do defeito.
+        if site_quality < 40:
+            opportunity += 22
+            missing.append("site funcional")
+        elif site_quality < 60:
+            opportunity += 14
+            missing.append("site adequado ao celular")
+        elif site_quality < 80:
+            opportunity += 7
     if not has_instagram:
         opportunity += 15
         missing.append("instagram")
@@ -295,6 +382,10 @@ def score_lead(
     elif 0 < rating < 3.5:
         opportunity -= 5
 
+    # Negocio de quem os clientes falam da assunto para a abordagem
+    if tem_avaliacao_com_texto:
+        opportunity += 3
+
     quality = 30
     if has_phone:
         quality += 20
@@ -306,36 +397,22 @@ def score_lead(
         quality += 10
     if rating_count >= 20:
         quality += 5
+    if tem_avaliacao_com_texto:
+        # Da para abrir a conversa citando o que um cliente escreveu:
+        # e a abordagem que mais recebe resposta.
+        quality += 5
 
     return max(1, min(99, opportunity)), max(1, min(99, quality)), missing
-
-
-def build_summary(
-    company: str, city: str, rating: float, rating_count: int, missing: List[str], bio: str
-) -> str:
-    parts = [f"{company} em {city}." if city else f"{company}."]
-    if rating and rating_count:
-        parts.append(f"Nota {rating:.1f} no Google com {rating_count} avaliações.")
-    elif rating_count:
-        parts.append(f"{rating_count} avaliações no Google.")
-    else:
-        parts.append("Ainda sem avaliações relevantes no Google.")
-
-    gaps = [g for g in missing if g in ("website", "instagram", "facebook")]
-    if gaps:
-        parts.append("Lacuna digital: sem " + ", sem ".join(gaps) + ".")
-    else:
-        parts.append("Presença digital montada — a oportunidade está em conversão, não em existir.")
-
-    if bio:
-        parts.append(f"Sobre: {bio[:180].strip()}")
-    return " ".join(parts)
 
 
 class LeadsEngine:
     @staticmethod
     async def _fetch_page(
-        client: httpx.AsyncClient, api_key: str, text_query: str, page_token: Optional[str] = None
+        client: httpx.AsyncClient,
+        api_key: str,
+        text_query: str,
+        page_token: Optional[str] = None,
+        rica: bool = True,
     ) -> Dict[str, Any]:
         payload: Dict[str, Any] = {
             "textQuery": text_query,
@@ -351,7 +428,7 @@ class LeadsEngine:
             headers={
                 "Content-Type": "application/json",
                 "X-Goog-Api-Key": api_key,
-                "X-Goog-FieldMask": FIELD_MASK,
+                "X-Goog-FieldMask": MASCARA_RICA if rica else FIELD_MASK,
             },
             json=payload,
         )
@@ -362,27 +439,63 @@ class LeadsEngine:
             # numero do projeto do Google Cloud para o usuario final, e
             # em ingles, dizendo coisa que so o dono do sistema resolve.
             print(f"Places API recusou ({resp.status_code}): {bruta}")
+            if rica and _e_recusa_de_mascara(bruta, resp.status_code):
+                raise MascaraRecusada(bruta)
             raise ValueError(traduzir_erro_do_google(bruta, resp.status_code))
         return data
+
+    @staticmethod
+    async def _pagina(
+        client: httpx.AsyncClient, api_key: str, consulta: str, token: Optional[str]
+    ) -> Dict[str, Any]:
+        """Busca uma pagina, caindo para a mascara basica se preciso.
+
+        A degradacao acontece uma vez por processo: a partir da recusa,
+        todas as chamadas seguintes ja saem enxutas.
+        """
+        global _mascara_rica_ativa
+        try:
+            return await LeadsEngine._fetch_page(
+                client, api_key, consulta, token, rica=_mascara_rica_ativa
+            )
+        except MascaraRecusada:
+            _mascara_rica_ativa = False
+            print("Campos ricos indisponiveis nesta conta do Google; seguindo com a mascara basica.")
+            return await LeadsEngine._fetch_page(client, api_key, consulta, token, rica=False)
 
     @staticmethod
     async def _collect_places(api_key: str, queries: List[str], target: int) -> List[Dict[str, Any]]:
         """Pagina e combina varias consultas ate o alvo, sem repetir estabelecimento."""
         seen: set = set()
         places: List[Dict[str, Any]] = []
+        # Uma frente por variacao do nicho. As frentes avancam em
+        # rodadas, uma pagina de cada vez: assim "drogaria" e "farmacia
+        # de manipulacao" entram na lista mesmo quando "farmacia" tem
+        # resultado de sobra. Antes a primeira consulta esgotava o alvo
+        # sozinha e os sinonimos nunca chegavam a ser usados.
+        frentes = [{"consulta": q, "token": None, "fim": False} for q in queries]
 
         async with httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=8.0)) as client:
-            for query in queries:
-                token: Optional[str] = None
-                for _ in range(MAX_PAGES_PER_QUERY):
+            for rodada in range(MAX_PAGES_PER_QUERY):
+                if len(places) >= target or all(f["fim"] for f in frentes):
+                    break
+                for frente in frentes:
+                    if frente["fim"] or len(places) >= target:
+                        continue
+                    if rodada and not frente["token"]:
+                        frente["fim"] = True
+                        continue
                     try:
-                        data = await LeadsEngine._fetch_page(client, api_key, query, token)
+                        data = await LeadsEngine._pagina(
+                            client, api_key, frente["consulta"], frente["token"]
+                        )
                     except ValueError:
                         # Falhar na primeira consulta indica chave/quota: propaga.
                         # Nas seguintes, o que ja foi coletado ainda serve.
                         if not places:
                             raise
-                        break
+                        frente["fim"] = True
+                        continue
 
                     for place in data.get("places", []):
                         pid = place.get("id")
@@ -393,11 +506,8 @@ class LeadsEngine:
                         seen.add(pid)
                         places.append(place)
 
-                    token = data.get("nextPageToken")
-                    if not token or len(places) >= target:
-                        break
-                if len(places) >= target:
-                    break
+                    frente["token"] = data.get("nextPageToken")
+                    frente["fim"] = not frente["token"]
         return places
 
     @staticmethod
@@ -449,8 +559,28 @@ class LeadsEngine:
                 "&background=0D6EFD&color=fff&size=150"
             )
 
-        hours = place.get("regularOpeningHours") or {}
-        weekday = hours.get("weekdayDescriptions") or []
+        regular = place.get("regularOpeningHours") or {}
+        agora = place.get("currentOpeningHours") or {}
+        weekday = regular.get("weekdayDescriptions") or agora.get("weekdayDescriptions") or []
+        aberto = agora.get("openNow")
+        if aberto is None:
+            aberto = regular.get("openNow")
+
+        # Endereco destrinchado: o bairro e o gancho mais forte depois da
+        # nota ("a unica padaria da Pituba sem site"), e o formattedAddress
+        # sozinho nao entrega isso.
+        bairro = extract_component(
+            place, ("sublocality_level_1", "sublocality", "neighborhood")
+        )
+        cep = extract_component(place, ("postal_code",))
+        rua = extract_component(place, ("route",))
+        numero = extract_component(place, ("street_number",))
+
+        simbolo_preco, nivel_preco = faixa_de_preco(place.get("priceLevel") or "")
+        avaliacoes = ler_avaliacoes(place.get("reviews") or [])
+        descricao_google = ((place.get("editorialSummary") or {}).get("text") or "").strip()
+        tipos = [t.replace("_", " ") for t in (place.get("types") or [])][:8]
+        coordenada = place.get("location") or {}
 
         return LeadItem(
             id=place.get("id", ""),
@@ -471,6 +601,23 @@ class LeadsEngine:
             maps_url=place.get("googleMapsUri"),
             business_status=place.get("businessStatus"),
             opening_hours="; ".join(weekday[:3]) if weekday else None,
+            opening_hours_week=weekday[:7],
+            open_now=aberto,
+            neighborhood=bairro or None,
+            postal_code=cep or None,
+            street=(f"{rua}, {numero}" if rua and numero else rua) or None,
+            short_address=place.get("shortFormattedAddress") or None,
+            latitude=coordenada.get("latitude"),
+            longitude=coordenada.get("longitude"),
+            place_types=tipos,
+            google_description=descricao_google or None,
+            price_level=simbolo_preco or None,
+            price_tier=nivel_preco,
+            reviews_sample=avaliacoes["amostra"],
+            review_highlight=avaliacoes["destaque"] or None,
+            praise_count=avaliacoes["elogios"],
+            complaint_count=avaliacoes["reclamacoes"],
+            site_status=site_kind,
             verified=True,
             quality_score=0,
             opportunityScore=0,
@@ -556,8 +703,33 @@ class LeadsEngine:
                 if not lead.phone:
                     lead.phone = wa_numbers[0]
 
+            # Telefones achados no proprio site. Ficam separados do
+            # principal: servem quando o numero do Google esta velho, e
+            # mostram quando o negocio tem fixo e celular.
+            do_site = [t for t in (data.get("phones") or []) if t != lead.phone]
+            lead.phones_extra = do_site[:3]
+            if not lead.phone and do_site:
+                lead.phone = do_site[0]
+                lead.whatsapp = len(do_site[0]) == 13 and do_site[0][4] == "9"
+
             if data.get("bio"):
                 lead.bio = data["bio"][:400]
+
+            # Diagnostico do site. So existe quando havia site para abrir:
+            # para quem nao tem, a oportunidade ja esta em missingDigitalAssets.
+            sinais = data.get("site") or {}
+            if sinais:
+                lead.site_quality = data.get("site_quality")
+                lead.site_issues = (data.get("site_issues") or [])[:4]
+                lead.site_platform = sinais.get("plataforma") or None
+                lead.site_responsive = sinais.get("responsivo")
+                lead.site_https = sinais.get("https")
+                lead.site_load_ms = sinais.get("tempo_ms") or None
+                lead.site_has_booking = sinais.get("tem_agendamento")
+                lead.site_has_form = sinais.get("tem_formulario")
+                lead.site_title = sinais.get("titulo") or None
+                if not lead.bio and sinais.get("descricao"):
+                    lead.bio = sinais["descricao"]
 
             opportunity, quality, missing = score_lead(
                 has_own_website=bool(lead.website),
@@ -568,6 +740,8 @@ class LeadsEngine:
                 has_whatsapp=bool(lead.whatsapp),
                 rating=lead.rating or 0.0,
                 rating_count=lead.rating_count or 0,
+                site_quality=lead.site_quality,
+                tem_avaliacao_com_texto=bool(lead.review_highlight or lead.reviews_sample),
             )
             lead.opportunityScore = opportunity
             lead.quality_score = quality
@@ -575,10 +749,33 @@ class LeadsEngine:
             lead.contactability = sum([
                 bool(lead.phone), bool(lead.whatsapp), bool(lead.email), bool(lead.socials.instagram)
             ])
-            lead.ai_summary = build_summary(
-                lead.company, lead.city, lead.rating or 0.0, lead.rating_count or 0,
-                missing, lead.bio or ""
-            )
+
+            # O resumo anterior repetia a linha de cima do card. O que
+            # falta a quem abre a lista nao e o dado, e a leitura dele:
+            # por que este lead vale o contato e por onde comecar.
+            retrato = {
+                "company": lead.company,
+                "city": lead.city,
+                "neighborhood": lead.neighborhood,
+                "rating": lead.rating,
+                "rating_count": lead.rating_count,
+                "review_highlight": lead.review_highlight,
+                "site_status": lead.site_status,
+                "site_issues": lead.site_issues,
+                "site_platform": lead.site_platform,
+                "site_quality": lead.site_quality,
+                "opening_hours": lead.opening_hours,
+                "price_level": lead.price_level,
+                "google_description": lead.google_description,
+                "whatsapp": lead.whatsapp,
+                "email": lead.email,
+                "phone": lead.phone,
+                "socials": lead.socials.model_dump(),
+            }
+            lead.hooks = montar_ganchos(retrato)
+            lead.diagnosis = montar_diagnostico(retrato)
+            lead.best_channel = melhor_canal(retrato)
+            lead.ai_summary = lead.diagnosis
 
         # Primeiro quem da para contatar, depois quem mais precisa do servico
         leads.sort(

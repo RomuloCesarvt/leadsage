@@ -16,6 +16,33 @@ import {
   Globe
 } from 'lucide-react';
 
+const SITUACAO: Record<string, string> = {
+  own: 'Tem site próprio',
+  social: 'O link do perfil leva a uma rede social, não a um site',
+  aggregator: 'Usa um agregador de links no lugar de site',
+  whatsapp: 'O link do perfil vai direto para o WhatsApp',
+  none: 'Não tem site nenhum no perfil do Google',
+};
+
+const CANAIS: Record<string, string> = {
+  whatsapp: 'WhatsApp',
+  email: 'e-mail',
+  instagram_direct: 'Instagram',
+  linkedin_msg: 'LinkedIn',
+};
+
+const Etiqueta: React.FC<{ children: React.ReactNode; cor?: 'zinc' | 'emerald' }> = ({ children, cor = 'zinc' }) => (
+  <span
+    className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${
+      cor === 'emerald'
+        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+        : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+    }`}
+  >
+    {children}
+  </span>
+);
+
 export const LeadProfilePanel: React.FC = () => {
   const { selectedProfileLead, setSelectedProfileLead, setSelectedLeadForMessage } = useApp() as any;
 
@@ -147,69 +174,155 @@ export const LeadProfilePanel: React.FC = () => {
           <div className="space-y-3 pt-6 border-t border-zinc-900">
             <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-2">
               <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              Resumo IA
+              Leitura comercial
             </h3>
             <p className="text-sm text-zinc-300 leading-relaxed font-light">
-              {lead.ai_summary || lead.bio || "Resumo não disponível."}
+              {lead.diagnosis || lead.ai_summary || lead.bio || "Sem leitura disponível para este lead."}
             </p>
           </div>
 
-          {/* Match Criteria */}
-          <div className="space-y-4 pt-6 border-t border-zinc-900">
-            <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-2">
-              <Target className="w-3.5 h-3.5 text-emerald-400" />
-              Julgamento de Correspondência
-            </h3>
-            
-            <div className="space-y-4">
-              <div className="bg-zinc-900/40 border border-zinc-800/60 rounded-xl p-3">
-                <div className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="text-xs font-semibold text-zinc-200">Intenção (Intent)</h4>
-                    <p className="text-[13px] text-zinc-400 mt-1 leading-relaxed">
-                      {lead.match_intent || "O perfil demonstra interesse direto ou indireto relacionado à sua oferta."}
-                    </p>
-                  </div>
-                </div>
-              </div>
+          {/* Os ganchos sao fatos verificados, prontos para abrir a
+              conversa. Substituem os tres cartoes de "Julgamento de
+              Correspondencia", que mostravam texto de preenchimento
+              ("O perfil demonstra interesse direto ou indireto...")
+              porque os campos por tras deles nunca foram preenchidos
+              por busca nenhuma. */}
+          {!!(lead.hooks || []).length && (
+            <div className="space-y-3 pt-6 border-t border-zinc-900">
+              <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-2">
+                <Target className="w-3.5 h-3.5 text-emerald-400" />
+                Por onde abrir a conversa
+              </h3>
+              <ul className="space-y-2">
+                {(lead.hooks || []).map((g: string, i: number) => (
+                  <li
+                    key={i}
+                    className="bg-zinc-900/40 border border-zinc-800/60 rounded-xl p-3 text-[13px] text-zinc-300 leading-relaxed flex gap-2.5"
+                  >
+                    <span className="text-emerald-500 font-bold shrink-0">{i + 1}.</span>
+                    <span>{g}</span>
+                  </li>
+                ))}
+              </ul>
+              {lead.best_channel && (
+                <p className="text-[11px] text-zinc-500">
+                  Canal com mais chance de ser lido: <strong className="text-zinc-300">{CANAIS[lead.best_channel] || lead.best_channel}</strong>
+                </p>
+              )}
+            </div>
+          )}
 
-              <div className="bg-zinc-900/40 border border-zinc-800/60 rounded-xl p-3">
-                <div className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="text-xs font-semibold text-zinc-200">Localização</h4>
-                    <p className="text-[13px] text-zinc-400 mt-1 leading-relaxed">
-                      {lead.match_location || `Localizado em ${lead.location}, condizente com a pesquisa.`}
-                    </p>
-                  </div>
-                </div>
-              </div>
+          {/* Estado do site atual. E o que separa "voce precisa de um
+              site" de "seu site nao abre no celular" — a segunda frase o
+              dono confere em dez segundos. */}
+          {(lead.site_status || lead.site_quality !== undefined) && (
+            <div className="space-y-3 pt-6 border-t border-zinc-900">
+              <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-2">
+                <Globe className="w-3.5 h-3.5 text-blue-400" />
+                Presença digital hoje
+              </h3>
 
-              <div className="bg-zinc-900/40 border border-zinc-800/60 rounded-xl p-3">
-                <div className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="text-xs font-semibold text-zinc-200">Perfil de Negócio (Business)</h4>
-                    <p className="text-[13px] text-zinc-400 mt-1 leading-relaxed">
-                      {lead.match_business || `Empresa alvo: ${lead.company}.`}
-                    </p>
-                  </div>
+              <div className="bg-zinc-900/40 border border-zinc-800/60 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[13px] text-zinc-300">{SITUACAO[lead.site_status] || 'Situação desconhecida'}</span>
+                  {typeof lead.site_quality === 'number' && (
+                    <span
+                      className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                        lead.site_quality >= 75 ? 'bg-emerald-500/15 text-emerald-400'
+                        : lead.site_quality >= 45 ? 'bg-amber-500/15 text-amber-400'
+                        : 'bg-red-500/15 text-red-400'}`}
+                    >
+                      {lead.site_quality}/100
+                    </span>
+                  )}
+                </div>
+
+                {!!(lead.site_issues || []).length && (
+                  <ul className="space-y-1 pt-1">
+                    {(lead.site_issues || []).map((x: string, i: number) => (
+                      <li key={i} className="text-[12px] text-zinc-400 flex gap-2">
+                        <span className="text-red-400">•</span><span>{x}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {lead.site_platform && <Etiqueta>{lead.site_platform}</Etiqueta>}
+                  {lead.site_responsive === false && <Etiqueta>não é responsivo</Etiqueta>}
+                  {lead.site_https === false && <Etiqueta>sem HTTPS</Etiqueta>}
+                  {!!lead.site_load_ms && <Etiqueta>{(lead.site_load_ms / 1000).toFixed(1)}s para abrir</Etiqueta>}
+                  {lead.site_has_booking && <Etiqueta>tem agendamento</Etiqueta>}
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Experience */}
-          <div className="space-y-3 pt-6 border-t border-zinc-900 pb-4">
-            <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-2">
-              <Briefcase className="w-3.5 h-3.5 text-blue-400" />
-              Experiência Profissional
-            </h3>
-            <p className="text-sm text-zinc-300 leading-relaxed font-light">
-              {lead.experience || "Informações de experiência profissional extraídas do perfil."}
-            </p>
-          </div>
+          {/* O que o Google sabe do negocio. Estava tudo na resposta da
+              API e nada aparecia na tela. */}
+          {(lead.google_description || lead.price_level || lead.opening_hours_week?.length
+            || lead.open_now !== undefined || lead.place_types?.length) && (
+            <div className="space-y-3 pt-6 border-t border-zinc-900">
+              <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-2">
+                <Building2 className="w-3.5 h-3.5 text-amber-400" />
+                O que o Google mostra
+              </h3>
+
+              {lead.google_description && (
+                <p className="text-[13px] text-zinc-300 leading-relaxed">{lead.google_description}</p>
+              )}
+
+              <div className="flex flex-wrap gap-1.5">
+                {lead.open_now === true && <Etiqueta cor="emerald">aberto agora</Etiqueta>}
+                {lead.open_now === false && <Etiqueta>fechado agora</Etiqueta>}
+                {lead.price_level && <Etiqueta>faixa {lead.price_level}</Etiqueta>}
+                {lead.neighborhood && <Etiqueta>{lead.neighborhood}</Etiqueta>}
+                {(lead.place_types || []).slice(0, 3).map((t: string) => <Etiqueta key={t}>{t}</Etiqueta>)}
+              </div>
+
+              {!!(lead.opening_hours_week || []).length && (
+                <details className="text-[12px] text-zinc-400">
+                  <summary className="cursor-pointer text-zinc-500 hover:text-zinc-300">Horário da semana</summary>
+                  <ul className="mt-2 space-y-0.5">
+                    {(lead.opening_hours_week || []).map((h: string, i: number) => <li key={i}>{h}</li>)}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
+
+          {/* Avaliacoes com texto: e delas que sai a frase que faz o dono
+              responder ("um cliente seu escreveu isto"). */}
+          {!!(lead.reviews_sample || []).length && (
+            <div className="space-y-3 pt-6 border-t border-zinc-900">
+              <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
+                O que os clientes escreveram
+              </h3>
+              {(lead.reviews_sample || []).map((r: any, i: number) => (
+                <blockquote key={i} className="bg-zinc-900/40 border border-zinc-800/60 rounded-xl p-3">
+                  <p className="text-[13px] text-zinc-300 italic leading-relaxed">“{r.text}”</p>
+                  <footer className="text-[11px] text-zinc-500 mt-1.5">
+                    {r.rating ? `${r.rating}★` : ''} {r.when || ''}
+                  </footer>
+                </blockquote>
+              ))}
+            </div>
+          )}
+
+          {/* Contatos extras achados no site do proprio lead. */}
+          {(!!(lead.all_emails || []).length || !!(lead.phones_extra || []).length) && (
+            <div className="space-y-2 pt-6 border-t border-zinc-900 pb-4">
+              <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-2">
+                <Briefcase className="w-3.5 h-3.5 text-blue-400" />
+                Outros contatos encontrados
+              </h3>
+              <div className="flex flex-wrap gap-1.5">
+                {(lead.all_emails || []).map((e: string) => <Etiqueta key={e}>{e}</Etiqueta>)}
+                {(lead.phones_extra || []).map((t: string) => <Etiqueta key={t}>+{t}</Etiqueta>)}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Fixed Footer CTAs */}

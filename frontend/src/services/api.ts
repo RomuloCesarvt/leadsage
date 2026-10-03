@@ -12,7 +12,10 @@ import type {
   IntegrationSettings,
   DocumentItem,
   CreditPackage,
-  PlanoAtual
+  PlanoAtual,
+  SiteCopyResponse,
+  DocumentAIRequest,
+  DocumentAIResponse
 } from '../types';
 import { auth } from '../lib/firebase';
 
@@ -108,6 +111,34 @@ export const api = {
 
   async dispatchMessage(req: DispatchRequest): Promise<DispatchResponse> {
     return await fetchWithToken('/dispatch', {
+      method: 'POST',
+      body: JSON.stringify(req)
+    });
+  },
+
+  /**
+   * Textos do site + a identidade visual daquele negocio.
+   *
+   * Antes o construtor pedia isso ao endpoint de abordagem, embutindo
+   * "responda um JSON" dentro do prompt de e-mail e garimpando as
+   * chaves no meio do texto devolvido.
+   */
+  async generateSiteCopy(req: {
+    lead?: any;
+    empresa?: string;
+    categoria?: string;
+    cidade?: string;
+    servico_do_usuario?: string;
+  }): Promise<SiteCopyResponse> {
+    return await fetchWithToken('/generate-site-copy', {
+      method: 'POST',
+      body: JSON.stringify(req)
+    });
+  },
+
+  /** Proposta ou contrato redigido para aquele lead, nao um modelo preenchido. */
+  async generateDocument(req: DocumentAIRequest): Promise<DocumentAIResponse> {
+    return await fetchWithToken('/generate-document', {
       method: 'POST',
       body: JSON.stringify(req)
     });

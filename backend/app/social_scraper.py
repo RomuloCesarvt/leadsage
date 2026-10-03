@@ -1,10 +1,14 @@
 import asyncio
 import re
+import time
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
+
+from app.lead_intel import analisar_site, qualidade_do_site
 
 # Enderecos que aparecem em sites mas nunca sao contato real do negocio
 EMAIL_BLOCKLIST = (
@@ -51,6 +55,14 @@ BROWSER_HEADERS = {
 CONTACT_LOCALS = ("contato", "contact", "comercial", "vendas", "atendimento", "faleconosco", "sac")
 
 
+# Telefone escrito na pagina: "(11) 3456-7890", "11 98765-4321",
+# "+55 11 98765 4321". Fora desses formatos o risco de capturar CNPJ,
+# CEP ou codigo de produto passa a ser maior que o ganho.
+TELEFONE_RE = re.compile(
+    r"(?:\+?55[\s.-]?)?(?:\(?\d{2}\)?[\s.-]?)?(?:9[\s.-]?)?\d{4}[\s.-]?\d{4}"
+)
+
+
 def empty_result() -> Dict[str, Any]:
     return {
         "instagram": None,
@@ -61,8 +73,35 @@ def empty_result() -> Dict[str, Any]:
         "youtube": None,
         "emails": [],
         "whatsapp_numbers": [],
+        "phones": [],
         "bio": "",
+        # Diagnostico do site: o que ele tem, o que falta e quanto vale.
+        # E o que transforma "faca um site" em "seu site nao abre no
+        # celular", que e uma frase que o dono confere em dez segundos.
+        "site": {},
+        "site_quality": None,
+        "site_issues": [],
     }
+
+
+def limpar_telefone(bruto: str) -> Optional[str]:
+    """Normaliza para digitos e recusa o que nao forma telefone brasileiro."""
+    digitos = re.sub(r"\D", "", bruto or "")
+    if digitos.startswith("55") and len(digitos) in (12, 13):
+        digitos = digitos[2:]
+    if len(digitos) == 8 or len(digitos) == 9:
+        return None  # sem DDD nao da para discar
+    if len(digitos) not in (10, 11):
+        return None
+    ddd = int(digitos[:2])
+    if not 11 <= ddd <= 99:
+        return None
+    if len(digitos) == 11 and digitos[2] != "9":
+        return None
+    # 00000000, 11111111: mascara de formulario, nao telefone
+    if len(set(digitos[2:])) <= 2:
+        return None
+    return "55" + digitos
 
 
 def normalize_url(url: str) -> str:
@@ -116,6 +155,13 @@ def score_email(email: str, site_domain: str) -> int:
     return score
 
 
+def texto_visivel(soup: BeautifulSoup) -> str:
+    """Texto da pagina sem script/style: evita casar telefone dentro de JS."""
+    for tag in soup(["script", "style", "noscript"]):
+        tag.decompose()
+    return soup.get_text(" ", strip=True)[:60_000]
+
+
 class SocialScraper:
     """Enriquecimento por scraping real do site do lead.
 
@@ -140,6 +186,14 @@ class SocialScraper:
             number = re.sub(r"\D", "", match)
             if 10 <= len(number) <= 15 and number not in result["whatsapp_numbers"]:
                 result["whatsapp_numbers"].append(number)
+
+        # Telefone do rodape e da pagina de contato. Vale mais do que o
+        # do Google quando o negocio mudou de numero e nao atualizou o
+        # perfil — acontece o tempo todo com quem trocou para celular.
+        for bruto in TELEFONE_RE.findall(texto_visivel(soup))[:12]:
+            numero = limpar_telefone(bruto)
+            if numero and numero not in result["phones"]:
+                result["phones"].append(numero)
 
         for a_tag in soup.find_all("a", href=True):
             href = a_tag["href"].strip()
@@ -189,17 +243,38 @@ class SocialScraper:
                 follow_redirects=True,
                 headers=BROWSER_HEADERS,
             ) as client:
+                inicio = time.monotonic()
                 try:
                     resp = await client.get(url)
                 except Exception:
+                    # O site consta no Google mas nao responde. Isso e um
+                    # achado, nao um vazio: o lead esta pagando dominio
+                    # para mandar o cliente a uma pagina de erro.
+                    result["site"] = analisar_site("", url, 0, 0)
+                    result["site_quality"], result["site_issues"] = qualidade_do_site(
+                        result["site"], datetime.now().year
+                    )
                     return result
-                if resp.status_code != 200:
-                    return result
-                if "text/html" not in resp.headers.get("content-type", ""):
+                if resp.status_code != 200 or "text/html" not in resp.headers.get("content-type", ""):
+                    result["site"] = analisar_site("", str(resp.url), resp.status_code, 0)
+                    result["site_quality"], result["site_issues"] = qualidade_do_site(
+                        result["site"], datetime.now().year
+                    )
                     return result
 
                 base = str(resp.url)
                 contact_links = SocialScraper.parse_page(resp.text, base, result)
+
+                # Diagnostico do site: e daqui que sai a frase que abre a
+                # conversa. "Voce precisa de um site" nao vende para quem
+                # ja tem um; "seu site nao abre no celular" vende.
+                sinais = analisar_site(
+                    resp.text, base, resp.status_code, (time.monotonic() - inicio) * 1000
+                )
+                nota, problemas = qualidade_do_site(sinais, datetime.now().year)
+                result["site"] = sinais
+                result["site_quality"] = nota
+                result["site_issues"] = problemas
 
                 # Ja temos o essencial: nao gasta uma segunda requisicao
                 if result["emails"] and result["instagram"]:
@@ -254,7 +329,9 @@ class SocialScraper:
 
         scraped = await SocialScraper.scrape_website(website)
         for key, value in scraped.items():
-            if key in ("emails", "whatsapp_numbers"):
+            if key in ("emails", "whatsapp_numbers", "phones", "site", "site_issues"):
+                data[key] = value
+            elif key == "site_quality":
                 data[key] = value
             elif value and not data.get(key):
                 data[key] = value

@@ -47,7 +47,41 @@ export interface LeadItem {
   opening_hours?: string;
   // Enriquecimento real (nunca inventado)
   all_emails?: string[];
+  phones_extra?: string[];
   contactability?: number;
+  // Camada rica do Google. Chega vazia quando a conta nao libera os
+  // campos — a busca continua funcionando sem eles.
+  opening_hours_week?: string[];
+  open_now?: boolean;
+  neighborhood?: string;
+  postal_code?: string;
+  street?: string;
+  short_address?: string;
+  latitude?: number;
+  longitude?: number;
+  place_types?: string[];
+  google_description?: string;
+  price_level?: string;
+  price_tier?: number;
+  reviews_sample?: { rating?: number; text?: string; when?: string }[];
+  review_highlight?: string;
+  praise_count?: number;
+  complaint_count?: number;
+  // Diagnostico do site atual do lead
+  site_status?: 'own' | 'social' | 'aggregator' | 'whatsapp' | 'none';
+  site_quality?: number;
+  site_issues?: string[];
+  site_platform?: string;
+  site_responsive?: boolean;
+  site_https?: boolean;
+  site_load_ms?: number;
+  site_has_booking?: boolean;
+  site_has_form?: boolean;
+  site_title?: string;
+  // Leitura comercial: ganchos verificados e o porque do lead valer o contato
+  hooks?: string[];
+  diagnosis?: string;
+  best_channel?: string;
 }
 
 export interface LeadSearchRequest {
@@ -71,10 +105,18 @@ export interface LeadSearchResponse {
 
 export interface PitchGenerationRequest {
   lead: LeadItem;
+  /** Muda o tamanho e o tom: WhatsApp no celular nao comporta um e-mail. */
+  channel?: string;
   tone: string;
   custom_instructions?: string;
   sender_name?: string;
   user_product?: string;
+}
+
+export interface FollowUp {
+  quando: string;
+  objetivo?: string;
+  texto: string;
 }
 
 export interface PitchGenerationResponse {
@@ -83,6 +125,58 @@ export interface PitchGenerationResponse {
   body: string;
   tone: string;
   placeholders: Record<string, string>;
+  channel?: string;
+  /** Qual fato abriu a mensagem e qual perda concreta ela ataca. */
+  hook?: string;
+  reasoning?: string;
+  /** A cadencia que aquece: dois seguimentos ja escritos. */
+  follow_ups?: FollowUp[];
+  /** O que a revisao encontrou e o modelo nao corrigiu. */
+  warnings?: string[];
+}
+
+export interface SiteIdentity {
+  familia?: string;
+  primaria?: string;
+  destaque?: string;
+  tipografia?: string;
+  tipografia_nome?: string;
+  cantos?: string;
+  cantos_nome?: string;
+  layout?: string;
+  motivo?: string;
+}
+
+export interface SiteCopyResponse {
+  categoria: string;
+  slogan: string;
+  sobre: string;
+  servicos: { titulo: string; descricao: string }[];
+  diferenciais: string[];
+  cta: string;
+  seo_titulo: string;
+  seo_descricao: string;
+  identidade: SiteIdentity;
+}
+
+export interface DocumentAIRequest {
+  kind: 'proposta' | 'contrato';
+  lead_id?: string;
+  servico?: string;
+  escopo?: string;
+  valor?: string;
+  condicoes?: string;
+  prazo?: string;
+  observacoes?: string;
+}
+
+export interface DocumentAIResponse {
+  kind: string;
+  title: string;
+  content: string;
+  resumo?: string;
+  campos_faltando?: string[];
+  aviso?: string;
 }
 
 export interface DispatchRequest {

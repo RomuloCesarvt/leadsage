@@ -236,3 +236,176 @@ def regras_do_canal(canal: str) -> Dict[str, Any]:
 
 def lista_de_cliches() -> str:
     return ", ".join(f'"{c}"' for c in CLICHES)
+
+
+# ---------------------------------------------------------------- tom de voz
+
+# "Tom: Consultivo" nao ensina nada ao modelo — e um rotulo. O que muda
+# de verdade um texto e a instrucao concreta: que verbo usar, como abrir,
+# o que nao fazer. Cada tom abaixo e uma direcao de escrita, nao um
+# adjetivo.
+TONS: Dict[str, Dict[str, str]] = {
+    "Consultivo": {
+        "voz": "de quem entende do negocio do outro e fala de igual para igual",
+        "postura": "aponta um fato, explica a consequencia em dinheiro e propoe um passo pequeno",
+        "abertura": "comece pelo dado que voce observou, nao por voce nem pela sua empresa",
+        "evite": "vender o servico antes de nomear o problema; adjetivo sobre si mesmo",
+    },
+    "Amigável": {
+        "voz": "de vizinho que conhece o bairro e resolveu escrever",
+        "postura": "informal, frases curtas, sem jargao, como quem manda mensagem no celular",
+        "abertura": "cite algo local e concreto: o bairro, a fila, o horario, o que os clientes falam",
+        "evite": "intimidade falsa, 'tudo bem?' protocolar, exclamacao em toda frase",
+    },
+    "Direto": {
+        "voz": "de quem respeita o tempo do outro",
+        "postura": "duas ou tres frases; o problema, a proposta, a pergunta. Nada mais",
+        "abertura": "va direto ao fato, sem preambulo e sem se apresentar antes da terceira linha",
+        "evite": "contexto longo, historico da sua empresa, qualquer frase que nao mude a decisao",
+    },
+    "Autoridade": {
+        "voz": "de especialista que ja viu esse cenario dezenas de vezes no mesmo setor",
+        "postura": "afirma com seguranca a partir de um padrao de mercado, sem arrogancia",
+        "abertura": "abra com o padrao do setor e mostre onde esse negocio esta dentro dele",
+        "evite": "soar superior, dar licao de moral, listar credenciais sem ligacao com o caso",
+    },
+    "Promocional": {
+        "voz": "de quem tem uma condicao real e por tempo definido",
+        "postura": "a oferta aparece cedo, com o limite claro, e a pergunta e sobre aceitar ou nao",
+        "abertura": "diga rapidamente o que esta oferecendo e por que agora",
+        "evite": "urgencia inventada, desconto sem motivo, promessa de resultado numerico",
+    },
+}
+
+
+def regras_do_tom(tom: str) -> Dict[str, str]:
+    return TONS.get((tom or "").strip(), TONS["Consultivo"])
+
+
+# ------------------------------------------------------------- aquecimento
+
+# Um contato nao vira cliente na primeira mensagem, e a maioria das
+# respostas vem do segundo ou do terceiro toque. O erro classico e
+# repetir o mesmo pedido mais alto ("so passando para ver se viu"), que
+# soa cobranca. Cada toque aqui entrega algo novo e pede menos que o
+# anterior.
+CADENCIA = (
+    {
+        "toque": 1,
+        "quando": "agora",
+        "objetivo": "ser lido e reconhecido: provar que voce olhou aquele negocio",
+        "pedido": "uma pergunta que se responde com uma palavra",
+    },
+    {
+        "toque": 2,
+        "quando": "3 dias depois, se nao houve resposta",
+        "objetivo": "entregar valor sem cobrar resposta: um dado, uma comparacao, uma ideia aplicavel",
+        "pedido": "nenhum pedido novo — no maximo 'faz sentido?'",
+    },
+    {
+        "toque": 3,
+        "quando": "7 dias depois do segundo, se ainda nao houve resposta",
+        "objetivo": "fechar o ciclo com elegancia e deixar a porta aberta",
+        "pedido": "permissao para parar de escrever, o que costuma provocar a resposta",
+    },
+)
+
+
+def plano_de_aquecimento() -> str:
+    """O texto da cadencia, pronto para entrar no prompt."""
+    linhas = []
+    for passo in CADENCIA:
+        linhas.append(
+            f"Toque {passo['toque']} ({passo['quando']}): {passo['objetivo']}. "
+            f"Pedido: {passo['pedido']}."
+        )
+    return "\n".join(linhas)
+
+
+# ----------------------------------------------------------- controle final
+
+# O modelo obedece "nao use cliche" na maior parte das vezes, nao em
+# todas. Como o texto vai para um desconhecido em nome do usuario, o que
+# escapa precisa ser pego antes de chegar na tela.
+_PERGUNTA = re.compile(r"\?")
+_EMOJI = re.compile(
+    "[" + "\U0001F300-\U0001FAFF" + "\U00002600-\U000027BF" + "\U0001F1E6-\U0001F1FF" + "]"
+)
+# Restos de template que denunciam automacao: [NOME], {empresa}, XXX
+_PLACEHOLDER = re.compile(r"\[[A-Za-zÀ-ú _/]{2,30}\]|\{[a-z_]{2,20}\}|\bX{3,}\b")
+
+# Numero que o modelo nao tinha como saber. A invencao aparece quase
+# sempre em uma destas tres formas: percentual ("aumenta 30% as
+# vendas"), dinheiro ("voce perde R$ 3.000 por mes") e volume de
+# clientes ("a padaria vizinha recebe 15 encomendas"). Nota e quantidade
+# de avaliacoes vem dos dados reais do Google e nao casam aqui.
+_PROMESSA_NUMERICA = re.compile(
+    r"\d+\s?%"
+    r"|R\$\s?\d"
+    r"|\b\d+\s+(?:clientes|encomendas|vendas|pedidos|pacientes|agendamentos|"
+    r"leads|contratos|matr[ií]culas|or[çc]amentos)\b",
+    re.I,
+)
+
+LIMITE_DE_PALAVRAS = {
+    "email": 150,
+    "whatsapp": 75,
+    "whatsapp_api": 75,
+    "instagram_direct": 60,
+    "linkedin_msg": 100,
+    "webhook": 150,
+}
+
+
+def contar_palavras(texto: str) -> int:
+    return len([p for p in re.split(r"\s+", (texto or "").strip()) if p])
+
+
+def revisar_copy(texto: str, canal: str = "email") -> List[str]:
+    """Devolve os problemas encontrados no texto gerado.
+
+    Lista vazia = pode ir para a tela. Com problemas, quem chamou manda o
+    modelo reescrever citando exatamente estes itens — reescrever com o
+    defeito nomeado funciona; reescrever "melhor" nao.
+    """
+    problemas: List[str] = []
+    limpo = (texto or "").strip()
+
+    if not limpo:
+        return ["a mensagem veio vazia"]
+
+    baixo = strip_accents(limpo.lower())
+    for cliche in CLICHES:
+        if strip_accents(cliche.lower()) in baixo:
+            problemas.append(f'contém o clichê "{cliche}"')
+
+    limite = LIMITE_DE_PALAVRAS.get(canal or "email", 150)
+    palavras = contar_palavras(limpo)
+    if palavras > limite:
+        problemas.append(f"tem {palavras} palavras e o limite deste canal é {limite}")
+
+    perguntas = len(_PERGUNTA.findall(limpo))
+    if perguntas > 1:
+        problemas.append(f"faz {perguntas} perguntas; deve fazer uma só")
+    if perguntas == 0:
+        problemas.append("não termina em pergunta, então não convida a responder")
+
+    if _PLACEHOLDER.search(limpo):
+        problemas.append("sobrou um campo de modelo por preencher, como [NOME] ou {empresa}")
+
+    emojis = _EMOJI.findall(limpo)
+    if canal in ("email", "linkedin_msg", "webhook") and emojis:
+        problemas.append("usa emoji num canal onde isso passa impressão de disparo em massa")
+    elif len(emojis) > 1:
+        problemas.append("usa mais de um emoji")
+
+    if "http://" in limpo or "https://" in limpo:
+        problemas.append("inclui link no primeiro contato, o que derruba a entrega e a resposta")
+
+    inventado = _PROMESSA_NUMERICA.search(limpo)
+    if inventado:
+        problemas.append(
+            f'afirma o número "{inventado.group(0).strip()}", que não veio dos dados do lead'
+        )
+
+    return problemas

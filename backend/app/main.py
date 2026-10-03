@@ -20,10 +20,14 @@ from app.models import (
     CreditTopUpRequest, CheckoutRequest, UserProfile,
     DemoSiteRequest, DemoSiteResponse,
     SiteCreateRequest, SiteItem, IntegrationSettings,
-    DocumentCreateRequest, DocumentUpdateRequest, DocumentItem
+    DocumentCreateRequest, DocumentUpdateRequest, DocumentItem,
+    SiteCopyRequest, SiteCopyResponse, DocumentAIRequest, DocumentAIResponse,
 )
 from app.leads_engine import LeadsEngine
+from app.ai_client import AIIndisponivel
 from app.ai_generator import AIGenerator
+from app.ai_site import gerar_conteudo_de_site
+from app.ai_docs import gerar_documento
 from app.dispatcher import OutreachDispatcher, DispatchError
 from app.credit_system import check_and_deduct_credits, get_user_balance
 import httpx
@@ -237,49 +241,20 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
     if remaining_credits is None:
         remaining_credits = 9999
 
-    # Save to SQLite DB
+    # Grava o lead inteiro, campo a campo pelo nome da coluna.
+    #
+    # Antes cada campo era listado a mao na construcao do DBLead, e todo
+    # dado novo do Google (bairro, avaliacoes, diagnostico do site)
+    # chegava na resposta da API mas nunca no banco: quem abrisse o
+    # historico via o lead pela metade.
+    colunas = {c.name for c in DBLead.__table__.columns}
     for lead in leads:
-        db_lead = DBLead(
-            id=lead.id,
-            name=lead.name,
-            avatar=lead.avatar,
-            role=lead.role,
-            niche=lead.niche,
-            company=lead.company,
-            location=lead.location,
-            city=lead.city,
-            email=lead.email,
-            phone=lead.phone,
-            whatsapp=lead.whatsapp,
-            socials=lead.socials.model_dump() if lead.socials else None,
-            website=lead.website,
-            address=lead.address,
-            quality_score=lead.quality_score,
-            verified=lead.verified,
-            bio=lead.bio,
-            ai_summary=lead.ai_summary,
-            match_intent=lead.match_intent,
-            match_location=lead.match_location,
-            match_business=lead.match_business,
-            experience=lead.experience,
-            opportunityScore=lead.opportunityScore,
-            missingDigitalAssets=lead.missingDigitalAssets,
-            outreach_status=lead.outreach_status,
-            last_contacted_at=lead.last_contacted_at,
-            last_message=lead.last_message,
-            match_category=lead.match_category,
-            pipeline_stage=lead.pipeline_stage,
-            rating=lead.rating,
-            rating_count=lead.rating_count,
-            maps_url=lead.maps_url,
-            business_status=lead.business_status,
-            opening_hours=lead.opening_hours,
-            all_emails=lead.all_emails,
-            contactability=lead.contactability,
-            owner_uid=uid,
-            search_id=search_id,
-        )
-        await db.merge(db_lead)
+        dados = lead.model_dump()
+        dados["socials"] = lead.socials.model_dump() if lead.socials else None
+        registro = {k: v for k, v in dados.items() if k in colunas}
+        registro["owner_uid"] = uid
+        registro["search_id"] = search_id
+        await db.merge(DBLead(**registro))
 
     db_history = DBSearchHistory(
         id=search_id,
@@ -308,14 +283,94 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
 
 @app.post("/api/generate-pitch", response_model=PitchGenerationResponse)
 async def generate_pitch(request: Request, req: PitchGenerationRequest, user: dict = Depends(get_current_user)):
+    """Escreve a abordagem e a cadencia de aquecimento.
+
+    Uma falha da IA agora e 503, nao 200. Antes a excecao virava o corpo
+    da mensagem: o usuario recebia "Houve um erro ao processar com a IA:
+    404" dentro do campo de texto, com o botao de disparar ligado.
+    """
     await exigir_recurso(user, "ia_abordagem", "A IA de abordagem")
-    gemini_key = settings.GEMINI_API_KEY
-    return await AIGenerator.generate_pitch(req, api_key=gemini_key)
+    try:
+        return await AIGenerator.generate_pitch(req, api_key=settings.GEMINI_API_KEY)
+    except AIIndisponivel as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
 
 @app.post("/api/generate-demo-site", response_model=DemoSiteResponse)
 async def generate_demo_site(request: Request, req: DemoSiteRequest, user: dict = Depends(get_current_user)):
-    gemini_key = settings.GEMINI_API_KEY
-    return await AIGenerator.generate_demo_site(req, api_key=gemini_key)
+    try:
+        return await AIGenerator.generate_demo_site(req, api_key=settings.GEMINI_API_KEY)
+    except AIIndisponivel as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+@app.post("/api/generate-site-copy", response_model=SiteCopyResponse)
+async def gerar_texto_do_site(req: SiteCopyRequest, user: dict = Depends(get_current_user)):
+    """Conteudo do site + a identidade visual daquele negocio."""
+    await exigir_recurso(user, "ia_abordagem", "A escrita com IA")
+
+    perfil = await get_profile(user.get("uid"))
+    alvo = req.lead.model_dump() if req.lead else {}
+    # O construtor pode estar sendo usado sem lead nenhum (cliente que o
+    # usuario ja tem). Nesse caso o que veio dos campos da tela e tudo.
+    alvo["company"] = req.empresa or alvo.get("company") or alvo.get("name") or ""
+    alvo["role"] = req.categoria or alvo.get("role") or ""
+    alvo["niche"] = req.categoria or alvo.get("niche") or ""
+    alvo["city"] = req.cidade or alvo.get("city") or ""
+    if not alvo["company"].strip():
+        raise HTTPException(status_code=400, detail="Informe o nome da empresa antes de gerar os textos.")
+
+    try:
+        return await gerar_conteudo_de_site(
+            alvo,
+            settings.GEMINI_API_KEY,
+            req.servico_do_usuario or perfil.product_description or "",
+        )
+    except AIIndisponivel as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+@app.post("/api/generate-document", response_model=DocumentAIResponse)
+async def gerar_documento_com_ia(
+    req: DocumentAIRequest,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Redige a proposta ou o contrato a partir do lead e do briefing.
+
+    O documento sai no mesmo formato dos modelos de texto, entao o editor
+    continua reconhecendo os [CAMPOS] e o tema visual continua montando o
+    PDF com a marca do usuario.
+    """
+    if req.kind not in ("proposta", "contrato"):
+        raise HTTPException(status_code=400, detail="Tipo de documento inválido.")
+    await exigir_recurso(
+        user,
+        "propostas" if req.kind == "proposta" else "contratos",
+        "Gerar proposta com IA" if req.kind == "proposta" else "Gerar contrato com IA",
+    )
+
+    lead = None
+    if req.lead_id:
+        resultado = await db.execute(
+            select(DBLead).where(DBLead.id == req.lead_id, DBLead.owner_uid == user.get("uid"))
+        )
+        encontrado = resultado.scalar_one_or_none()
+        if encontrado:
+            lead = {
+                coluna.name: getattr(encontrado, coluna.name)
+                for coluna in DBLead.__table__.columns
+            }
+
+    perfil = await get_profile(user.get("uid"))
+    try:
+        return await gerar_documento(
+            req.kind, lead, perfil.model_dump(), req.model_dump(), settings.GEMINI_API_KEY
+        )
+    except AIIndisponivel as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/api/dispatch", response_model=DispatchResponse)
 async def dispatch_outreach(
@@ -588,6 +643,18 @@ async def publish_site(req: SiteCreateRequest, user: dict = Depends(get_current_
         raise HTTPException(status_code=400, detail=str(e))
 
 
+# Como o "site" do Google e traduzido no CSV. O campo websiteUri quase
+# nunca e site proprio: costuma ser Instagram, Linktree ou link de
+# WhatsApp, e essa diferenca e o que qualifica o lead.
+SITUACAO_DO_SITE = {
+    "own": "site proprio",
+    "social": "so rede social",
+    "aggregator": "so agregador (Linktree e afins)",
+    "whatsapp": "so link de WhatsApp",
+    "none": "sem site",
+}
+
+
 @app.get("/api/leads/export")
 async def exportar_leads(user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Exporta os leads do usuario em CSV.
@@ -600,10 +667,16 @@ async def exportar_leads(user: dict = Depends(get_current_user), db: AsyncSessio
     result = await db.execute(select(DBLead).where(DBLead.owner_uid == user.get("uid")))
     leads = result.scalars().all()
 
+    # A exportacao e o que o usuario leva para o CRM dele. Levar so o
+    # telefone e a nota desperdicava tudo que a busca ja descobriu.
     colunas = [
-        "Empresa", "Categoria", "Cidade", "Endereco", "Telefone", "WhatsApp",
-        "E-mail", "Site", "Instagram", "Facebook", "Nota", "Avaliacoes",
-        "Oportunidade", "Falta", "Google Maps",
+        "Empresa", "Categoria", "Tipos", "Cidade", "Bairro", "Endereco", "CEP",
+        "Latitude", "Longitude", "Telefone", "Outros telefones", "WhatsApp",
+        "E-mail", "Outros e-mails", "Site", "Situacao do site", "Nota do site",
+        "Problemas do site", "Plataforma do site", "Instagram", "Facebook",
+        "LinkedIn", "Nota", "Avaliacoes", "Destaque de avaliacao", "Faixa de preco",
+        "Horario", "Aberto agora", "Oportunidade", "Qualidade", "Falta",
+        "Melhor canal", "Diagnostico", "Google Maps", "Status do contato",
     ]
 
     def escapar(valor) -> str:
@@ -614,11 +687,18 @@ async def exportar_leads(user: dict = Depends(get_current_user), db: AsyncSessio
     for l in leads:
         redes = l.socials or {}
         linhas.append(",".join(escapar(v) for v in [
-            l.company, l.role, l.city, l.address, l.phone,
-            "sim" if l.whatsapp else "nao", l.email, l.website,
-            redes.get("instagram", ""), redes.get("facebook", ""),
-            l.rating, l.rating_count, l.opportunityScore,
-            "; ".join(l.missingDigitalAssets or []), l.maps_url,
+            l.company, l.role, "; ".join(l.place_types or []), l.city, l.neighborhood,
+            l.address, l.postal_code, l.latitude, l.longitude, l.phone,
+            "; ".join(l.phones_extra or []), "sim" if l.whatsapp else "nao",
+            l.email, "; ".join((l.all_emails or [])[1:]), l.website,
+            SITUACAO_DO_SITE.get(l.site_status or "", ""), l.site_quality,
+            "; ".join(l.site_issues or []), l.site_platform,
+            redes.get("instagram", ""), redes.get("facebook", ""), redes.get("linkedin", ""),
+            l.rating, l.rating_count, l.review_highlight, l.price_level,
+            l.opening_hours, "sim" if l.open_now else ("nao" if l.open_now is False else ""),
+            l.opportunityScore, l.quality_score,
+            "; ".join(l.missingDigitalAssets or []), l.best_channel, l.diagnosis,
+            l.maps_url, l.outreach_status,
         ]))
 
     # BOM para o Excel abrir os acentos corretamente
