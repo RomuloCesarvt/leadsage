@@ -319,3 +319,65 @@ export interface PlanoAtual {
   recursos: string[];
   admin: boolean;
 }
+
+
+// ------------------------------------------------- robo de atendimento
+
+export type RoboCanal = 'whatsapp' | 'messenger' | 'instagram';
+
+export interface RoboConfigEntrada {
+  app_secret: string;
+  wa_token: string;
+  wa_phone_id: string;
+  page_id: string;
+  page_token: string;
+  ig_id: string;
+  ativo: boolean;
+  objetivo: 'agendar' | 'site' | 'qualificar';
+  instrucoes: string;
+  link_agenda: string;
+  nome_assistente: string;
+}
+
+/** O que a tela recebe: os segredos so aparecem como "configurado". */
+export interface RoboConfig extends Omit<RoboConfigEntrada, 'app_secret' | 'wa_token' | 'page_token'> {
+  tem_app_secret: boolean;
+  tem_wa_token: boolean;
+  tem_page_token: boolean;
+  webhook_url: string;
+  verify_token: string;
+  whatsapp_pronto: boolean;
+  meta_pronto: boolean;
+}
+
+export interface RoboMensagem {
+  de: 'contato' | 'robo' | 'voce';
+  texto: string;
+  em?: string;
+}
+
+export interface RoboConversaResumo {
+  id: string;
+  canal: RoboCanal;
+  contato: string;
+  nome: string;
+  lead_id: string;
+  robo_ativo: boolean;
+  optout: boolean;
+  precisa_humano: boolean;
+  motivo: string;
+  atualizado: string;
+  ultima: RoboMensagem | null;
+  total: number;
+}
+
+export interface RoboConversa extends Omit<RoboConversaResumo, 'ultima' | 'total'> {
+  mensagens: RoboMensagem[];
+}
+
+export interface RoboTeste {
+  resposta: string;
+  passar_para_humano: boolean;
+  motivo: string;
+  optout: boolean;
+}

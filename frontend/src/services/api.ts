@@ -15,7 +15,13 @@ import type {
   PlanoAtual,
   SiteCopyResponse,
   DocumentAIRequest,
-  DocumentAIResponse
+  DocumentAIResponse,
+  RoboConfig,
+  RoboConfigEntrada,
+  RoboConversa,
+  RoboConversaResumo,
+  RoboMensagem,
+  RoboTeste
 } from '../types';
 import { auth } from '../lib/firebase';
 
@@ -214,6 +220,43 @@ export const api = {
     } catch {
       return [];
     }
+  },
+
+  // ------------------------------------------------ robo de atendimento
+
+  async roboConfig(): Promise<RoboConfig> {
+    return await fetchWithToken('/robo/config');
+  },
+
+  async roboSalvarConfig(dados: Partial<RoboConfigEntrada>): Promise<RoboConfig> {
+    return await fetchWithToken('/robo/config', { method: 'PUT', body: JSON.stringify(dados) });
+  },
+
+  async roboConversas(): Promise<RoboConversaResumo[]> {
+    return await fetchWithToken('/robo/conversas');
+  },
+
+  async roboConversa(id: string): Promise<RoboConversa> {
+    return await fetchWithToken(`/robo/conversas/${encodeURIComponent(id)}`);
+  },
+
+  async roboLigar(id: string, ativo: boolean): Promise<RoboConversa> {
+    return await fetchWithToken(`/robo/conversas/${encodeURIComponent(id)}/robo`, {
+      method: 'POST', body: JSON.stringify({ ativo }),
+    });
+  },
+
+  async roboResponder(id: string, texto: string): Promise<RoboConversa> {
+    return await fetchWithToken(`/robo/conversas/${encodeURIComponent(id)}/responder`, {
+      method: 'POST', body: JSON.stringify({ texto }),
+    });
+  },
+
+  async roboTestar(mensagens: RoboMensagem[], canal = 'whatsapp'): Promise<RoboTeste> {
+    return await fetchWithToken('/robo/testar', {
+      method: 'POST',
+      body: JSON.stringify({ mensagens: mensagens.map(m => ({ de: m.de, texto: m.texto })), canal }),
+    });
   },
 
   async meuPlano(): Promise<PlanoAtual> {

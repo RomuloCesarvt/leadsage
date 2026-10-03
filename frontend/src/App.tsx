@@ -19,6 +19,7 @@ import { ProposalsScreen } from './components/screens/ProposalsScreen';
 
 import { DashboardScreen } from './components/screens/DashboardScreen';
 import { AIOutreachScreen } from './components/screens/AIOutreachScreen';
+import { RoboScreen } from './components/screens/RoboScreen';
 import { ContractsScreen } from './components/screens/ContractsScreen';
 import { CalculatorScreen } from './components/screens/CalculatorScreen';
 import { SiteBuilder } from './components/SiteBuilder';
@@ -73,6 +74,7 @@ const MainApp: React.FC = () => {
 
           {/* Ferramentas de Vendas */}
           {viewState === 'ai-outreach' && <AIOutreachScreen />}
+          {viewState === 'robo' && <RoboScreen />}
           {viewState === 'proposals' && <ProposalsScreen />}
           {viewState === 'contracts' && <ContractsScreen />}
           {viewState === 'calculator' && <CalculatorScreen />}
