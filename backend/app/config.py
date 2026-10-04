@@ -52,6 +52,10 @@ class Settings(BaseModel):
     # Business). Sem ela, o botao do WhatsApp nao aparece.
     META_WA_CONFIG_ID: str = os.getenv("META_WA_CONFIG_ID", "")
 
+    # Banco de imagens dos sites. Sem chave, usa Openverse/StockSnap
+    # (gratuito, ate 960 px); com chave gratuita do Pexels, alta resolucao.
+    PEXELS_API_KEY: str = os.getenv("PEXELS_API_KEY", "")
+
     # Origens autorizadas do frontend, separadas por virgula.
     # Vazio mantem o comportamento permissivo antigo para nao quebrar
     # o dev local sem configuracao.

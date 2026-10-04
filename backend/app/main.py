@@ -42,7 +42,7 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
-from app import robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x
+from app import robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote as _quote
 from app.ai_robo import decidir as robo_decidir
@@ -753,6 +753,16 @@ async def site_publico(slug: str):
         headers={
             "X-Robots-Tag": "noindex, nofollow",
             "Cache-Control": "public, max-age=300",
+            # O site publicado mora no MESMO dominio do app, e o HTML vem do
+            # usuario: sem isto, um "site" com <script> rodaria com acesso a
+            # sessao de qualquer usuario do LeadSage que abrisse o link. O
+            # sandbox trata a pagina como origem isolada e bloqueia script;
+            # os sites gerados sao so HTML e CSS, entao nada muda para eles.
+            "Content-Security-Policy": (
+                "sandbox allow-popups allow-popups-to-escape-sandbox "
+                "allow-top-navigation-by-user-activation; script-src 'none'; object-src 'none'"
+            ),
+            "X-Content-Type-Options": "nosniff",
         },
     )
 
@@ -1274,6 +1284,13 @@ async def gerar_raio_x(req: RaioXRequest, user: dict = Depends(get_current_user)
 
     await raio_x.gravar_cache(uid, req.place_id, dados)
     return {**dados, "do_cache": False}
+
+
+@app.get("/api/imagens")
+async def imagens(nicho: str = "", termo: str = "", user: dict = Depends(get_current_user)):
+    """Fotos profissionais do ramo para montar o site. Sem custo de credito:
+    sao bancos gratuitos, e foto e o que tira o site da cara de rascunho."""
+    return await banco_imagens.buscar(nicho=nicho[:80], termo=termo[:80])
 
 
 @app.get("/api/place-photo")

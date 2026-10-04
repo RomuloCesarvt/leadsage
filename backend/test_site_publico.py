@@ -137,3 +137,17 @@ def test_site_antigo_ganha_link_ao_listar(client, com_plano):
     listagem = client.get("/api/sites").json()
     assert listagem[0]["slug"], "site antigo continuou sem link"
     assert client.get(f"/s/{listagem[0]['slug']}").status_code == 200
+
+
+def test_site_publicado_nao_roda_script_no_dominio_do_app(client, com_plano):
+    """O HTML vem do usuario e e servido no dominio do app. Sem sandbox,
+    um <script> publicado leria a sessao de quem abrisse o link."""
+    com_plano()
+    site = client.post("/api/sites", json={
+        "company": "Golpe", "html": "<html><script>alert(document.cookie)</script></html>"}).json()
+    cabecalho = client.get(f"/s/{site['slug']}").headers
+    csp = cabecalho.get("content-security-policy", "")
+    assert "sandbox" in csp and "allow-scripts" not in csp
+    assert "allow-same-origin" not in csp, "same-origin anularia o isolamento"
+    assert "script-src 'none'" in csp
+    assert cabecalho.get("x-content-type-options") == "nosniff"
