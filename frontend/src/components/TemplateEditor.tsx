@@ -5,6 +5,8 @@ import { api } from '../services/api';
 import { extrairCampos, aplicarCampos } from '../templates';
 import { DOC_THEMES, acharTheme } from '../templates/docs/themes';
 import type { MarcaDocumento } from '../templates/docs/base';
+import { BancoImagens, buscarFotos } from './BancoImagens';
+import type { FotoBanco } from './BancoImagens';
 import type { DocumentItem } from '../types';
 
 const LIMITE_LOGO = 200 * 1024;
@@ -48,7 +50,19 @@ export const TemplateEditor: React.FC<Props> = ({
   const [conteudo, setConteudo] = useState(conteudoBase);
   const [valores, setValores] = useState<Record<string, string>>(documento?.fields || {});
   const [aba, setAba] = useState<'campos' | 'texto' | 'marca'>('campos');
-  const [temaId, setTemaId] = useState(documento?.fields?.__tema || 'classico');
+  // Novos documentos abrem no tema premium do tipo; os salvos mantêm o seu.
+  const [temaId, setTemaId] = useState(
+    documento?.fields?.__tema || (kind === 'contrato' ? 'juridico' : 'executivo')
+  );
+  // Foto da capa (banco de imagens), guardada junto com o documento.
+  const [fotoCapa, setFotoCapa] = useState<string>(documento?.fields?.__capa || '');
+  const [bancoFotos, setBancoFotos] = useState<FotoBanco[]>([]);
+  const [buscandoFotos, setBuscandoFotos] = useState(false);
+  const buscarCapa = async (termo = '') => {
+    setBuscandoFotos(true);
+    try { setBancoFotos((await buscarFotos(user?.niche_focus || 'business', termo)).imagens); }
+    finally { setBuscandoFotos(false); }
+  };
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const [copiado, setCopiado] = useState(false);
@@ -67,7 +81,9 @@ export const TemplateEditor: React.FC<Props> = ({
     corPrimaria: user?.brand_primary || '#2563eb',
     corDestaque: user?.brand_accent || '#f59e0b',
     contato: user?.brand_contact || user?.email || '',
-  }), [user]);
+    tipo: kind,
+    fotoCapa: fotoCapa || undefined,
+  }), [user, kind, fotoCapa]);
 
   const html = useMemo(
     () => acharTheme(temaId).render(preenchido, marca, titulo || 'Documento'),
@@ -112,11 +128,11 @@ export const TemplateEditor: React.FC<Props> = ({
     try {
       const salvo = documento
         ? await api.atualizarDocumento(documento.id, {
-            title: titulo, content: conteudo, fields: { ...valores, __tema: temaId },
+            title: titulo, content: conteudo, fields: { ...valores, __tema: temaId, __capa: fotoCapa },
           })
         : await api.criarDocumento({
             kind, title: titulo, content: conteudo,
-            fields: { ...valores, __tema: temaId },
+            fields: { ...valores, __tema: temaId, __capa: fotoCapa },
             template_id: template?.id || '',
           });
       onSalvo(salvo);
@@ -312,6 +328,30 @@ export const TemplateEditor: React.FC<Props> = ({
                     {DOC_THEMES.find(t => t.id === temaId)?.descricao}
                   </p>
                 </div>
+
+                {['executivo', 'contemporaneo'].includes(temaId) && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+                      Foto da capa
+                    </label>
+                    {fotoCapa ? (
+                      <div className="flex items-center gap-3 mb-2">
+                        <img src={fotoCapa} alt="" className="h-12 w-20 object-cover rounded-lg border border-slate-200" />
+                        <button onClick={() => setFotoCapa('')} className="text-xs font-semibold text-slate-500 hover:text-red-600">Remover</button>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 mb-2">Sem foto, a capa usa as cores da sua marca.</p>
+                    )}
+                    {bancoFotos.length || buscandoFotos ? (
+                      <BancoImagens semDestino fotos={bancoFotos} carregando={buscandoFotos} aoBuscar={buscarCapa}
+                        aoEscolher={url => setFotoCapa(url)} />
+                    ) : (
+                      <button onClick={() => buscarCapa()} className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">
+                        Escolher no banco de imagens
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">

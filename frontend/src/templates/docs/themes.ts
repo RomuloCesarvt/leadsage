@@ -6,6 +6,7 @@
  */
 import type { DocTheme, MarcaDocumento } from './base';
 import { envelope, esc, marcaVisual, textoParaHtml } from './base';
+import { TEMAS_PREMIUM } from './premium';
 
 const rodapeImpresso = (m: MarcaDocumento): string =>
   m.contato
@@ -166,7 +167,9 @@ ${rodapeImpresso(m)}`
     ),
 };
 
-export const DOC_THEMES: DocTheme[] = [classico, moderno, minimalista];
+// Os premium vem primeiro: sao o que o editor oferece. Os tres antigos
+// continuam para quem ja tem documento salvo com eles.
+export const DOC_THEMES: DocTheme[] = [...TEMAS_PREMIUM, classico, moderno, minimalista];
 
 export const acharTheme = (id: string): DocTheme =>
   DOC_THEMES.find(t => t.id === id) || DOC_THEMES[0];

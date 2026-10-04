@@ -17,7 +17,9 @@ export const BancoImagens: React.FC<{
   carregando: boolean;
   aoBuscar: (termo: string) => void;
   aoEscolher: (url: string, destino: DestinoFoto) => void;
-}> = ({ fotos, carregando, aoBuscar, aoEscolher }) => {
+  /** esconde o "onde usar" quando so existe um lugar (capa do documento) */
+  semDestino?: boolean;
+}> = ({ fotos, carregando, aoBuscar, aoEscolher, semDestino }) => {
   const [termo, setTermo] = useState('');
   const [destino, setDestino] = useState<DestinoFoto>('galeria');
 
@@ -25,12 +27,12 @@ export const BancoImagens: React.FC<{
     <div className="rounded-2xl border border-slate-200 p-3 bg-slate-50/60">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-bold text-slate-600 flex items-center gap-1.5"><ImageIcon className="w-3.5 h-3.5" /> Banco de imagens</span>
-        <select value={destino} onChange={e => setDestino(e.target.value as DestinoFoto)}
+        {!semDestino && <select value={destino} onChange={e => setDestino(e.target.value as DestinoFoto)}
           className="text-[11px] font-semibold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-600">
           <option value="capa">Clicar usa como capa</option>
           <option value="fotoSobre">Clicar usa no "Sobre"</option>
           <option value="galeria">Clicar põe na galeria</option>
-        </select>
+        </select>}
       </div>
       <form onSubmit={e => { e.preventDefault(); aoBuscar(termo.trim()); }} className="flex gap-2 mb-2">
         <input value={termo} onChange={e => setTermo(e.target.value)} placeholder="Buscar em inglês: bakery, gym, coffee…"

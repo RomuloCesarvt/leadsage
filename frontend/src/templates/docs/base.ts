@@ -17,6 +17,10 @@ export type MarcaDocumento = {
   corPrimaria: string;
   corDestaque: string;
   contato: string;
+  /** proposta ou contrato: muda o rotulo da capa e se as secoes sao numeradas */
+  tipo?: 'proposta' | 'contrato';
+  /** foto da capa (banco de imagens), nos temas que tem capa com foto */
+  fotoCapa?: string;
 };
 
 export type DocTheme = {

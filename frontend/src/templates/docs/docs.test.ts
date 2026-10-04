@@ -8,6 +8,7 @@
  * Rodar:  cd frontend && npm run test:docs
  */
 import { DOC_THEMES, acharTheme } from './themes';
+import { TEMAS_PREMIUM } from './premium';
 import { textoParaHtml, esc } from './base';
 import type { MarcaDocumento } from './base';
 
@@ -74,8 +75,12 @@ for (const t of DOC_THEMES) {
   checar(`${t.nome}: documento completo`,
     html.startsWith('<!DOCTYPE html>') && html.trim().endsWith('</html>'));
   checar(`${t.nome}: regra de impressão A4`, html.includes('@page') && html.includes('A4'));
-  checar(`${t.nome}: sem dependência externa`,
-    !/<script|cdn\.|googleapis|unpkg|<link[^>]+href=["']http/i.test(html));
+  // Script nunca. Fonte do Google, so nos temas premium: sem tipografia
+  // de verdade o documento parecia formulario.
+  const externos = [...html.matchAll(/<link[^>]+href=["'](https?:[^"']+)/gi)].map(m => m[1])
+    .filter(u => !/^https:\/\/fonts\.(googleapis|gstatic)\.com(\/|$)/.test(u));
+  checar(`${t.nome}: sem script e sem dependência além das fontes`,
+    !/<script/i.test(html) && !externos.length, externos[0] || '');
   checar(`${t.nome}: mostra a marca`, html.includes('Studio Rômulo'));
   checar(`${t.nome}: aplica a cor`, html.includes('#9f1239'));
   checar(`${t.nome}: miniatura é SVG`, t.miniatura(marca).trim().startsWith('<svg'));
@@ -157,6 +162,37 @@ for (const t of DOC_THEMES) {
   checar(`${t.nome}: estiliza o bloco de valor`, html.includes('.bloco-valor{'));
   checar(`${t.nome}: estiliza a linha de total`, html.includes('.tabela tr.total td{'));
   checar(`${t.nome}: imprime a cor do bloco`, html.includes('print-color-adjust:exact'));
+}
+
+/* -------------------------------------------------- temas premium */
+
+console.log('\n--- premium: capa e corpo ---');
+const proposta = [
+  'PROPOSTA COMERCIAL', '', 'Para: Padaria Jacarandá', 'De: Studio', 'Data: 04/10/2026', '---', '',
+  '1. DIAGNÓSTICO', 'Sem site no Google.', '', '2. INVESTIMENTO', 'Valor total: R$ 2.500,00',
+].join('\n');
+for (const t of TEMAS_PREMIUM.filter(t => t.id !== 'juridico')) {
+  const html = t.render(proposta, { ...marca, tipo: 'proposta' }, 'Proposta de presença digital');
+  const corpo = html.split('class="folha capa"')[1].split('<main class="corpo">')[1] || '';
+  checar(`${t.nome}: capa diz para quem é`, html.includes('Padaria Jacarandá</b>'));
+  checar(`${t.nome}: o corpo não repete Para/De/Data da capa`, !/>Para<|>De<|>Data</.test(corpo));
+  checar(`${t.nome}: o corpo não repete "PROPOSTA COMERCIAL"`, !corpo.includes('PROPOSTA COMERCIAL'));
+  checar(`${t.nome}: seções numeradas sem o número do texto`,
+    corpo.includes('<span class="num">01</span><span>DIAGNÓSTICO</span>'));
+  checar(`${t.nome}: capa sozinha na primeira folha do PDF`, html.includes('break-after:page'));
+  checar(`${t.nome}: fundo da tela não vai para o PDF`, /@media print\{\s*body\{background:#fff !important\}/.test(html));
+}
+
+const contrato = 'CONTRATANTE: Padaria Jacarandá Ltda., CNPJ 1\n\nCLÁUSULA 1ª - DO OBJETO\nCriação de site.';
+const juridico = TEMAS_PREMIUM.find(t => t.id === 'juridico')!.render(contrato, { ...marca, tipo: 'contrato' }, 'Contrato');
+checar('Jurídico: contratante na folha de rosto, sem o CNPJ', juridico.includes('Contratante: Padaria Jacarandá Ltda.<'));
+checar('Jurídico: o contrato não perde a qualificação das partes', juridico.includes('CNPJ 1'));
+checar('Jurídico: numera as páginas e pede rubrica', juridico.includes('counter(pages)') && juridico.includes('Rubrica'));
+
+console.log('\n--- premium: foto da capa só se for imagem ---');
+for (const t of TEMAS_PREMIUM) {
+  const html = t.render(proposta, { ...marca, tipo: 'proposta', fotoCapa: "https://x.com/a.jpg') ;}</style><script>alert(1)</script>" }, 'P');
+  checar(`${t.nome}: foto maliciosa não injeta nada`, !html.includes('<script>alert(1)'));
 }
 
 console.log(`\n=========== ${falhas === 0 ? 'TUDO PASSOU' : falhas + ' FALHARAM'} ===========`);
