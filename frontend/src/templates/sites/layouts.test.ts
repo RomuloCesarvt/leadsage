@@ -9,6 +9,8 @@
  * Rodar:  cd frontend && npx tsx src/templates/sites/layouts.test.ts
  */
 import { SITE_TEMPLATES, sugerirTemplate } from './layouts';
+import { LAYOUTS_PREMIUM } from './premium';
+import { urlImagem } from './premium-base';
 import { esc, linkWhatsapp, corDoTexto } from './base';
 import type { SiteData } from './base';
 
@@ -43,9 +45,14 @@ for (const t of SITE_TEMPLATES) {
   const html = t.render(dados);
   checar(`${t.nome}: documento HTML completo`,
     html.startsWith('<!DOCTYPE html>') && html.trim().endsWith('</html>'));
-  checar(`${t.nome}: sem dependência externa`,
-    !/<script|cdn\.|googleapis|unpkg|jsdelivr|<link[^>]+href=["']http/i.test(html),
-    html.match(/<script[^>]*>|https?:\/\/(cdn|fonts)[^"']*/i)?.[0] || '');
+  // Nenhum script, nunca: o site e servido em sandbox sem JavaScript.
+  // A unica dependencia externa aceita e a fonte do Google, nos layouts
+  // premium — foi a falta de tipografia que deixava tudo com cara de
+  // rascunho. Qualquer outro <link> externo e falha.
+  const externos = [...html.matchAll(/<link[^>]+href=["'](https?:[^"']+)/gi)].map(m => m[1])
+    .filter(u => !/^https:\/\/fonts\.(googleapis|gstatic)\.com(\/|$)/.test(u));
+  checar(`${t.nome}: sem script e sem dependência além das fontes`,
+    !/<script/i.test(html) && !externos.length, externos[0] || '');
   checar(`${t.nome}: responsivo`, html.includes('name="viewport"') && html.includes('@media'));
   checar(`${t.nome}: usa os dados informados`,
     html.includes('Padaria Favorita') && html.includes('Fermentação natural.'));
@@ -73,9 +80,13 @@ checar('cor escura pede texto claro', corDoTexto('#0f172a') === '#ffffff');
 checar('cor clara pede texto escuro', corDoTexto('#facc15') === '#111827');
 
 console.log('\n--- sugestão de layout por nicho ---');
-checar('padaria sugere Vitrine', sugerirTemplate('Padarias').id === 'vitrine');
-checar('clínica sugere Profissional', sugerirTemplate('Clínicas Odontológicas').id === 'profissional');
-checar('mecânica sugere Serviço Local', sugerirTemplate('Mecânicas').id === 'servico-local');
+checar('padaria sugere Aurora', sugerirTemplate('Padarias').id === 'aurora');
+checar('clínica odontológica sugere Clínica', sugerirTemplate('Clínicas Odontológicas').id === 'clinica');
+checar('mecânica sugere Oficina', sugerirTemplate('Mecânicas').id === 'oficina');
+checar('barbearia sugere Estúdio', sugerirTemplate('Barbearia').id === 'estudio');
+checar('advogado sugere Escritório', sugerirTemplate('Advogados').id === 'escritorio');
+checar('academia sugere Vibrante', sugerirTemplate('Academia').id === 'vibrante');
+checar('acento não atrapalha', sugerirTemplate('ESTÉTICA').id === 'clinica');
 checar('nicho desconhecido cai num layout válido',
   SITE_TEMPLATES.some(t => t.id === sugerirTemplate('Alguma coisa').id));
 
@@ -139,6 +150,46 @@ for (const t of SITE_TEMPLATES) {
     assinado.indexOf('</footer>') < assinado.indexOf('<div class="selo-leadsage">'));
   checar(`${t.nome}: o selo nao rouba a cor da marca`,
     !assinado.includes('selo-leadsage" style'));
+}
+
+/* --------------------------------------------------- layouts premium */
+
+console.log('\n--- premium: seguranca das imagens ---');
+const imagemMaliciosa: SiteData = {
+  ...dados,
+  capa: 'javascript:alert(1)',
+  fotoSobre: `https://x.com/a.jpg" onerror="alert(1)`,
+  galeria: ['https://ok.com/foto.jpg', "x' onload='alert(1)", 'data:text/html;base64,PHNjcmlwdD4='],
+  logo: 'http://sem-https.com/logo.png',
+};
+for (const t of LAYOUTS_PREMIUM) {
+  const html = t.render(imagemMaliciosa);
+  checar(`${t.nome}: recusa URL de imagem perigosa`,
+    !/javascript:|onerror=|onload=|data:text\/html|http:\/\/sem-https/i.test(html));
+}
+checar('urlImagem aceita https', urlImagem('https://images.pexels.com/a.jpg') === 'https://images.pexels.com/a.jpg');
+checar('urlImagem aceita data:image', urlImagem('data:image/png;base64,iVBORw0KGgo=').startsWith('data:image/png'));
+checar('urlImagem recusa http', urlImagem('http://x.com/a.jpg') === '');
+
+console.log('\n--- premium: texto nao se repete ---');
+const umaFrase: SiteData = { ...dados, sobre: 'Padaria de bairro desde 1998 com fermentação natural.' };
+const duasFrases: SiteData = { ...dados, sobre: 'Padaria de bairro desde 1998. Fornadas antes do sol nascer.' };
+for (const t of LAYOUTS_PREMIUM) {
+  const conta = (h: string, trecho: string) => h.split(trecho).length - 1;
+  const a = t.render(umaFrase), b = t.render(duasFrases);
+  checar(`${t.nome}: "sobre" de uma frase aparece uma vez no corpo`,
+    conta(a.split('<body>')[1], 'desde 1998 com fermentação') === 1);
+  checar(`${t.nome}: duas frases se dividem entre capa e seção`,
+    conta(b.split('<body>')[1], 'Padaria de bairro desde 1998.') === 1 &&
+    conta(b.split('<body>')[1], 'Fornadas antes do sol nascer.') === 1);
+}
+
+console.log('\n--- premium: cada um tem identidade propria ---');
+const fontes = LAYOUTS_PREMIUM.map(t => (t.render(dados).match(/css2\?family=([A-Za-z+]+)/) || [])[1]);
+checar('seis pares de fontes diferentes', new Set(fontes).size === LAYOUTS_PREMIUM.length, fontes.join(','));
+for (const t of LAYOUTS_PREMIUM) {
+  checar(`${t.nome}: selo do Google quando há nota`, t.render({ ...dados, nota: 4.7, avaliacoes: 120 }).includes('120 avaliações'));
+  checar(`${t.nome}: sem selo do Google quando a nota é baixa`, !t.render({ ...dados, nota: 3.1 }).includes('selo-google"'));
 }
 
 console.log(`\n=========== ${falhas === 0 ? 'TUDO PASSOU' : falhas + ' FALHARAM'} ===========`);

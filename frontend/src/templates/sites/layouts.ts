@@ -1,3 +1,4 @@
+import { LAYOUTS_PREMIUM } from './premium';
 /**
  * Os layouts propriamente ditos.
  *
@@ -634,13 +635,34 @@ ${rodape(d)}`
     ),
 };
 
-export const SITE_TEMPLATES: SiteTemplate[] = [vitrine, profissional, servicoLocal, essencial];
+/**
+ * Os seis premium vêm primeiro: são o que o construtor oferece hoje. Os
+ * quatro da primeira geração continuam na lista porque há sites
+ * publicados com eles — reabrir para editar precisa encontrar o layout.
+ */
+export const SITE_TEMPLATES: SiteTemplate[] = [
+  ...LAYOUTS_PREMIUM, vitrine, profissional, servicoLocal, essencial,
+];
+
+export const LAYOUTS_ANTIGOS = new Set(['vitrine', 'profissional', 'servico-local', 'essencial']);
+
+const semAcento = (t: string) => (t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+/** Palavras do ramo -> layout. Mais preciso que comparar com a lista de nichos. */
+const POR_RAMO: [string, string[]][] = [
+  ['aurora', ['padaria', 'panific', 'confeit', 'cafe', 'restaurante', 'pizz', 'lanch', 'hamburg', 'bistro', 'doceria', 'sorvet', 'acai', 'gastronom', 'bar ']],
+  ['clinica', ['odonto', 'dentist', 'clinic', 'medic', 'saude', 'fisio', 'nutri', 'psicolog', 'estetica', 'harmoniz', 'laborat', 'farmac']],
+  ['oficina', ['mecan', 'oficina', 'auto', 'funilar', 'constru', 'reforma', 'eletric', 'encanad', 'pintor', 'tinta', 'serralher', 'vidrac', 'material']],
+  ['estudio', ['barbear', 'salao', 'cabelei', 'beleza', 'manicure', 'unha', 'tatuag', 'tattoo', 'moda', 'boutique', 'joalher', 'maquiag', 'sobrancelha']],
+  ['escritorio', ['advoga', 'advoca', 'juridic', 'contab', 'contador', 'imobili', 'corretor', 'arquitet', 'consult', 'engenhar', 'seguro']],
+  ['vibrante', ['academia', 'fitness', 'crossfit', 'pilates', 'pet', 'veterin', 'escola', 'curso', 'idioma', 'infantil', 'brinqued', 'festa', 'buffet', 'danca', 'natacao']],
+];
 
 /** Sugere o layout mais adequado ao nicho do lead. */
 export const sugerirTemplate = (nicho: string): SiteTemplate => {
-  const alvo = (nicho || '').toLowerCase();
-  const achado = SITE_TEMPLATES.find(t =>
-    t.nichos.some(n => alvo.includes(n.toLowerCase()) || n.toLowerCase().includes(alvo))
-  );
-  return achado || SITE_TEMPLATES[0];
+  const alvo = semAcento(nicho);
+  for (const [id, palavras] of POR_RAMO) {
+    if (palavras.some(p => alvo.includes(p))) return SITE_TEMPLATES.find(t => t.id === id)!;
+  }
+  return SITE_TEMPLATES.find(t => t.id === 'clinica')!;
 };

@@ -43,6 +43,9 @@ export type SiteData = {
   depoimentos?: Depoimento[];
   corPrimaria: string;
   corDestaque: string;
+  /** nota e número de avaliações no Google, quando o site nasce de um lead */
+  nota?: number | null;
+  avaliacoes?: number | null;
   /**
    * Identidade tipográfica e forma dos cantos.
    *

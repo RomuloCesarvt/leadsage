@@ -9,6 +9,8 @@ import { SITE_TEMPLATES, sugerirTemplate } from '../templates/sites/layouts';
 import type { SiteData, SiteTemplate } from '../templates/sites/base';
 import type { SiteIdentity } from '../types';
 import { prepararImagem, formatarBytes, TETO_SITE_BYTES } from '../lib/imagem';
+import { BancoImagens, buscarFotos } from './BancoImagens';
+import type { DestinoFoto, FotoBanco } from './BancoImagens';
 
 /**
  * Construtor visual de sites.
@@ -44,6 +46,9 @@ const dadosIniciais = (lead: any): SiteData => ({
   instagram: lead?.socials?.instagram || '',
   corPrimaria: '#2563eb',
   corDestaque: '#f59e0b',
+  // a nota do Google vira o selo de prova social no site
+  nota: lead?.rating ?? null,
+  avaliacoes: lead?.rating_count ?? null,
 });
 
 const PALETAS = [
@@ -76,6 +81,53 @@ export const SiteBuilder: React.FC = () => {
   // para de mexer nele.
   const [escolheuLayout, setEscolheuLayout] = useState(false);
   const inputLogo = useRef<HTMLInputElement>(null);
+
+  // Banco de imagens. Site sem foto parecia rascunho: agora ele nasce com
+  // fotos do ramo, e o usuario troca o que quiser.
+  const [bancoFotos, setBancoFotos] = useState<FotoBanco[]>([]);
+  const [buscandoFotos, setBuscandoFotos] = useState(false);
+  const nichoDoSite = lead?.niche || lead?.role || dados.categoria || '';
+
+  const buscarNoBanco = async (termo = '') => {
+    setBuscandoFotos(true);
+    try {
+      const r = await buscarFotos(nichoDoSite, termo);
+      setBancoFotos(r.imagens);
+      return r.imagens;
+    } finally {
+      setBuscandoFotos(false);
+    }
+  };
+
+  // Ao escolher um layout, preenche so o que estiver vazio — nunca troca
+  // uma foto que o usuario enviou ou escolheu.
+  useEffect(() => {
+    if (!template) return;
+    let vivo = true;
+    buscarNoBanco().then(lista => {
+      if (!vivo || !lista.length) return;
+      setDados(d => ({
+        ...d,
+        capa: d.capa || lista[0]?.url,
+        fotoSobre: d.fotoSobre || lista[1]?.url,
+        galeria: (d.galeria || []).filter(Boolean).length ? d.galeria : lista.slice(2, 8).map(f => f.url),
+      }));
+    });
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [template?.id, nichoDoSite]);
+
+  const usarFotoDoBanco = (url: string, destino: DestinoFoto) => {
+    if (destino === 'galeria') {
+      setDados(d => {
+        const atual = (d.galeria || []).filter(Boolean);
+        if (atual.includes(url)) return d;
+        return { ...d, galeria: [...atual, url].slice(-6) };
+      });
+    } else {
+      alterar(destino, url);
+    }
+  };
 
   // Sem marca propria no plano, o site sai assinado pelo LeadSage.
   // Comeca ligado: se a consulta do plano falhar, o padrao seguro e
@@ -475,6 +527,13 @@ export const SiteBuilder: React.FC = () => {
               <p className="text-[11px] text-slate-400 mt-1.5">Sem logo, usamos as iniciais da empresa.</p>
             </div>
 
+            <BancoImagens
+              fotos={bancoFotos}
+              carregando={buscandoFotos}
+              aoBuscar={termo => buscarNoBanco(termo)}
+              aoEscolher={usarFotoDoBanco}
+            />
+
             {([
               { chave: 'capa' as const, rotulo: 'Foto de capa', dica: 'A imagem grande do topo. É o que mais muda a cara do site.' },
               { chave: 'fotoSobre' as const, rotulo: 'Foto do "Sobre"', dica: 'A equipe, a fachada, o ambiente.' },
@@ -505,9 +564,9 @@ export const SiteBuilder: React.FC = () => {
             ))}
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1.5">Galeria (até 4)</label>
-              <div className="grid grid-cols-4 gap-2">
-                {[0, 1, 2, 3].map(i => {
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">Galeria (até 6)</label>
+              <div className="grid grid-cols-6 gap-2">
+                {[0, 1, 2, 3, 4, 5].map(i => {
                   const foto = (dados.galeria || [])[i];
                   return (
                     <label

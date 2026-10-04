@@ -288,6 +288,15 @@ export const api = {
     });
   },
 
+  async imagens(nicho: string, termo = ''): Promise<{ imagens: { url: string; miniatura: string; autor: string; fonte: string }[]; fonte: string }> {
+    const q = new URLSearchParams({ nicho, termo });
+    try {
+      return await fetchWithToken(`/imagens?${q}`);
+    } catch {
+      return { imagens: [], fonte: '' };
+    }
+  },
+
   async meuPlano(): Promise<PlanoAtual> {
     try {
       return await fetchWithToken('/plan');
