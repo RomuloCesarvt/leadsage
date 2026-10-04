@@ -238,7 +238,9 @@ async def listar_conversas(uid: str) -> List[Dict[str, Any]]:
 # id da pagina, da conta do Instagram ou do numero do WhatsApp. Este
 # indice resolve isso em uma leitura.
 
-TIPOS_DE_ATIVO = ("pagina", "instagram", "whatsapp")
+# usuario_meta: quem do Facebook autorizou — e por ele que chega o pedido
+# de exclusao de dados quando a pessoa remove o LeadSage da conta dela.
+TIPOS_DE_ATIVO = ("pagina", "instagram", "whatsapp", "usuario_meta")
 
 
 def _chave_ativo(tipo: str, ativo_id: str) -> str:
@@ -310,3 +312,53 @@ async def substituir_canal(uid: str, canal: Dict[str, Any]) -> Dict[str, Any]:
             print(f"Falha ao gravar canal do robo: {exc}")
     await _sql_put(f"canal:{canal['gancho']}", uid, "canal", canal)
     return canal
+
+
+async def apagar_conversas(uid: str) -> int:
+    """Remove todas as conversas do robo de um usuario (exclusao de dados)."""
+    total = 0
+    if firestore_db is not None:
+        try:
+            ref = firestore_db.collection("users").document(uid).collection("robo_conversas")
+            for doc in ref.stream():
+                doc.reference.delete()
+                total += 1
+            return total
+        except Exception as exc:
+            print(f"Falha ao apagar conversas: {exc}")
+    async with AsyncSessionLocal() as s:
+        rows = (
+            await s.execute(select(DBRobo).where(DBRobo.uid == uid, DBRobo.tipo == "conversa"))
+        ).scalars().all()
+        for row in rows:
+            await s.delete(row)
+            total += 1
+        await s.commit()
+    return total
+
+
+async def registrar_exclusao(codigo: str, conversas_apagadas: int) -> None:
+    """Comprovante do pedido de exclusao: so codigo, data e contagem.
+
+    Nao guarda quem pediu — guardar isso contradiria a propria exclusao.
+    """
+    dados = {"codigo": codigo, "em": agora(), "conversas_apagadas": conversas_apagadas}
+    if firestore_db is not None:
+        try:
+            firestore_db.collection("exclusoes_meta").document(codigo).set(dados)
+            return
+        except Exception as exc:
+            print(f"Falha ao registrar exclusao: {exc}")
+    await _sql_put(f"exclusao:{codigo}", "", "exclusao", dados)
+
+
+async def ler_exclusao(codigo: str) -> Optional[Dict[str, Any]]:
+    if not re.fullmatch(r"[0-9a-f]{16}", codigo or ""):
+        return None
+    if firestore_db is not None:
+        try:
+            doc = firestore_db.collection("exclusoes_meta").document(codigo).get()
+            return doc.to_dict() if doc.exists else None
+        except Exception as exc:
+            print(f"Falha ao ler exclusao: {exc}")
+    return await _sql_get(f"exclusao:{codigo}")

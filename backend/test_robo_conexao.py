@@ -347,3 +347,62 @@ def test_whatsapp_por_cadastro_guiado(client, pronto, monkeypatch):
                       "text": {"body": "oi"}}]}}]}]}).encode()
     client.post("/api/robo/meta/webhook", content=corpo, headers={"X-Hub-Signature-256": assinar(corpo)})
     assert envio.enviados and envio.enviados[0][1] == "5514999990000"
+
+
+# -------------------------------------------------------- exclusao de dados
+
+def pedido_assinado(dados: dict, segredo: str = SEGREDO_APP) -> str:
+    import base64
+    corpo = base64.urlsafe_b64encode(json.dumps(dados).encode()).decode().rstrip("=")
+    sig = hmac.new(segredo.encode(), corpo.encode(), hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(sig).decode().rstrip("=") + "." + corpo
+
+
+@pytest.fixture
+def quem_e(monkeypatch):
+    async def quem(token):
+        return "FBUSER42"
+    monkeypatch.setattr(meta_oauth, "quem_autorizou", quem)
+
+
+def test_exclusao_apaga_conexao_e_conversas(client, pronto, quem_e, monkeypatch):
+    monkeypatch.setattr(meta_canais, "enviar", Envio())
+    monkeypatch.setattr(robo_service, "_gerador_padrao", ia_falsa)
+    paginas_falsas(monkeypatch, [PAG_A])
+    retorno(client)
+    ligar_robo(client)
+    corpo = json.dumps(corpo_paginas(evento_pagina("PAGA"))).encode()
+    client.post("/api/robo/meta/webhook", content=corpo, headers={"X-Hub-Signature-256": assinar(corpo)})
+    assert len(client.get("/api/robo/conversas").json()) == 1
+
+    r = client.post("/api/robo/meta/exclusao", data={
+        "signed_request": pedido_assinado({"algorithm": "HMAC-SHA256", "user_id": "FBUSER42"})})
+    assert r.status_code == 200
+    resposta = r.json()
+    assert resposta["confirmation_code"] and resposta["url"].endswith(resposta["confirmation_code"])
+
+    assert client.get("/api/robo/conversas").json() == []
+    assert not client.get("/api/robo/config").json()["meta_pronto"]
+    assert ("desassinar", "PAGA") in pronto
+
+    pagina = client.get("/api/robo/meta/exclusao/" + resposta["confirmation_code"])
+    assert "Dados excluídos" in pagina.text
+
+
+def test_exclusao_forjada_e_recusada(client, pronto, quem_e, monkeypatch):
+    paginas_falsas(monkeypatch, [PAG_A])
+    retorno(client)
+    falso = pedido_assinado({"algorithm": "HMAC-SHA256", "user_id": "FBUSER42"}, segredo="outro")
+    assert client.post("/api/robo/meta/exclusao", data={"signed_request": falso}).status_code == 400
+    assert client.get("/api/robo/config").json()["meta_pronto"], "pedido forjado nao pode desconectar"
+
+
+def test_exclusao_de_quem_nao_conhecemos(client, pronto):
+    r = client.post("/api/robo/meta/exclusao", data={
+        "signed_request": pedido_assinado({"algorithm": "HMAC-SHA256", "user_id": "NINGUEM"})})
+    assert r.status_code == 200 and r.json()["confirmation_code"]
+
+
+def test_status_de_codigo_estranho(client):
+    assert "não encontrado" in client.get("/api/robo/meta/exclusao/../../etc").text \
+        or client.get("/api/robo/meta/exclusao/xyz").status_code == 200

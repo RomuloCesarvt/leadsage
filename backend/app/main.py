@@ -1099,6 +1099,7 @@ async def meta_retorno(request: Request):
     try:
         uid = meta_oauth.ler_state(q.get("state", ""))
         token = await meta_oauth.trocar_codigo(q.get("code", ""))
+        await robo_conexao.lembrar_quem_autorizou(uid, await meta_oauth.quem_autorizou(token))
         paginas = await meta_oauth.listar_paginas(token)
         if not paginas:
             return RedirectResponse(destino + "erro&msg=" + _quote(
@@ -1143,6 +1144,51 @@ async def meta_desconectar(req: MetaDesconectarRequest, user: dict = Depends(get
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return robo_store.visao_publica(canal, settings.APP_URL)
+
+
+@app.post("/api/robo/meta/exclusao")
+async def meta_exclusao(request: Request):
+    """Pedido de exclusao de dados da Meta (Data Deletion Callback).
+
+    Chega quando alguem remove o LeadSage da propria conta do Facebook. A
+    Meta exige que o app apague o que recebeu dela e devolva um endereco
+    onde a pessoa acompanha o pedido, com um codigo de confirmacao.
+    """
+    formulario = await request.form()
+    try:
+        dados = meta_oauth.ler_signed_request(str(formulario.get("signed_request", "")))
+    except meta_oauth.MetaRecusou as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    codigo = uuid.uuid4().hex[:16]
+    apagadas = await robo_conexao.excluir_por_pedido_da_meta(str(dados.get("user_id", "")))
+    await robo_store.registrar_exclusao(codigo, apagadas)
+    return {
+        "url": f"{settings.APP_URL}/api/robo/meta/exclusao/{codigo}",
+        "confirmation_code": codigo,
+    }
+
+
+@app.get("/api/robo/meta/exclusao/{codigo}")
+async def meta_exclusao_status(codigo: str):
+    """Onde a pessoa confere que a exclusao foi feita. Sem login."""
+    registro = await robo_store.ler_exclusao(codigo)
+    if not registro:
+        corpo = "<h1>Pedido não encontrado</h1><p>Confira o código de confirmação.</p>"
+    else:
+        corpo = (
+            "<h1>Dados excluídos</h1>"
+            f"<p>Pedido <b>{codigo}</b> concluído em {registro.get('em', '')[:10]}.</p>"
+            "<p>O LeadSage apagou os acessos à sua página, Instagram e WhatsApp e as "
+            "conversas recebidas por eles.</p>"
+        )
+    return Response(
+        content=f'<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
+                f'<title>Exclusão de dados — LeadSage</title>'
+                f'<body style="font-family:system-ui;max-width:560px;margin:48px auto;padding:0 16px;color:#1f2937">'
+                f'{corpo}</body>',
+        media_type="text/html; charset=utf-8",
+    )
 
 
 @app.get("/api/robo/meta/webhook")

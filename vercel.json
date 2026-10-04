@@ -27,6 +27,10 @@
       "dest": "/api/index.py"
     },
     {
+      "src": "/privacidade/?",
+      "dest": "/privacidade.html"
+    },
+    {
       "handle": "filesystem"
     },
     {

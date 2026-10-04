@@ -17,6 +17,37 @@ async def _canal(uid: str, email: str = "") -> Dict[str, Any]:
     return canal
 
 
+async def lembrar_quem_autorizou(uid: str, meta_user_id: str) -> None:
+    if not meta_user_id:
+        return
+    canal = await _canal(uid)
+    canal["meta_user_id"] = meta_user_id
+    await robo_store.substituir_canal(uid, canal)
+    await robo_store.registrar_ativo("usuario_meta", meta_user_id, uid, canal["gancho"])
+
+
+async def excluir_por_pedido_da_meta(meta_user_id: str) -> int:
+    """A pessoa removeu o LeadSage da conta do Facebook: apaga o que veio dela.
+
+    Sai tudo que a Meta nos deu — tokens, pagina, Instagram, WhatsApp — e
+    as conversas recebidas por esses canais. Fica o que o usuario criou
+    dentro do LeadSage (leads da busca, sites, propostas), que nao veio da
+    Meta. Devolve quantas conversas foram apagadas.
+    """
+    canal = await robo_store.canal_por_ativo("usuario_meta", meta_user_id)
+    if not canal:
+        return 0
+    uid = canal["uid"]
+    await desconectar(uid, "facebook")
+    await desconectar(uid, "whatsapp")
+    apagadas = await robo_store.apagar_conversas(uid)
+    canal = await _canal(uid)
+    canal.pop("meta_user_id", None)
+    await robo_store.substituir_canal(uid, canal)
+    await robo_store.esquecer_ativo("usuario_meta", meta_user_id)
+    return apagadas
+
+
 async def guardar_paginas(uid: str, paginas: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Depois do login: guarda as paginas autorizadas.
 

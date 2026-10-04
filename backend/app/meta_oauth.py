@@ -141,6 +141,35 @@ async def trocar_codigo(code: str, com_redirect: bool = True) -> str:
     return longo.get("access_token") or curto
 
 
+def ler_signed_request(signed_request: str) -> Dict[str, Any]:
+    """Abre o pedido assinado que a Meta manda na exclusao de dados.
+
+    Formato: "<assinatura>.<dados>", ambos base64url; a assinatura e
+    HMAC-SHA256 dos dados com o segredo do app. Sem conferir, qualquer um
+    poderia mandar um pedido falso e apagar a conexao de outro cliente.
+    """
+    try:
+        assinatura_b64, dados_b64 = (signed_request or "").split(".", 1)
+        assinatura = base64.urlsafe_b64decode(assinatura_b64 + "=" * (-len(assinatura_b64) % 4))
+        dados = json.loads(base64.urlsafe_b64decode(dados_b64 + "=" * (-len(dados_b64) % 4)))
+    except Exception:
+        raise MetaRecusou("Pedido da Meta ilegível.")
+    if str(dados.get("algorithm", "")).upper() != "HMAC-SHA256":
+        raise MetaRecusou("Algoritmo de assinatura inesperado.")
+    esperado = hmac.new(settings.META_APP_SECRET.encode(), dados_b64.encode(), hashlib.sha256).digest()
+    if not settings.META_APP_SECRET or not hmac.compare_digest(esperado, assinatura):
+        raise MetaRecusou("Assinatura do pedido inválida.")
+    return dados
+
+
+async def quem_autorizou(token_usuario: str) -> str:
+    """O id (por app) de quem fez o login. E a chave do pedido de exclusao."""
+    try:
+        return (await graph("GET", "me", params={"fields": "id", "access_token": token_usuario})).get("id", "")
+    except MetaRecusou:
+        return ""
+
+
 async def listar_paginas(token_usuario: str) -> List[Dict[str, Any]]:
     dados = await graph("GET", "me/accounts", params={
         "fields": "id,name,access_token,instagram_business_account{id,username}",
