@@ -388,3 +388,33 @@ export interface RoboTeste {
   motivo: string;
   optout: boolean;
 }
+
+
+// ---------------------------------------------------------------- raio-x
+
+export interface RaioX {
+  place_id: string;
+  do_cache: boolean;
+  gerado_em: string;
+  gmn: {
+    nome: string; categoria: string; nota: number | null; avaliacoes: number; aberto: boolean;
+    descricao: string; resumo_avaliacoes: string; completude: number;
+    itens: { item: string; ok: boolean | null; detalhe: string }[];
+    link_avaliacoes: string; link_fotos: string; link_perfil: string;
+  };
+  site: {
+    url: string; tipo: 'own' | 'social' | 'aggregator' | 'whatsapp' | 'none';
+    nota: number | null; problemas: string[]; plataforma: string; credito_agencia: string;
+    pixel_meta: boolean; tag_google_ads: boolean; tag_tiktok: boolean; google_analytics: boolean;
+    pixels_via_tag_manager: boolean; ano_rodape: number | null;
+  };
+  instagram: {
+    disponivel: boolean; usuario?: string; motivo?: string; seguidores?: number | null;
+    publicacoes?: number | null; dias_desde_ultimo_post?: number | null; posts_90_dias?: number;
+    engajamento_medio?: number | null;
+  };
+  quem_cuida: {
+    veredito: 'agencia' | 'dono' | 'abandonado' | 'ninguem' | 'indefinido';
+    rotulo: string; confianca: string; evidencias: string[]; abordagem: string; lacunas: string[];
+  };
+}

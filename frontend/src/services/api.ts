@@ -21,7 +21,8 @@ import type {
   RoboConversa,
   RoboConversaResumo,
   RoboMensagem,
-  RoboTeste
+  RoboTeste,
+  RaioX
 } from '../types';
 import { auth } from '../lib/firebase';
 
@@ -279,6 +280,12 @@ export const api = {
 
   async metaDesconectar(alvo: 'facebook' | 'whatsapp'): Promise<RoboConfig> {
     return await fetchWithToken('/robo/meta/desconectar', { method: 'POST', body: JSON.stringify({ alvo }) });
+  },
+
+  async raioX(place_id: string, website: string, instagram: string, refazer = false): Promise<RaioX> {
+    return await fetchWithToken('/raio-x', {
+      method: 'POST', body: JSON.stringify({ place_id, website, instagram, refazer }),
+    });
   },
 
   async meuPlano(): Promise<PlanoAtual> {

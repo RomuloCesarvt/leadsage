@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import {
   InstagramIcon, WhatsAppIcon, FacebookIcon, LinkedInIcon, TikTokIcon, XIcon, GoogleMapsIcon,
 } from './BrandIcons';
+import { RaioXLead } from './RaioXLead';
 import { 
   X, 
   MapPin, 
@@ -180,6 +181,8 @@ export const LeadProfilePanel: React.FC = () => {
               {lead.diagnosis || lead.ai_summary || lead.bio || "Sem leitura disponível para este lead."}
             </p>
           </div>
+
+          <RaioXLead lead={lead} />
 
           {/* Os ganchos sao fatos verificados, prontos para abrir a
               conversa. Substituem os tres cartoes de "Julgamento de
