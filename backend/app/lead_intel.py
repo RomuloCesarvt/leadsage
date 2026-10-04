@@ -73,6 +73,41 @@ MARCADORES_LOJA = ("adicionar ao carrinho", "comprar agora", "finalizar compra",
 ANO_COPYRIGHT = re.compile(r"(?:©|&copy;|copyright)\s*(?:20\d{2}\s*[-–]\s*)?(20\d{2})", re.I)
 
 
+# "Criado com Wix" e credito da plataforma, nao de quem fez — indica o
+# contrario de agencia: o dono montou sozinho.
+_PLATAFORMAS_NO_CREDITO = (
+    "wix", "wordpress", "squarespace", "shopify", "nuvemshop", "webnode",
+    "google sites", "jimdo", "weebly", "hostinger", "godaddy", "elementor", "blogger",
+)
+_PRIMEIRA_PESSOA = ("nossa", "nosso", "nossas", "nossos", "voce", "você", "a", "o", "com", "amor", "mim", "nós", "nos")
+_CREDITO = re.compile(
+    r"(?:desenvolvid[oa]|criad[oa]|feito|produzid[oa]|site|design|projetad[oa])"
+    r"\s+(?:por|by)\s*:?\s*(?:<[^>]*>\s*)*([^<>\n|]{2,60}?)\s*(?:<|\n|\||$)",
+    re.I,
+)
+
+
+def credito_de_agencia(html: str) -> str:
+    """O nome de quem fez o site, quando o rodape diz.
+
+    "Desenvolvido por Agencia X" e a pista mais direta de que ja ha um
+    profissional na conta — e, portanto, de que a abordagem e outra:
+    substituir um fornecedor, nao convencer alguem a comecar.
+    """
+    # So o rodape: "este bolo foi feito por nossa equipe" no meio da
+    # pagina nao e credito de ninguem.
+    rodapes = re.findall(r"<footer\b.*?</footer>", html or "", re.S | re.I)
+    trecho = " ".join(rodapes) if rodapes else (html or "")[-3000:]
+    for m in _CREDITO.finditer(trecho):
+        nome = re.sub(r"\s+", " ", m.group(1)).strip(" .:-|©")
+        if len(nome) < 2 or nome.lower().split(" ")[0] in _PRIMEIRA_PESSOA:
+            continue
+        if any(p in nome.lower() for p in _PLATAFORMAS_NO_CREDITO):
+            continue
+        return nome[:60]
+    return ""
+
+
 def analisar_site(
     html: str,
     url: str,
@@ -104,6 +139,14 @@ def analisar_site(
         "tem_loja": False,
         "tem_mapa": False,
         "tem_analytics": False,
+        # quem cuida: credito de agencia e sinais de investimento em anuncio
+        "credito_agencia": "",
+        "pixel_meta": False,
+        "tag_google_ads": False,
+        "google_analytics": False,
+        "tag_tiktok": False,
+        # containers do Tag Manager: os pixels costumam estar dentro deles
+        "gtm_ids": [],
         "ano_rodape": None,
         "peso_kb": len(html or "") // 1024,
     }
@@ -142,6 +185,21 @@ def analisar_site(
         "googletagmanager" in baixo or "google-analytics" in baixo or "gtag(" in baixo
         or "fbq(" in baixo or "facebook.net/" in baixo
     )
+
+    # Medir (Analytics) e diferente de anunciar: Pixel da Meta e tag de
+    # conversao do Google Ads so existem em site de quem compra trafego —
+    # quase sempre com alguem profissional cuidando.
+    sinais["pixel_meta"] = "fbq(" in baixo or "connect.facebook.net/" in baixo
+    sinais["tag_google_ads"] = (
+        "googleadservices.com" in baixo or bool(re.search(r"['\"]aw-\d{6,}", baixo))
+    )
+    sinais["google_analytics"] = (
+        "google-analytics.com" in baixo or "googletagmanager" in baixo
+        or bool(re.search(r"['\"]g-[a-z0-9]{6,}", baixo))
+    )
+    sinais["tag_tiktok"] = "analytics.tiktok.com" in baixo or "ttq.load" in baixo
+    sinais["gtm_ids"] = sorted(set(re.findall(r"GTM-[A-Z0-9]{4,10}", html or "")))[:3]
+    sinais["credito_agencia"] = credito_de_agencia(html or "")
 
     ano = ANO_COPYRIGHT.search(html or "")
     if ano:

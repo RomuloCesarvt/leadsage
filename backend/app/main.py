@@ -42,7 +42,7 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
-from app import robo_store, robo_service, meta_canais, meta_oauth, robo_conexao
+from app import robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote as _quote
 from app.ai_robo import decidir as robo_decidir
@@ -1187,6 +1187,47 @@ async def meta_webhook(request: Request):
             except Exception as exc:
                 print(f"Robo: falha ao processar {msg.canal}/{msg.meta_id}: {exc}")
     return {"ok": True}
+
+
+# ------------------------------------------------------------- raio-x
+
+class RaioXRequest(BaseModel):
+    place_id: str = Field(pattern=r"^[A-Za-z0-9_-]{10,200}$")
+    website: Optional[str] = Field(default="", max_length=500)
+    instagram: Optional[str] = Field(default="", max_length=200)
+    # refazer mesmo com o guardado ainda valido (cobra de novo)
+    refazer: bool = False
+
+
+@app.post("/api/raio-x")
+async def gerar_raio_x(req: RaioXRequest, user: dict = Depends(get_current_user)):
+    """O lead a fundo: Google Meu Negocio, site, Instagram e quem cuida.
+
+    Cobra 1 credito na primeira vez e guarda por 7 dias: reabrir o lead
+    nao gasta de novo. O custo existe porque o detalhe do Google e uma
+    consulta por lugar, ao contrario da busca, que traz 20 por consulta.
+    """
+    uid, email = user.get("uid"), user.get("email", "")
+
+    if not req.refazer:
+        guardado = await raio_x.ler_cache(uid, req.place_id)
+        if guardado:
+            return {**guardado, "do_cache": True}
+
+    if await check_and_deduct_credits(uid, 1, email) is None:
+        raise HTTPException(status_code=402, detail="Créditos insuficientes para o raio-x.")
+
+    canal = await robo_store.canal_do_usuario(uid) or {}
+    try:
+        dados = await asyncio.wait_for(
+            raio_x.montar(req.place_id, req.website or "", req.instagram or "", canal),
+            timeout=40,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="O raio-x demorou demais. Tente de novo.")
+
+    await raio_x.gravar_cache(uid, req.place_id, dados)
+    return {**dados, "do_cache": False}
 
 
 @app.get("/api/place-photo")
