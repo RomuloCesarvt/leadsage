@@ -154,8 +154,8 @@ def test_eco_da_propria_pagina_e_ignorado():
 # ----------------------------------------------------------- pedido de saida
 
 @pytest.mark.parametrize("texto", [
-    "Pare", "pare por favor", "Não quero, obrigado", "ok obrigado pode parar", "STOP",
-    "não tenho interesse no momento", "para de mandar mensagem", "me tira dessa lista",
+    "Pare", "pare por favor", "ok obrigado pode parar", "STOP",
+    "para de mandar mensagem", "me tira dessa lista",
     "Para", "Sair", "descadastrar",
 ])
 def test_reconhece_pedido_de_saida(texto):
@@ -428,3 +428,128 @@ def test_conversa_de_outro_usuario(client, com_plano, as_user, monkeypatch):
     assert client.get(f"/api/robo/conversas/{c['id']}").status_code == 404
     assert client.post(f"/api/robo/conversas/{c['id']}/responder",
                        json={"texto": "oi"}).status_code == 404
+
+
+# ------------------------------------------------------------------ recusa
+
+from app.ai_robo import RESPOSTA_ENCERRA, recusou
+
+
+@pytest.mark.parametrize("texto", ["Não tenho interesse no momento", "Não quero, obrigado",
+                                   "não preciso", "agora não", "sem interesse"])
+def test_recusa_nao_e_pedido_de_saida(texto):
+    """"Agora nao" e diferente de "pare de me mandar mensagem"."""
+    assert recusou(texto) and not pediu_para_sair(texto)
+
+
+def test_recusa_longa_e_conversa():
+    assert not recusou("não quero perder essa oportunidade, me explica melhor como funciona")
+
+
+def test_primeira_recusa_ganha_uma_resposta_gentil():
+    gerar = ia("Tudo bem! Posso só saber se é o momento ou o serviço?")
+    d = decidir(conversa("Não tenho interesse no momento"), "whatsapp", {}, CFG, None, gerar)
+    assert not d.optout and d.resposta and d.sdr["recusas"] == 1
+    assert "acabou de recusar" in gerar.chamadas[0]
+
+
+def test_segunda_recusa_encerra_sem_ia():
+    gerar = ia()
+    d = decidir(conversa("não tenho interesse"), "whatsapp", {}, CFG, None, gerar, sdr={"recusas": 1})
+    assert d.optout and d.resposta == RESPOSTA_ENCERRA and gerar.chamadas == []
+
+
+def test_memoria_da_negociacao_nao_regride():
+    """Modelo que devolve campo vazio nao apaga o que ja foi descoberto."""
+    gerar = lambda prompt: {"mensagens": ["Certo!"], "etapa": "inventada", "dados": {"dor": ""}}
+    anterior = {"etapa": "proposta", "temperatura": "quente", "dados": {"dor": "sem clientes no Google"}}
+    d = decidir(conversa("ok"), "whatsapp", {}, CFG, None, gerar, sdr=anterior)
+    assert d.sdr["etapa"] == "proposta" and d.sdr["temperatura"] == "quente"
+    assert d.sdr["dados"]["dor"] == "sem clientes no Google"
+
+
+def test_reuniao_combinada_passa_para_o_humano():
+    gerar = lambda prompt: {"mensagens": ["Combinado, quinta às 15h!"], "etapa": "agendamento",
+                            "reuniao": "quinta 15h"}
+    d = decidir(conversa("quinta às 15h"), "whatsapp", {}, CFG, None, gerar)
+    assert d.passar_para_humano and "quinta 15h" in d.motivo
+
+
+def test_ate_duas_mensagens():
+    gerar = lambda prompt: {"mensagens": ["um", "dois", "tres"]}
+    assert decidir(conversa("oi"), "whatsapp", {}, CFG, None, gerar).mensagens == ["um", "dois"]
+
+
+def test_dossie_entra_no_prompt():
+    gerar = ia()
+    raio = {"gmn": {"resumo_avaliacoes": "Clientes elogiam o pão de queijo",
+                    "itens": [{"item": "Descrição do negócio", "ok": False}]},
+            "quem_cuida": {"rotulo": "Ninguém cuidando do digital", "confianca": "média", "evidencias": ["sem site"]}}
+    decidir(conversa("oi"), "whatsapp", {}, CFG, {"company": "Padaria X"}, gerar, raio=raio)
+    p = gerar.chamadas[0]
+    assert "pão de queijo" in p and "Ninguém cuidando" in p and "Descrição do negócio" in p
+
+
+def test_sem_catalogo_proibe_preco_e_com_catalogo_usa():
+    sem, com = ia(), ia()
+    decidir(conversa("quanto custa"), "whatsapp", {}, CFG, None, sem)
+    decidir(conversa("quanto custa"), "whatsapp", {}, {**CFG, "catalogo": "Site: R$ 2.500", "desconto_maximo": 10}, None, com)
+    assert "NUNCA diga valores" in sem.chamadas[0]
+    assert "R$ 2.500" in com.chamadas[0] and "10%" in com.chamadas[0]
+
+
+def test_persuasao_proibe_o_que_engana():
+    gerar = ia()
+    decidir(conversa("oi"), "whatsapp", {}, CFG, None, gerar)
+    p = gerar.chamadas[0]
+    assert "escassez inventada" in p and "inventar justificativa" in p
+
+
+# -------------------------------------------------------------- verificador
+
+from app.ai_sdr import problemas_da_resposta
+
+CAT = {**CFG, "catalogo": "Site + Google: R$ 2.500\nInstagram: R$ 900/mês", "desconto_maximo": 10}
+
+
+@pytest.mark.parametrize("texto", [
+    "O site sai R$ 2.500.", "À vista consigo R$ 2.250.", "A gestão é R$ 900 por mês.",
+])
+def test_valores_do_catalogo_passam(texto):
+    assert problemas_da_resposta([texto], CAT, []) == []
+
+
+@pytest.mark.parametrize("texto", ["Faço por R$ 1.800.", "Fica R$ 3.000 com tudo."])
+def test_valor_inventado_e_barrado(texto):
+    assert problemas_da_resposta([texto], CAT, [])
+
+
+def test_valor_dito_pelo_cliente_pode_ser_repetido():
+    msgs = [{"de": "contato", "texto": "faz por 1500?"}]
+    assert problemas_da_resposta(["R$ 1.500 não consigo, mas à vista fica R$ 2.250."], CAT, msgs) == []
+
+
+def test_sem_catalogo_nenhum_valor_passa():
+    assert problemas_da_resposta(["Um site custa uns R$ 2.000."], CFG, [])
+
+
+@pytest.mark.parametrize("texto", [
+    "R$ 1.500 fica abaixo do nosso custo de produção.", "Últimas vagas deste mês!", "Só hoje consigo esse valor.",
+])
+def test_motivo_ou_urgencia_inventados_sao_barrados(texto):
+    assert problemas_da_resposta([texto], CAT, [{"de": "contato", "texto": "1500"}])
+
+
+def test_resposta_errada_e_reescrita():
+    respostas = iter([
+        {"mensagens": ["R$ 1.500 fica abaixo do nosso custo."]},
+        {"mensagens": ["Esse valor não consigo, mas à vista fica R$ 2.250."]},
+    ])
+    d = decidir(conversa("faz por 1500?"), "whatsapp", {}, CAT, None, lambda p: next(respostas))
+    assert d.mensagens == ["Esse valor não consigo, mas à vista fica R$ 2.250."] and not d.passar_para_humano
+
+
+def test_erro_insistente_vai_para_o_humano():
+    d = decidir(conversa("faz por 1500?"), "whatsapp", {}, CAT, None,
+                lambda p: {"mensagens": ["Faço por R$ 1.700, última vaga!"]})
+    assert d.passar_para_humano and not d.mensagens

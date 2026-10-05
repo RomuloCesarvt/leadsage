@@ -868,6 +868,9 @@ class RoboConfigRequest(BaseModel):
     instrucoes: Optional[str] = Field(default=None, max_length=3000)
     link_agenda: Optional[str] = None
     nome_assistente: Optional[str] = Field(default=None, max_length=60)
+    catalogo: Optional[str] = Field(default=None, max_length=4000)
+    faq: Optional[str] = Field(default=None, max_length=4000)
+    desconto_maximo: Optional[int] = Field(default=None, ge=0, le=50)
 
 
 class RoboTextoRequest(BaseModel):
@@ -883,6 +886,8 @@ class RoboTesteRequest(BaseModel):
     mensagens: List[Dict[str, str]] = Field(default_factory=list, max_length=40)
     canal: str = "whatsapp"
     lead_id: Optional[str] = None
+    # o estado da negociacao volta da tela a cada mensagem do simulador
+    sdr: Optional[Dict[str, Any]] = None
 
 
 @app.get("/api/robo/config")
@@ -895,7 +900,7 @@ async def robo_config(user: dict = Depends(get_current_user)):
 @app.put("/api/robo/config")
 async def robo_salvar_config(req: RoboConfigRequest, user: dict = Depends(get_current_user)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    if req.objetivo and req.objetivo not in ("agendar", "site", "qualificar"):
+    if req.objetivo and req.objetivo not in ("agendar", "site", "qualificar", "vender"):
         raise HTTPException(status_code=400, detail="Objetivo inválido.")
     canal = await robo_store.salvar_canal(
         user.get("uid"), user.get("email", ""), req.model_dump(exclude_none=True)
@@ -1028,9 +1033,10 @@ async def robo_testar(req: RoboTesteRequest, user: dict = Depends(get_current_us
     if not mensagens or mensagens[-1]["de"] != "contato":
         raise HTTPException(status_code=400, detail="A última mensagem precisa ser do contato.")
 
-    lead = None
+    lead, raio = None, None
     if req.lead_id:
         lead = await robo_service._lead_por_id(uid, req.lead_id)
+        raio = await raio_x.ler_cache(uid, req.lead_id)
 
     if await check_and_deduct_credits(uid, robo_service.CUSTO_RESPOSTA, email) is None:
         raise HTTPException(status_code=402, detail="Créditos insuficientes para testar o robô.")
@@ -1039,7 +1045,7 @@ async def robo_testar(req: RoboTesteRequest, user: dict = Depends(get_current_us
         decisao = await asyncio.wait_for(
             asyncio.to_thread(
                 robo_decidir, mensagens, req.canal, perfil.model_dump(), canal, lead,
-                robo_service._gerador_padrao(),
+                robo_service._gerador_padrao(), raio, req.sdr,
             ),
             timeout=robo_service.PRAZO_IA + 6,
         )
@@ -1050,6 +1056,9 @@ async def robo_testar(req: RoboTesteRequest, user: dict = Depends(get_current_us
 
     return {
         "resposta": decisao.resposta,
+        "mensagens": decisao.mensagens or ([decisao.resposta] if decisao.resposta else []),
+        "sdr": decisao.sdr,
+        "usou_dossie": bool(lead or raio),
         "passar_para_humano": decisao.passar_para_humano,
         "motivo": decisao.motivo,
         "optout": decisao.optout,

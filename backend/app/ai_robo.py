@@ -20,7 +20,7 @@ diz que vai confirmar e chama o dono.
 """
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
 # Quantas respostas o robo da seguidas sem nenhuma intervencao humana.
@@ -31,9 +31,22 @@ MAX_RESPOSTAS_SEGUIDAS = 12
 # nao e pedido para sair.
 PEDIDOS_DE_SAIDA = (
     "pare", "parar", "para", "sair", "stop", "cancelar", "descadastrar",
-    "remover", "me tira", "me remove", "nao quero", "nao tenho interesse",
-    "sem interesse", "nao me mande", "nao mande mais", "nao envie mais",
-    "bloquear", "unsubscribe",
+    "remover", "me tira", "me remove", "nao me mande", "nao mande mais",
+    "nao envie mais", "bloquear", "unsubscribe",
+)
+
+# Recusa nao e pedido para sair. "Nao tenho interesse no momento" e um
+# "agora nao": um bom SDR agradece e faz no maximo uma pergunta gentil.
+# Tratar isso como saida definitiva encerrava conversas recuperaveis; a
+# segunda recusa, essa sim, encerra.
+RECUSAS = (
+    "nao tenho interesse", "sem interesse", "nao quero", "nao preciso",
+    "agora nao", "no momento nao", "nao obrigado", "nao, obrigado", "dispenso",
+)
+
+RESPOSTA_ENCERRA = (
+    "Entendido, obrigado pela sinceridade! Não vou mais te incomodar. "
+    "Se um dia precisar, é só chamar por aqui."
 )
 
 RESPOSTA_SAIDA = (
@@ -49,6 +62,10 @@ class Decisao:
     motivo: str = ""
     optout: bool = False
     usou_ia: bool = False
+    # ate duas mensagens curtas, como gente escreve no WhatsApp
+    mensagens: List[str] = field(default_factory=list)
+    # memoria da negociacao: etapa, temperatura, o que foi descoberto
+    sdr: Dict[str, Any] = field(default_factory=dict)
 
 
 def _normal(texto: str) -> str:
@@ -99,6 +116,15 @@ def pediu_para_sair(texto: str) -> bool:
     return False
 
 
+def recusou(texto: str) -> bool:
+    """Recusa curta e direta. Mensagem longa com "nao quero" no meio e
+    conversa, nao recusa ("nao quero perder essa oportunidade")."""
+    t = _normal(texto)
+    if not t or len(t.split()) > 7:
+        return False
+    return any(t == r or t.startswith(r + " ") or t.endswith(" " + r) for r in RECUSAS)
+
+
 def e_so_midia(texto: str) -> bool:
     return bool(re.fullmatch(r"\[[^\]]+\]", (texto or "").strip()))
 
@@ -114,73 +140,7 @@ def respostas_seguidas_do_robo(mensagens: List[Dict[str, Any]]) -> int:
     return n
 
 
-def montar_prompt(
-    mensagens: List[Dict[str, Any]],
-    canal: str,
-    perfil: Dict[str, Any],
-    cfg: Dict[str, Any],
-    lead: Optional[Dict[str, Any]],
-) -> str:
-    quem = perfil.get("company_name") or perfil.get("name") or "a empresa"
-    assistente = cfg.get("nome_assistente") or "assistente virtual"
-    oferta = perfil.get("product_description") or "serviços de presença digital"
-    objetivo = {
-        "agendar": "marcar uma conversa rápida (ligação ou reunião) com o responsável",
-        "site": "mostrar o site que já foi preparado para o negócio e saber o que a pessoa achou",
-        "qualificar": "entender se a pessoa tem interesse e momento para contratar",
-    }.get(cfg.get("objetivo") or "agendar", cfg.get("objetivo") or "marcar uma conversa")
-
-    contexto_lead = "Não há dados do negócio desta pessoa."
-    if lead:
-        partes = [f"Negócio: {lead.get('company') or lead.get('name')}"]
-        if lead.get("niche"):
-            partes.append(f"Ramo: {lead['niche']}")
-        if lead.get("city"):
-            partes.append(f"Cidade: {lead['city']}")
-        if lead.get("missingDigitalAssets"):
-            partes.append("O que falta no digital: " + ", ".join(lead["missingDigitalAssets"]))
-        if lead.get("rating"):
-            partes.append(f"Nota no Google: {lead['rating']} ({lead.get('rating_count') or 0} avaliações)")
-        if lead.get("site_publicado"):
-            partes.append(f"Site já preparado para ele: {lead['site_publicado']}")
-        contexto_lead = "\n".join(partes)
-
-    limite = 60 if canal == "whatsapp" else 45
-    historico = "\n".join(
-        f"{'CONTATO' if m.get('de') == 'contato' else quem.upper()}: {m.get('texto', '')}"
-        for m in mensagens[-20:]
-    )
-
-    return f"""Você é {assistente}, que responde mensagens em nome de {quem}.
-{quem} oferece: {oferta}
-
-OBJETIVO DA CONVERSA: {objetivo}.
-{f"Link para agendar: {cfg['link_agenda']}" if cfg.get("link_agenda") else ""}
-
-SOBRE QUEM ESTÁ CONVERSANDO:
-{contexto_lead}
-
-INSTRUÇÕES DO DONO:
-{cfg.get("instrucoes") or "(nenhuma)"}
-
-REGRAS — não negociáveis:
-- Português do Brasil, tom de conversa de {canal}, no máximo {limite} palavras.
-- Uma pergunta por vez. Nada de lista, nada de emoji em excesso, nada de "Prezado".
-- NUNCA invente preço, prazo, desconto, garantia ou resultado. Se perguntarem
-  e isso não estiver nas instruções do dono, diga que vai confirmar com o
-  responsável e marque passar_para_humano.
-- Se perguntarem se você é um robô ou uma pessoa, diga a verdade: você é o
-  assistente virtual de {quem}.
-- Passe para o humano quando a pessoa quiser fechar, negociar valor, pedir
-  algo fora do objetivo, reclamar, ou quando você não souber responder.
-- Não repita a mesma pergunta que já foi feita no histórico.
-
-CONVERSA ATÉ AGORA:
-{historico}
-
-Responda APENAS com JSON:
-{{"resposta": "texto para enviar", "passar_para_humano": false, "motivo": "por que (só se passar)"}}
-"""
+from app.ai_sdr import montar_prompt, normalizar, problemas_da_resposta  # noqa: E402
 
 
 def decidir(
@@ -190,6 +150,8 @@ def decidir(
     cfg: Dict[str, Any],
     lead: Optional[Dict[str, Any]],
     gerar_json: Callable[[str], Dict[str, Any]],
+    raio: Optional[Dict[str, Any]] = None,
+    sdr: Optional[Dict[str, Any]] = None,
 ) -> Decisao:
     """O que fazer com a ultima mensagem do contato.
 
@@ -204,6 +166,15 @@ def decidir(
     if pediu_para_sair(texto):
         return Decisao(resposta=RESPOSTA_SAIDA, optout=True, motivo="pediu para não receber mais")
 
+    if recusou(texto):
+        recusas = int((sdr or {}).get("recusas") or 0)
+        if recusas >= 1:
+            return Decisao(
+                resposta=RESPOSTA_ENCERRA, optout=True, motivo="recusou duas vezes",
+                sdr={**(sdr or {}), "recusas": recusas + 1, "etapa": "perdido"},
+            )
+        sdr = {**(sdr or {}), "recusas": recusas + 1}
+
     if e_so_midia(texto):
         return Decisao(passar_para_humano=True, motivo=f"mandou {texto} — o robô não interpreta mídia")
 
@@ -213,16 +184,35 @@ def decidir(
             motivo=f"{MAX_RESPOSTAS_SEGUIDAS} respostas seguidas sem você — pode ser outro robô do outro lado",
         )
 
-    dados = gerar_json(montar_prompt(mensagens, canal, perfil, cfg, lead))
-    resposta = str(dados.get("resposta") or "").strip()
-    humano = bool(dados.get("passar_para_humano"))
+    prompt = montar_prompt(mensagens, canal, perfil, cfg, lead, raio=raio, sdr=sdr)
+    n = normalizar(gerar_json(prompt), sdr)
 
-    if not resposta and not humano:
-        return Decisao(passar_para_humano=True, motivo="a IA não produziu resposta", usou_ia=True)
+    # Conferencia em codigo: preco fora do catalogo e motivo inventado nao
+    # saem. Uma chance de corrigir; errou de novo, o humano assume.
+    erros = problemas_da_resposta(n["mensagens"], cfg, mensagens)
+    if erros:
+        correcao = (prompt + "\n\n== SUA RESPOSTA ANTERIOR FOI RECUSADA ==\n"
+                    + "\n".join(f"- {e}" for e in erros)
+                    + "\nReescreva sem isso. Para negar algo, basta dizer que não é possível.")
+        n = normalizar(gerar_json(correcao), sdr)
+        if problemas_da_resposta(n["mensagens"], cfg, mensagens):
+            return Decisao(passar_para_humano=True, usou_ia=True, sdr=n["sdr"],
+                           motivo="a IA insistiu em citar preço ou motivo que não existe — responda você")
+    humano = n["passar_para_humano"]
+
+    if not n["mensagens"] and not humano:
+        return Decisao(passar_para_humano=True, motivo="a IA não produziu resposta", usou_ia=True, sdr=n["sdr"])
+
+    # Reuniao combinada e o fim do trabalho do robo: o humano assume.
+    if n["sdr"].get("reuniao") and not (sdr or {}).get("reuniao"):
+        humano = True
+        n["motivo"] = n["motivo"] or f"reunião combinada: {n['sdr']['reuniao']}"
 
     return Decisao(
-        resposta=resposta,
+        resposta="\n\n".join(n["mensagens"]),
+        mensagens=n["mensagens"],
         passar_para_humano=humano,
-        motivo=str(dados.get("motivo") or "").strip() if humano else "",
+        motivo=n["motivo"] if humano else "",
         usou_ia=True,
+        sdr=n["sdr"],
     )

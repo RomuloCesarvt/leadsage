@@ -37,6 +37,9 @@ CAMPOS_CANAL = (
     "page_id", "page_token", "ig_id",
     # comportamento do robo
     "ativo", "objetivo", "instrucoes", "link_agenda", "nome_assistente",
+    # base de conhecimento do SDR: o que existe para vender e o que pode
+    # ser concedido. O que nao estiver aqui, o robo nao inventa.
+    "catalogo", "faq", "desconto_maximo",
     # preenchidos pela conexao com um clique (app do LeadSage)
     "page_nome", "ig_usuario", "waba_id", "wa_pin",
 )

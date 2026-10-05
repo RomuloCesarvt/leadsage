@@ -40,7 +40,9 @@ def _gerador_padrao() -> Callable[[str], Dict[str, Any]]:
     from app.ai_client import build_client, gerar_json
 
     cliente = build_client(settings.GEMINI_API_KEY)
-    return lambda prompt: gerar_json(cliente, prompt, obrigatorias=["resposta"])
+    # "mensagens" e conferida em ai_sdr.normalizar, que aceita tambem o
+    # formato antigo ("resposta"); exigir aqui faria rejeitar o outro.
+    return lambda prompt: gerar_json(cliente, prompt)
 
 
 async def _lead_do_contato(uid: str, canal: str, contato: str) -> Optional[Dict[str, Any]]:
@@ -65,6 +67,7 @@ async def _lead_do_contato(uid: str, canal: str, contato: str) -> Optional[Dict[
                 "id": row.id, "name": row.name, "company": row.company, "niche": row.niche,
                 "city": row.city, "missingDigitalAssets": row.missingDigitalAssets or [],
                 "rating": row.rating, "rating_count": row.rating_count,
+                "diagnosis": getattr(row, "diagnosis", None), "hooks": getattr(row, "hooks", None) or [],
             }
     return None
 
@@ -84,6 +87,7 @@ async def _lead_por_id(uid: str, lead_id: str) -> Optional[Dict[str, Any]]:
         "id": row.id, "name": row.name, "company": row.company, "niche": row.niche,
         "city": row.city, "missingDigitalAssets": row.missingDigitalAssets or [],
         "rating": row.rating, "rating_count": row.rating_count,
+                "diagnosis": getattr(row, "diagnosis", None), "hooks": getattr(row, "hooks", None) or [],
     }
     lead["site_publicado"] = await _site_do_lead(uid, row.id)
     return lead
@@ -159,13 +163,22 @@ async def processar(
         _marcar(conversa, "seu plano não inclui o robô de atendimento")
         return await salvar()
 
+    # O raio-x do lead, se ja foi feito: e o que torna a conversa unica.
+    raio = None
+    if lead:
+        try:
+            from app import raio_x
+            raio = await raio_x.ler_cache(uid, lead["id"])
+        except Exception:
+            raio = None
+
     # 5 e 6. regras fixas, depois IA
     gerador = gerar or _gerador_padrao()
     try:
         decisao: Decisao = await asyncio.wait_for(
             asyncio.to_thread(
                 decidir, conversa["mensagens"], msg.canal,
-                perfil.model_dump(), cfg, lead, gerador,
+                perfil.model_dump(), cfg, lead, gerador, raio, conversa.get("sdr"),
             ),
             timeout=PRAZO_IA,
         )
@@ -175,6 +188,9 @@ async def processar(
     except Exception as exc:
         _marcar(conversa, f"a IA não respondeu ({type(exc).__name__}) — responda você")
         return await salvar()
+
+    if decisao.sdr:
+        conversa["sdr"] = decisao.sdr
 
     if decisao.optout:
         conversa["optout"] = True
@@ -190,11 +206,13 @@ async def processar(
             _marcar(conversa, "sem créditos para o robô responder")
             return await salvar()
 
-    if decisao.resposta:
+    # Uma ou duas mensagens curtas, enviadas em sequencia — como uma
+    # pessoa escreve. A resposta fixa de saida vem em `resposta`.
+    for texto in (decisao.mensagens or ([decisao.resposta] if decisao.resposta else [])):
         try:
-            meta_id = await enviar(msg.canal, msg.contato, decisao.resposta, cfg)
+            meta_id = await enviar(msg.canal, msg.contato, texto, cfg)
             conversa["mensagens"].append({
-                "de": "robo", "texto": decisao.resposta, "em": robo_store.agora(), "meta_id": meta_id,
+                "de": "robo", "texto": texto, "em": robo_store.agora(), "meta_id": meta_id,
             })
         except meta_canais.EnvioFalhou as exc:
             _marcar(conversa, f"a resposta não foi entregue: {exc}")
