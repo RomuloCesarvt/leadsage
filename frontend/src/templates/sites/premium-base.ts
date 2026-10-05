@@ -16,6 +16,41 @@ import { esc, digitos, linkWhatsapp, linkInstagram, ajustarCor, corDoTexto } fro
 
 export type ParFontes = { titulos: string; corpo: string; google: string };
 
+/**
+ * Pares tipográficos que o usuário pode escolher no lugar do par do layout.
+ * Cada um foi montado para combinar título e texto — misturar duas fontes
+ * ao acaso é o jeito mais rápido de um site parecer amador.
+ */
+export const FONTES: Record<string, ParFontes & { nome: string; tom: string }> = {
+  elegante: { nome: 'Elegante', tom: 'serifa clássica e texto limpo',
+    titulos: '"Playfair Display",Georgia,serif', corpo: '"Inter",system-ui,sans-serif',
+    google: 'family=Playfair+Display:wght@500;700&family=Inter:wght@400;500;600;700' },
+  artesanal: { nome: 'Artesanal', tom: 'calor de coisa feita à mão',
+    titulos: '"Fraunces",Georgia,serif', corpo: '"Inter",system-ui,sans-serif',
+    google: 'family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700' },
+  moderna: { nome: 'Moderna', tom: 'geométrica e direta',
+    titulos: '"Plus Jakarta Sans",system-ui,sans-serif', corpo: '"Plus Jakarta Sans",system-ui,sans-serif',
+    google: 'family=Plus+Jakarta+Sans:wght@400;500;600;700;800' },
+  forte: { nome: 'Forte', tom: 'larga e impactante',
+    titulos: '"Archivo",system-ui,sans-serif', corpo: '"Inter",system-ui,sans-serif',
+    google: 'family=Archivo:wdth,wght@112,700;112,800;112,900&family=Inter:wght@400;500;600' },
+  luxo: { nome: 'Luxo', tom: 'serifa fina, ar de boutique',
+    titulos: '"Cormorant Garamond",Georgia,serif', corpo: '"Jost",system-ui,sans-serif',
+    google: 'family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Jost:wght@300;400;500;600' },
+  sobria: { nome: 'Sóbria', tom: 'livro e escritório',
+    titulos: '"Libre Baskerville",Georgia,serif', corpo: '"Source Sans 3",system-ui,sans-serif',
+    google: 'family=Libre+Baskerville:wght@400;700&family=Source+Sans+3:wght@400;600;700' },
+  amigavel: { nome: 'Amigável', tom: 'arredondada e leve',
+    titulos: '"Outfit",system-ui,sans-serif', corpo: '"Nunito",system-ui,sans-serif',
+    google: 'family=Outfit:wght@600;700;800;900&family=Nunito:wght@400;600;700' },
+  editorial: { nome: 'Editorial', tom: 'revista, contraste alto',
+    titulos: '"DM Serif Display",Georgia,serif', corpo: '"DM Sans",system-ui,sans-serif',
+    google: 'family=DM+Serif+Display&family=DM+Sans:wght@400;500;700' },
+  tecnologica: { nome: 'Tecnológica', tom: 'precisa, de startup',
+    titulos: '"Space Grotesk",system-ui,sans-serif', corpo: '"Inter",system-ui,sans-serif',
+    google: 'family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600' },
+};
+
 /** Uma linha de <link> para as duas famílias, com display=swap. */
 export const linkFontes = (f: ParFontes): string =>
   `<link rel="preconnect" href="https://fonts.googleapis.com">` +
@@ -185,7 +220,10 @@ export const cssRodape = (classe = 'rp', fundo = '#0e1014', texto = '#c6cad3') =
 @media(max-width:760px){.${classe}-grade{grid-template-columns:1fr}}
 `;
 
-export const documentoPremium = (d: SiteData, f: ParFontes, css: string, corpo: string): string => `<!DOCTYPE html>
+export const documentoPremium = (d: SiteData, padrao: ParFontes, css: string, corpo: string): string => {
+  // a fonte escolhida pelo usuario vence o par do layout
+  const f = (d.fonte && FONTES[d.fonte]) || padrao;
+  return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -202,3 +240,4 @@ ${linkFontes(f)}
 ${corpo}
 </body>
 </html>`;
+};

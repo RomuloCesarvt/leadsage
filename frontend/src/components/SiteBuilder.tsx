@@ -8,8 +8,11 @@ import { api } from '../services/api';
 import { SITE_TEMPLATES, sugerirTemplate } from '../templates/sites/layouts';
 import type { SiteData, SiteTemplate } from '../templates/sites/base';
 import type { SiteIdentity } from '../types';
-import { prepararImagem, formatarBytes, TETO_SITE_BYTES } from '../lib/imagem';
+import { prepararImagem, prepararLogo, formatarBytes, TETO_SITE_BYTES } from '../lib/imagem';
 import { BancoImagens, buscarFotos } from './BancoImagens';
+import { comEditor, editarCampo, listarTextos, restaurarTexto } from '../templates/sites/textos-editaveis';
+import { FONTES } from '../templates/sites/premium-base';
+import { LAYOUTS_ANTIGOS } from '../templates/sites/layouts';
 import type { DestinoFoto, FotoBanco } from './BancoImagens';
 
 /**
@@ -81,6 +84,15 @@ export const SiteBuilder: React.FC = () => {
   // para de mexer nele.
   const [escolheuLayout, setEscolheuLayout] = useState(false);
   const inputLogo = useRef<HTMLInputElement>(null);
+  // A logo original fica guardada para "manter o fundo" sem pedir o arquivo de novo.
+  const arquivoLogo = useRef<File | null>(null);
+  const [fundoRemovido, setFundoRemovido] = useState(false);
+  const manterFundoDaLogo = async () => {
+    if (!arquivoLogo.current) return;
+    const r = await prepararLogo(arquivoLogo.current, { tetoBytes: TETO_LOGO, removerFundo: false });
+    setFundoRemovido(false);
+    alterar('logo', r.dataUri);
+  };
 
   // Banco de imagens. Site sem foto parecia rascunho: agora ele nasce com
   // fotos do ramo, e o usuario troca o que quiser.
@@ -116,6 +128,23 @@ export const SiteBuilder: React.FC = () => {
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [template?.id, nichoDoSite]);
+
+  // Edição direto na prévia. A prévia roda isolada (sandbox só com
+  // allow-scripts) e manda o texto editado por mensagem; aqui só se aceita
+  // mensagem que venha dela.
+  const previa = useRef<HTMLIFrameElement>(null);
+  useEffect(() => {
+    const receber = (ev: MessageEvent) => {
+      if (ev.source !== previa.current?.contentWindow) return;
+      const m = ev.data;
+      if (!m || m.tipo !== 'leadsage-texto' || typeof m.campo !== 'string' || typeof m.valor !== 'string') return;
+      if (m.campo.length > 80 || m.valor.length > 2000) return;
+      setDados(d => editarCampo(d, m.campo, m.valor));
+    };
+    window.addEventListener('message', receber);
+    return () => window.removeEventListener('message', receber);
+  }, []);
+  const [verTextos, setVerTextos] = useState(false);
 
   const usarFotoDoBanco = (url: string, destino: DestinoFoto) => {
     if (destino === 'galeria') {
@@ -161,6 +190,8 @@ export const SiteBuilder: React.FC = () => {
     [template, dados, selo]
   );
 
+  const textosDaPagina = useMemo(() => (html ? listarTextos(html, dados) : []), [html, dados]);
+
   // O site publicado precisa caber no armazenamento; as fotos embutidas
   // sao o que pesa.
   const pesoDoSite = new Blob([html]).size;
@@ -193,10 +224,22 @@ export const SiteBuilder: React.FC = () => {
     indice = 0
   ) => {
     setErro('');
+    if (destino === 'logo') {
+      // Logo tem regra própria: transparência preservada e fundo liso removido.
+      try {
+        arquivoLogo.current = arquivo;
+        const r = await prepararLogo(arquivo, { tetoBytes: TETO_LOGO });
+        setFundoRemovido(r.fundoRemovido);
+        alterar('logo', r.dataUri);
+      } catch (err: any) {
+        setErro(err?.message || 'Não foi possível usar esta logo.');
+      }
+      return;
+    }
     try {
       const dataUri = await prepararImagem(arquivo, {
-        larguraMaxima: destino === 'logo' ? 600 : 1600,
-        tetoBytes: destino === 'logo' ? TETO_LOGO : TETO_FOTO,
+        larguraMaxima: 1600,
+        tetoBytes: TETO_FOTO,
       });
       if (destino === 'galeria') {
         setDados(d => {
@@ -489,6 +532,60 @@ export const SiteBuilder: React.FC = () => {
             </div>
           )}
 
+          <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-100 text-[12px] text-blue-900 leading-snug">
+            <b>Dica:</b> clique em qualquer texto da prévia para escrever ou apagar. Enter confirma, Esc desfaz.
+          </div>
+
+          <div>
+            <button type="button" onClick={() => setVerTextos(v => !v)}
+              className="w-full flex items-center justify-between text-xs font-bold text-slate-600 py-1">
+              <span>Textos da página ({textosDaPagina.length})</span>
+              <span className="text-blue-600">{verTextos ? 'Fechar' : 'Ver todos'}</span>
+            </button>
+            {verTextos && (
+              <div className="mt-2 space-y-2 max-h-80 overflow-y-auto custom-scrollbar pr-1">
+                {textosDaPagina.map(t => (
+                  // a chave inclui o texto: editado pela prévia, a caixa acompanha
+                  <div key={t.chave + '|' + t.texto}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        {t.doFormulario ? 'do formulário' : t.editado ? 'editado' : 'texto do layout'}
+                      </span>
+                      {t.editado && (
+                        <button type="button" onClick={() => setDados(d => restaurarTexto(d, t.chave))}
+                          className="text-[10px] font-bold text-slate-500 hover:text-blue-600">restaurar</button>
+                      )}
+                    </div>
+                    <textarea
+                      rows={t.texto.length > 70 ? 3 : 1}
+                      defaultValue={t.texto}
+                      onBlur={e => e.target.value !== t.texto && setDados(d => editarCampo(d, t.chave, e.target.value))}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 resize-none"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {template && !LAYOUTS_ANTIGOS.has(template.id) && (
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">Tipografia</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button type="button" onClick={() => alterar('fonte', undefined)}
+                  className={`px-2.5 py-2 rounded-lg border text-left text-[11px] ${!dados.fonte ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                  <b className="block">Do layout</b><span className="opacity-70">a escolhida para {template.nome}</span>
+                </button>
+                {Object.entries(FONTES).map(([id, f]) => (
+                  <button key={id} type="button" onClick={() => alterar('fonte', id)}
+                    className={`px-2.5 py-2 rounded-lg border text-left text-[11px] ${dados.fonte === id ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                    <b className="block">{f.nome}</b><span className="opacity-70">{f.tom}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-3">
             {campo('Nome da empresa', dados.empresa, v => alterar('empresa', v))}
             {campo('Categoria', dados.categoria, v => alterar('categoria', v), false, 'Padaria, Clínica...')}
@@ -503,7 +600,9 @@ export const SiteBuilder: React.FC = () => {
               <label className="block text-xs font-bold text-slate-600 mb-1.5">Logo</label>
               <div className="flex items-center gap-3">
                 {dados.logo && (
-                  <img src={dados.logo} alt="" className="h-10 w-auto object-contain border border-slate-200 rounded-lg p-1" />
+                  // fundo xadrez: mostra que a logo está transparente de verdade
+                  <img src={dados.logo} alt="" className="h-10 w-auto object-contain border border-slate-200 rounded-lg p-1"
+                    style={{ backgroundImage: 'repeating-conic-gradient(#e5e7eb 0 25%, #fff 0 50%)', backgroundSize: '10px 10px' }} />
                 )}
                 <button
                   onClick={() => inputLogo.current?.click()}
@@ -524,7 +623,14 @@ export const SiteBuilder: React.FC = () => {
                   onChange={e => e.target.files?.[0] && enviarImagem(e.target.files[0], 'logo')}
                 />
               </div>
-              <p className="text-[11px] text-slate-400 mt-1.5">Sem logo, usamos as iniciais da empresa.</p>
+              {dados.logo ? (
+                <p className="text-[11px] text-slate-500 mt-1.5">
+                  {fundoRemovido ? <>Fundo removido automaticamente. <button type="button" onClick={manterFundoDaLogo} className="font-bold text-blue-600 hover:underline">Manter o fundo original</button></>
+                    : 'Logo com fundo transparente preservado.'}
+                </p>
+              ) : (
+                <p className="text-[11px] text-slate-400 mt-1.5">PNG, JPG ou SVG. Fundo liso (branco ou de uma cor) é removido sozinho. Sem logo, usamos as iniciais.</p>
+              )}
             </div>
 
             <BancoImagens
@@ -723,8 +829,11 @@ export const SiteBuilder: React.FC = () => {
         <div className="lg:col-span-2 bg-slate-100 border border-slate-200 rounded-2xl overflow-hidden flex items-center justify-center p-4">
           <iframe
             title="Prévia do site"
-            srcDoc={html}
-            sandbox="allow-same-origin"
+            ref={previa}
+            srcDoc={comEditor(html)}
+            // allow-scripts SEM allow-same-origin: o script de edição roda
+            // isolado e só conversa por mensagem. Juntar os dois anularia o sandbox.
+            sandbox="allow-scripts"
             className={`bg-white shadow-lg transition-all ${
               dispositivo === 'mobile'
                 ? 'w-[390px] h-full rounded-[28px] border-[10px] border-slate-800'

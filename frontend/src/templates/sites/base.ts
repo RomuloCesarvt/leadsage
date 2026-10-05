@@ -43,6 +43,10 @@ export type SiteData = {
   depoimentos?: Depoimento[];
   corPrimaria: string;
   corDestaque: string;
+  /** textos da página editados pelo usuário, por chave (ver textos-editaveis.ts) */
+  textos?: Record<string, string>;
+  /** par tipografico escolhido (FONTES em premium-base); vazio = o do layout */
+  fonte?: string;
   /** nota e número de avaliações no Google, quando o site nasce de um lead */
   nota?: number | null;
   avaliacoes?: number | null;

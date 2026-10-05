@@ -126,17 +126,20 @@ CANTOS = [
 ]
 
 # Layout recomendado por família. São os ids dos templates do construtor.
+# Os layouts premium. O mapa apontava para os quatro da primeira geracao:
+# quem clicava em "Escrever textos com IA" sem ter escolhido layout a mao
+# via o site trocar, sozinho, para o visual antigo.
 LAYOUT_POR_FAMILIA = {
-    "alimentacao": "vitrine",
-    "beleza": "vitrine",
-    "pet": "vitrine",
-    "saude": "profissional",
-    "juridico": "profissional",
-    "educacao": "profissional",
-    "imobiliario": "profissional",
-    "oficina": "servico-local",
-    "fitness": "servico-local",
-    "": "essencial",
+    "alimentacao": "aurora",
+    "beleza": "estudio",
+    "pet": "vibrante",
+    "saude": "clinica",
+    "juridico": "escritorio",
+    "educacao": "vibrante",
+    "imobiliario": "escritorio",
+    "oficina": "oficina",
+    "fitness": "vibrante",
+    "": "clinica",
 }
 
 
@@ -169,7 +172,7 @@ def briefing_visual(
         "paleta": {"primaria": primaria, "destaque": destaque},
         "tipografia": tipografia,
         "cantos": cantos,
-        "layout": LAYOUT_POR_FAMILIA.get(familia, "essencial"),
+        "layout": LAYOUT_POR_FAMILIA.get(familia, "clinica"),
         "motivo": _motivo(familia, tipografia["nome"], cantos["nome"]),
     }
 

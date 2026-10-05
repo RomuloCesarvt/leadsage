@@ -1,4 +1,5 @@
 import { LAYOUTS_PREMIUM } from './premium';
+import { aplicarTextos } from './textos-editaveis';
 /**
  * Os layouts propriamente ditos.
  *
@@ -642,7 +643,12 @@ ${rodape(d)}`
  */
 export const SITE_TEMPLATES: SiteTemplate[] = [
   ...LAYOUTS_PREMIUM, vitrine, profissional, servicoLocal, essencial,
-];
+].map(t => ({
+  ...t,
+  // Todo texto marcado e com as edições do usuário aplicadas — na prévia
+  // e no site publicado.
+  render: (d: SiteData) => aplicarTextos(t.render(d), d),
+}));
 
 export const LAYOUTS_ANTIGOS = new Set(['vitrine', 'profissional', 'servico-local', 'essencial']);
 
