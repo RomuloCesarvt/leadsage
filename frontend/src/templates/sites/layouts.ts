@@ -1,3 +1,4 @@
+import { prepararDados } from './profissional';
 import { LAYOUTS_PREMIUM } from './premium';
 import { aplicarTextos } from './textos-editaveis';
 /**
@@ -647,7 +648,7 @@ export const SITE_TEMPLATES: SiteTemplate[] = [
   ...t,
   // Todo texto marcado e com as edições do usuário aplicadas — na prévia
   // e no site publicado.
-  render: (d: SiteData) => aplicarTextos(t.render(d), d),
+  render: (d: SiteData) => { const p = prepararDados(d); return aplicarTextos(t.render(p), p); },
 }));
 
 export const LAYOUTS_ANTIGOS = new Set(['vitrine', 'profissional', 'servico-local', 'essencial']);

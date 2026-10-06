@@ -13,6 +13,9 @@ import { BancoImagens, buscarFotos } from './BancoImagens';
 import { comEditor, editarCampo, listarTextos, restaurarTexto } from '../templates/sites/textos-editaveis';
 import { FONTES } from '../templates/sites/premium-base';
 import { LAYOUTS_ANTIGOS } from '../templates/sites/layouts';
+import { semearConteudo, layoutDoRamo } from '../templates/sites/semear';
+import { resumirSemana } from '../templates/sites/profissional';
+import { ConteudoDoSite } from './ConteudoDoSite';
 import type { DestinoFoto, FotoBanco } from './BancoImagens';
 
 /**
@@ -29,30 +32,37 @@ import type { DestinoFoto, FotoBanco } from './BancoImagens';
 const TETO_LOGO = 120 * 1024;
 const TETO_FOTO = 260 * 1024;
 
-const dadosIniciais = (lead: any): SiteData => ({
-  empresa: lead?.company || lead?.name || 'Minha Empresa',
-  categoria: lead?.role || lead?.niche || '',
-  slogan: '',
-  sobre: '',
-  servicos: [
-    { titulo: '', descricao: '' },
-    { titulo: '', descricao: '' },
-    { titulo: '', descricao: '' },
-  ],
-  galeria: [],
-  depoimentos: [{ texto: '', autor: '' }],
-  telefone: lead?.phone ? `+${lead.phone}` : '',
-  whatsapp: lead?.whatsapp && lead?.phone ? lead.phone : '',
-  email: lead?.email || '',
-  endereco: lead?.address || lead?.location || '',
-  horario: lead?.opening_hours || '',
-  instagram: lead?.socials?.instagram || '',
-  corPrimaria: '#2563eb',
-  corDestaque: '#f59e0b',
-  // a nota do Google vira o selo de prova social no site
-  nota: lead?.rating ?? null,
-  avaliacoes: lead?.rating_count ?? null,
-});
+const dadosIniciais = (lead: any): SiteData => {
+  const base: SiteData = {
+    empresa: lead?.company || lead?.name || 'Minha Empresa',
+    // o ramo da busca ("Dentistas") casa melhor com o banco do que o cargo do contato
+    categoria: lead?.niche || lead?.role || '',
+    cidade: lead?.city || '',
+    slogan: '',
+    sobre: '',
+    servicos: [
+      { titulo: '', descricao: '' },
+      { titulo: '', descricao: '' },
+      { titulo: '', descricao: '' },
+    ],
+    galeria: [],
+    depoimentos: [{ texto: '', autor: '' }],
+    telefone: lead?.phone ? `+${lead.phone}` : '',
+    whatsapp: lead?.whatsapp && lead?.phone ? lead.phone : '',
+    email: lead?.email || '',
+    endereco: lead?.address || lead?.location || '',
+    // a semana inteira resumida ("Seg a Sex 08:00–18:00 · Sáb ..."), nao so os 3 primeiros dias
+    horario: lead?.opening_hours_week?.length ? resumirSemana(lead.opening_hours_week) : lead?.opening_hours || '',
+    instagram: lead?.socials?.instagram || '',
+    corPrimaria: '#2563eb',
+    corDestaque: '#f59e0b',
+    // a nota do Google vira o selo de prova social no site
+    nota: lead?.rating ?? null,
+    avaliacoes: lead?.rating_count ?? null,
+  };
+  // com um negocio de verdade, o repertorio do ramo ja vem escrito (e editavel)
+  return lead ? semearConteudo(base, { cores: true }) : base;
+};
 
 const PALETAS = [
   { nome: 'Azul', primaria: '#2563eb', destaque: '#f59e0b' },
@@ -210,7 +220,12 @@ export const SiteBuilder: React.FC = () => {
     const encontrado = (leads || []).find((l: any) => l.id === id) || null;
     setLead(encontrado);
     setDados(dadosIniciais(encontrado));
-    if (encontrado) setTemplate(sugerirTemplate(encontrado.niche || encontrado.role || ''));
+    if (encontrado) {
+      const ramo = encontrado.niche || encontrado.role || '';
+      // o banco do ramo recomenda o layout; sem ele, a sugestao por palavras-chave
+      const doBanco = SITE_TEMPLATES.find(t => t.id === layoutDoRamo(ramo));
+      setTemplate(doBanco || sugerirTemplate(ramo));
+    }
   };
 
   /**
@@ -284,7 +299,7 @@ export const SiteBuilder: React.FC = () => {
         servico_do_usuario: user?.product_description || '',
       });
 
-      setDados(d => ({
+      setDados(d => semearConteudo({
         ...d,
         categoria: r.categoria || d.categoria,
         slogan: r.slogan || d.slogan,
@@ -391,7 +406,8 @@ export const SiteBuilder: React.FC = () => {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-          {SITE_TEMPLATES.map(t => (
+          {/* os layouts antigos seguem abrindo sites já salvos, mas não são mais oferecidos para criar */}
+          {SITE_TEMPLATES.filter(t => !LAYOUTS_ANTIGOS.has(t.id)).map(t => (
             <button
               key={t.id}
               onClick={() => { setTemplate(t); setEscolheuLayout(true); }}
@@ -815,6 +831,8 @@ export const SiteBuilder: React.FC = () => {
               ))}
             </div>
           </div>
+
+          <ConteudoDoSite dados={dados} setDados={setDados} />
 
           <div className="space-y-3">
             {campo('Telefone', dados.telefone, v => alterar('telefone', v))}

@@ -69,6 +69,20 @@ export type SiteData = {
    * fazem os construtores de plano gratuito.
    */
   selo?: boolean;
+  /** cidade do negócio: entra no título da página, no SEO e nos textos do ramo */
+  cidade?: string;
+  /** "Por que escolher": 3 a 6 itens curtos */
+  diferenciais?: { titulo: string; texto: string }[];
+  /** "Como funciona": 3 passos */
+  passos?: { titulo: string; texto: string }[];
+  /** perguntas frequentes: tratam as objeções antes do contato */
+  faq?: { pergunta: string; resposta: string }[];
+  /** seções extras: false esconde; o padrão é aparecer quando há conteúdo */
+  secoes?: Partial<Record<'diferenciais' | 'passos' | 'faq' | 'ctaFinal', boolean>>;
+  /** texto do botão principal em toda a página (vazio = o do layout) */
+  ctaPrincipal?: string;
+  /** tipo do schema.org para o Google (Dentist, Restaurant, ...); vazio = LocalBusiness */
+  schema?: string;
 };
 
 export type Tipografia = 'editorial' | 'moderna' | 'classica' | 'tecnica' | 'acolhedora';
@@ -145,6 +159,21 @@ export const esc = (texto: string): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+/**
+ * Telefone brasileiro para leitura: "5514998003784" → "(14) 99800-3784".
+ * Número que não for reconhecido volta como veio, sem inventar formato.
+ */
+export const telefoneLegivel = (valor: string): string => {
+  const bruto = String(valor ?? '').trim();
+  let n = bruto.replace(/\D/g, '');
+  if (n.startsWith('55') && (n.length === 12 || n.length === 13)) n = n.slice(2);
+  // "+55 14 ..." digitado com mascara ja pronta: nao mexe
+  if (/[()]/.test(bruto) && n.length >= 10) return bruto;
+  if (n.length === 11) return `(${n.slice(0, 2)}) ${n.slice(2, 7)}-${n.slice(7)}`;
+  if (n.length === 10) return `(${n.slice(0, 2)}) ${n.slice(2, 6)}-${n.slice(6)}`;
+  return bruto;
+};
+
 /** Só dígitos, para montar links de telefone e WhatsApp. */
 export const digitos = (valor: string): string => String(valor ?? '').replace(/\D/g, '');
 
@@ -184,9 +213,13 @@ export const corDoTexto = (hex: string): string => {
   const r = (num >> 16) & 0xff;
   const g = (num >> 8) & 0xff;
   const b = num & 0xff;
-  // luminância relativa aproximada
-  const luz = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luz > 0.6 ? '#111827' : '#ffffff';
+  // contraste WCAG: a letra com mais contraste sobre a cor, nao uma luminancia
+  // aproximada (que deixava laranja-avermelhado com letra branca a 4,07:1)
+  const lin = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  const comBranco = 1.05 / (L + 0.05);
+  const comGrafite = (L + 0.05) / (0.0108 + 0.05);
+  return comBranco >= comGrafite ? '#ffffff' : '#111827';
 };
 
 /** Marca da empresa: a logo enviada, ou as iniciais num círculo. */

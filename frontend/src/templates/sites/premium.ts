@@ -7,9 +7,10 @@
  * cor e pelo texto. Dois ramos diferentes nunca saem parecidos.
  */
 import type { SiteData, SiteTemplate } from './base';
+import { documentoPremium } from './documento';
 import { esc } from './base';
 import {
-  type ParFontes, ICONES, ctaPrincipal, cssRodape, depoimentosValidos, documentoPremium, fotos,
+  type ParFontes, ICONES, ctaPrincipal, cssRodape, depoimentosValidos, fotos,
   fundoFoto, iconeDoServico, linkInsta, linkMapa, linkTel, linkZap, logo, rodapePremium,
   partirSobre, seloGoogle, servicosValidos, urlImagem,
 } from './premium-base';
@@ -67,6 +68,32 @@ const seloLeadsage = (d: SiteData) =>
 const fim = (d: SiteData, rodape: string) => `${rodape}${seloLeadsage(d)}${zapFlutuante(d)}`;
 
 const slogan = (d: SiteData, padrao: string) => esc(d.slogan || padrao);
+
+/** Os 3 primeiros diferenciais (do dono ou do ramo) viram a lista de destaques; sem eles, textos neutros. */
+const destaques = (d: SiteData, padrao: string[]): string[] => {
+  const dados = (d.diferenciais || []).map(x => x.titulo.trim()).filter(Boolean).slice(0, 3);
+  return dados.length ? dados : padrao;
+};
+
+/* Passos e perguntas da Clínica: o que o dono editou; sem nada, textos que
+   não prometem o que o negócio não disse (sem "garantido", sem prazo). */
+const passosDaClinica = (d: SiteData) => {
+  const lista = (d.passos || []).filter(p => p.titulo.trim() && p.texto.trim()).slice(0, 4);
+  return lista.length ? lista : [
+    { titulo: 'Você chama', texto: 'Pelo WhatsApp ou telefone, no horário que for melhor para você.' },
+    { titulo: 'Avaliação', texto: 'Ouvimos e explicamos as opções com calma.' },
+    { titulo: 'Acompanhamento', texto: 'Plano combinado e acompanhamento de perto.' },
+  ];
+};
+/** A pergunta sobre horário/endereço ja esta no FAQ do dono? Evita repetir. */
+const jaPergunta = (d: SiteData, raiz: string) =>
+  (d.faq || []).some(p => p.pergunta.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(raiz));
+const faqDaClinica = (d: SiteData) => {
+  const lista = (d.faq || []).filter(p => p.pergunta.trim() && p.resposta.trim()).slice(0, 8);
+  return lista.length ? lista : [
+    { pergunta: 'Como faço para agendar?', resposta: 'Pelo WhatsApp ou telefone. Encontramos o melhor horário para você.' },
+  ];
+};
 
 /* ================================================================ AURORA */
 /* Gastronomia: foto em tela cheia, cabeçalho transparente por cima, serifa
@@ -294,24 +321,21 @@ ${d.horario || d.endereco ? `<div class="barra"><div class="wrap">${d.horario ? 
 </div></section>
 ${servicos.length ? `<section class="servicos" id="servicos"><div class="wrap"><div class="titulo"><h2>Como podemos ajudar</h2><p>Cada tratamento começa por uma conversa: entender o que você precisa antes de propor qualquer coisa.</p></div>
 <div class="cartoes">${servicos.map((s, i) => `<div class="cartao"><div class="ic">${iconeDoServico(i)}</div><h3>${esc(s.titulo)}</h3><p>${esc(s.descricao)}</p></div>`).join('')}</div></div></section>` : ''}
-<section class="passos"><div class="wrap"><div class="titulo"><h2>Como funciona</h2><p>Sem surpresa: você sabe o que acontece em cada etapa.</p></div>
-<div class="passos-grade"><div class="passo"><h3>Você chama</h3><p>Pelo WhatsApp ou telefone, no horário que for melhor para você.</p></div>
-<div class="passo"><h3>Avaliação</h3><p>Ouvimos, examinamos e explicamos as opções com calma.</p></div>
-<div class="passo"><h3>Tratamento</h3><p>Plano combinado, acompanhamento de perto e retorno garantido.</p></div></div></div></section>
+${d.secoes?.passos === false ? '' : `<section class="passos" id="passos"><div class="wrap"><div class="titulo"><h2>Como funciona</h2><p>Sem surpresa: você sabe o que acontece em cada etapa.</p></div>
+<div class="passos-grade">${passosDaClinica(d).map(p => `<div class="passo"><h3>${esc(p.titulo)}</h3><p>${esc(p.texto)}</p></div>`).join('')}</div></div></section>`}
 <section class="sobre" id="sobre"><div class="wrap">
   ${foto2 ? `<div class="foto"><img src="${foto2}" alt="${esc(d.empresa)}" loading="lazy"></div>` : ''}
   <div><h2>Sobre a ${esc(d.empresa)}</h2><p>${partes[1]}</p>
-  <ul class="lista"><li>${ICONES.check}Atendimento com hora marcada</li><li>${ICONES.check}Explicação clara de cada etapa</li><li>${ICONES.check}Ambiente acolhedor e higienizado</li></ul></div>
+  <ul class="lista">${destaques(d, ['Agendamento pelo WhatsApp', 'Explicação de cada etapa', 'Atendimento com atenção']).map(t => `<li>${ICONES.check}${esc(t)}</li>`).join('')}</ul></div>
 </div></section>
 ${galeriaHtml(d, 'galeria', 'Nossa estrutura')}
 ${depoimentosHtml(d, 'vozes', 'Pacientes que confiam')}
-<section class="faq"><div class="wrap"><div class="titulo"><h2>Perguntas frequentes</h2></div><div class="faq-lista">
-  <details><summary>Como faço para agendar?</summary><p>Pelo WhatsApp ou telefone. Respondemos rápido e encontramos o melhor horário para você.</p></details>
-  <details><summary>Preciso de encaminhamento?</summary><p>Não. Você pode agendar direto uma avaliação com a gente.</p></details>
-  ${d.horario ? `<details><summary>Qual o horário de atendimento?</summary><p>${esc(d.horario)}.</p></details>` : ''}
-  ${d.endereco ? `<details><summary>Onde vocês ficam?</summary><p>${esc(d.endereco)}.</p></details>` : ''}
-</div></div></section>
-<section class="chamada"><div class="wrap"><div class="chamada-in"><h2>Agende sua avaliação ainda esta semana</h2>${ctaPrincipal(d, 'Agendar pelo WhatsApp')}</div></div></section>
+${d.secoes?.faq === false ? '' : `<section class="faq" id="faq"><div class="wrap"><div class="titulo"><h2>Perguntas frequentes</h2></div><div class="faq-lista">
+  ${faqDaClinica(d).map(p => `<details><summary>${esc(p.pergunta)}</summary><p>${esc(p.resposta)}</p></details>`).join('')}
+  ${d.horario && !jaPergunta(d, 'horario') ? `<details><summary>Qual o horário de atendimento?</summary><p>${esc(d.horario)}.</p></details>` : ''}
+  ${d.endereco && !jaPergunta(d, 'endereco') ? `<details><summary>Onde vocês ficam?</summary><p>${esc(d.endereco)}.</p></details>` : ''}
+</div></div></section>`}
+${d.secoes?.ctaFinal === false ? '' : `<section class="chamada" id="chamada"><div class="wrap"><div class="chamada-in"><h2>Agende sua avaliação</h2>${ctaPrincipal(d, 'Agendar pelo WhatsApp')}</div></div></section>`}
 ${fim(d, rodapePremium(d))}`);
   },
 };
@@ -336,7 +360,7 @@ const oficina: SiteTemplate = {
     <rect x="10" y="52" width="34" height="8" fill="${corDestaque}"/>
     <rect x="0" y="80" width="160" height="12" fill="${corDestaque}"/><rect x="10" y="96" width="40" height="8" fill="#d4d4d8"/><rect x="60" y="96" width="40" height="8" fill="#d4d4d8"/><rect x="110" y="96" width="40" height="8" fill="#d4d4d8"/></svg>`,
   render: d => {
-    const partes = partirSobre(d, 'Orçamento claro, prazo combinado e garantia no que a gente faz.', 'Quem chama a gente volta e indica. É assim que o bairro conhece nosso trabalho.');
+    const partes = partirSobre(d, 'Orçamento combinado antes do serviço e atendimento direto pelo WhatsApp.', 'Conte o problema, receba o orçamento e combine o horário. Sem enrolação.');
     const capa = urlImagem(d.capa), foto2 = urlImagem(d.fotoSobre) || fotos(d)[0] || '';
     const servicos = servicosValidos(d);
     const tel = linkTel(d);
@@ -411,16 +435,16 @@ ${cssRodape('rp', '#09090b', '#a1a1aa')}${cssComum(d)}
   <div class="btns sobe sobe-3">${ctaPrincipal(d, 'Pedir orçamento')}${servicos.length ? '<a class="btn btn-2" href="#servicos">Nossos serviços</a>' : ''}</div>
 </div></section>
 <section class="numeros"><div class="wrap">
-  <div class="num"><b>${nota >= 3.5 ? nota.toFixed(1).replace('.', ',') + '★' : '100%'}</b><span>${nota >= 3.5 ? `${d.avaliacoes || ''} avaliações no Google` : 'orçamento sem compromisso'}</span></div>
+  <div class="num"><b>${nota >= 3.5 ? nota.toFixed(1).replace('.', ',') + '★' : 'Orçamento'}</b><span>${nota >= 3.5 ? `${d.avaliacoes || ''} avaliações no Google` : 'orçamento antes do serviço'}</span></div>
   <div class="num"><b>${servicos.length || '+'}</b><span>${servicos.length ? 'tipos de serviço' : 'serviços sob medida'}</span></div>
-  <div class="num"><b>✓</b><span>garantia no serviço</span></div>
+  <div class="num"><b>✓</b><span>${d.whatsapp ? 'atendimento pelo WhatsApp' : 'contato por telefone'}</span></div>
 </div></section>
-${servicos.length ? `<section class="servicos" id="servicos"><div class="wrap"><div class="cab"><h2>O que a gente resolve</h2><p>${esc(d.categoria || 'Atendimento')} com equipe própria e material de qualidade.</p></div>
+${servicos.length ? `<section class="servicos" id="servicos"><div class="wrap"><div class="cab"><h2>O que a gente resolve</h2><p>Veja o que fazemos e peça o seu orçamento.</p></div>
 <div class="grade">${servicos.map((s, i) => `<div class="item"><span class="n">${String(i + 1).padStart(2, '0')}</span><h3>${esc(s.titulo)}</h3><p>${esc(s.descricao)}</p></div>`).join('')}</div></div></section>` : ''}
 <section class="sobre"><div class="wrap">
   ${foto2 ? `<div class="foto"><img src="${foto2}" alt="${esc(d.empresa)}" loading="lazy"></div>` : ''}
   <div><h2>Por que a ${esc(d.empresa)}</h2><p>${partes[1]}</p>
-  <ul class="lista"><li>${ICONES.check}Orçamento antes de começar</li><li>${ICONES.check}Prazo combinado e cumprido</li><li>${ICONES.check}Garantia por escrito</li></ul></div>
+  <ul class="lista">${destaques(d, ['Atendimento direto pelo WhatsApp', 'Orçamento combinado antes do serviço', 'Explicação do que será feito']).map(t => `<li>${ICONES.check}${esc(t)}</li>`).join('')}</ul></div>
 </div></section>
 ${galeriaHtml(d, 'galeria', 'Trabalhos recentes')}
 ${depoimentosHtml(d, 'vozes', 'Clientes falando')}

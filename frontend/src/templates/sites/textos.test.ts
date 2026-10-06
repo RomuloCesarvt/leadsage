@@ -59,7 +59,9 @@ checar('texto editado é escapado', !comScript.includes('<img src=x') && comScri
 const comSelo = SITE_TEMPLATES[0].render({ ...dados, selo: true });
 checar('o selo do LeadSage não é editável',
   !/data-campo="[^"]*"[^>]*>LeadSage</.test(comSelo) && comSelo.includes('>LeadSage</a>'));
-checar('o editor só entra na prévia, não no site', !aurora.render(dados).includes('<script'));
+// o unico <script> aceito no site e o JSON-LD (dado estruturado); o editor e JS de verdade
+checar('o editor só entra na prévia, não no site', !/<script(?![^>]*application\/ld\+json)/.test(aurora.render(dados))
+  && !aurora.render(dados).includes('contenteditable'));
 checar('a prévia recebe o editor', comEditor(aurora.render(dados)).includes("contenteditable"));
 
 console.log(`\n=========== ${falhas === 0 ? 'TUDO PASSOU' : falhas + ' FALHARAM'} ===========`);

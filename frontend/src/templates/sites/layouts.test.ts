@@ -52,7 +52,8 @@ for (const t of SITE_TEMPLATES) {
   const externos = [...html.matchAll(/<link[^>]+href=["'](https?:[^"']+)/gi)].map(m => m[1])
     .filter(u => !/^https:\/\/fonts\.(googleapis|gstatic)\.com(\/|$)/.test(u));
   checar(`${t.nome}: sem script e sem dependência além das fontes`,
-    !/<script/i.test(html) && !externos.length, externos[0] || '');
+    // dados estruturados (application/ld+json) sao dado, nao codigo: nao executam
+    !/<script(?![^>]*application\/ld\+json)/i.test(html) && !externos.length, externos[0] || '');
   checar(`${t.nome}: responsivo`, html.includes('name="viewport"') && html.includes('@media'));
   checar(`${t.nome}: usa os dados informados`,
     html.includes('Padaria Favorita') && html.includes('Fermentação natural.'));

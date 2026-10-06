@@ -11,8 +11,9 @@
  * tipografia escolhida (Google Fonts) e fotografia (banco de imagens).
  * Continua sem JavaScript: o site é servido em sandbox, sem script.
  */
+import { garantirContraste, letraSobre, marcaLegivel } from './profissional';
 import type { SiteData } from './base';
-import { esc, digitos, linkWhatsapp, linkInstagram, ajustarCor, corDoTexto } from './base';
+import { esc, digitos, linkWhatsapp, linkInstagram, ajustarCor } from './base';
 
 export type ParFontes = { titulos: string; corpo: string; google: string };
 
@@ -121,7 +122,8 @@ export const linkInsta = (d: SiteData): string => {
 /** O botão principal: WhatsApp quando há, senão telefone. */
 export const ctaPrincipal = (d: SiteData, texto = 'Falar no WhatsApp', classe = 'btn btn-1'): string => {
   const zap = linkZap(d);
-  if (zap) return `<a class="${classe}" href="${zap}" target="_blank" rel="noopener">${ICONES.zap}${esc(texto)}</a>`;
+  // o texto que o dono escolheu vale em todos os botoes principais da pagina
+  if (zap) return `<a class="${classe}" href="${zap}" target="_blank" rel="noopener">${ICONES.zap}${esc(d.ctaPrincipal?.trim() || texto)}</a>`;
   const tel = linkTel(d);
   if (tel) return `<a class="${classe}" href="${tel}">${ICONES.tel}Ligar agora</a>`;
   return '';
@@ -165,12 +167,13 @@ export const iconeDoServico = (i: number): string =>
 
 /** Variáveis de cor e o reset comum. Cada layout acrescenta o próprio CSS. */
 export const cssRaiz = (d: SiteData, f: ParFontes): string => `
-:root{--p:${d.corPrimaria};--p-esc:${ajustarCor(d.corPrimaria, -40)};--p-cla:${ajustarCor(d.corPrimaria, 175)};
-  --d:${d.corDestaque};--sobre-p:${corDoTexto(d.corPrimaria)};--sobre-d:${corDoTexto(d.corDestaque)};
+:root{--p:${marcaLegivel(d.corPrimaria)};--p-esc:${ajustarCor(marcaLegivel(d.corPrimaria), -40)};--p-cla:${ajustarCor(d.corPrimaria, 175)};
+  --p-texto:${garantirContraste(d.corPrimaria)};
+  --d:${marcaLegivel(d.corDestaque)};--sobre-p:${letraSobre(marcaLegivel(d.corPrimaria))};--sobre-d:${letraSobre(marcaLegivel(d.corDestaque))};
   --fonte-t:${f.titulos};--fonte-c:${f.corpo}}
 *,*::before,*::after{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;background:#fff;color:#16181d;font-family:var(--fonte-c);font-size:17px;line-height:1.65;
+body{margin:0;background:#fff;color:#16181d;font-family:var(--fonte-c);font-size:var(--t0,17px);line-height:1.6;
   -webkit-font-smoothing:antialiased;color-scheme:light}
 img{max-width:100%;display:block}
 a{color:inherit;text-decoration:none}
@@ -186,7 +189,7 @@ p{margin:0 0 1em}
 .sobe-2{animation-delay:.12s}.sobe-3{animation-delay:.24s}.sobe-4{animation-delay:.36s}
 .estrelas{color:#f5b301;letter-spacing:2px}
 @media(prefers-reduced-motion:reduce){.sobe{animation:none}}
-@media(max-width:760px){body{font-size:16px}.btn{width:100%;justify-content:center}}
+@media(max-width:760px){.btn{width:100%;justify-content:center}}
 `;
 
 /** Rodapé comum aos layouts premium, com contatos e horário. */
@@ -219,25 +222,3 @@ export const cssRodape = (classe = 'rp', fundo = '#0e1014', texto = '#c6cad3') =
 .${classe}-linha{border-top:1px solid rgba(255,255,255,.1);margin-top:40px;padding-top:20px;font-size:13px;opacity:.7}
 @media(max-width:760px){.${classe}-grade{grid-template-columns:1fr}}
 `;
-
-export const documentoPremium = (d: SiteData, padrao: ParFontes, css: string, corpo: string): string => {
-  // a fonte escolhida pelo usuario vence o par do layout
-  const f = (d.fonte && FONTES[d.fonte]) || padrao;
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(d.empresa)}${d.categoria ? ` — ${esc(d.categoria)}` : ''}</title>
-<meta name="description" content="${esc(d.slogan || d.sobre).slice(0, 155)}">
-<meta property="og:title" content="${esc(d.empresa)}">
-<meta property="og:description" content="${esc(d.slogan || d.sobre).slice(0, 155)}">
-${urlImagem(d.capa) ? `<meta property="og:image" content="${urlImagem(d.capa)}">` : ''}
-${linkFontes(f)}
-<style>${cssRaiz(d, f)}${css}</style>
-</head>
-<body>
-${corpo}
-</body>
-</html>`;
-};
