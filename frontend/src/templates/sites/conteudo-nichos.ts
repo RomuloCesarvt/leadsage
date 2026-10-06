@@ -55,7 +55,7 @@ export const BANCO: ConteudoNicho[] = [
   {
     id: 'padaria', nome: 'Padaria e confeitaria',
     chaves: ['padaria', 'panificadora', 'confeitaria', 'doceria', 'cafeteria', 'bolo', 'confeiteir', 'doceir', 'cafe '],
-    schema: 'Bakery', layout: 'aurora', paleta: { primaria: '#8a4b1f', destaque: '#e9a23b' },
+    schema: 'Bakery', layout: 'forno', paleta: { primaria: '#8a4b1f', destaque: '#e9a23b' },
     cta: { principal: 'Fazer meu pedido', secundario: 'Ver como chegar' },
     etiqueta: 'Feito todos os dias',
     titulos: ['Pão quente e doces feitos com carinho', 'O sabor que {cidade} procura, todo dia', 'Do forno para a sua mesa'],

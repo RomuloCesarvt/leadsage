@@ -10,5 +10,6 @@ import { CENAS_SORRISO } from './cena-sorriso';
 import { CENAS_PATINHAS } from './cena-patinhas';
 import { CENAS_SHOWROOM } from './cena-showroom';
 import { CENAS_CREDITO } from './cena-credito';
+import { CENAS_FORNO } from './cena-forno';
 
-export const CENAS: SiteTemplate[] = [...CENAS_RITUAL, ...CENAS_MESA, ...CENAS_PLANTA, ...CENAS_SORRISO, ...CENAS_PATINHAS, ...CENAS_SHOWROOM, ...CENAS_CREDITO];
+export const CENAS: SiteTemplate[] = [...CENAS_RITUAL, ...CENAS_MESA, ...CENAS_PLANTA, ...CENAS_SORRISO, ...CENAS_PATINHAS, ...CENAS_SHOWROOM, ...CENAS_CREDITO, ...CENAS_FORNO];

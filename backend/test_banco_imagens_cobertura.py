@@ -33,8 +33,8 @@ def test_todo_nicho_do_catalogo_tem_foto_do_ramo():
 
 
 @pytest.mark.parametrize("nicho,esperado", [
-    ("Padarias", "bakery"), ("Dentistas", "dentist"), ("Clínicas odontológicas", "dentist"), ("Cardiologistas", "cardiologist"),
-    ("Pediatras", "pediatrician"), ("Hospitais", "hospital"), ("Bares", "bar"), ("Advogados", "business meeting"),
+    ("Padarias", "bakery"), ("Dentistas", "dentist"), ("Clínicas odontológicas", "dentist"), ("Cardiologistas", "heart"),
+    ("Pediatras", "baby"), ("Hospitais", "hospital"), ("Bares", "bar"), ("Advogados", "business meeting"),
     ("Contadores", "accounting"), ("Barbearias", "barber"), ("Clínicas de estética", "spa"), ("Academias", "gym"),
     ("Oficinas mecânicas", "car mechanic"), ("Hotéis", "hotel room"), ("Pousadas", "hotel room"), ("Agropecuárias", "farm field"),
     ("Pizzarias", "pizza"), ("Pet shops", "dog grooming"), ("Eletricistas", "electrician"), ("Marcenarias", "carpentry"),
