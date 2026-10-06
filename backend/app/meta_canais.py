@@ -134,6 +134,10 @@ ERROS_META = {
     551: "Esta pessoa não está disponível para receber mensagens agora.",
     131047: "Passaram mais de 24 horas desde a última mensagem do contato; a Meta só permite modelo aprovado.",
     131026: "A Meta não conseguiu entregar: o número pode não ter WhatsApp.",
+    131049: "A Meta limitou mensagens de divulgação para este contato; tente outro dia.",
+    130429: "Limite de envios por segundo atingido; tente de novo em instantes.",
+    132001: "O modelo de mensagem não existe ou ainda não foi aprovado pela Meta.",
+    132000: "O modelo espera outra quantidade de variáveis.",
 }
 
 
@@ -185,3 +189,44 @@ async def enviar(canal: str, contato: str, texto: str, cfg: Dict[str, Any]) -> s
     if canal == "whatsapp":
         return ((dados.get("messages") or [{}])[0]).get("id", "")
     return dados.get("message_id", "")
+
+
+async def enviar_modelo(
+    cfg: Dict[str, Any], contato: str, nome: str, idioma: str, variaveis: List[str],
+) -> str:
+    """Primeira mensagem para quem nunca escreveu: so o modelo aprovado passa.
+
+    E a unica forma que a Meta aceita de iniciar conversa no WhatsApp. O
+    modelo vai com a frase de saida ("responda SAIR"), e quem responde abre
+    a janela de 24h em que o robo conversa livremente.
+    """
+    token, origem = cfg.get("wa_token"), cfg.get("wa_phone_id")
+    if not (token and origem):
+        raise EnvioFalhou("WhatsApp não conectado.")
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": re.sub(r"\D", "", contato),
+        "type": "template",
+        "template": {
+            "name": nome,
+            "language": {"code": idioma},
+            "components": [{
+                "type": "body",
+                "parameters": [{"type": "text", "text": (v or "-")[:60]} for v in variaveis],
+            }] if variaveis else [],
+        },
+    }
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as cliente:
+            r = await cliente.post(f"{GRAPH}/{origem}/messages", json=payload,
+                                   headers={"Authorization": f"Bearer {token}"})
+    except Exception as exc:
+        raise EnvioFalhou(f"Não foi possível falar com a Meta: {type(exc).__name__}")
+    dados = r.json() if r.content else {}
+    if r.status_code >= 400:
+        erro = dados.get("error") or {}
+        raise EnvioFalhou(
+            ERROS_META.get(erro.get("code")) or erro.get("error_user_msg")
+            or erro.get("message") or f"erro {r.status_code}"
+        )
+    return ((dados.get("messages") or [{}])[0]).get("id", "")

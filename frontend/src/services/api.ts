@@ -17,6 +17,9 @@ import type {
   DocumentAIRequest,
   DocumentAIResponse,
   RoboConfig,
+  PipelineItem,
+  ModeloWhatsApp,
+  DisparoResultado,
   RoboConfigEntrada,
   RoboConversa,
   RoboConversaResumo,
@@ -280,6 +283,36 @@ export const api = {
 
   async metaDesconectar(alvo: 'facebook' | 'whatsapp'): Promise<RoboConfig> {
     return await fetchWithToken('/robo/meta/desconectar', { method: 'POST', body: JSON.stringify({ alvo }) });
+  },
+
+  // ------------------------------------------------ pipeline e disparo
+
+  async pipelineListar(): Promise<{ etapas: string[]; itens: PipelineItem[] }> {
+    return await fetchWithToken('/pipeline');
+  },
+
+  async pipelineSincronizar(leads: Record<string, unknown>[]): Promise<{ novos: number }> {
+    return await fetchWithToken('/pipeline/sync', { method: 'POST', body: JSON.stringify({ leads }) });
+  },
+
+  async pipelineMover(leadId: string, etapa: string, lead?: Record<string, unknown>): Promise<{ etapa: string; mudou: boolean }> {
+    return await fetchWithToken(`/pipeline/${encodeURIComponent(leadId)}/etapa`, {
+      method: 'PUT', body: JSON.stringify({ etapa, lead }),
+    });
+  },
+
+  async modeloWhatsApp(): Promise<ModeloWhatsApp> {
+    return await fetchWithToken('/robo/whatsapp/modelo');
+  },
+
+  async criarModeloWhatsApp(): Promise<ModeloWhatsApp> {
+    return await fetchWithToken('/robo/whatsapp/modelo', { method: 'POST' });
+  },
+
+  async roboDisparar(lead_ids: string[], consentimento: boolean): Promise<DisparoResultado> {
+    return await fetchWithToken('/robo/disparar', {
+      method: 'POST', body: JSON.stringify({ lead_ids, consentimento }),
+    });
   },
 
   async raioX(place_id: string, website: string, instagram: string, refazer = false): Promise<RaioX> {

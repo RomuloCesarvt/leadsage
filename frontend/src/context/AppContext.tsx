@@ -1,11 +1,58 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { api } from '../services/api';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { rodandoNativo } from '../lib/pwa';
 import { colherRedirecionamento } from '../lib/autenticacao';
-import type { LeadItem, SearchHistoryItem, SuggestedNiche, UserProfile } from '../types';
+import type { LeadItem, PipelineItem, SearchHistoryItem, SuggestedNiche, UserProfile } from '../types';
+
+// O servidor so precisa do que o robo usa para conversar e do que o card
+// mostra; mandar o lead inteiro (avaliacoes, horarios) pesaria a cada busca.
+const CAMPOS_PIPELINE = [
+  'id', 'name', 'company', 'phone', 'email', 'niche', 'city', 'website', 'instagram',
+  'rating', 'rating_count', 'missingDigitalAssets', 'diagnosis', 'hooks', 'opportunityScore',
+  'maps_url', 'pipeline_stage',
+] as const;
+
+const fotoDoLead = (l: LeadItem): Record<string, unknown> => {
+  const foto: Record<string, unknown> = {};
+  for (const c of CAMPOS_PIPELINE) {
+    const v = (l as any)[c];
+    if (v !== undefined && v !== null && v !== '') foto[c] = v;
+  }
+  return foto;
+};
+
+// Quem escreveu sem estar na busca nasce no servidor; aqui vira um card.
+const leadDeItem = (i: PipelineItem): LeadItem => {
+  const f = (i.lead || {}) as Partial<LeadItem>;
+  const nome = f.company || f.name || 'Novo contato';
+  return {
+    id: i.id, name: f.name || nome, avatar: '', role: '', niche: f.niche || '', company: nome,
+    location: f.city || '', city: f.city || '', email: f.email || '', phone: f.phone || '',
+    whatsapp: !!f.phone, socials: {}, quality_score: 0, verified: false, outreach_status: 'Respondido',
+    ...f,
+  } as LeadItem;
+};
+
+const mesclarPipeline = (atuais: LeadItem[], itens: PipelineItem[]): LeadItem[] => {
+  const porId = new Map(itens.map(i => [i.id, i]));
+  const vistos = new Set<string>();
+  const saida = atuais.map(l => {
+    vistos.add(l.id);
+    const i = porId.get(l.id);
+    if (!i) return l;
+    const ultimo = (i.historico || [])[(i.historico || []).length - 1];
+    return { ...l, pipeline_stage: i.etapa, pipeline_por: ultimo?.por, pipeline_motivo: ultimo?.motivo, pipeline_em: ultimo?.em };
+  });
+  for (const i of itens) {
+    if (vistos.has(i.id)) continue;
+    const ultimo = (i.historico || [])[(i.historico || []).length - 1];
+    saida.push({ ...leadDeItem(i), pipeline_stage: i.etapa, pipeline_por: ultimo?.por, pipeline_motivo: ultimo?.motivo, pipeline_em: ultimo?.em });
+  }
+  return saida;
+};
 
 interface AppContextType {
   user: UserProfile | null;
@@ -46,6 +93,7 @@ interface AppContextType {
 
   // Actions
   refreshUserData: () => Promise<void>;
+  atualizarPipeline: () => Promise<void>;
   performLeadSearch: (niche: string, location: string, limit?: number) => Promise<void>;
   resetWorkspace: () => void;
   viewState: string;
@@ -163,9 +211,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLeads([]);
   };
 
+  // O pipeline mora no servidor: e la que o robo move os cards enquanto
+  // conversa. O navegador entrega os leads que tem, pede o estado de volta
+  // e mostra o que o robo fez.
+  const leadsRef = useRef<LeadItem[]>(leads);
+  leadsRef.current = leads;
+  const sincronizados = useRef<Set<string>>(new Set());
+
+  const atualizarPipeline = useCallback(async () => {
+    if (!auth.currentUser) return;
+    try {
+      const novos = leadsRef.current.filter(l => !sincronizados.current.has(l.id));
+      if (novos.length) {
+        await api.pipelineSincronizar(novos.slice(0, 300).map(fotoDoLead));
+        novos.forEach(l => sincronizados.current.add(l.id));
+      }
+      const { itens } = await api.pipelineListar();
+      setLeads(prev => mesclarPipeline(prev, itens));
+    } catch {
+      // plano sem pipeline ou servidor fora: o quadro local continua valendo
+    }
+  }, []);
+
   const updateLeadStage = (leadId: string, stage: string) => {
-    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, pipeline_stage: stage } : l));
+    const lead = leadsRef.current.find(l => l.id === leadId);
+    setLeads(prev => prev.map(l => l.id === leadId
+      ? { ...l, pipeline_stage: stage, pipeline_por: 'voce', pipeline_motivo: 'movido por você', pipeline_em: new Date().toISOString() }
+      : l));
+    api.pipelineMover(leadId, stage, lead ? fotoDoLead(lead) : undefined).catch(() => {});
   };
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+    const t = setTimeout(() => { void atualizarPipeline(); }, 800);
+    return () => clearTimeout(t);
+  }, [authLoading, user, leads.length, atualizarPipeline]);
+
+  // Enquanto olha o pipeline ou o robo, traz o que o robo moveu sem precisar recarregar.
+  useEffect(() => {
+    if (!user || (viewState !== 'pipeline' && viewState !== 'robo')) return;
+    const id = setInterval(() => { void atualizarPipeline(); }, 20000);
+    return () => clearInterval(id);
+  }, [user, viewState, atualizarPipeline]);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -211,6 +298,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         selectedProfileLead,
         setSelectedProfileLead,
         refreshUserData,
+        atualizarPipeline,
         performLeadSearch,
         resetWorkspace,
         updateLeadStage,

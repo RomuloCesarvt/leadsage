@@ -39,6 +39,10 @@ export interface LeadItem {
   opportunityScore?: number;
   missingDigitalAssets?: string[];
   pipeline_stage?: string;
+  // quem moveu o card por ultimo ("robô" ou "voce") e por que
+  pipeline_por?: string;
+  pipeline_motivo?: string;
+  pipeline_em?: string;
   // Dados reais do Google Maps
   rating?: number;
   rating_count?: number;
@@ -417,4 +421,38 @@ export interface RaioX {
     veredito: 'agencia' | 'dono' | 'abandonado' | 'ninguem' | 'indefinido';
     rotulo: string; confianca: string; evidencias: string[]; abordagem: string; lacunas: string[];
   };
+}
+
+
+// ------------------------------------------------------------- pipeline
+
+export interface PipelineMovimento {
+  de: string;
+  para: string;
+  por: string;
+  motivo: string;
+  em: string;
+}
+
+export interface PipelineItem {
+  id: string;
+  etapa: string;
+  origem?: string;
+  lead?: Partial<LeadItem>;
+  historico?: PipelineMovimento[];
+  atualizado?: string;
+}
+
+export interface ModeloWhatsApp {
+  existe: boolean;
+  status: string; // PENDING | APPROVED | REJECTED | ''
+  motivo: string;
+  texto: string;
+  lote: number;
+}
+
+export interface DisparoResultado {
+  enviados: { id: string; nome: string }[];
+  ignorados: { id: string; nome?: string; motivo: string }[];
+  falhas: { id: string; nome?: string; motivo: string }[];
 }

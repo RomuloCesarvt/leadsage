@@ -19,7 +19,7 @@ from typing import Any, Awaitable, Callable, Dict, Optional
 
 from sqlalchemy import select
 
-from app import meta_canais, robo_store
+from app import meta_canais, pipeline_store, robo_store
 from app.ai_robo import Decisao, decidir
 from app.config import settings
 from app.credit_system import BancoDeCreditosIndisponivel, check_and_deduct_credits, is_admin
@@ -70,6 +70,58 @@ async def _lead_do_contato(uid: str, canal: str, contato: str) -> Optional[Dict[
                 "diagnosis": getattr(row, "diagnosis", None), "hooks": getattr(row, "hooks", None) or [],
             }
     return None
+
+
+def _lead_do_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    """O lead no formato que o SDR espera, a partir do registro do pipeline."""
+    foto = dict(item.get("lead") or {})
+    foto["id"] = item["id"]
+    return foto
+
+
+async def _achar_ou_criar_no_pipeline(
+    uid: str, conversa: Dict[str, Any], msg: meta_canais.Recebida,
+) -> Optional[Dict[str, Any]]:
+    """O card desta conversa no pipeline. Quem chegou sem estar na busca
+    (anuncio, indicacao, quem achou o numero) ganha um card novo: ManyChat
+    sem CRM nao serve para vender."""
+    try:
+        if conversa.get("lead_id"):
+            item = await pipeline_store.obter(uid, conversa["lead_id"])
+            if item:
+                return item
+        if msg.canal == "whatsapp":
+            item = await pipeline_store.achar_por_telefone(uid, msg.contato)
+            if item:
+                return item
+        nome = msg.nome or "Novo contato"
+        novo_id = f"in_{robo_store.id_da_conversa(msg.canal, msg.contato)}"
+        foto: Dict[str, Any] = {"id": novo_id, "name": nome, "company": nome}
+        if msg.canal == "whatsapp":
+            foto["phone"] = "+" + re.sub(r"\D", "", msg.contato)
+        return await pipeline_store.registrar(uid, foto, etapa="Respondeu", origem=f"inbound_{msg.canal}")
+    except Exception as exc:
+        print(f"Falha ao ligar a conversa ao pipeline: {exc}")
+        return None
+
+
+async def _atualizar_pipeline(uid: str, conversa: Dict[str, Any], sdr: Dict[str, Any]) -> None:
+    """Move o card conforme a conversa. Nunca derruba a resposta ao lead."""
+    lead_id = conversa.get("lead_id")
+    if not lead_id:
+        return
+    try:
+        destino = pipeline_store.etapa_pelo_sdr(sdr, respondeu=True)
+        motivo = {
+            "Respondeu": "o lead respondeu",
+            "Qualificado": "o robô qualificou a conversa",
+            "Reunião": "o lead confirmou a reunião",
+            "Proposta": "a conversa chegou na proposta",
+            "Perdido": "o lead recusou",
+        }.get(destino, "")
+        await pipeline_store.mover(uid, lead_id, destino, motivo=motivo, por="robô", sozinho=True)
+    except Exception as exc:
+        print(f"Falha ao mover o pipeline: {exc}")
 
 
 async def _lead_por_id(uid: str, lead_id: str) -> Optional[Dict[str, Any]]:
@@ -139,11 +191,15 @@ async def processar(
     conversa["ultima_entrada"] = robo_store.agora()
     conversa["atualizado"] = robo_store.agora()
 
-    lead = await _lead_do_contato(uid, msg.canal, msg.contato)
+    item = await _achar_ou_criar_no_pipeline(uid, conversa, msg)
+    lead = _lead_do_item(item) if item else await _lead_do_contato(uid, msg.canal, msg.contato)
     if lead:
         conversa["lead_id"] = lead["id"]
         conversa["nome"] = conversa["nome"] or lead.get("company") or lead.get("name") or ""
         lead["site_publicado"] = await _site_do_lead(uid, lead["id"])
+        # primeira resposta do lead: sai de "Contato Enviado" mesmo que o
+        # robo nao possa responder (desligado, sem plano, sem creditos)
+        await _atualizar_pipeline(uid, conversa, {"etapa": "abertura"})
 
     async def salvar() -> Dict[str, Any]:
         await robo_store.salvar_conversa(uid, conversa)
@@ -191,8 +247,10 @@ async def processar(
 
     if decisao.sdr:
         conversa["sdr"] = decisao.sdr
+        await _atualizar_pipeline(uid, conversa, decisao.sdr)
 
     if decisao.optout:
+        await _atualizar_pipeline(uid, conversa, {"etapa": "perdido"})
         conversa["optout"] = True
         conversa["robo_ativo"] = False
         conversa["motivo"] = decisao.motivo

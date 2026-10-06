@@ -1,16 +1,36 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import type { LeadItem } from '../../types';
-import { GripVertical, Phone, MessageCircle } from 'lucide-react';
+import { GripVertical, Phone, MessageCircle, Bot, RefreshCw } from 'lucide-react';
 
 const COLUMNS = [
   { key: 'Novo Lead', color: 'bg-blue-600' },
   { key: 'Contato Enviado', color: 'bg-indigo-600' },
   { key: 'Respondeu', color: 'bg-purple-600' },
+  { key: 'Qualificado', color: 'bg-cyan-600' },
   { key: 'Reunião', color: 'bg-amber-500' },
   { key: 'Proposta', color: 'bg-fuchsia-600' },
   { key: 'Fechado', color: 'bg-emerald-600' },
+  { key: 'Perdido', color: 'bg-slate-500' },
 ];
+
+// Etapas de antes do pipeline ir para o servidor ("Novos" era o padrao do
+// banco): sem este mapa o card nao cai em nenhuma coluna e some do quadro.
+const ETAPA_ANTIGA: Record<string, string> = { Novos: 'Novo Lead', Novo: 'Novo Lead', Contato: 'Contato Enviado' };
+const etapaDe = (l: LeadItem) => {
+  const e = l.pipeline_stage || 'Novo Lead';
+  const normal = ETAPA_ANTIGA[e] || e;
+  return COLUMNS.some(c => c.key === normal) ? normal : 'Novo Lead';
+};
+
+const haQuanto = (iso?: string) => {
+  if (!iso) return '';
+  const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (min < 1) return 'agora';
+  if (min < 60) return `há ${min} min`;
+  if (min < 1440) return `há ${Math.round(min / 60)} h`;
+  return `há ${Math.round(min / 1440)} d`;
+};
 
 const getScoreLabel = (score: number | undefined) => {
   if (!score || score === 0) return { text: 'Baixa (0)', color: 'text-slate-500 bg-slate-100 border-slate-200' };
@@ -20,7 +40,8 @@ const getScoreLabel = (score: number | undefined) => {
 };
 
 export const PipelineScreen: React.FC = () => {
-  const { leads, updateLeadStage, setSelectedProfileLead } = useApp() as any;
+  const { leads, updateLeadStage, setSelectedProfileLead, atualizarPipeline } = useApp() as any;
+  const [atualizando, setAtualizando] = React.useState(false);
 
   const onDragStart = (e: React.DragEvent, leadId: string) => {
     e.dataTransfer.setData("leadId", leadId);
@@ -40,14 +61,25 @@ export const PipelineScreen: React.FC = () => {
 
   return (
     <div className="flex-1 overflow-x-auto overflow-y-hidden p-2 h-full custom-scrollbar">
-      <div className="mb-6 px-2">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-800">Pipeline de Vendas</h1>
-        <p className="text-slate-500 text-sm mt-1">Arraste os cards para mover leads entre etapas.</p>
+      <div className="mb-6 px-2 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-800">Pipeline de Vendas</h1>
+          <p className="text-slate-500 text-sm mt-1">
+            Arraste os cards para mover leads entre etapas. Quando o robô conversa, ele move o card sozinho
+            (<Bot className="w-3.5 h-3.5 inline -mt-0.5 text-blue-600" /> mostra o motivo), mas nunca volta uma etapa que você avançou.
+          </p>
+        </div>
+        <button
+          onClick={async () => { setAtualizando(true); await atualizarPipeline(); setAtualizando(false); }}
+          className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2"
+        >
+          <RefreshCw className={`w-4 h-4 ${atualizando ? 'animate-spin' : ''}`} /> Atualizar
+        </button>
       </div>
 
       <div className="flex gap-4 items-start min-w-max pb-8 h-[calc(100vh-200px)]">
         {COLUMNS.map(column => {
-          const columnLeads = leads.filter((l: LeadItem) => (l.pipeline_stage || 'Novo Lead') === column.key);
+          const columnLeads = leads.filter((l: LeadItem) => etapaDe(l) === column.key);
           return (
             <div 
               key={column.key}
@@ -112,6 +144,15 @@ export const PipelineScreen: React.FC = () => {
                           {scoreInfo.text}
                         </span>
                       </div>
+
+                      {lead.pipeline_motivo && (
+                        <p className="mt-2.5 text-[11px] text-slate-500 flex items-start gap-1.5 leading-snug">
+                          {lead.pipeline_por === 'robô'
+                            ? <Bot className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            : <GripVertical className="w-3.5 h-3.5 text-slate-300 shrink-0" />}
+                          <span>{lead.pipeline_motivo}{lead.pipeline_em ? ` · ${haQuanto(lead.pipeline_em)}` : ''}</span>
+                        </p>
+                      )}
                     </div>
                   );
                 })}

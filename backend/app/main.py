@@ -42,7 +42,7 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
-from app import robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens
+from app import robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote as _quote
 from app.ai_robo import decidir as robo_decidir
@@ -962,6 +962,97 @@ async def robo_webhook(gancho: str, request: Request):
         except Exception as exc:
             print(f"Robo: falha ao processar {msg.canal}/{msg.meta_id}: {exc}")
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- pipeline
+
+class PipelineSyncRequest(BaseModel):
+    leads: List[Dict[str, Any]] = Field(default_factory=list, max_length=300)
+
+
+class PipelineMoverRequest(BaseModel):
+    etapa: str
+    # foto do lead, para o caso de o servidor ainda nao conhece-lo
+    lead: Optional[Dict[str, Any]] = None
+
+
+@app.get("/api/pipeline")
+async def pipeline_listar(user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "pipeline", "O pipeline")
+    itens = await pipeline_store.listar(user.get("uid"))
+    for i in itens:
+        i["historico"] = (i.get("historico") or [])[-5:]
+    return {"etapas": list(pipeline_store.TODAS), "itens": itens}
+
+
+@app.post("/api/pipeline/sync")
+async def pipeline_sincronizar(req: PipelineSyncRequest, user: dict = Depends(get_current_user)):
+    """O navegador entrega os leads que ja tem: e por esta copia que o robo
+    reconhece quem escreveu."""
+    await exigir_recurso(user, "pipeline", "O pipeline")
+    return {"novos": await pipeline_store.registrar_varios(user.get("uid"), req.leads)}
+
+
+@app.put("/api/pipeline/{lead_id}/etapa")
+async def pipeline_mover(lead_id: str, req: PipelineMoverRequest, user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "pipeline", "O pipeline")
+    uid = user.get("uid")
+    if not pipeline_store.etapa_valida(req.etapa):
+        raise HTTPException(status_code=400, detail="Etapa desconhecida.")
+    if await pipeline_store.obter(uid, lead_id) is None:
+        if not req.lead:
+            raise HTTPException(status_code=404, detail="Lead não encontrado no pipeline.")
+        await pipeline_store.registrar(uid, {**req.lead, "id": lead_id})
+    item = await pipeline_store.mover(uid, lead_id, req.etapa, motivo="movido por você", por="voce")
+    return {"etapa": pipeline_store.etapa_valida(req.etapa), "mudou": item is not None}
+
+
+# ------------------------------------------------------------------ disparo
+
+class DisparoRequest(BaseModel):
+    lead_ids: List[str] = Field(default_factory=list, max_length=robo_disparo.TAMANHO_LOTE)
+    consentimento: bool = False
+
+
+@app.get("/api/robo/whatsapp/modelo")
+async def robo_modelo_status(user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    cfg = await robo_store.canal_do_usuario(user.get("uid"))
+    try:
+        return {**await robo_disparo.status_modelo(cfg), "texto": robo_disparo.CORPO_PADRAO,
+                "lote": robo_disparo.TAMANHO_LOTE}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except meta_oauth.MetaRecusou as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.post("/api/robo/whatsapp/modelo")
+async def robo_modelo_criar(user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    cfg = await robo_store.canal_do_usuario(user.get("uid"))
+    try:
+        return await robo_disparo.criar_modelo(cfg)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except meta_oauth.MetaRecusou as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.post("/api/robo/disparar")
+async def robo_disparar(req: DisparoRequest, user: dict = Depends(get_current_user)):
+    """Primeira mensagem pelo WhatsApp do cliente, com modelo aprovado."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    await exigir_recurso(user, "ia_abordagem", "O disparo")
+    uid, email = user.get("uid"), user.get("email", "")
+    cfg = await robo_store.canal_do_usuario(uid)
+    perfil = await get_profile(uid)
+    try:
+        return await robo_disparo.disparar(uid, email, cfg, perfil.model_dump(), req.lead_ids, req.consentimento)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except meta_oauth.MetaRecusou as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 @app.get("/api/robo/conversas")

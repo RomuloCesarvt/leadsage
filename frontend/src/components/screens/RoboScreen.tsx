@@ -1,11 +1,9 @@
 /**
- * Robô de atendimento — caixa de entrada, simulador e conexão com a Meta.
+ * Robô de atendimento — caixa de entrada, disparo, simulador e conexão com a Meta.
  *
- * O robô RESPONDE a quem escreveu (modelo ManyChat). O primeiro contato
- * com o lead continua sendo enviado por você, pela IA de Abordagem:
- * a API da Meta não permite que um robô inicie conversa com contato frio
- * no Instagram e no Messenger, e no WhatsApp isso exige modelo aprovado e
- * consentimento.
+ * No WhatsApp o robô abre a conversa com um modelo aprovado (aba Disparo) e
+ * depois conversa livremente. No Instagram e no Messenger ele só RESPONDE a
+ * quem escreveu: a API da Meta não permite iniciar conversa com contato frio.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -16,11 +14,12 @@ import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { WhatsAppIcon, InstagramIcon, FacebookIcon } from '../BrandIcons';
 import { ConexaoMeta } from '../ConexaoMeta';
+import { DisparoWhatsApp } from '../DisparoWhatsApp';
 import type {
   RoboCanal, RoboConfig, RoboConfigEntrada, RoboConversa, RoboConversaResumo, RoboMensagem,
 } from '../../types';
 
-type Aba = 'conversas' | 'simulador' | 'configurar';
+type Aba = 'conversas' | 'disparo' | 'simulador' | 'configurar';
 
 const ICONE_CANAL: Record<RoboCanal, React.FC<{ className?: string }>> = {
   whatsapp: WhatsAppIcon,
@@ -105,17 +104,19 @@ export const RoboScreen: React.FC = () => {
             <Bot className="w-7 h-7 text-blue-600" /> Robô de atendimento
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            Quando o lead responde no WhatsApp, Instagram ou Messenger, a IA conversa por você.
+            A IA abre a conversa no WhatsApp, responde no WhatsApp, Instagram e Messenger como SDR e move o lead no pipeline.
           </p>
         </div>
         <div className="flex gap-1 bg-white border border-slate-200 rounded-2xl p-1">
           <Tab id="conversas" icon={MessageCircle} label="Conversas" />
+          <Tab id="disparo" icon={Send} label="Disparo" />
           <Tab id="simulador" icon={FlaskConical} label="Simulador" />
           <Tab id="configurar" icon={Settings2} label="Configurar" />
         </div>
       </div>
 
       {aba === 'conversas' && <Conversas onBloqueio={setBloqueado} irConfigurar={() => setAba('configurar')} />}
+      {aba === 'disparo' && <DisparoWhatsApp irConfigurar={() => setAba('configurar')} />}
       {aba === 'simulador' && <Simulador />}
       {aba === 'configurar' && retornoMeta && (
         <div className={`mb-4 p-3 rounded-xl text-sm border ${
