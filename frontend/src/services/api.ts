@@ -324,7 +324,10 @@ export const api = {
   async imagens(nicho: string, termo = ''): Promise<{ imagens: { url: string; miniatura: string; autor: string; fonte: string }[]; fonte: string }> {
     const q = new URLSearchParams({ nicho, termo });
     try {
-      return await fetchWithToken(`/imagens?${q}`);
+      const r = await fetchWithToken(`/imagens?${q}`);
+      // Resposta inesperada vira lista vazia: o banco de fotos e um extra, e
+      // um .length em undefined derrubava a tela inteira do construtor.
+      return { imagens: Array.isArray(r?.imagens) ? r.imagens : [], fonte: String(r?.fonte || '') };
     } catch {
       return { imagens: [], fonte: '' };
     }

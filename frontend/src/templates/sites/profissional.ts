@@ -272,6 +272,8 @@ main:focus{outline:none}
   .acao-movel .am-tel{background:#fff;color:var(--p-texto);border:1.5px solid var(--p)}
   body{padding-bottom:78px}
   .zap-fixo{display:none}
+  /* a barra de baixo ja cobre o gesto; o botao do topo so tirava espaco do nome da empresa */
+  .topo .btn{display:none}
 }
 @media print{.acao-movel,.zap-fixo,.pular{display:none}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

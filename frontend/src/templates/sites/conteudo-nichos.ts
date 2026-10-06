@@ -124,7 +124,7 @@ export const BANCO: ConteudoNicho[] = [
   {
     id: 'psicologia', nome: 'Psicologia e terapias',
     chaves: ['psicolog', 'terapeut', 'psicanal', 'neuropsic', 'psicopedag', 'fonoaudi', 'terapia'],
-    schema: 'MedicalBusiness', layout: 'clinica', paleta: { primaria: '#5b7fa6', destaque: '#c58b6b' },
+    schema: 'MedicalBusiness', layout: 'natural', paleta: { primaria: '#5b7fa6', destaque: '#c58b6b' },
     cta: { principal: 'Marcar uma conversa', secundario: 'Saiba mais' },
     etiqueta: 'Atendimento com sigilo e acolhimento',
     titulos: ['Um espaço seguro para cuidar de você', 'Conversar pode ser o primeiro passo', 'Acolhimento e escuta em {cidade}'],
@@ -140,7 +140,7 @@ export const BANCO: ConteudoNicho[] = [
   {
     id: 'estetica', nome: 'Estética, salão e barbearia',
     chaves: ['estetic', 'salao', 'barbearia', 'barbeiro', 'manicure', 'cabeleir', 'beleza', 'sobrancelha', 'depila', 'spa', 'massag', 'cilios', 'unhas', 'maquiador', 'micropigment', 'podolog'],
-    schema: 'BeautySalon', layout: 'estudio', paleta: { primaria: '#8a3f5d', destaque: '#d9a35b' },
+    schema: 'BeautySalon', layout: 'natural', paleta: { primaria: '#8a3f5d', destaque: '#d9a35b' },
     cta: { principal: 'Agendar horário', secundario: 'Ver serviços' },
     etiqueta: 'Horário marcado, sem espera',
     titulos: ['Realce o que você tem de melhor', 'Beleza e cuidado, no seu horário', 'Seu momento de cuidado em {cidade}'],
@@ -156,7 +156,7 @@ export const BANCO: ConteudoNicho[] = [
   {
     id: 'academia', nome: 'Academia e treino',
     chaves: ['academia', 'pilates', 'crossfit', 'personal', 'fitness', 'muscula', 'yoga', 'danca', 'natacao', 'treino', 'jiu', 'boxe', 'muay', 'karate', 'judo', 'capoeira', 'funcional'],
-    schema: 'HealthClub', layout: 'vibrante', paleta: { primaria: '#e0451f', destaque: '#1d2b53' },
+    schema: 'HealthClub', layout: 'impacto', paleta: { primaria: '#e0451f', destaque: '#facc15' },
     cta: { principal: 'Quero uma aula experimental', secundario: 'Ver modalidades' },
     etiqueta: 'Comece hoje',
     titulos: ['Treine com orientação e resultado', 'O primeiro passo é o mais importante', 'Sua melhor versão começa em {cidade}'],
@@ -172,7 +172,7 @@ export const BANCO: ConteudoNicho[] = [
   {
     id: 'advocacia', nome: 'Advocacia',
     chaves: ['advoca', 'advogad', 'juridic', 'direito'],
-    schema: 'LegalService', layout: 'escritorio', paleta: { primaria: '#1b2a4a', destaque: '#b08d57' },
+    schema: 'LegalService', layout: 'classico', paleta: { primaria: '#1b2a4a', destaque: '#b08d57' },
     cta: { principal: 'Falar com um advogado', secundario: 'Áreas de atuação' },
     etiqueta: 'Atendimento sigiloso',
     titulos: ['Orientação jurídica clara, com respeito ao seu caso', 'Seus direitos explicados sem complicação', 'Advocacia atenta em {cidade}'],
@@ -188,7 +188,7 @@ export const BANCO: ConteudoNicho[] = [
   {
     id: 'contabilidade', nome: 'Contabilidade',
     chaves: ['contab', 'contad', 'fiscal', 'bpo', 'abertura de empresa'],
-    schema: 'AccountingService', layout: 'escritorio', paleta: { primaria: '#0f4c5c', destaque: '#e08e45' },
+    schema: 'AccountingService', layout: 'classico', paleta: { primaria: '#0f4c5c', destaque: '#e08e45' },
     cta: { principal: 'Pedir um orçamento', secundario: 'Nossos serviços' },
     etiqueta: 'Contabilidade sem dor de cabeça',
     titulos: ['Contabilidade que cuida do seu negócio', 'Menos burocracia, mais tempo para vender', 'Seu contador de confiança em {cidade}'],
@@ -380,7 +380,7 @@ export const BANCO: ConteudoNicho[] = [
   {
     id: 'tecnologia-marketing', nome: 'Tecnologia, marketing e serviços profissionais',
     chaves: ['software', 'desenvolv', 'ti ', 'tecnologia', 'marketing', 'agencia', 'publicidade', 'design', 'grafica', 'consultoria', 'coach', 'treinamento corporativo', 'seguranca eletronica', 'cftv', 'provedor', 'informatica', 'rh', 'recrutamento'],
-    schema: 'ProfessionalService', layout: 'escritorio', paleta: { primaria: '#2d3a8c', destaque: '#00b8a9' },
+    schema: 'ProfessionalService', layout: 'bento', paleta: { primaria: '#2d3a8c', destaque: '#00b8a9' },
     cta: { principal: 'Pedir uma proposta', secundario: 'Ver serviços' },
     etiqueta: 'Resultado combinado antes de começar',
     titulos: ['Soluções que resolvem o problema de verdade', 'Do briefing à entrega, com acompanhamento', 'Parceiro de negócios em {cidade}'],

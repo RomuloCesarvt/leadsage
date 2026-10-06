@@ -21,6 +21,8 @@ const casos: [string, string, string, string, Partial<SiteData>][] = [
   ['b-advocacia', 'Advogados', 'Moura & Leite Advocacia', 'Advogados', { nota: 4.9, avaliacoes: 41 }],
   ['b-academia', 'Academias', 'Pulse Fit Academia', 'Academia', { nota: 4.5, avaliacoes: 390 }],
   ['b-oficina', 'Oficinas mecânicas', 'Auto Center Botucatu', 'Oficina Mecânica', { nota: 4.6, avaliacoes: 520 }],
+  ['b-bento', 'Agências de marketing', 'Pixel Agência Digital', 'Advogados', { nota: 4.9, avaliacoes: 64 }],
+  ['b-natural', 'Psicólogos', 'Espaço Vida Plena', 'Clínica Odontológica', { nota: 5.0, avaliacoes: 38 }],
   ['b-estetica', 'Salões de Beleza', 'Navalha Clube Barbearia', 'Barbearia', { nota: 4.7, avaliacoes: 150 }],
 ];
 

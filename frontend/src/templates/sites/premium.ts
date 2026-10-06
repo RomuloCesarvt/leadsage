@@ -17,7 +17,7 @@ import {
 
 /* ------------------------------------------------------------- pedaços */
 
-const blocoContato = (d: SiteData, classe: string, titulo = 'Venha nos visitar'): string => {
+export const blocoContato = (d: SiteData, classe: string, titulo = 'Venha nos visitar'): string => {
   const mapa = linkMapa(d), tel = linkTel(d), ig = linkInsta(d);
   return `<section class="${classe}" id="contato"><div class="wrap ${classe}-in">
   <div><h2>${titulo}</h2>
@@ -32,7 +32,7 @@ const blocoContato = (d: SiteData, classe: string, titulo = 'Venha nos visitar')
   </div></div></section>`;
 };
 
-const depoimentosHtml = (d: SiteData, classe: string, titulo = 'Quem já é cliente'): string => {
+export const depoimentosHtml = (d: SiteData, classe: string, titulo = 'Quem já é cliente'): string => {
   const lista = depoimentosValidos(d);
   if (!lista.length) return '';
   return `<section class="${classe}"><div class="wrap"><h2>${titulo}</h2><div class="${classe}-grade">${lista
@@ -41,7 +41,7 @@ const depoimentosHtml = (d: SiteData, classe: string, titulo = 'Quem já é clie
     .join('')}</div></div></section>`;
 };
 
-const galeriaHtml = (d: SiteData, classe: string, titulo = ''): string => {
+export const galeriaHtml = (d: SiteData, classe: string, titulo = ''): string => {
   const lista = fotos(d);
   if (!lista.length) return '';
   return `<section class="${classe}"><div class="wrap">${titulo ? `<h2>${titulo}</h2>` : ''}<div class="${classe}-grade">${lista
@@ -49,12 +49,12 @@ const galeriaHtml = (d: SiteData, classe: string, titulo = ''): string => {
     .join('')}</div></div></section>`;
 };
 
-const zapFlutuante = (d: SiteData): string => {
+export const zapFlutuante = (d: SiteData): string => {
   const zap = linkZap(d);
   return zap ? `<a class="zap-fixo" href="${zap}" target="_blank" rel="noopener" aria-label="WhatsApp">${ICONES.zap}</a>` : '';
 };
 
-const cssComum = (d: SiteData) => `
+export const cssComum = (d: SiteData) => `
 .zap-fixo{position:fixed;right:22px;bottom:22px;width:60px;height:60px;border-radius:50%;background:#25D366;color:#fff;
   display:grid;place-items:center;box-shadow:0 12px 30px -8px rgba(0,0,0,.45);z-index:60}
 .zap-fixo svg{width:30px;height:30px}
@@ -62,12 +62,12 @@ ${d.selo ? `.selo-leadsage{background:#0b0c0f;color:#8b90a0;text-align:center;pa
 .selo-leadsage a{color:#e2e5ec;font-weight:700}` : ''}
 `;
 
-const seloLeadsage = (d: SiteData) =>
+export const seloLeadsage = (d: SiteData) =>
   d.selo ? '<div class="selo-leadsage">Site criado com <a href="https://leadsageofc.vercel.app" target="_blank" rel="noopener">LeadSage</a></div>' : '';
 
-const fim = (d: SiteData, rodape: string) => `${rodape}${seloLeadsage(d)}${zapFlutuante(d)}`;
+export const fim = (d: SiteData, rodape: string) => `${rodape}${seloLeadsage(d)}${zapFlutuante(d)}`;
 
-const slogan = (d: SiteData, padrao: string) => esc(d.slogan || padrao);
+export const slogan = (d: SiteData, padrao: string) => esc(d.slogan || padrao);
 
 /** Os 3 primeiros diferenciais (do dono ou do ramo) viram a lista de destaques; sem eles, textos neutros. */
 const destaques = (d: SiteData, padrao: string[]): string[] => {

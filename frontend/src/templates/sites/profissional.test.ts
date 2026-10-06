@@ -2,7 +2,9 @@
  * Camada profissional: contraste, SEO, acessibilidade, seções e conteúdo.
  * Rodar: cd frontend && npx tsx src/templates/sites/profissional.test.ts
  */
-import { LAYOUTS_PREMIUM } from './premium';
+import { LAYOUTS_PREMIUM as LAYOUTS_BASE } from './premium';
+import { LAYOUTS_PREMIUM_2 } from './premium2';
+const LAYOUTS_PREMIUM = [...LAYOUTS_BASE, ...LAYOUTS_PREMIUM_2];
 import { BANCO, GENERICO, SOBRE_COMPLEMENTO, achar, preencher } from './conteudo-nichos';
 import { semearConteudo } from './semear';
 import { corDoTexto } from './base';
@@ -131,7 +133,7 @@ for (const c of [...BANCO, GENERICO]) {
   ok(`${c.nome}: títulos curtos (até 10 palavras) e botões de até 5 palavras`, c.titulos.every(t => t.split(/\s+/).length <= 10)
     && c.cta.principal.split(/\s+/).length <= 5 && c.cta.secundario.split(/\s+/).length <= 5, c.titulos.find(t => t.split(/\s+/).length > 10) || c.cta.principal);
   ok(`${c.nome}: perguntas terminam com ? e respostas com ponto`, c.faq.every(f => f.pergunta.endsWith('?') && /[.!]$/.test(f.resposta)));
-  ok(`${c.nome}: tem termos de imagem e layout existente`, c.imagens.length >= 3 && ['aurora', 'clinica', 'oficina', 'estudio', 'escritorio', 'vibrante'].includes(c.layout), c.layout);
+  ok(`${c.nome}: tem termos de imagem e layout existente`, c.imagens.length >= 3 && ['aurora', 'clinica', 'oficina', 'estudio', 'escritorio', 'vibrante', 'bento', 'natural', 'impacto', 'classico'].includes(c.layout), c.layout);
   ok(`${c.nome}: placeholders só {empresa} e {cidade}`, todos.every(t => (t.match(/\{[^}]*\}/g) || []).every(p => p === '{empresa}' || p === '{cidade}')));
 }
 ok('todo ramo tem complemento do "sobre"', [...BANCO, GENERICO].every(c => (SOBRE_COMPLEMENTO[c.id] || '').split('. ').length >= 2));
