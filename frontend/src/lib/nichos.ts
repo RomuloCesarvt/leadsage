@@ -186,7 +186,7 @@ export const CATEGORIAS: CategoriaDeNichos[] = [
     categoria: 'Finanças e Seguros', icone: 'Landmark',
     nichos: [
       'Corretores de seguros', 'Seguradoras', 'Corretoras de planos de saúde', 'Corretores de consórcio', 'Consórcios',
-      'Financeiras', 'Correspondentes bancários', 'Cooperativas de crédito', 'Fintechs', 'Assessorias de investimentos',
+      'Financeiras', 'Crediários', 'Lojas de crédito', 'Correspondentes bancários', 'Cooperativas de crédito', 'Fintechs', 'Assessorias de investimentos',
       'Planejadores financeiros', 'Casas de câmbio', 'Empresas de cobrança', 'Factoring', 'Crédito consignado',
       'Seguros de vida', 'Seguros residenciais', 'Seguros empresariais', 'Corretoras de seguros auto', 'Previdência privada',
       'Gestão de patrimônio', 'Casas de penhor', 'Compra de ouro', 'Meios de pagamento', 'Maquininhas de cartão',

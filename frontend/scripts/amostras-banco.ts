@@ -23,6 +23,12 @@ const casos: [string, string, string, string, Partial<SiteData>][] = [
   ['b-oficina', 'Oficinas mecânicas', 'Auto Center Botucatu', 'Oficina Mecânica', { nota: 4.6, avaliacoes: 520 }],
   ['b-bento', 'Agências de marketing', 'Pixel Agência Digital', 'Advogados', { nota: 4.9, avaliacoes: 64 }],
   ['b-natural', 'Psicólogos', 'Espaço Vida Plena', 'Clínica Odontológica', { nota: 5.0, avaliacoes: 38 }],
+  ['b-conc', 'Concessionárias', 'Primavera Veículos', 'Concessionária', { nota: 4.6, avaliacoes: 318 }],
+  ['b-credito', 'Crediários', 'Crediário Praça Central', 'Financeira', { nota: 4.5, avaliacoes: 87 }],
+  ['b-pet', 'Pet shops', 'Pet Shop Amigo Fiel', 'Academia', { nota: 4.9, avaliacoes: 142 }],
+  ['b-planta', 'Reformas', 'Moura Reformas e Projetos', 'Oficina Mecânica', { nota: 4.7, avaliacoes: 96 }],
+  ['b-mesa', 'Restaurantes', 'Cantina Forno de Ouro', 'Padaria', { nota: 4.6, avaliacoes: 812 }],
+  ['b-ritual', 'Clínicas de estética', 'Studio Bella Pele', 'Barbearia', { nota: 4.8, avaliacoes: 187 }],
   ['b-estetica', 'Salões de Beleza', 'Navalha Clube Barbearia', 'Barbearia', { nota: 4.7, avaliacoes: 150 }],
 ];
 

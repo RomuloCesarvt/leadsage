@@ -1,6 +1,7 @@
 import { prepararDados } from './profissional';
 import { LAYOUTS_PREMIUM } from './premium';
 import { LAYOUTS_PREMIUM_2 } from './premium2';
+import { CENAS } from './cenas';
 import { aplicarTextos } from './textos-editaveis';
 /**
  * Os layouts propriamente ditos.
@@ -644,7 +645,7 @@ ${rodape(d)}`
  * publicados com eles — reabrir para editar precisa encontrar o layout.
  */
 export const SITE_TEMPLATES: SiteTemplate[] = [
-  ...LAYOUTS_PREMIUM, ...LAYOUTS_PREMIUM_2, vitrine, profissional, servicoLocal, essencial,
+  ...CENAS, ...LAYOUTS_PREMIUM, ...LAYOUTS_PREMIUM_2, vitrine, profissional, servicoLocal, essencial,
 ].map(t => ({
   ...t,
   // Todo texto marcado e com as edições do usuário aplicadas — na prévia

@@ -148,12 +148,13 @@ TERMOS_POR_NICHO: List[Tuple[Tuple[str, ...], List[str]]] = [
     (("pneu", "borracharia", "alinhamento", "balanceamento", "suspensao", "freio"), ["tire shop", "car tires", "wheel alignment", "garage"]),
     (("lava jato", "lavajato", "lava-jato", "estetica automotiva", "martelinho", "funilaria", "lanternagem", "pintura automotiva", "vitrificacao"), ["car wash", "car detailing", "auto body", "car polish"]),
     (("autopeca", "auto peca", "pecas para caminhao", "peca de moto", "pecas de moto", "bateria", "escapamento", "retifica", "cambio", "ar-condicionado automotivo", "injecao", "auto eletric"), ["auto parts", "car engine", "mechanic tools", "garage"]),
-    (("concessionaria", "revenda", "carros usados", "veiculos novos", "locadora de veiculo", "locacao de moto", "blindagem", "customizacao", "proteção veicular", "protecao veicular", "rastreamento", "seguro auto"), ["car dealership", "used cars", "car rental", "car showroom"]),
+    (("concessionaria", "revenda", "carros usados", "veiculos novos", "locadora de veiculo", "locacao de moto", "blindagem", "customizacao", "proteção veicular", "protecao veicular", "rastreamento", "seguro auto"), ["car dealership", "used cars", "car", "automobile"]),
     (("moto", "motocicleta", "bicicletaria"), ["motorcycle", "motorbike shop", "motorcycle repair"]),
     (("estacionamento", "guincho", "reboque", "vistoria veicular", "despachante de veiculo", "taxi", "troca de oleo", "oleo", "insulfilm", "som automotivo", "vidros automotivos", "adesivo automotivo", "capas e tapetes"), ["parking lot", "tow truck", "car service", "car interior"]),
     # --- juridico, contabil, financas
     (("advogad", "advocacia", "juridic", "mediacao", "arbitragem", "assessoria juridica", "perito", "pericia", "direito"), ["business meeting", "office desk", "contract signing", "law books"]),
     (("contab", "contad", "bpo", "tribut", "fiscal", "auditoria"), ["accounting", "calculator", "tax documents", "laptop work"]),
+    (("crediario", "loja de credito", "lojas de credito"), ["credit card payment", "shopping store", "financial advisor", "money"]),
     (("seguro", "seguradora", "previdencia", "consorcio", "financeira", "credito", "correspondente bancario", "cooperativa de credito", "fintech", "investimento", "planejador financeiro", "cambio", "patrimonio", "cobranca", "factoring", "penhor", "ouro", "meios de pagamento", "maquininha"), ["financial advisor", "insurance", "money", "bank"]),
     # --- marketing, consultoria, tecnologia
     (("marketing", "trafego", "publicidade", "seo", "social media", "branding", "influenciador", "criador de conteudo", "copywriter", "assessoria de imprensa", "relacoes publicas", "pesquisa de mercado", "design grafico", "designer", "embalagem"), ["creative team", "marketing meeting", "laptop work", "brainstorming"]),

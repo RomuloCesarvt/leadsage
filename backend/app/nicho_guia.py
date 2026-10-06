@@ -32,6 +32,22 @@ GUIA: List[Dict[str, object]] = [
         "objecoes": "'O iFood já resolve' (mostre pedido direto sem comissão); 'não tenho tempo' (o trabalho é seu).",
     },
     {
+        "nome": "Concessionária e revenda de veículos",
+        "chaves": ("concessionaria", "revenda", "carros usados", "veiculos novos", "seminovo", "multimarcas", "automoveis", "automovel", "motos novas"),
+        "cliente": "Compra grande e planejada: pesquisa muito no Google e em portais, compara preço e estoque e quer falar com um vendedor antes de ir à loja. Confia em quem responde rápido e é claro sobre valores e financiamento.",
+        "dores": "Depender só de portais pagos e de anúncios; lead que pede preço e some; estoque que muda e o site não acompanha; atendimento que demora no WhatsApp.",
+        "evitar": "Sábado e fim de semana (pico de visitas na loja). Melhor: terça a quinta, fim da manhã ou início da tarde.",
+        "objecoes": "'Já anuncio nos portais' (o site próprio capta contato direto, sem concorrência de outros anúncios na mesma tela); 'meu estoque muda toda hora' (o site mostra categorias e leva ao WhatsApp, onde o estoque do dia é informado).",
+    },
+    {
+        "nome": "Crediário, financeira e crédito",
+        "chaves": ("crediario", "credito", "financeira", "emprestimo", "consignado", "consorcio", "financiamento", "microcredito", "correspondente bancario"),
+        "cliente": "Decide por confiança e clareza: quer entender parcela, prazo e o que precisa levar antes de se comprometer. Pesquisa muito e desconfia de promessa fácil, pela quantidade de golpe no setor.",
+        "dores": "Desconfiança do público com crédito; dúvida sobre documentos e prazo que trava o contato; atendimento por telefone que não registra a conversa; presença digital que não passa seriedade.",
+        "evitar": "Início e fim de mês (movimento de pagamentos). Melhor: meio de semana, meio da manhã. Seja sempre formal e transparente.",
+        "objecoes": "'Já tenho clientes pelo balcão' (o site responde as dúvidas antes de a pessoa ir ao balcão e reduz atendimento repetido); 'não posso prometer aprovação' (e não deve: o site fala em simulação e análise, nunca em aprovação garantida).",
+    },
+    {
         "nome": "Padaria, confeitaria, doceria, cafeteria",
         "chaves": ("padaria", "panificadora", "confeitaria", "doceria", "cafeteria", "bolo", "confeiteir", "cafe "),
         "cliente": "Compra por hábito e proximidade, mas encomenda (bolos, festas, cestas) vem de busca e indicação. Foto e prova social vendem.",
