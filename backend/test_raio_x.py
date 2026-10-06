@@ -189,7 +189,7 @@ async def test_pixels_escondidos_no_tag_manager(monkeypatch):
 def test_raio_x_cobra_uma_vez_e_guarda(client, monkeypatch):
     chamadas = []
 
-    async def montar(place_id, website, instagram, canal):
+    async def montar(place_id, website, instagram, canal, lead=None):
         chamadas.append(place_id)
         return {"place_id": place_id, "gmn": {}, "site": {}, "instagram": {},
                 "quem_cuida": {"veredito": "ninguem"}, "gerado_em": "x",

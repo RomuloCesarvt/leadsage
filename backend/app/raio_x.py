@@ -19,6 +19,7 @@ rodape, pixel de anuncio, data do ultimo post — e vem com o grau de
 confianca. Nada de IA aqui: um veredito inventado faria o usuario abrir
 a conversa com uma afirmacao errada sobre o negocio do outro.
 """
+import asyncio
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -360,7 +361,9 @@ async def montar(
     website_da_tela: str,
     instagram_da_tela: str,
     canal: Dict[str, Any],
+    lead: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
+    from app import dossie
     from app.dispatcher import DispatchError, _validar_destino_webhook
     from app.leads_engine import classify_website
     from app.social_scraper import SocialScraper
@@ -398,7 +401,7 @@ async def montar(
                 sinais_site[chave] = True
                 via_gtm = True
 
-    return {
+    resultado = {
         "place_id": place_id,
         "gmn": gmn,
         "site": {
@@ -420,3 +423,16 @@ async def montar(
         "gerado_em": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "gerado_em_ts": time.time(),
     }
+
+    # Dossie: empresa (Receita), pessoas, dores e abordagem. Falha sozinho:
+    # sem ele o raio-x continua valendo.
+    contexto = dict(lead or {})
+    contexto.setdefault("rating", gmn.get("nota"))
+    contexto.setdefault("rating_count", gmn.get("avaliacoes"))
+    contexto.setdefault("company", gmn.get("nome"))
+    try:
+        resultado.update(await asyncio.wait_for(dossie.montar(contexto, resultado, site_url, canal), timeout=24))
+    except Exception as exc:
+        print(f"Dossie indisponivel: {exc}")
+        resultado.update({"empresa": {}, "pessoas": [], "dores": dossie.montar_dores(resultado, contexto), "abordagem": None})
+    return resultado

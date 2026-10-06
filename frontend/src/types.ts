@@ -442,6 +442,22 @@ export interface RaioX {
     veredito: 'agencia' | 'dono' | 'abandonado' | 'ninguem' | 'indefinido';
     rotulo: string; confianca: string; evidencias: string[]; abordagem: string; lacunas: string[];
   };
+  // Dossie. Raio-x guardado antes dele chega sem estes campos.
+  empresa?: DossieEmpresa;
+  pessoas?: { nome: string; cargo: string; fonte: string }[];
+  dores?: { titulo: string; evidencia: string; peso: 'alto' | 'medio' | 'baixo' }[];
+  abordagem?: DossieAbordagem | null;
+}
+
+export interface DossieEmpresa {
+  cnpj?: string; razao_social?: string; nome_fantasia?: string; situacao?: string; aberta_em?: string;
+  anos_de_atividade?: number | null; porte?: string; atividade?: string; municipio?: string; uf?: string;
+  socios?: { nome: string; qualificacao: string }[]; fonte?: string;
+}
+
+export interface DossieAbordagem {
+  angulo: string; abertura: string; por_que_funciona: string; objecao_provavel: string;
+  resposta_a_objecao: string; proximo_passo: string; evitar: string; origem: 'ia' | 'fatos'; canal: string;
 }
 
 

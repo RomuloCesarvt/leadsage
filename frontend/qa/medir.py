@@ -247,4 +247,5 @@ async def main():
     json.dump(relatorio, open(os.path.join(SAIDA, "relatorio.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

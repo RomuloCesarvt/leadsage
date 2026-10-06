@@ -1356,6 +1356,18 @@ class RaioXRequest(BaseModel):
     instagram: Optional[str] = Field(default="", max_length=200)
     # refazer mesmo com o guardado ainda valido (cobra de novo)
     refazer: bool = False
+    # o que a tela ja sabe do lead; alimenta a abordagem personalizada
+    lead: Optional[Dict[str, Any]] = None
+
+
+def raio_x_contexto(lead: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Só os campos que a abordagem usa, com tamanho limitado: o corpo vem do
+    navegador e vai para dentro de um prompt."""
+    lead = lead or {}
+    texto = {k: str(lead.get(k) or "")[:160] for k in
+             ("id", "company", "name", "niche", "city", "neighborhood", "best_channel", "phone", "email")}
+    numeros = {k: lead.get(k) for k in ("rating", "rating_count") if isinstance(lead.get(k), (int, float))}
+    return {**texto, **numeros, "whatsapp": bool(lead.get("whatsapp"))}
 
 
 @app.post("/api/raio-x")
@@ -1379,8 +1391,9 @@ async def gerar_raio_x(req: RaioXRequest, user: dict = Depends(get_current_user)
     canal = await robo_store.canal_do_usuario(uid) or {}
     try:
         dados = await asyncio.wait_for(
-            raio_x.montar(req.place_id, req.website or "", req.instagram or "", canal),
-            timeout=40,
+            raio_x.montar(req.place_id, req.website or "", req.instagram or "", canal,
+                          raio_x_contexto(req.lead)),
+            timeout=55,
         )
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="O raio-x demorou demais. Tente de novo.")

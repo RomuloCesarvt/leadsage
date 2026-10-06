@@ -315,9 +315,9 @@ export const api = {
     });
   },
 
-  async raioX(place_id: string, website: string, instagram: string, refazer = false): Promise<RaioX> {
+  async raioX(place_id: string, website: string, instagram: string, refazer = false, lead?: Record<string, unknown>): Promise<RaioX> {
     return await fetchWithToken('/raio-x', {
-      method: 'POST', body: JSON.stringify({ place_id, website, instagram, refazer }),
+      method: 'POST', body: JSON.stringify({ place_id, website, instagram, refazer, lead }),
     });
   },
 
