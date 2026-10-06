@@ -58,7 +58,7 @@ export const SubscriptionScreen: React.FC = () => {
             <Zap className="w-6 h-6 text-white" />
           </div>
           <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">PLANO</span>
-          <h3 className="font-black text-slate-900 text-2xl mb-8">START VITALÍCIO</h3>
+          <h3 className="font-black text-slate-900 text-xl leading-tight pr-14 mb-8">START VITALÍCIO</h3>
           
           <div className="flex items-start gap-1 mb-10">
             <span className="text-xl font-bold text-slate-500 mt-2">R$</span>
@@ -105,7 +105,7 @@ export const SubscriptionScreen: React.FC = () => {
           </div>
           
           <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">PLANO</span>
-          <h3 className="font-black text-slate-900 text-2xl mb-8">PRO VITALÍCIO</h3>
+          <h3 className="font-black text-slate-900 text-xl leading-tight pr-14 mb-8">PRO VITALÍCIO</h3>
           
           <div className="flex items-start gap-1 mb-2">
             <span className="text-xl font-bold text-slate-500 mt-2">R$</span>
@@ -153,7 +153,7 @@ export const SubscriptionScreen: React.FC = () => {
           </div>
 
           <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">PLANO</span>
-          <h3 className="font-black text-blue-600 text-2xl mb-8">AGÊNCIA VITALÍCIO</h3>
+          <h3 className="font-black text-blue-600 text-xl leading-tight pr-14 mb-8">AGÊNCIA VITALÍCIO</h3>
           
           <div className="flex items-start gap-1 mb-10">
             <span className="text-xl font-bold text-blue-500 mt-2">R$</span>

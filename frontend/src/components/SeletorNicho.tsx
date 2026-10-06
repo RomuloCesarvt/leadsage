@@ -7,7 +7,7 @@
  * - o que a pessoa digitar vale mesmo fora da lista: a busca é no Google
  *   Maps, então qualquer ramo funciona.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Search, ChevronDown, ChevronRight, X, Check,
   HeartPulse, Sparkles, Dumbbell, Utensils, ShoppingBag, Building, Hammer, Wrench, Car, Scale, Landmark,
@@ -31,6 +31,35 @@ export const SeletorNicho: React.FC<{ value: string; onChange: (v: string) => vo
   const [ativo, setAtivo] = useState(0);
   const raiz = useRef<HTMLDivElement>(null);
   const campo = useRef<HTMLInputElement>(null);
+  // A lista tem de caber inteira na janela: com altura fixa, o ultimo item
+  // ficava abaixo da borda e so aparecia rolando a pagina. A altura sai do
+  // espaco real ate a borda da janela; sem espaco embaixo, abre para cima.
+  const [lugar, setLugar] = useState<{ acima: boolean; max: number; largura: number; esq: number }>(
+    { acima: false, max: 420, largura: 0, esq: 0 });
+
+  useLayoutEffect(() => {
+    if (!aberto) return;
+    const medir = () => {
+      const el = raiz.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const abaixo = window.innerHeight - r.bottom - 20;
+      const acima = r.top - 20;
+      const sobe = abaixo < 280 && acima > abaixo;
+      // largura propria: um campo estreito (grade de 3 colunas ao lado do
+      // menu) nao pode encolher a lista e cortar os nomes dos nichos
+      const largura = Math.max(r.width, Math.min(440, window.innerWidth - 32));
+      const esq = Math.min(0, window.innerWidth - 16 - (r.left + largura));
+      setLugar({ acima: sobe, max: Math.max(180, Math.min(520, Math.floor(sobe ? acima : abaixo))), largura, esq });
+    };
+    medir();
+    window.addEventListener('resize', medir);
+    window.addEventListener('scroll', medir, true);
+    return () => {
+      window.removeEventListener('resize', medir);
+      window.removeEventListener('scroll', medir, true);
+    };
+  }, [aberto]);
 
   useEffect(() => {
     if (!aberto) return;
@@ -87,13 +116,13 @@ export const SeletorNicho: React.FC<{ value: string; onChange: (v: string) => vo
         aria-expanded={aberto}
         aria-controls="lista-de-nichos"
         autoComplete="off"
-        placeholder="Digite ou escolha na lista"
+        placeholder="Escolha ou digite"
         value={value}
         onChange={e => { onChange(e.target.value); setDigitou(true); setAberto(true); }}
         onFocus={() => setAberto(true)}
         onClick={() => setAberto(true)}
         onKeyDown={teclas}
-        className="w-full pl-11 pr-20 py-3.5 bg-white border border-blue-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer"
+        className={`w-full pl-11 ${value ? 'pr-[4.5rem]' : 'pr-11'} py-3.5 bg-white border border-blue-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer text-ellipsis`}
       />
       <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
         {value && (
@@ -112,18 +141,20 @@ export const SeletorNicho: React.FC<{ value: string; onChange: (v: string) => vo
 
       {aberto && (
         <div id="lista-de-nichos" role="listbox"
-          className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 max-h-[420px] overflow-y-auto">
+          style={{ maxHeight: lugar.max, width: lugar.largura || undefined, left: lugar.esq }}
+          className={`absolute bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-y-auto overscroll-contain ${
+            lugar.acima ? 'bottom-full mb-2' : 'top-full mt-2'}`}>
           {consulta ? (
             <ul className="p-2">
               {opcoes.map((o, i) => (
                 <li key={`${o.nome}-${i}`} role="option" aria-selected={i === ativo}>
                   <button type="button" onClick={() => escolher(o.nome)} onMouseEnter={() => setAtivo(i)}
-                    className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-left text-sm ${
+                    className={`w-full flex flex-col items-start gap-0.5 px-3 py-2.5 rounded-lg text-left text-sm ${
                       i === ativo ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'}`}>
-                    <span className="font-semibold truncate">
+                    <span className="font-semibold leading-snug break-words max-w-full">
                       {o.livre ? <>Buscar por “{o.nome}”</> : o.nome}
                     </span>
-                    <span className="text-[11px] text-slate-400 shrink-0">{o.livre ? 'texto livre' : o.categoria}</span>
+                    <span className="text-[11px] text-slate-400">{o.livre ? 'texto livre' : o.categoria}</span>
                   </button>
                 </li>
               ))}
@@ -150,7 +181,7 @@ export const SeletorNicho: React.FC<{ value: string; onChange: (v: string) => vo
                         <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
                           <Icone className="w-4 h-4 text-blue-600" />
                         </span>
-                        <span className="font-bold text-slate-800 text-sm truncate">{cat.categoria}</span>
+                        <span className="font-bold text-slate-800 text-sm leading-snug break-words min-w-0">{cat.categoria}</span>
                       </span>
                       <span className="flex items-center gap-2 shrink-0">
                         <span className="text-[11px] text-slate-400">{cat.nichos.length}</span>
@@ -158,15 +189,15 @@ export const SeletorNicho: React.FC<{ value: string; onChange: (v: string) => vo
                       </span>
                     </button>
                     {aberta && (
-                      <div className="px-3 pb-3 pt-1 grid grid-cols-1 sm:grid-cols-2 gap-1.5 bg-slate-50/50">
+                      <div className="px-3 pb-3 pt-1 grid gap-1.5 bg-slate-50/50 [grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr))]">
                         {cat.nichos.map(nome => {
                           const sel = value === nome;
                           return (
                             <button key={nome} type="button" onClick={() => escolher(nome)}
-                              className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-left text-sm transition-colors ${
+                              className={`flex items-start justify-between gap-2 px-3 py-2 rounded-lg border text-left text-sm transition-colors ${
                                 sel ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/50'}`}>
-                              <span className="font-semibold truncate">{nome}</span>
-                              {sel && <Check className="w-4 h-4 shrink-0" />}
+                              <span className="font-semibold leading-snug break-words min-w-0">{nome}</span>
+                              {sel && <Check className="w-4 h-4 shrink-0 mt-0.5" />}
                             </button>
                           );
                         })}

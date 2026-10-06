@@ -395,10 +395,10 @@ export const SiteBuilder: React.FC = () => {
             <button
               key={t.id}
               onClick={() => { setTemplate(t); setEscolheuLayout(true); }}
-              className="group text-left bg-white border border-slate-200 rounded-2xl overflow-hidden hover:border-blue-400 hover:shadow-lg transition-all"
+              className="group text-left bg-white border border-slate-200 rounded-2xl overflow-hidden hover:border-blue-400 hover:shadow-lg transition-all flex flex-col justify-start items-stretch"
             >
               <div
-                className="bg-slate-100 border-b border-slate-200"
+                className="bg-slate-100 border-b border-slate-200 aspect-[160/110] overflow-hidden [&>svg]:block [&>svg]:w-full [&>svg]:h-auto"
                 dangerouslySetInnerHTML={{
                   __html: t.miniatura({ corPrimaria: dados.corPrimaria, corDestaque: dados.corDestaque }),
                 }}

@@ -5,7 +5,7 @@ import { useApp } from '../../context/AppContext';
 export const NotificationsScreen: React.FC = () => {
   const { setViewState } = useApp() as any;
   return (
-    <div className="flex-1 flex flex-col h-full relative max-w-4xl mx-auto w-full">
+    <div className="flex-1 flex flex-col h-full relative max-w-4xl w-full">
       
       {/* Header */}
       <div className="mb-6">

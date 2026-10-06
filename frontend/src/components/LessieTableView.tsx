@@ -92,12 +92,12 @@ export const LessieTableView: React.FC = () => {
           </label>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 cursor-pointer">
             <input type="checkbox" checked={filterWhatsApp} onChange={() => setFilterWhatsApp(!filterWhatsApp)} className="rounded border-slate-300" />
             Com WhatsApp
           </label>
-          <div className="flex-1"></div>
+          <div className="hidden lg:block flex-1"></div>
           {[
             { key: 'favoritos', icon: <Star className="w-3 h-3" />, label: 'Favoritos' },
             { key: 'sem-site', icon: <Globe className="w-3 h-3" />, label: 'Sem Site' },
@@ -108,7 +108,7 @@ export const LessieTableView: React.FC = () => {
             <button
               key={tag.key}
               onClick={() => setActiveTag(activeTag === tag.key ? null : tag.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 border ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 border whitespace-nowrap ${
                 activeTag === tag.key 
                   ? 'bg-blue-50 border-blue-200 text-blue-700' 
                   : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
@@ -129,10 +129,10 @@ export const LessieTableView: React.FC = () => {
                 <input type="checkbox" className="rounded border-slate-300" />
               </th>
               <th className="py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Empresa</th>
-              <th className="py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Localização</th>
-              <th className="py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contato</th>
+              <th className="hidden md:table-cell py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Localização</th>
+              <th className="hidden md:table-cell py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contato</th>
               <th className="py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Score</th>
-              <th className="py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Presença Digital</th>
+              <th className="hidden lg:table-cell py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Presença Digital</th>
               <th className="py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Ações</th>
             </tr>
           </thead>
@@ -159,10 +159,10 @@ export const LessieTableView: React.FC = () => {
                       </div>
                     </div>
                   </td>
-                  <td className="py-4 px-4">
+                  <td className="hidden md:table-cell py-4 px-4">
                     <p className="text-sm text-slate-600">{lead.city || lead.location?.split(',')[0] || '-'}</p>
                   </td>
-                  <td className="py-4 px-4">
+                  <td className="hidden md:table-cell py-4 px-4">
                     <p className="text-sm font-medium text-slate-700">
                       {lead.phone 
                         ? `+${lead.phone}`
@@ -175,7 +175,7 @@ export const LessieTableView: React.FC = () => {
                       {scoreInfo.text}
                     </span>
                   </td>
-                  <td className="py-4 px-4">
+                  <td className="hidden lg:table-cell py-4 px-4">
                     <DigitalPresence
                       lead={lead}
                       canais={['website', 'instagram', 'whatsapp', 'facebook', 'email']}

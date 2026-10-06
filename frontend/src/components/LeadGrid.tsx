@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { LeadCard } from './LeadCard';
 import { useApp } from '../context/AppContext';
+import { Avatar } from './Avatar';
 
 export const LeadGrid: React.FC = () => {
   const { leads, isLoading, currentNiche, currentLocation, setSelectedLeadForMessage } = useApp();
@@ -150,7 +151,7 @@ export const LeadGrid: React.FC = () => {
                     </td>
                     <td className="p-3.5">
                       <div className="flex items-center gap-2.5">
-                        <img src={lead.avatar} alt={lead.name} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                        <Avatar src={lead.avatar} nome={lead.name} className="w-8 h-8" />
                         <div>
                           <div className="font-bold text-slate-100">{lead.name}</div>
                           <div className="text-[11px] text-indigo-400">{lead.role} • {lead.company}</div>

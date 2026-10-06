@@ -142,7 +142,7 @@ export const SettingsScreen: React.FC = () => {
     'placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors';
 
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar max-w-5xl mx-auto w-full">
+    <div className="flex-1 overflow-y-auto custom-scrollbar max-w-5xl w-full">
       
       {/* Header */}
       <div className="mb-8">

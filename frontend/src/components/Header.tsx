@@ -1,6 +1,7 @@
 import React from 'react';
 import { Menu, Zap, Bell } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { Avatar } from './Avatar';
 
 export const Header: React.FC<{ toggleSidebar: () => void }> = ({ toggleSidebar }) => {
   const { user, setIsCreditModalOpen, setIsProfileModalOpen, viewState } = useApp() as any;
@@ -63,7 +64,7 @@ export const Header: React.FC<{ toggleSidebar: () => void }> = ({ toggleSidebar 
             onClick={() => setIsProfileModalOpen(true)}
             className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white shadow-sm border border-slate-200 hover:ring-blue-100 transition-all"
           >
-            <img src={user?.avatar || ''} alt={user?.name || ''} className="w-full h-full object-cover" />
+            <Avatar src={user?.avatar} nome={user?.name} className="w-full h-full" />
           </button>
 
         </div>

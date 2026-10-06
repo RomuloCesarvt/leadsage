@@ -68,7 +68,7 @@ export const NovaBuscaScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full relative max-w-5xl mx-auto w-full pb-20">
+    <div className="flex-1 flex flex-col h-full relative w-full pb-20">
       
       {/* Header */}
       <div className="mb-6">
@@ -86,7 +86,7 @@ export const NovaBuscaScreen: React.FC = () => {
       {/* Form Area */}
       <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm mb-8">
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 mb-6">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">País</label>
             <div className="relative">
@@ -158,7 +158,7 @@ export const NovaBuscaScreen: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 mb-6">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Nicho</label>
             <SeletorNicho value={niche} onChange={setNiche} />

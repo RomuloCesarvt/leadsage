@@ -60,8 +60,8 @@ export const PipelineScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 overflow-x-auto overflow-y-hidden p-2 h-full custom-scrollbar">
-      <div className="mb-6 px-2 flex flex-wrap items-end justify-between gap-3">
+    <div className="flex-1 overflow-x-auto overflow-y-hidden pb-2 h-full custom-scrollbar">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-800">Pipeline de Vendas</h1>
           <p className="text-slate-500 text-sm mt-1">
@@ -113,10 +113,10 @@ export const PipelineScreen: React.FC = () => {
                       draggable
                       onDragStart={(e) => onDragStart(e, lead.id)}
                       onClick={() => setSelectedProfileLead(lead)}
-                      className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm cursor-grab active:cursor-grabbing hover:border-blue-300 hover:shadow-md transition-all group"
+                      className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm cursor-grab active:cursor-grabbing hover:border-blue-300 hover:shadow-md transition-all group relative"
                     >
                       <div className="flex items-start gap-2 mb-2">
-                        <GripVertical className="w-4 h-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 shrink-0" />
+                        <GripVertical className="w-4 h-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity absolute left-1 top-4" />
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-bold text-slate-800 truncate leading-tight mb-0.5">
                             {lead.company}

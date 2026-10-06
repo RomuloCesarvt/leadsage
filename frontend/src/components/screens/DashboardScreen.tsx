@@ -156,7 +156,7 @@ export const DashboardScreen: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Buscas Recentes */}
-        <div>
+        <div className="flex flex-col">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-slate-800 text-lg">Buscas Recentes</h3>
             <button 
@@ -166,7 +166,7 @@ export const DashboardScreen: React.FC = () => {
               Ver todas <ArrowRight className="w-4 h-4" />
             </button>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-3 flex-1 flex flex-col">
             {history && history.length > 0 ? history.slice(0, 3).map((item: any) => (
               <div key={item.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center justify-between hover:border-blue-200 transition-colors cursor-pointer" onClick={() => setViewState('history')}>
                 <div className="flex items-center gap-4">
@@ -184,7 +184,7 @@ export const DashboardScreen: React.FC = () => {
                 </div>
               </div>
             )) : (
-              <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 text-center flex flex-col items-center justify-center h-48">
+              <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 text-center flex flex-col items-center justify-center flex-1 min-h-48">
                 <Search className="w-8 h-8 text-slate-300 mb-3" />
                 <p className="text-slate-500 font-medium text-sm">Nenhuma busca recente</p>
               </div>
@@ -193,7 +193,7 @@ export const DashboardScreen: React.FC = () => {
         </div>
 
         {/* Funil de Vendas */}
-        <div>
+        <div className="flex flex-col">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-slate-800 text-lg">Funil de Vendas</h3>
             <button 
@@ -204,22 +204,22 @@ export const DashboardScreen: React.FC = () => {
             </button>
           </div>
           
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4 flex-1">
             {stageData.map((stage, i) => {
               const widthPct = totalLeads > 0 ? Math.round((stage.count / maxStageCount) * 100) : 0;
               const pctLabel = totalLeads > 0 ? `${Math.round((stage.count / totalLeads) * 100)}%` : '0%';
               return (
-                <div key={i} className="flex items-center gap-4 group">
-                  <div className="w-40 flex items-center gap-2 text-sm font-medium text-slate-700">
+                <div key={i} className="flex items-center gap-2 sm:gap-4 group">
+                  <div className="w-28 sm:w-40 shrink-0 flex items-center gap-2 text-[13px] sm:text-sm font-medium text-slate-700 leading-tight">
                     <span className={`w-2 h-2 rounded-full ${stage.dot}`}></span>
                     {stage.label}
                   </div>
-                  <div className="flex-1 flex items-center gap-3">
-                    <div className="font-bold text-slate-800 w-6">{stage.count}</div>
+                  <div className="flex-1 min-w-0 flex items-center gap-2 sm:gap-3">
+                    <div className="font-bold text-slate-800 w-5 sm:w-6 shrink-0">{stage.count}</div>
                     <div className="flex-1 h-8 bg-slate-50 rounded-lg overflow-hidden relative border border-slate-100 group-hover:bg-slate-100 transition-colors">
                       <div className={`h-full ${stage.color} opacity-20`} style={{ width: `${widthPct}%` }}></div>
                     </div>
-                    <div className="w-10 text-right text-xs font-bold text-slate-400">{pctLabel}</div>
+                    <div className="w-9 sm:w-10 shrink-0 text-right text-xs font-bold text-slate-400">{pctLabel}</div>
                   </div>
                 </div>
               );

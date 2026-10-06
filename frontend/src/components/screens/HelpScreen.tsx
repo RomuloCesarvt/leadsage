@@ -56,7 +56,7 @@ export const HelpScreen: React.FC = () => {
     : FAQ_ITEMS;
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar max-w-4xl mx-auto w-full pb-12">
+    <div className="flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar max-w-4xl w-full pb-12">
       
       {/* Header */}
       <div className="mb-8 text-center">
