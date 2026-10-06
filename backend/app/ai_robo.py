@@ -140,6 +140,7 @@ def respostas_seguidas_do_robo(mensagens: List[Dict[str, Any]]) -> int:
     return n
 
 
+from app import ai_oferta  # noqa: E402
 from app.ai_sdr import montar_prompt, normalizar, problemas_da_resposta  # noqa: E402
 
 
@@ -160,6 +161,9 @@ def decidir(
     ultima = next((m for m in reversed(mensagens) if m.get("de") == "contato"), None)
     if not ultima:
         return Decisao()
+
+    # o preco cadastrado na oferta vale para o desconto e para o verificador
+    cfg = ai_oferta.aplicar(cfg)
 
     texto = ultima.get("texto", "")
 

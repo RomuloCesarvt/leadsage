@@ -15,6 +15,7 @@ import { useApp } from '../../context/AppContext';
 import { WhatsAppIcon, InstagramIcon, FacebookIcon } from '../BrandIcons';
 import { ConexaoMeta } from '../ConexaoMeta';
 import { DisparoWhatsApp } from '../DisparoWhatsApp';
+import { OfertaDoRobo } from '../OfertaDoRobo';
 import type {
   RoboCanal, RoboConfig, RoboConfigEntrada, RoboConversa, RoboConversaResumo, RoboMensagem,
 } from '../../types';
@@ -88,11 +89,11 @@ export const RoboScreen: React.FC = () => {
   const Tab = ({ id, icon: Icon, label }: { id: Aba; icon: any; label: string }) => (
     <button
       onClick={() => setAba(id)}
-      className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors ${
+      className={`px-2.5 sm:px-4 py-2 rounded-xl text-[13px] sm:text-sm font-bold flex items-center gap-2 transition-colors whitespace-nowrap shrink-0 ${
         aba === id ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-100'
       }`}
     >
-      <Icon className="w-4 h-4" /> {label}
+      <Icon className="w-4 h-4 hidden sm:block" /> {label}
     </button>
   );
 
@@ -107,7 +108,7 @@ export const RoboScreen: React.FC = () => {
             A IA abre a conversa no WhatsApp, responde no WhatsApp, Instagram e Messenger como SDR e move o lead no pipeline.
           </p>
         </div>
-        <div className="flex gap-1 bg-white border border-slate-200 rounded-2xl p-1">
+        <div className="flex gap-1 bg-white border border-slate-200 rounded-2xl p-1 max-w-full overflow-x-auto">
           <Tab id="conversas" icon={MessageCircle} label="Conversas" />
           <Tab id="disparo" icon={Send} label="Disparo" />
           <Tab id="simulador" icon={FlaskConical} label="Simulador" />
@@ -494,6 +495,8 @@ const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio 
         setForm({
           ativo: c.ativo, objetivo: (c.objetivo || 'agendar') as any, instrucoes: c.instrucoes,
           link_agenda: c.link_agenda, nome_assistente: c.nome_assistente,
+          catalogo: c.catalogo, faq: c.faq, desconto_maximo: c.desconto_maximo || 0,
+          oferta: c.oferta || {},
           wa_phone_id: c.wa_phone_id, page_id: c.page_id, ig_id: c.ig_id,
         });
       })
@@ -558,6 +561,8 @@ const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio 
 
         <ConexaoMeta cfg={cfg} aoMudar={setCfg} />
 
+        <OfertaDoRobo valor={form.oferta} onChange={o => mudar('oferta', o)} />
+
         {/* comportamento */}
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-5">
@@ -582,6 +587,7 @@ const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio 
                 <option value="agendar">Marcar uma conversa</option>
                 <option value="site">Mostrar o site que já fiz para ele</option>
                 <option value="qualificar">Entender se tem interesse</option>
+                <option value="vender">Fechar a venda pela conversa</option>
               </select>
             </div>
             <div className="md:col-span-2">
@@ -589,13 +595,26 @@ const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio 
               <input value={form.link_agenda || ''} onChange={e => mudar('link_agenda', e.target.value)}
                 placeholder="https://calendly.com/…" className={campo} />
             </div>
+            <div>
+              <label className={rotulo}>Desconto máximo (%)</label>
+              <input type="number" min={0} max={50} value={form.desconto_maximo ?? 0}
+                onChange={e => mudar('desconto_maximo', Math.max(0, Math.min(50, Number(e.target.value) || 0)))}
+                className={campo} />
+              <p className="text-xs text-slate-500 mt-1.5">Só em troca de pagamento à vista ou de fechar na hora. 0 = nunca dá desconto.</p>
+            </div>
+            <div className="md:col-span-2">
+              <label className={rotulo}>Perguntas frequentes (respostas oficiais)</label>
+              <textarea rows={4} value={form.faq || ''} onChange={e => mudar('faq', e.target.value)}
+                placeholder={'Uma por linha. Ex.:\nVocês atendem fora de Botucatu? Sim, online, em todo o Brasil.\nPrecisa de contrato? Sim, enviado digitalmente.'}
+                className={`${campo} resize-none`} />
+            </div>
             <div className="md:col-span-2">
               <label className={rotulo}>Instruções</label>
               <textarea rows={5} value={form.instrucoes || ''} onChange={e => mudar('instrucoes', e.target.value)}
-                placeholder={'O que o robô precisa saber. Ex.:\n- Site institucional a partir de R$ 1.200, entrega em 15 dias.\n- Atendo só a região de Botucatu.\n- Não ofereço desconto; isso é comigo.'}
+                placeholder={'Outras regras. Ex.:\n- Atendo só a região de Botucatu.\n- Nunca prometo resultado de vendas.\n- Reunião só de terça a quinta.'}
                 className={`${campo} resize-none`} />
               <p className="text-xs text-slate-500 mt-1.5">
-                Preço e prazo só são ditos se estiverem aqui. Sem isso, o robô diz que vai confirmar e chama você.
+                Preço e prazo ficam em "Serviço que o robô vende". Aqui vão só as regras extras do seu jeito de trabalhar.
               </p>
             </div>
           </div>

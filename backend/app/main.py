@@ -42,7 +42,7 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
-from app import robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo
+from app import robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote as _quote
 from app.ai_robo import decidir as robo_decidir
@@ -871,6 +871,8 @@ class RoboConfigRequest(BaseModel):
     catalogo: Optional[str] = Field(default=None, max_length=4000)
     faq: Optional[str] = Field(default=None, max_length=4000)
     desconto_maximo: Optional[int] = Field(default=None, ge=0, le=50)
+    # o servico que o robo vende; normalizado em ai_oferta antes de gravar
+    oferta: Optional[Dict[str, Any]] = None
 
 
 class RoboTextoRequest(BaseModel):
@@ -902,9 +904,10 @@ async def robo_salvar_config(req: RoboConfigRequest, user: dict = Depends(get_cu
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     if req.objetivo and req.objetivo not in ("agendar", "site", "qualificar", "vender"):
         raise HTTPException(status_code=400, detail="Objetivo inválido.")
-    canal = await robo_store.salvar_canal(
-        user.get("uid"), user.get("email", ""), req.model_dump(exclude_none=True)
-    )
+    dados = req.model_dump(exclude_none=True)
+    if "oferta" in dados:
+        dados["oferta"] = ai_oferta.normalizar(dados["oferta"])
+    canal = await robo_store.salvar_canal(user.get("uid"), user.get("email", ""), dados)
     return robo_store.visao_publica(canal, settings.APP_URL)
 
 

@@ -26,6 +26,8 @@ enganosos e sao exatamente o que faz o numero ser denunciado e banido.
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+from app import ai_oferta, nicho_guia
+
 ETAPAS = ("abertura", "descoberta", "diagnostico", "proposta", "objecao", "agendamento", "fechamento", "perdido")
 TEMPERATURAS = ("frio", "morno", "quente")
 
@@ -49,6 +51,16 @@ OBJECOES = """
   já foi preparado, se houver; não despeje um texto longo.
 - "Quem é você?" / "como conseguiu meu número?": transparência total — o número é o público do perfil
   do Google do negócio, e você é assistente virtual de quem oferece o serviço.
+- "Preciso falar com meu sócio / marido / esposa": ótimo, quem decide precisa ver. Ofereça incluir a pessoa
+  na conversa de 15 minutos ou mande o essencial para ela ver (link do site pronto). Pergunte o melhor horário para os dois.
+- "Já tentei e não deu resultado": valide sem criticar quem fez. Pergunte o que foi feito e o que faltou;
+  mostre que o seu método é outro e que o esboço/diagnóstico prova antes de ele gastar qualquer coisa.
+- "Estou sem dinheiro agora" / "mês fraco": não force. Mostre o menor passo (esboço, diagnóstico) e combine
+  retomar; se há parcelamento nos fatos do dono, mencione.
+- "Tem exemplo? Tem portfólio?": mande o que existir (o site já preparado dele é o melhor exemplo). Não invente
+  clientes nem resultados.
+- "Isso é golpe? Vocês existem?" / "de onde vocês são?": seja transparente — nome da empresa, que é assistente
+  virtual, que o contato veio do perfil público do Google, e ofereça uma ligação para ele conferir quem é.
 - "Não tenho interesse": agradeça, não insista. No máximo uma pergunta aberta e gentil ("posso saber se é
   o momento ou o serviço?"). Se repetir, encerre com educação.
 """
@@ -166,9 +178,12 @@ def montar_prompt(
     sdr: Optional[Dict[str, Any]] = None,
     agora: Optional[datetime] = None,
 ) -> str:
+    cfg = ai_oferta.aplicar(cfg)
     quem = perfil.get("company_name") or perfil.get("name") or "a empresa"
     assistente = cfg.get("nome_assistente") or "assistente virtual"
     oferta = perfil.get("product_description") or "serviços de presença digital (site, Google e redes sociais)"
+    servico = ai_oferta.bloco_do_servico(cfg, lead)
+    ramo = nicho_guia.bloco((lead or {}).get("niche"))
     vender = cfg.get("objetivo") == "vender"
     meta = {
         "agendar": "marcar uma conversa de 15 minutos com o responsável (ligação ou vídeo)",
@@ -189,6 +204,7 @@ Agora é {_agora_brasil(agora)}.
 
 == O QUE {quem.upper()} VENDE ==
 {oferta}
+{servico}
 {f"Catálogo e preços (só estes existem):{chr(10)}{cfg['catalogo']}" if cfg.get('catalogo') else "Não há catálogo de preços: NUNCA diga valores; diga que depende do escopo e proponha a conversa."}
 {f"Perguntas frequentes (respostas oficiais):{chr(10)}{cfg['faq']}" if cfg.get('faq') else ""}
 {_regra_de_desconto(cfg)}
@@ -201,6 +217,9 @@ Instruções do dono: {cfg.get('instrucoes') or '(nenhuma)'}
 == DOSSIÊ DESTE NEGÓCIO (use; é o que torna a conversa única) ==
 {_formatar_dossie(lead, raio)}
 
+== ENTENDENDO O RAMO ==
+{ramo}
+
 == ONDE A CONVERSA ESTÁ ==
 {_formatar_estado(sdr or {})}
 
@@ -212,6 +231,20 @@ Avance uma etapa por vez: abertura → descoberta → diagnóstico → proposta 
 - Proposta: o que muda para o negócio dele, não a lista técnica do serviço.
 - {"Fechamento: confirme escopo, preço do catálogo e forma de pagamento; ao aceitar, passe para o humano formalizar." if vender else "Agendamento: proponha dois horários concretos (ou o link), evitando o pico do negócio dele (padaria cedo, restaurante no almoço e no jantar, comércio no sábado). Confirmado o horário, passe para o humano."}
 - Lead frio que só respondeu "oi": devolva com o gancho mais forte do dossiê e uma pergunta.
+
+== COMO TRAZER A REUNIÃO (o que separa SDR de atendente) ==
+1. Responda PRIMEIRO o que a pessoa perguntou, em uma frase; só depois conduza. Quem pergunta e não recebe resposta desconfia.
+2. Termine cada mensagem com UM próximo passo, no formato mais fácil de aceitar: pergunta de sim/não ou escolha entre duas opções.
+3. Regra dos 3 turnos: até a 3ª resposta do cliente já deve existir um convite concreto ({"fechar" if vender else "uma conversa de 15 minutos"} ou ver o material). Descoberta longa cansa e esfria.
+4. Sinal de compra (perguntou preço, prazo, "como funciona", "quero ver", elogiou, disse que precisa): PARE de qualificar e proponha o horário agora.
+5. Convide com dois horários concretos nos próximos dois ou três dias úteis, usando a data de hoje acima (ex.: "amanhã, quinta, às 15h ou sexta às 10h"),
+   fora do horário de pico do ramo. Se houver link de agenda, ofereça junto.
+6. Diminua o esforço do sim: 15 minutos, por vídeo ou ligação, "eu te mostro e você decide, sem compromisso".
+7. Quando ele confirmar: repita dia, data e hora, peça o melhor WhatsApp ou ligação e quem mais deve participar, e passe para o humano.
+8. "Vou pensar": descubra o que falta ("é o valor, o momento ou prefere ver antes?") e ofereça um passo pequeno, nunca um "fico no aguardo".
+9. Não repita pergunta já respondida nem abra duas mensagens seguidas do mesmo jeito; varie a forma.
+10. Não sabe? Diga que confirma com o responsável e já siga para o convite. Nunca invente.
+11. Espelhe o jeito dele: formal com quem é formal, direto com quem é direto, curto com quem escreve curto.
 
 == OBJEÇÕES ==
 {OBJECOES}
@@ -327,12 +360,35 @@ def _num(texto: str) -> float:
         return -1.0
 
 
+def valores_da_oferta(cfg: Dict[str, Any]) -> List[float]:
+    """Valores que o proprio dono escreveu (ex.: "hospedagem cerca de R$ 40
+    por mes") e os que saem do pagamento combinado (50% de entrada, 6x).
+
+    Medido em simulacao: o robo respondeu "R$ 40" a quem perguntou da
+    hospedagem — dado do dono — e o verificador barrou como inventado.
+    """
+    o = cfg.get("oferta") or {}
+    escrito = " ".join(
+        str(o.get(k) or "") for k in ("inclui", "nao_inclui", "pagamento", "revisoes", "garantia", "diferenciais")
+    ) + " " + (cfg.get("faq") or "") + " " + (cfg.get("instrucoes") or "")
+    valores = [_num(v) for v in _VALOR.findall(escrito)]
+    preco = float(o.get("preco") or 0)
+    if preco:
+        pagamento = o.get("pagamento") or ""
+        for pct in _re.findall(r"(\d{1,3})\s*%", pagamento):
+            valores.append(round(preco * int(pct) / 100, 2))
+        for n in _re.findall(r"\b(\d{1,2})\s*x\b", pagamento):
+            if int(n) >= 2:
+                valores.append(round(preco / int(n), 2))
+    return [v for v in valores if v > 0]
+
+
 def valores_permitidos(cfg: Dict[str, Any], mensagens: List[Dict[str, Any]]) -> List[float]:
     """Os valores que o robo pode citar: os do catalogo, esses mesmos com
     o desconto autorizado, e os que o proprio cliente disse."""
     base = [_num(v) for v in _VALOR.findall(cfg.get("catalogo") or "")]
     desconto = int(cfg.get("desconto_maximo") or 0)
-    permitidos = list(base)
+    permitidos = list(base) + valores_da_oferta(cfg)
     for v in base:
         permitidos += [round(v * (1 - d / 100), 2) for d in range(1, desconto + 1)]
     for m in mensagens:

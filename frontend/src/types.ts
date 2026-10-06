@@ -337,10 +337,31 @@ export interface RoboConfigEntrada {
   page_token: string;
   ig_id: string;
   ativo: boolean;
-  objetivo: 'agendar' | 'site' | 'qualificar';
+  objetivo: 'agendar' | 'site' | 'qualificar' | 'vender';
   instrucoes: string;
   link_agenda: string;
   nome_assistente: string;
+  catalogo: string;
+  faq: string;
+  desconto_maximo: number;
+  /** o servico que o robo vende, em campos */
+  oferta: Partial<OfertaRobo>;
+}
+
+export interface OfertaRobo {
+  servico: 'site' | 'gmn' | 'social' | 'trafego' | 'outro';
+  nome: string;
+  preco: string | number;
+  prazo_dias: string | number;
+  inclui: string;
+  nao_inclui: string;
+  esboco: 'gratis' | 'pago' | 'nao';
+  esboco_prazo: string;
+  esboco_preco: string | number;
+  pagamento: string;
+  revisoes: string;
+  garantia: string;
+  diferenciais: string;
 }
 
 /** O que a tela recebe: os segredos so aparecem como "configurado". */

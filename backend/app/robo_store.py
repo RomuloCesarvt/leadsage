@@ -40,6 +40,8 @@ CAMPOS_CANAL = (
     # base de conhecimento do SDR: o que existe para vender e o que pode
     # ser concedido. O que nao estiver aqui, o robo nao inventa.
     "catalogo", "faq", "desconto_maximo",
+    # o servico que o robo vende, em campos (ai_oferta)
+    "oferta",
     # preenchidos pela conexao com um clique (app do LeadSage)
     "page_nome", "ig_usuario", "waba_id", "wa_pin",
 )
@@ -159,6 +161,7 @@ def visao_publica(canal: Optional[Dict[str, Any]], url_base: str) -> Dict[str, A
     c = canal or {}
     saida = {k: c.get(k, "") for k in CAMPOS_CANAL if k not in SEGREDOS}
     saida["ativo"] = bool(c.get("ativo"))
+    saida["oferta"] = c.get("oferta") or {}
     for segredo in SEGREDOS:
         saida[f"tem_{segredo}"] = bool(c.get(segredo))
     saida["webhook_url"] = f"{url_base}/api/robo/webhook/{c['gancho']}" if c.get("gancho") else ""
