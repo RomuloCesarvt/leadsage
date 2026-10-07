@@ -23,7 +23,7 @@ URL = "http://localhost:5198/"
 EDGE = r"C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
 
 TELAS = [
-    ("dashboard", "Dashboard"), ("hero", "Nova Busca"), ("workspace", "Meus Leads"), ("pipeline", "Pipeline de Vendas"),
+    ("dashboard", "Dashboard"), ("hero", "Nova Busca"), ("results", "Resultados"), ("workspace", "Meus Leads"), ("pipeline", "Pipeline de Vendas"),
     ("history", "Histórico"), ("ai-outreach", "IA de Abordagem"), ("robo", "Robô de Atendimento"), ("proposals", "Propostas"),
     ("contracts", "Contratos"), ("calculator", "Precificador"), ("create-site", "Criar Site"), ("my-sites", "Meus Sites"),
     ("tutorials", "Tutoriais"), ("notifications", "Avisos"), ("settings", "Configurações"), ("help", "Ajuda"),

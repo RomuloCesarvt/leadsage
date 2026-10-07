@@ -1,3 +1,4 @@
+import { ehSalvo } from '../../lib/leadsSalvos';
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import type { LeadItem } from '../../types';
@@ -79,7 +80,7 @@ export const PipelineScreen: React.FC = () => {
 
       <div className="flex gap-4 items-start min-w-max pb-8 h-[calc(100vh-200px)]">
         {COLUMNS.map(column => {
-          const columnLeads = leads.filter((l: LeadItem) => etapaDe(l) === column.key);
+          const columnLeads = leads.filter((l: LeadItem) => ehSalvo(l) && etapaDe(l) === column.key);
           return (
             <div 
               key={column.key}

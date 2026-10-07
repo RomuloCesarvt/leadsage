@@ -1,11 +1,39 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { History, Eye, Trash2, Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
 
 export const HistoryScreen: React.FC = () => {
-  const { history, setHistory, setViewState, performLeadSearch } = useApp() as any;
+  const { history, setHistory, setViewState, performLeadSearch, limparResultados } = useApp() as any;
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [limpando, setLimpando] = useState(false);
+  const [carregando, setCarregando] = useState(true);
+
+  // O histórico só era carregado depois de uma busca na sessão: ao reabrir o app
+  // a tela vinha vazia, mesmo com buscas guardadas no servidor.
+  useEffect(() => {
+    let vivo = true;
+    api.getSearchHistory().then(h => { if (vivo) setHistory(h); }).finally(() => { if (vivo) setCarregando(false); });
+    return () => { vivo = false; };
+  }, [setHistory]);
+
+  const total = (h: any): number => Number(h?.total_leads ?? h?.resultsFound ?? 0) || 0;
+
+  // Limpa o histórico inteiro. Os leads que você já adicionou a Meus Leads ficam;
+  // só somem os resultados de busca que ninguém escolheu.
+  const limparTudo = async () => {
+    if (!window.confirm('Limpar todo o histórico de buscas? Os leads que você adicionou a Meus Leads continuam lá.')) return;
+    setLimpando(true);
+    try {
+      await api.limparHistorico();
+      setHistory([]);
+      limparResultados();
+    } catch (err: any) {
+      alert(err?.message || 'Não foi possível limpar o histórico.');
+    } finally {
+      setLimpando(false);
+    }
+  };
 
   // O botão de excluir era decorativo: não tinha onClick nem rota.
   const handleDelete = async (id: string) => {
@@ -29,13 +57,25 @@ export const HistoryScreen: React.FC = () => {
           <h1 className="text-2xl font-bold tracking-tight text-slate-800">Histórico de Buscas</h1>
           <p className="text-slate-500 text-sm mt-1">Visualize e gerencie suas prospecções anteriores.</p>
         </div>
-        <button 
-          onClick={() => setViewState('hero')}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm transition-colors w-fit"
-        >
-          <Search className="w-4 h-4" />
-          Nova Busca
-        </button>
+        <div className="flex items-center gap-2">
+          {history.length > 0 && (
+            <button
+              onClick={limparTudo}
+              disabled={limpando}
+              className="px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 hover:text-rose-700 text-slate-600 transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="w-4 h-4" />
+              {limpando ? 'Limpando…' : 'Limpar histórico'}
+            </button>
+          )}
+          <button 
+            onClick={() => setViewState('hero')}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm transition-colors w-fit"
+          >
+            <Search className="w-4 h-4" />
+            Nova Busca
+          </button>
+        </div>
       </div>
 
       {/* Stats Row */}
@@ -56,7 +96,7 @@ export const HistoryScreen: React.FC = () => {
           <div>
             <p className="text-sm font-semibold text-slate-500">Total de Leads</p>
             <p className="text-2xl font-black text-slate-800">
-              {history.reduce((acc: number, curr: any) => acc + curr.resultsFound, 0)}
+              {history.reduce((acc: number, curr: any) => acc + total(curr), 0)}
             </p>
           </div>
         </div>
@@ -67,7 +107,7 @@ export const HistoryScreen: React.FC = () => {
           <div>
             <p className="text-sm font-semibold text-slate-500">Média por Busca</p>
             <p className="text-2xl font-black text-slate-800">
-              {history.length > 0 ? Math.round(history.reduce((acc: number, curr: any) => acc + curr.resultsFound, 0) / history.length) : 0}
+              {history.length > 0 ? Math.round(history.reduce((acc: number, curr: any) => acc + total(curr), 0) / history.length) : 0}
             </p>
           </div>
         </div>
@@ -75,7 +115,9 @@ export const HistoryScreen: React.FC = () => {
 
       {/* Table */}
       <div className="flex-1 bg-white border border-slate-200 rounded-xl overflow-auto custom-scrollbar relative shadow-sm">
-        {history.length === 0 ? (
+        {carregando && history.length === 0 ? (
+          <div className="h-full flex items-center justify-center p-12 text-sm text-slate-500">Carregando…</div>
+        ) : history.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center p-12 text-center">
             <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
               <History className="w-8 h-8 text-slate-400" />
@@ -102,7 +144,7 @@ export const HistoryScreen: React.FC = () => {
                   </td>
                   <td className="py-4 px-6 text-sm text-slate-600 font-medium">{item.niche}</td>
                   <td className="py-4 px-6 text-sm text-slate-500">{item.location}</td>
-                  <td className="py-4 px-6 text-sm font-semibold text-slate-700">{item.resultsFound} de até 20</td>
+                  <td className="py-4 px-6 text-sm font-semibold text-slate-700">{total(item)} encontrados</td>
                   <td className="py-4 px-6 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button 

@@ -157,8 +157,12 @@ async def registrar(uid: str, lead: Dict[str, Any], etapa: str = "", origem: str
     return item
 
 
-async def registrar_varios(uid: str, leads: List[Dict[str, Any]]) -> int:
-    """Sincroniza os leads que o navegador ja tem. So grava o que mudou."""
+async def registrar_varios(uid: str, leads: List[Dict[str, Any]], origem: str = "busca") -> int:
+    """Sincroniza os leads que o navegador ja tem. So grava o que mudou.
+
+    `origem="salvo"` marca quem a pessoa escolheu para Meus Leads; um item que
+    antes era so sobra de busca passa a valer como escolhido.
+    """
     novos = 0
     for lead in leads[:300]:
         lead_id = str(lead.get("id") or "").strip()
@@ -166,9 +170,12 @@ async def registrar_varios(uid: str, leads: List[Dict[str, Any]]) -> int:
             continue
         existente = await _ler(uid, lead_id)
         foto = _foto(lead)
+        if existente and origem != "busca" and existente.get("origem") == "busca":
+            existente["origem"] = origem
+            await _gravar(uid, existente)
         if existente and all((existente.get("lead") or {}).get(k) == v for k, v in foto.items()):
             continue
-        await registrar(uid, lead, etapa=lead.get("pipeline_stage") or "")
+        await registrar(uid, lead, etapa=lead.get("pipeline_stage") or "", origem=origem)
         novos += existente is None
     return novos
 

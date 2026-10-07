@@ -2,6 +2,7 @@ import React from 'react';
 import { LessieTableView } from './LessieTableView';
 import { useApp } from '../context/AppContext';
 import { Download } from 'lucide-react';
+import { ehSalvo } from '../lib/leadsSalvos';
 import type { LeadItem } from '../types';
 
 function downloadFile(content: string, filename: string, mimeType: string) {
@@ -85,7 +86,8 @@ function leadsToTSV(leads: LeadItem[]): string {
 }
 
 export const SplitViewWorkspace: React.FC = () => {
-  const { leads, isLoading } = useApp() as any;
+  const { leads: todos, isLoading, setViewState } = useApp() as any;
+  const leads: LeadItem[] = (todos as LeadItem[]).filter(ehSalvo);
 
   const handleExportCSV = () => {
     if (leads.length === 0) return alert('Nenhum lead para exportar.');
@@ -102,17 +104,23 @@ export const SplitViewWorkspace: React.FC = () => {
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col h-[calc(100vh-8rem)]">
+    <div className="w-full flex-1 flex flex-col h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] min-h-0">
       
       {/* Title Area */}
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Meus Leads</h1>
           <p className="text-sm text-slate-500 font-medium mt-1">
-            Gerencie e filtre todos os leads encontrados. <span className="text-blue-600 font-bold">{leads.length} leads</span>
+            Os leads que você escolheu. É daqui que o contato começa. <span className="text-blue-600 font-bold">{leads.length} leads</span>
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setViewState('results')}
+            className="flex items-center gap-2 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600 transition-colors"
+          >
+            Resultados da busca
+          </button>
           <button 
             onClick={handleExportCSV}
             disabled={isLoading || leads.length === 0}
@@ -131,7 +139,7 @@ export const SplitViewWorkspace: React.FC = () => {
       </div>
 
       {/* Main Table Area */}
-      <div className="flex-1 flex flex-col overflow-hidden w-full relative">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden w-full relative">
         {isLoading ? (
           <div className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-8 animate-pulse">
             <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-6"></div>
@@ -146,7 +154,7 @@ export const SplitViewWorkspace: React.FC = () => {
             </div>
           </div>
         ) : (
-          <LessieTableView />
+          <LessieTableView modo="meus" />
         )}
       </div>
       

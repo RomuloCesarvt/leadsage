@@ -1,9 +1,11 @@
+import { ehSalvo } from '../../lib/leadsSalvos';
 import React from 'react';
 import { Search, Users, ArrowUpRight, BarChart2, Zap, Globe, MessageCircle, Target, ArrowRight } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const DashboardScreen: React.FC = () => {
-  const { setViewState, leads, history, user } = useApp() as any;
+  const { setViewState, leads: todos, history, user } = useApp() as any;
+  const leads = (todos as any[]).filter(ehSalvo);
 
   // Real computed metrics
   const totalLeads = leads.length;

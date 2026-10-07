@@ -994,7 +994,15 @@ async def pipeline_sincronizar(req: PipelineSyncRequest, user: dict = Depends(ge
     """O navegador entrega os leads que ja tem: e por esta copia que o robo
     reconhece quem escreveu."""
     await exigir_recurso(user, "pipeline", "O pipeline")
-    return {"novos": await pipeline_store.registrar_varios(user.get("uid"), req.leads)}
+    return {"novos": await pipeline_store.registrar_varios(user.get("uid"), req.leads, origem="salvo")}
+
+
+@app.delete("/api/pipeline/{lead_id}")
+async def pipeline_remover(lead_id: str, user: dict = Depends(get_current_user)):
+    """Tira um lead de Meus Leads (e do pipeline). So apaga o da propria conta."""
+    await exigir_recurso(user, "pipeline", "O pipeline")
+    await pipeline_store.apagar(user.get("uid"), lead_id)
+    return {"status": "removed", "id": lead_id}
 
 
 @app.put("/api/pipeline/{lead_id}/etapa")
@@ -1631,6 +1639,30 @@ async def delete_search_history(
     await db.delete(entry)
     await db.commit()
     return {"status": "deleted", "id": search_id}
+
+
+@app.delete("/api/history")
+async def clear_search_history(
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Limpa o historico inteiro e os leads que vieram das buscas.
+
+    Leads que a pessoa ja salvou em "Meus Leads" ficam no pipeline do
+    servidor (que e separado) e nao sao tocados aqui.
+    """
+    uid = user.get("uid")
+    historico = await db.execute(select(DBSearchHistory).where(DBSearchHistory.owner_uid == uid))
+    entradas = historico.scalars().all()
+    for entrada in entradas:
+        leads = await db.execute(
+            select(DBLead).where(DBLead.search_id == entrada.id, DBLead.owner_uid == uid)
+        )
+        for lead in leads.scalars().all():
+            await db.delete(lead)
+        await db.delete(entrada)
+    await db.commit()
+    return {"status": "cleared", "removidas": len(entradas)}
 
 
 @app.get("/api/suggested-niches")

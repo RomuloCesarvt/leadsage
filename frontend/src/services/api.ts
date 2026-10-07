@@ -414,6 +414,14 @@ export const api = {
     await fetchWithToken(`/sites/${id}`, { method: 'DELETE' });
   },
 
+  async limparHistorico(): Promise<{ removidas: number }> {
+    return await fetchWithToken('/history', { method: 'DELETE' });
+  },
+
+  async pipelineRemover(leadId: string): Promise<void> {
+    await fetchWithToken(`/pipeline/${encodeURIComponent(leadId)}`, { method: 'DELETE' });
+  },
+
   async deleteSearchHistory(id: string): Promise<void> {
     await fetchWithToken(`/history/${id}`, { method: 'DELETE' });
   },

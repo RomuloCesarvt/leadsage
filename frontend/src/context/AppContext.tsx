@@ -5,6 +5,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { rodandoNativo } from '../lib/pwa';
 import { colherRedirecionamento } from '../lib/autenticacao';
+import { ehSalvo, salvoPeloServidor } from '../lib/leadsSalvos';
 import type { LeadItem, PipelineItem, SearchHistoryItem, SuggestedNiche, UserProfile } from '../types';
 
 // O servidor so precisa do que o robo usa para conversar e do que o card
@@ -44,12 +45,18 @@ const mesclarPipeline = (atuais: LeadItem[], itens: PipelineItem[]): LeadItem[] 
     const i = porId.get(l.id);
     if (!i) return l;
     const ultimo = (i.historico || [])[(i.historico || []).length - 1];
-    return { ...l, pipeline_stage: i.etapa, pipeline_por: ultimo?.por, pipeline_motivo: ultimo?.motivo, pipeline_em: ultimo?.em };
+    return {
+      ...l, pipeline_stage: i.etapa, pipeline_por: ultimo?.por, pipeline_motivo: ultimo?.motivo, pipeline_em: ultimo?.em,
+      pipeline_origem: i.origem, salvo: l.salvo === true || salvoPeloServidor(i.origem, i.etapa),
+    };
   });
   for (const i of itens) {
     if (vistos.has(i.id)) continue;
     const ultimo = (i.historico || [])[(i.historico || []).length - 1];
-    saida.push({ ...leadDeItem(i), pipeline_stage: i.etapa, pipeline_por: ultimo?.por, pipeline_motivo: ultimo?.motivo, pipeline_em: ultimo?.em });
+    saida.push({
+      ...leadDeItem(i), pipeline_stage: i.etapa, pipeline_por: ultimo?.por, pipeline_motivo: ultimo?.motivo, pipeline_em: ultimo?.em,
+      pipeline_origem: i.origem, salvo: salvoPeloServidor(i.origem, i.etapa),
+    });
   }
   return saida;
 };
@@ -96,6 +103,16 @@ interface AppContextType {
   atualizarPipeline: () => Promise<void>;
   performLeadSearch: (niche: string, location: string, limit?: number) => Promise<void>;
   resetWorkspace: () => void;
+  /** Escolhe leads dos resultados para entrar em Meus Leads (e no pipeline). */
+  salvarLeads: (ids: string[]) => Promise<void>;
+  /** Tira leads de Meus Leads (e do pipeline). */
+  removerLeads: (ids: string[]) => Promise<void>;
+  alternarFavorito: (id: string) => void;
+  /** Some só com os resultados de busca que ninguém escolheu. */
+  limparResultados: () => void;
+  /** Leads marcados em Meus Leads para começar o contato (aba Fila de envio do robô). */
+  leadsParaContato: string[];
+  setLeadsParaContato: (ids: string[]) => void;
   viewState: string;
   setViewState: (viewState: string) => void;
   // Site que o construtor deve reabrir. Nulo = criar do zero.
@@ -185,11 +202,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const performLeadSearch = async (niche: string, location: string, limit: number = 10) => {
     setIsLoading(true);
-    setLeads([]);
-    setViewState('workspace');
+    // os resultados antigos que ninguém escolheu saem; Meus Leads fica como está
+    setLeads(prev => prev.filter(ehSalvo));
+    setViewState('results');
     try {
       const res = await api.searchLeads({ niche, location, limit });
-      setLeads(res.leads);
+      setLeads(prev => {
+        const jaTem = new Set(prev.map(l => l.id));
+        return [...prev, ...res.leads.filter(l => !jaTem.has(l.id)).map(l => ({ ...l, salvo: false }))];
+      });
       if (user) {
         setUser({ ...user, credits: res.remaining_credits });
       }
@@ -208,7 +229,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const resetWorkspace = () => {
     setViewState('hero');
-    setLeads([]);
+    setLeads(prev => prev.filter(ehSalvo));
   };
 
   // O pipeline mora no servidor: e la que o robo move os cards enquanto
@@ -221,7 +242,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const atualizarPipeline = useCallback(async () => {
     if (!auth.currentUser) return;
     try {
-      const novos = leadsRef.current.filter(l => !sincronizados.current.has(l.id));
+      const novos = leadsRef.current.filter(l => ehSalvo(l) && !sincronizados.current.has(l.id));
       if (novos.length) {
         await api.pipelineSincronizar(novos.slice(0, 300).map(fotoDoLead));
         novos.forEach(l => sincronizados.current.add(l.id));
@@ -236,10 +257,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateLeadStage = (leadId: string, stage: string) => {
     const lead = leadsRef.current.find(l => l.id === leadId);
     setLeads(prev => prev.map(l => l.id === leadId
-      ? { ...l, pipeline_stage: stage, pipeline_por: 'voce', pipeline_motivo: 'movido por você', pipeline_em: new Date().toISOString() }
+      ? { ...l, salvo: true, pipeline_stage: stage, pipeline_por: 'voce', pipeline_motivo: 'movido por você', pipeline_em: new Date().toISOString() }
       : l));
     api.pipelineMover(leadId, stage, lead ? fotoDoLead(lead) : undefined).catch(() => {});
   };
+
+  const salvarLeads = useCallback(async (ids: string[]) => {
+    const alvo = new Set(ids);
+    setLeads(prev => prev.map(l => alvo.has(l.id) ? { ...l, salvo: true, pipeline_stage: l.pipeline_stage || 'Novo Lead' } : l));
+    leadsRef.current = leadsRef.current.map(l => alvo.has(l.id) ? { ...l, salvo: true } : l);
+    await atualizarPipeline();
+  }, [atualizarPipeline]);
+
+  const removerLeads = useCallback(async (ids: string[]) => {
+    const alvo = new Set(ids);
+    setLeads(prev => prev.filter(l => !alvo.has(l.id)));
+    ids.forEach(id => sincronizados.current.delete(id));
+    await Promise.all(ids.map(id => api.pipelineRemover(id).catch(() => {})));
+  }, []);
+
+  const alternarFavorito = useCallback((id: string) => {
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, favorito: !l.favorito } : l));
+  }, []);
+
+  const limparResultados = useCallback(() => {
+    setLeads(prev => prev.filter(ehSalvo));
+  }, []);
+
+  const [leadsParaContato, setLeadsParaContato] = useState<string[]>([]);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -301,6 +346,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         atualizarPipeline,
         performLeadSearch,
         resetWorkspace,
+        salvarLeads,
+        removerLeads,
+        alternarFavorito,
+        limparResultados,
+        leadsParaContato,
+        setLeadsParaContato,
         updateLeadStage,
         viewState,
         setViewState,

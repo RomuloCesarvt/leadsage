@@ -11,6 +11,7 @@ import { Send, CheckCircle2, Clock, XCircle, RefreshCw, AlertTriangle, ShieldChe
 import { api } from '../services/api';
 import { useApp } from '../context/AppContext';
 import { WhatsAppIcon, InstagramIcon, FacebookIcon, LinkedInIcon } from './BrandIcons';
+import { ehSalvo } from '../lib/leadsSalvos';
 import type { DisparoResultado, LeadItem, ModeloWhatsApp } from '../types';
 
 const SEM_CONTATO_AINDA = new Set(['', 'Novo Lead', 'Novos', 'Novo']);
@@ -46,7 +47,7 @@ export const DisparoWhatsApp: React.FC<{ irConfigurar: () => void }> = ({ irConf
 
   const lote = modelo?.lote || 20;
   const candidatos: LeadItem[] = useMemo(
-    () => (leads as LeadItem[]).filter(l => l.phone && SEM_CONTATO_AINDA.has(l.pipeline_stage || '')),
+    () => (leads as LeadItem[]).filter(l => ehSalvo(l) && l.phone && SEM_CONTATO_AINDA.has(l.pipeline_stage || '')),
     [leads],
   );
 

@@ -3,6 +3,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { NovaBuscaScreen } from './components/screens/NovaBuscaScreen';
+import { ResultadosBusca } from './components/ResultadosBusca';
 import { SplitViewWorkspace } from './components/SplitViewWorkspace';
 import { MessageEditorModal } from './components/MessageEditorModal';
 import { CreditModal } from './components/CreditModal';
@@ -68,6 +69,7 @@ const MainApp: React.FC = () => {
           {/* Principal */}
           {viewState === 'dashboard' && <DashboardScreen />}
           {viewState === 'hero' && <NovaBuscaScreen />}
+          {viewState === 'results' && <ResultadosBusca />}
           {viewState === 'workspace' && <SplitViewWorkspace />}
           {viewState === 'pipeline' && <PipelineScreen />}
           {viewState === 'history' && <HistoryScreen />}

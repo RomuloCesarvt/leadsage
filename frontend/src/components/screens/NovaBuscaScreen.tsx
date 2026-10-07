@@ -58,7 +58,7 @@ export const NovaBuscaScreen: React.FC = () => {
     setIsSearching(true);
     try {
       await performLeadSearch(niche, fullLocation, searchLimit);
-      setViewState('workspace');
+      setViewState('results');
     } catch (e: any) {
       console.error(e);
       setErroBusca(e?.message || 'Não foi possível concluir a busca.');

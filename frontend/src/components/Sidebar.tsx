@@ -17,7 +17,8 @@ import {
   Bell,
   HelpCircle,
   CreditCard,
-  Bot
+  Bot,
+  ListChecks
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Logo } from './Logo';
@@ -66,6 +67,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> =
           <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Principal</p>
           <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
           <NavItem id="hero" icon={Search} label="Nova Busca" />
+          <NavItem id="results" icon={ListChecks} label="Resultados" />
           <NavItem id="workspace" icon={Users} label="Meus Leads" />
           <NavItem id="pipeline" icon={Kanban} label="Pipeline de Vendas" />
           <NavItem id="history" icon={History} label="Histórico" />

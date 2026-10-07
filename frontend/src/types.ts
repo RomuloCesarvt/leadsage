@@ -39,6 +39,10 @@ export interface LeadItem {
   opportunityScore?: number;
   missingDigitalAssets?: string[];
   pipeline_stage?: string;
+  // escolhido pela pessoa para entrar em Meus Leads (ver lib/leadsSalvos)
+  salvo?: boolean;
+  favorito?: boolean;
+  pipeline_origem?: string;
   // quem moveu o card por ultimo ("robô" ou "voce") e por que
   pipeline_por?: string;
   pipeline_motivo?: string;

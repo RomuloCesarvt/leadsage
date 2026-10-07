@@ -11,6 +11,7 @@ import { Bot, Mail, Send, Check, Copy, ExternalLink, SkipForward, Loader2, Refre
 import { api } from '../services/api';
 import { useApp } from '../context/AppContext';
 import { WhatsAppIcon, InstagramIcon, LinkedInIcon } from './BrandIcons';
+import { ehSalvo } from '../lib/leadsSalvos';
 import type { CanalFila, ItemFila, LeadItem, ResultadoPreparo, ResumoFila } from '../types';
 
 const SEM_CONTATO_AINDA = new Set(['', 'Novo Lead', 'Novos', 'Novo']);
@@ -47,12 +48,12 @@ const COR_RESULTADO: Record<ResultadoPreparo['resultado'], string> = {
 };
 
 export const FilaDeEnvio: React.FC = () => {
-  const { leads, atualizarPipeline } = useApp() as any;
+  const { leads, atualizarPipeline, leadsParaContato, setLeadsParaContato } = useApp() as any;
   const [itens, setItens] = useState<ItemFila[]>([]);
   const [resumo, setResumo] = useState<ResumoFila | null>(null);
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(true);
-  const [marcados, setMarcados] = useState<Set<string>>(new Set());
+  const [marcados, setMarcados] = useState<Set<string>>(() => new Set(leadsParaContato || []));
   const [preparando, setPreparando] = useState(false);
   const [progresso, setProgresso] = useState({ feitos: 0, total: 0 });
   const [resultados, setResultados] = useState<ResultadoPreparo[]>([]);
@@ -63,8 +64,8 @@ export const FilaDeEnvio: React.FC = () => {
     setCarregando(true);
     try {
       const r = await api.filaListar();
-      setItens(r.itens);
-      setResumo(r.resumo);
+      setItens(Array.isArray(r?.itens) ? r.itens : []);
+      setResumo(r?.resumo ?? null);
       setErro('');
     } catch (e: any) {
       setErro(e?.message || 'Não foi possível carregar a fila.');
@@ -75,8 +76,11 @@ export const FilaDeEnvio: React.FC = () => {
 
   useEffect(() => { void carregar(); }, [carregar]);
 
+  // a seleção que veio de Meus Leads vale para esta visita; ao sair, zera
+  useEffect(() => () => setLeadsParaContato([]), [setLeadsParaContato]);
+
   const candidatos = useMemo(
-    () => (leads as LeadItem[]).filter(l => SEM_CONTATO_AINDA.has(l.pipeline_stage || '') && canalDe(l)
+    () => (leads as LeadItem[]).filter(l => ehSalvo(l) && SEM_CONTATO_AINDA.has(l.pipeline_stage || '') && canalDe(l)
       && !itens.some(i => i.lead_id === l.id && ['pendente', 'enviado', 'aguardando_limite'].includes(i.status))),
     [leads, itens],
   );

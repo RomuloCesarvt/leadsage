@@ -60,7 +60,9 @@ export const RoboScreen: React.FC = () => {
     const estado = q.get('meta');
     return estado ? { estado, msg: q.get('msg') || '' } : null;
   }, []);
-  const [aba, setAba] = useState<Aba>(retornoMeta ? 'configurar' : 'conversas');
+  const { leadsParaContato } = useApp() as any;
+  // vindo de Meus Leads com leads marcados: abre direto a Fila de envio
+  const [aba, setAba] = useState<Aba>(retornoMeta ? 'configurar' : (leadsParaContato?.length ? 'fila' : 'conversas'));
   const [bloqueado, setBloqueado] = useState('');
 
   useEffect(() => {
