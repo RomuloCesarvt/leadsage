@@ -31,6 +31,10 @@
       "dest": "/privacidade.html"
     },
     {
+      "src": "/(lp|inicio)/?",
+      "dest": "/lp.html"
+    },
+    {
       "src": "/termos/?",
       "dest": "/termos.html"
     },

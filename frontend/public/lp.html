@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeadSage — Ache o cliente, mande a mensagem certa, venda o site</title>
+<meta name="description" content="O LeadSage encontra negócios locais que precisam de site, escreve a abordagem personalizada com IA, cria o site de demonstração e organiza o contato. Comece grátis.">
+<meta property="og:title" content="LeadSage — prospecção de negócios locais com IA">
+<meta property="og:description" content="Encontre quem precisa de site, abordagem personalizada com IA e site de demonstração pronto. Comece grátis.">
+<meta property="og:image" content="/icon-512.png">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#f8fafc;--card:#fff;--tinta:#0f172a;--suave:#64748b;--linha:#e2e8f0;--indigo:#4f46e5;--indigo2:#6366f1;--verde:#10b981;--escuro:#0b1020;--escuro2:#141b34}
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--tinta);font-family:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+  /* topo */
+  header{position:sticky;top:0;z-index:20;background:rgba(248,250,252,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--linha)}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .marca{display:flex;align-items:center;gap:8px;font-weight:800;font-size:19px;text-decoration:none}
+  .nav nav{display:flex;gap:26px;align-items:center;font-size:14px;font-weight:600;color:var(--suave)}
+  .nav nav a{text-decoration:none}.nav nav a:hover{color:var(--tinta)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 22px;border-radius:12px;font-weight:700;font-size:15px;text-decoration:none;border:1px solid transparent;transition:transform .15s,box-shadow .15s,background .15s;cursor:pointer}
+  .btn:hover{transform:translateY(-1px)}
+  .btn-p{background:var(--indigo);color:#fff;box-shadow:0 8px 24px -8px rgba(79,70,229,.6)}
+  .btn-p:hover{background:#4338ca}
+  .btn-s{background:#fff;border-color:var(--linha);color:var(--tinta)}
+  .btn-s:hover{border-color:#cbd5e1}
+  .btn-sm{padding:9px 16px;font-size:14px}
+  /* hero */
+  .hero{position:relative;overflow:hidden;padding:72px 0 56px;text-align:center}
+  .hero:before{content:"";position:absolute;inset:-200px -10% auto -10%;height:560px;background:radial-gradient(60% 60% at 50% 40%,rgba(99,102,241,.22),transparent 70%);pointer-events:none}
+  .selo{display:inline-flex;gap:8px;align-items:center;padding:6px 14px;border-radius:99px;background:#eef2ff;color:var(--indigo);font-weight:700;font-size:13px;border:1px solid #e0e7ff}
+  h1{font-size:clamp(34px,6vw,60px);line-height:1.06;letter-spacing:-.03em;margin:22px auto 18px;max-width:880px;font-weight:800}
+  h1 em{font-style:normal;background:linear-gradient(90deg,var(--indigo),#06b6d4);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-size:clamp(16px,2.2vw,20px);color:var(--suave);max-width:680px;margin:0 auto 30px}
+  .acoes{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .nota{font-size:13px;color:var(--suave);margin-top:14px}
+  /* mock */
+  .mock{max-width:900px;margin:48px auto 0;background:var(--card);border:1px solid var(--linha);border-radius:20px;box-shadow:0 30px 80px -30px rgba(15,23,42,.3);overflow:hidden;text-align:left}
+  .mock-top{display:flex;gap:6px;padding:12px 16px;border-bottom:1px solid var(--linha);background:#f1f5f9}
+  .mock-top i{width:10px;height:10px;border-radius:50%;background:#cbd5e1}
+  .mock-corpo{display:grid;grid-template-columns:1fr 1fr}
+  .mock-l{padding:20px;border-right:1px solid var(--linha)}
+  .mock-r{padding:20px;background:#fafaff}
+  .lead{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--linha);border-radius:12px;margin-bottom:8px;font-size:14px}
+  .lead b{display:block}.lead small{color:var(--suave)}
+  .tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:#fef2f2;color:#b91c1c;white-space:nowrap}
+  .tag.v{background:#ecfdf5;color:#047857}
+  .bolha{background:#fff;border:1px solid var(--linha);border-radius:14px 14px 14px 4px;padding:12px 14px;font-size:14px;margin-bottom:10px}
+  .rot{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--indigo);margin-bottom:10px}
+  /* seções */
+  section{padding:76px 0}
+  .tit{text-align:center;max-width:720px;margin:0 auto 44px}
+  .tit h2{font-size:clamp(28px,4vw,42px);letter-spacing:-.025em;line-height:1.12;margin:0 0 12px;font-weight:800}
+  .tit p{color:var(--suave);font-size:18px;margin:0}
+  .grade{display:grid;gap:18px;grid-template-columns:repeat(3,1fr)}
+  .cartao{background:var(--card);border:1px solid var(--linha);border-radius:18px;padding:24px;transition:transform .2s,box-shadow .2s}
+  .cartao:hover{transform:translateY(-3px);box-shadow:0 18px 40px -22px rgba(15,23,42,.3)}
+  .cartao h3{margin:14px 0 6px;font-size:18px}
+  .cartao p{margin:0;color:var(--suave);font-size:15px}
+  .ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:#eef2ff;color:var(--indigo)}
+  .ico svg{width:22px;height:22px}
+  .dor .ico{background:#fef2f2;color:#dc2626}
+  .dor q{display:block;font-weight:700;font-size:17px;quotes:"“" "”";margin-top:14px}
+  .dor q+p{margin-top:8px}
+  .dor .sol{margin-top:12px;padding-top:12px;border-top:1px dashed var(--linha);color:#047857;font-weight:600;font-size:14px}
+  /* passos */
+  .passos{background:var(--escuro);color:#e2e8f0}
+  .passos .tit p{color:#94a3b8}
+  .pass{display:grid;gap:18px;grid-template-columns:repeat(4,1fr);counter-reset:p}
+  .pass div{background:var(--escuro2);border:1px solid #1f2a4d;border-radius:18px;padding:24px;counter-increment:p}
+  .pass div:before{content:counter(p);display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--indigo2);color:#fff;font-weight:800;margin-bottom:14px}
+  .pass h3{margin:0 0 6px;font-size:17px;color:#fff}.pass p{margin:0;color:#94a3b8;font-size:14.5px}
+  /* abordagem */
+  .duas{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center}
+  .duas h2{font-size:clamp(28px,4vw,40px);letter-spacing:-.025em;line-height:1.12;margin:0 0 14px;font-weight:800}
+  .duas>div>p{color:var(--suave);font-size:17px}
+  .lista{list-style:none;padding:0;margin:20px 0 0;display:grid;gap:12px}
+  .lista li{display:flex;gap:10px;align-items:flex-start;font-size:15.5px}
+  .lista li:before{content:"";flex:none;width:20px;height:20px;margin-top:2px;border-radius:50%;background:var(--verde) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.5 10.5l3 3 6-6.5'/%3E%3C/svg%3E") center/16px no-repeat}
+  .zap{background:#e7f3ee;border-radius:20px;padding:20px;border:1px solid var(--linha)}
+  .zap .b{background:#fff;border-radius:12px 12px 12px 4px;padding:12px 14px;font-size:14.5px;box-shadow:0 1px 1px rgba(0,0,0,.06);margin-bottom:8px;max-width:92%}
+  .zap .b.e{margin-left:auto;background:#d9fdd3;border-radius:12px 12px 4px 12px}
+  .zap small{display:block;text-align:center;color:#4b6358;margin-top:10px;font-size:12px}
+  /* planos */
+  .planos{display:grid;gap:18px;grid-template-columns:repeat(3,1fr);align-items:stretch}
+  .plano{background:var(--card);border:1px solid var(--linha);border-radius:20px;padding:28px;display:flex;flex-direction:column}
+  .plano.d{border:2px solid var(--indigo);box-shadow:0 24px 60px -30px rgba(79,70,229,.6);position:relative}
+  .plano.d:before{content:"Mais escolhido";position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--indigo);color:#fff;font-size:12px;font-weight:800;padding:4px 14px;border-radius:99px}
+  .plano h3{margin:0;font-size:18px}
+  .preco{font-size:42px;font-weight:800;letter-spacing:-.03em;margin:10px 0 2px}
+  .preco small{font-size:14px;color:var(--suave);font-weight:600;letter-spacing:0}
+  .plano .lista{margin:18px 0 24px;flex:1}
+  .plano .btn{width:100%}
+  /* faq */
+  details{background:var(--card);border:1px solid var(--linha);border-radius:14px;padding:16px 20px;margin-bottom:10px}
+  summary{font-weight:700;cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:12px}
+  summary::-webkit-details-marker{display:none}
+  summary:after{content:"+";font-size:22px;line-height:1;color:var(--indigo)}
+  details[open] summary:after{content:"–"}
+  details p{color:var(--suave);margin:10px 0 0}
+  /* cta */
+  .cta{background:linear-gradient(135deg,#4338ca,#6366f1 55%,#06b6d4);color:#fff;border-radius:28px;padding:56px 24px;text-align:center}
+  .cta h2{font-size:clamp(28px,4.4vw,44px);margin:0 0 12px;letter-spacing:-.025em;line-height:1.1;font-weight:800}
+  .cta p{margin:0 auto 26px;max-width:560px;opacity:.9;font-size:18px}
+  .cta .btn{background:#fff;color:var(--indigo)}
+  footer{padding:36px 0 48px;color:var(--suave);font-size:14px}
+  footer .wrap{display:flex;gap:16px;justify-content:space-between;flex-wrap:wrap}
+  footer a{margin-right:16px;text-decoration:none}footer a:hover{color:var(--tinta)}
+  @media(max-width:900px){.grade,.planos,.pass{grid-template-columns:1fr 1fr}.duas{grid-template-columns:1fr}.mock-corpo{grid-template-columns:1fr}.mock-l{border-right:0;border-bottom:1px solid var(--linha)}.nav nav a.x{display:none}}
+  @media(max-width:620px){.grade,.planos,.pass{grid-template-columns:1fr}section{padding:56px 0}.hero{padding-top:48px}.nav nav{gap:12px}.nav nav a:not(.btn){display:none}}
+  @media(prefers-color-scheme:dark){
+    :root{--bg:#0b1020;--card:#121a33;--tinta:#e8ecf6;--suave:#9aa6c4;--linha:#222c4d}
+    header{background:rgba(11,16,32,.85)}
+    .btn-s{background:var(--card)}
+    .selo{background:#1c2250;border-color:#2b3470;color:#a5b4fc}
+    .mock-top{background:#0e1530}.mock-r{background:#0f1730}.bolha{background:var(--card)}
+    .ico{background:#1c2250;color:#a5b4fc}.dor .ico{background:#3a1620;color:#fca5a5}
+    .tag{background:#3a1620;color:#fca5a5}.tag.v{background:#0c2e25;color:#6ee7b7}
+    .dor .sol{color:#6ee7b7}
+    .zap{background:#12241f}.zap .b{background:#1b2b27;color:#e8ecf6}.zap .b.e{background:#134d37}.zap small{color:#8fb0a2}
+    .passos{background:#070b18}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap nav">
+    <a class="marca" href="/lp"><img src="/favicon.svg" width="28" height="28" alt="">LeadSage</a>
+    <nav>
+      <a class="x" href="#dores">Dores</a>
+      <a class="x" href="#como">Como funciona</a>
+      <a class="x" href="#planos">Planos</a>
+      <a class="x" href="#duvidas">Dúvidas</a>
+      <a class="btn btn-p btn-sm" href="/">Entrar grátis</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap">
+    <span class="selo">✨ Prospecção com IA para quem vende site e marketing</span>
+    <h1>Pare de caçar cliente. <em>Chegue já com a mensagem certa e o site pronto.</em></h1>
+    <p class="sub">O LeadSage encontra negócios locais que precisam de você, descobre o que falta no Google deles, escreve a abordagem personalizada e ainda monta o site de demonstração. Você só conversa.</p>
+    <div class="acoes">
+      <a class="btn btn-p" href="/">Começar grátis</a>
+      <a class="btn btn-s" href="#como">Ver como funciona</a>
+    </div>
+    <p class="nota">Prévia gratuita com 5 leads e 1 site, sem cartão.</p>
+
+    <div class="mock" aria-hidden="true">
+      <div class="mock-top"><i></i><i></i><i></i></div>
+      <div class="mock-corpo">
+        <div class="mock-l">
+          <div class="rot">Negócios encontrados</div>
+          <div class="lead"><span><b>Padaria Doce Vida</b><small>Botucatu · nota 4,8 · 212 avaliações</small></span><span class="tag">sem site</span></div>
+          <div class="lead"><span><b>Clínica Sorriso</b><small>Bauru · nota 4,6 · 88 avaliações</small></span><span class="tag">só Instagram</span></div>
+          <div class="lead"><span><b>Studio Bela Pet</b><small>Botucatu · nota 4,9 · 340 avaliações</small></span><span class="tag">sem site</span></div>
+        </div>
+        <div class="mock-r">
+          <div class="rot">Abordagem escrita pela IA</div>
+          <div class="bolha">Boa tarde! Tudo bem? Eu sou da Sites Já. Vi que a Padaria Doce Vida tem nota 4,8 com 212 avaliações no Google, mas não tem site no perfil…</div>
+          <span class="tag v">Site de demonstração pronto</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="dores">
+  <div class="wrap">
+    <div class="tit">
+      <h2>Prospectar do jeito antigo custa caro</h2>
+      <p>Você reconhece pelo menos uma destas?</p>
+    </div>
+    <div class="grade">
+      <div class="cartao dor"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>
+        <q>Passo horas no Google Maps copiando telefone.</q><p>Planilha manual, dado desatualizado e nenhuma ideia de quem realmente precisa do seu serviço.</p>
+        <div class="sol">O LeadSage busca por nicho e cidade e já marca quem não tem site.</div></div>
+      <div class="cartao dor"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <q>Mando mensagem e ninguém responde.</q><p>Texto copiado e colado soa como spam. O dono do negócio ignora em segundos.</p>
+        <div class="sol">Abordagem única por negócio: cumprimenta, se apresenta e cita um fato real dele.</div></div>
+      <div class="cartao dor"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div>
+        <q>Falo de site, mas o cliente não imagina como ficaria.</q><p>Proposta em PDF não convence quem nunca teve site.</p>
+        <div class="sol">Site de demonstração pronto com o nome, as fotos e as avaliações do negócio.</div></div>
+      <div class="cartao dor"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></div>
+        <q>Não sei o que falar nem quando.</q><p>Falta saber o momento, a objeção e como não parecer insistente.</p>
+        <div class="sol">Sequência de 3 toques, objeções previstas e o horário que não atrapalha o dono.</div></div>
+      <div class="cartao dor"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></div>
+        <q>Perco o controle de quem já contatei.</q><p>Lead esquecido na planilha é venda que foi para o concorrente.</p>
+        <div class="sol">Funil com status, fila de envio e histórico de cada conversa.</div></div>
+      <div class="cartao dor"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <q>Ferramenta de lead é cara e mensal.</q><p>Assinatura que pesa antes mesmo da primeira venda.</p>
+        <div class="sol">Plano vitalício: paga uma vez e usa para sempre.</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="passos" id="como">
+  <div class="wrap">
+    <div class="tit">
+      <h2 style="color:#fff">Do clique à primeira conversa em 4 passos</h2>
+      <p>Sem ferramenta emendada em ferramenta.</p>
+    </div>
+    <div class="pass">
+      <div><h3>Busque</h3><p>Escolha o nicho e a cidade. Veja nota, avaliações, contatos e o que falta na presença digital.</p></div>
+      <div><h3>Entenda</h3><p>O perfil do lead traz dores verificadas, quem é o dono quando aparece e a melhor forma de abordar.</p></div>
+      <div><h3>Mostre</h3><p>Gere um site de demonstração com a cara do negócio e envie o link como prova.</p></div>
+      <div><h3>Converse</h3><p>A IA escreve a mensagem certa para cada canal. Você envia, ou o robô atende por você.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap duas">
+    <div>
+      <h2>Mensagem que parece escrita por gente, porque considera o negócio</h2>
+      <p>A IA do LeadSage conhece o seu serviço, o ramo do lead e o momento. Nada de “espero que esteja bem”: cada abordagem tem um motivo claro para aquele negócio.</p>
+      <ul class="lista">
+        <li>Cumprimento e apresentação antes do assunto</li>
+        <li>Começa pelo que há de bom (nota e avaliações) e só então mostra a oportunidade</li>
+        <li>Fala a língua do ramo: encomenda, paciente, orçamento, agenda</li>
+        <li>Sem urgência falsa, sem promessa de resultado, sem dado inventado</li>
+        <li>Adapta o tamanho e o tom para WhatsApp, e-mail, Instagram e LinkedIn</li>
+      </ul>
+    </div>
+    <div class="zap" aria-hidden="true">
+      <div class="b">Boa tarde! Tudo bem?<br><br>Eu sou da Sites Já e ajudo negócios locais a serem encontrados no Google.<br><br>Vi suas 340 avaliações com nota 4,9 no Studio Bela Pet. Notei que falta um site para levar quem busca banho e tosa direto ao WhatsApp.<br><br>Posso te mostrar um esboço?</div>
+      <div class="b e">Pode sim! Manda aí 😊</div>
+      <small>Exemplo ilustrativo</small>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="tit"><h2>Tudo o que você precisa num lugar só</h2></div>
+    <div class="grade">
+      <div class="cartao"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div><h3>Busca por nicho e cidade</h3><p>Milhares de nichos em Brasil, Portugal e EUA, com pontuação de oportunidade.</p></div>
+      <div class="cartao"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div><h3>Perfil completo do lead</h3><p>Dados da empresa, pessoas, dores verificadas e Google Meu Negócio num painel só.</p></div>
+      <div class="cartao"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div><h3>Criador de sites</h3><p>Modelos por ramo, com fotos, avaliações e botão de WhatsApp. Publique com um link.</p></div>
+      <div class="cartao"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"/></svg></div><h3>Fila de envio</h3><p>E-mail automático com limite diário e fila assistida para WhatsApp, Instagram e LinkedIn.</p></div>
+      <div class="cartao"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 14h.01M15 14h.01"/></svg></div><h3>Robô de atendimento</h3><p>Conecte WhatsApp, Instagram, Messenger e Telegram e deixe o robô responder e agendar.</p></div>
+      <div class="cartao"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></div><h3>Funil de vendas</h3><p>Do primeiro contato ao fechamento, com status e histórico de cada lead.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="planos" style="background:var(--card);border-block:1px solid var(--linha)">
+  <div class="wrap">
+    <div class="tit"><h2>Pague uma vez. Use sempre.</h2><p>Planos vitalícios, sem mensalidade.</p></div>
+    <div class="planos">
+      <div class="plano"><h3>Prévia gratuita</h3><div class="preco">R$ 0</div><small style="color:var(--suave)">para conhecer</small>
+        <ul class="lista"><li>5 leads reais</li><li>1 site de demonstração</li><li>Sem cartão</li></ul>
+        <a class="btn btn-s" href="/">Começar grátis</a></div>
+      <div class="plano"><h3>Start Vitalício</h3><div class="preco">R$ 67 <small>pagamento único</small></div>
+        <ul class="lista"><li>150 leads</li><li>10 sites incluídos</li><li>Publicação de sites</li><li>IA de abordagem</li><li>Funil de vendas</li></ul>
+        <a class="btn btn-s" href="/">Quero o Start</a></div>
+      <div class="plano d"><h3>Pro Vitalício</h3><div class="preco">R$ 97 <small>pagamento único</small></div>
+        <ul class="lista"><li>500 leads</li><li>50 sites incluídos</li><li>Robô de atendimento com IA</li><li>Exportação de leads</li><li>Marca própria e modelos premium</li><li>Brasil, Portugal e EUA</li></ul>
+        <a class="btn btn-p" href="/">Quero o Pro</a></div>
+    </div>
+  </div>
+</section>
+
+<section id="duvidas">
+  <div class="wrap" style="max-width:760px">
+    <div class="tit"><h2>Dúvidas frequentes</h2></div>
+    <details><summary>Para quem o LeadSage serve?</summary><p>Para freelancers, agências e prestadores que vendem site, tráfego, social media ou outros serviços digitais para negócios locais.</p></details>
+    <details><summary>Os leads são reais?</summary><p>Sim. Os dados vêm do Google e mostram nota, avaliações, telefone e o que falta na presença digital de cada negócio.</p></details>
+    <details><summary>As mensagens saem sozinhas?</summary><p>O e-mail pode ser automático, com limite diário e opção de descadastro. Para WhatsApp, Instagram e LinkedIn, o sistema deixa a mensagem pronta na fila e você envia com um clique, respeitando as regras de cada plataforma.</p></details>
+    <details><summary>Preciso entender de tecnologia?</summary><p>Não. Escolha o nicho e a cidade, revise a mensagem e envie. O restante é guiado.</p></details>
+    <details><summary>Posso cancelar?</summary><p>Os planos são de pagamento único, sem renovação. Você usa os créditos incluídos e pode comprar recargas quando precisar.</p></details>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="cta">
+      <h2>Sua próxima venda pode estar a uma busca de distância</h2>
+      <p>Crie sua conta, rode a prévia gratuita e veja o primeiro site de demonstração ficar pronto.</p>
+      <a class="btn" href="/">Começar grátis agora</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 LeadSage</span>
+    <span><a href="/termos">Termos de uso</a><a href="/privacidade">Privacidade</a><a href="/exclusao-de-dados">Exclusão de dados</a></span>
+  </div>
+</footer>
+</body>
+</html>
