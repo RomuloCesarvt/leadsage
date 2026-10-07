@@ -4,23 +4,26 @@ import {
   Sparkles,
   Send,
   Mail,
-  Share2,
   CheckCircle2,
   Loader2,
   Coins,
-  Bot,
   Camera,
   MessageCircle,
   Webhook,
   AlertTriangle,
-  Target,
   Copy,
   Check,
   CalendarClock,
   RefreshCw,
+  ChevronDown,
+  Phone,
+  MapPin,
+  Star,
+  Wand2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { LinkedInIcon } from './BrandIcons';
+import { Avatar } from './Avatar';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
 import type { FollowUp } from '../types';
@@ -36,21 +39,37 @@ const NOME_DO_CANAL: Record<Canal, string> = {
   webhook: 'webhook',
 };
 
+const TONS: { valor: string; rotulo: string }[] = [
+  { valor: 'Consultivo', rotulo: 'Consultivo' },
+  { valor: 'Amigável', rotulo: 'Amigável' },
+  { valor: 'Direto', rotulo: 'Direto' },
+  { valor: 'Autoridade', rotulo: 'Autoridade' },
+  { valor: 'Promocional', rotulo: 'Promoção' },
+];
+
+const AJUSTES_RAPIDOS = [
+  'Mais curta',
+  'Mais informal',
+  'Mais profissional',
+  'Oferecer mostrar um esboço do site',
+  'Falar das avaliações dele',
+];
+
 /**
- * Editor da abordagem.
+ * Editor e envio da abordagem.
  *
- * Três defeitos foram corrigidos aqui, e todos custavam venda:
+ * Três regras que custavam venda e continuam valendo:
  *
- * 1. O canal não era enviado para a IA. A mensagem saía sempre no
- *    formato de e-mail — 130 palavras com assinatura — e ia para o
- *    WhatsApp, onde ninguém lê isso. Agora o canal vai junto, e trocar
- *    de canal avisa que o texto precisa ser reescrito, sem apagar o que
- *    o usuário já editou.
- * 2. Uma falha da IA virava texto no corpo da mensagem ("Houve um erro
- *    ao processar..."), com o botão de disparar ligado. Agora o erro
- *    aparece como erro.
- * 3. Não existia seguimento. Contato frio raramente responde no
- *    primeiro toque; a cadência de aquecimento agora vem pronta.
+ * 1. O canal vai para a IA: WhatsApp não comporta 130 palavras de e-mail.
+ *    Trocar de canal avisa que o texto precisa ser reescrito, sem apagar
+ *    o que o usuário já editou.
+ * 2. Falha da IA aparece como erro, nunca como texto dentro da mensagem.
+ * 3. Contato frio raramente responde no primeiro toque; a sequência de
+ *    aquecimento vem pronta.
+ *
+ * O visual segue o resto do sistema (tema claro): quem escreve e envia
+ * precisa ler o texto com conforto, ver para quem vai e poder pedir outra
+ * versão em um clique.
  */
 export const MessageEditorModal: React.FC = () => {
   const {
@@ -70,8 +89,7 @@ export const MessageEditorModal: React.FC = () => {
   const [usarTemplate, setUsarTemplate] = useState(false);
   const [subject, setSubject] = useState<string>('');
   const [body, setBody] = useState<string>('');
-  // Para qual canal o texto atual foi escrito. Sem isso não dá para
-  // avisar que a copy na caixa é de e-mail e o envio é de WhatsApp.
+  // Para qual canal o texto atual foi escrito.
   const [canalDaCopy, setCanalDaCopy] = useState<Canal | null>(null);
   const [hook, setHook] = useState<string>('');
   const [reasoning, setReasoning] = useState<string>('');
@@ -82,13 +100,17 @@ export const MessageEditorModal: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isSending, setIsSending] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [maisCanais, setMaisCanais] = useState(false);
+  const [verPorque, setVerPorque] = useState(false);
+  const [verSequencia, setVerSequencia] = useState(false);
+  const [verAjuste, setVerAjuste] = useState(false);
 
   // WhatsApp (link), Instagram e LinkedIn não têm API de envio: a
   // plataforma abre com a mensagem copiada e nada é cobrado.
   const isManualChannel = ['whatsapp', 'instagram_direct', 'linkedin_msg'].includes(channel);
   const copyDesatualizada = Boolean(body && canalDaCopy && canalDaCopy !== channel);
 
-  const gerarCopy = async (canal: Canal) => {
+  const gerarCopy = async (canal: Canal, opcoes: { tom?: string; instrucoes?: string } = {}) => {
     if (!lead) return;
     setIsGenerating(true);
     setGenerationError(null);
@@ -96,8 +118,8 @@ export const MessageEditorModal: React.FC = () => {
       const res = await api.generatePitch({
         lead,
         channel: canal,
-        tone,
-        custom_instructions: customInstructions,
+        tone: opcoes.tom ?? tone,
+        custom_instructions: opcoes.instrucoes ?? customInstructions,
         sender_name: user?.name || 'LeadSage',
         user_product: user?.product_description || ''
       });
@@ -109,8 +131,6 @@ export const MessageEditorModal: React.FC = () => {
       setSeguimentos(res.follow_ups || []);
       setCanalDaCopy((res.channel as Canal) || canal);
     } catch (err: any) {
-      // A mensagem do backend já diz o que aconteceu (chave ausente,
-      // Gemini fora do ar). Trocar por "Erro ao gerar" escondia isso.
       setGenerationError(err?.message || 'Não foi possível gerar a mensagem agora.');
     } finally {
       setIsGenerating(false);
@@ -129,7 +149,11 @@ export const MessageEditorModal: React.FC = () => {
     setChannel(inicial);
     setSuccessMessage(null);
     setDispatchError(null);
-    gerarCopy(inicial);
+    setVerPorque(false);
+    setVerSequencia(false);
+    setVerAjuste(false);
+    setCustomInstructions('');
+    gerarCopy(inicial, { instrucoes: '' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead?.id]);
 
@@ -180,18 +204,14 @@ export const MessageEditorModal: React.FC = () => {
         try {
           await navigator.clipboard.writeText(body);
         } catch {
-          // Alguns navegadores bloqueiam a área de transferência; sem
-          // avisar, o usuário colaria o conteúdo errado.
           copiou = false;
         }
         if (!copiou) {
-          setDispatchError('A conversa foi aberta, mas não consegui copiar a mensagem. Copie pelo botão acima.');
+          setDispatchError('A conversa foi aberta, mas não consegui copiar a mensagem. Use o botão Copiar.');
         }
         window.open(res.action_url, '_blank', 'noopener,noreferrer');
       }
 
-      // Confete só para entrega real. Antes ele disparava até quando a
-      // resposta era "Erro no Envio: ..." ou "(Simulado)".
       if (res.delivered) {
         confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
       }
@@ -204,361 +224,365 @@ export const MessageEditorModal: React.FC = () => {
 
   if (!lead) return null;
 
-  const botaoCanal = (
+  const fechar = () => setSelectedLeadForMessage(null);
+  const palavras = body.trim() ? body.trim().split(/\s+/).length : 0;
+
+  const aba = (
     valor: Canal,
     icone: React.ReactNode,
     rotulo: string,
     ativo: boolean,
     motivo: string,
-    cor: string,
   ) => (
     <button
+      key={valor}
       type="button"
       onClick={() => setChannel(valor)}
       disabled={!ativo}
       title={motivo}
-      className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-        channel === valor ? cor : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+      aria-pressed={channel === valor}
+      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+        channel === valor
+          ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+          : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
       }`}
     >
       {icone} {rotulo}
     </button>
   );
 
+  const destino =
+    channel === 'email' ? lead.email
+    : channel === 'whatsapp' || channel === 'whatsapp_api' ? lead.phone
+    : channel === 'instagram_direct' ? lead.socials?.instagram
+    : channel === 'linkedin_msg' ? lead.socials?.linkedin
+    : '';
+
+  const dicaDoCanal =
+    channel === 'whatsapp' ? 'Abre o WhatsApp com a mensagem já preenchida. Sem custo.'
+    : channel === 'instagram_direct' || channel === 'linkedin_msg'
+      ? 'Abre a conversa e copia a mensagem: é só colar (Ctrl+V) e enviar. Sem custo.'
+    : channel === 'email' ? 'Sai pelo seu e-mail configurado.'
+    : channel === 'whatsapp_api' ? 'Envia pela API oficial da Meta, no seu número conectado.'
+    : 'Envia os dados para a automação configurada em Integrações.';
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-indigo-400" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                Editor & Disparo de Copy com IA
+    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4"
+         onMouseDown={e => { if (e.target === e.currentTarget) fechar(); }}>
+      <div role="dialog" aria-label="Escrever e enviar mensagem"
+           className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[94vh] sm:max-h-[90vh]">
+
+        {/* cabeçalho: para quem vai */}
+        <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <Avatar src={lead.avatar} nome={lead.company || lead.name} className="w-11 h-11 shrink-0" />
+            <div className="min-w-0">
+              <h3 className="text-base font-bold text-slate-900 truncate">
+                Mensagem para {lead.company || lead.name}
               </h3>
-              <p className="text-xs text-slate-400">
-                Para: <strong className="text-slate-200">{lead.name}</strong> ({lead.role} na {lead.company})
-              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                {lead.name && lead.name !== lead.company && (
+                  <span className="font-semibold text-slate-700">{lead.name}</span>
+                )}
+                {lead.niche && <span>{lead.niche}</span>}
+                {lead.city && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{lead.city}</span>}
+                {typeof lead.rating === 'number' && lead.rating > 0 && (
+                  <span className="flex items-center gap-1"><Star className="w-3 h-3 text-amber-500 fill-amber-400" />
+                    {lead.rating.toFixed(1).replace('.', ',')}{lead.rating_count ? ` (${lead.rating_count})` : ''}
+                  </span>
+                )}
+                {lead.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{lead.phone}</span>}
+              </div>
             </div>
           </div>
-          <button
-            onClick={() => setSelectedLeadForMessage(null)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-          >
+          <button onClick={fechar} aria-label="Fechar"
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto space-y-5 flex-1">
+        <div className="px-5 sm:px-6 py-5 overflow-y-auto space-y-5 flex-1 min-h-0">
           {successMessage && (
-            <div className={`p-4 rounded-xl border text-xs font-semibold flex items-center justify-between animate-fadeIn ${
-              isManualChannel
-                ? 'bg-amber-500/10 border-amber-500/40 text-amber-300'
-                : 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
+            <div className={`p-3.5 rounded-xl border text-sm font-semibold flex items-center justify-between gap-3 ${
+              isManualChannel ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'
             }`}>
               <span className="flex items-center gap-2">
-                <CheckCircle2 className={`w-4 h-4 shrink-0 ${isManualChannel ? 'text-amber-400' : 'text-emerald-400'}`} />
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
                 {successMessage}
               </span>
-              <span className={`px-2 py-0.5 rounded text-[10px] ${isManualChannel ? 'bg-amber-500/20' : 'bg-emerald-500/20'}`}>
-                {isManualChannel ? 'Sem custo' : '-2 Créditos'}
+              <span className="px-2 py-0.5 rounded-md text-[11px] bg-white/70 shrink-0">
+                {isManualChannel ? 'Sem custo' : '-2 créditos'}
               </span>
             </div>
           )}
 
           {dispatchError && (
-            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/40 text-red-300 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
-              <X className="w-4 h-4 text-red-400 shrink-0" />
+            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium flex items-center gap-2">
+              <X className="w-4 h-4 shrink-0" />
               {dispatchError}
             </div>
           )}
 
           {generationError && (
-            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/40 text-red-300 text-xs animate-fadeIn">
+            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
               <div className="font-semibold flex items-center gap-2 mb-1">
-                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-                A IA não escreveu a mensagem
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                A IA não conseguiu escrever agora
               </div>
-              <p className="text-red-200/90 leading-snug">{generationError}</p>
-              <button
-                onClick={() => gerarCopy(channel)}
-                className="mt-2 text-[11px] font-semibold text-red-200 underline hover:text-white"
-              >
+              <p className="leading-snug">{generationError}</p>
+              <button onClick={() => gerarCopy(channel)} className="mt-2 text-xs font-bold underline">
                 Tentar de novo
               </button>
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <Bot className="w-4 h-4 text-indigo-400" /> Tom da Abordagem
-              </label>
-              <select
-                value={tone}
-                onChange={(e) => setTone(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
-              >
-                <option value="Consultivo">Consultivo &amp; Estratégico</option>
-                <option value="Amigável">Amigável &amp; Leve</option>
-                <option value="Direto">Direto ao Ponto</option>
-                <option value="Autoridade">Autoridade &amp; Benchmark</option>
-                <option value="Promocional">Oferta Promocional / Teste</option>
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <Share2 className="w-4 h-4 text-emerald-400" /> Canal de Envio
-              </label>
-              <div className="grid grid-cols-2 gap-1.5">
-                {botaoCanal(
-                  'email', <Mail className="w-3.5 h-3.5" />, 'E-mail / SMTP',
-                  Boolean(lead.email),
-                  lead.email ? 'Envia pelo seu SMTP' : 'Este lead não tem e-mail',
-                  'bg-indigo-600 border-indigo-500 text-white',
-                )}
-                {botaoCanal(
-                  'whatsapp_api', <MessageCircle className="w-3.5 h-3.5" />, 'WhatsApp API',
-                  Boolean(lead.phone),
-                  lead.phone ? 'Envia de verdade pela Cloud API da Meta' : 'Este lead não tem telefone',
-                  'bg-emerald-700 border-emerald-600 text-white',
-                )}
-                {botaoCanal(
-                  'whatsapp', <MessageCircle className="w-3.5 h-3.5" />, 'WhatsApp (link)',
-                  Boolean(lead.phone),
-                  lead.phone ? 'Abre o WhatsApp com a mensagem pronta' : 'Este lead não tem telefone',
-                  'bg-emerald-600 border-emerald-500 text-white',
-                )}
-                {botaoCanal(
-                  'instagram_direct', <Camera className="w-3.5 h-3.5" />, 'Instagram',
-                  Boolean(lead.socials.instagram),
-                  lead.socials.instagram ? 'Abre a conversa com a mensagem copiada' : 'Este lead não tem Instagram',
-                  'bg-pink-600 border-pink-500 text-white',
-                )}
-                {botaoCanal(
-                  'linkedin_msg', <LinkedInIcon className="w-3.5 h-3.5" title="LinkedIn" />, 'LinkedIn',
-                  Boolean(lead.socials.linkedin),
-                  lead.socials.linkedin ? 'Abre a janela de mensagem com o texto copiado' : 'Este lead não tem LinkedIn',
-                  'bg-sky-700 border-sky-600 text-white',
-                )}
-                {botaoCanal(
-                  'webhook', <Webhook className="w-3.5 h-3.5" />, 'Webhook',
-                  true,
-                  'Envia o payload para a automação configurada em Integrações',
-                  'bg-amber-600 border-amber-500 text-white',
-                )}
-              </div>
-              {isManualChannel && (
-                <p className="text-[11px] text-amber-400/90 leading-snug">
-                  {channel === 'whatsapp'
-                    ? 'Modo link: abre o WhatsApp com a mensagem já preenchida. Sem custo.'
-                    : 'Abre a conversa e copia a mensagem — é só colar com Ctrl+V e enviar. Instagram e LinkedIn não permitem preencher o texto por link. Sem custo.'}
-                </p>
-              )}
-
-              {channel === 'whatsapp_api' && (
-                <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 space-y-2">
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={usarTemplate}
-                      onChange={e => setUsarTemplate(e.target.checked)}
-                      className="mt-0.5"
-                    />
-                    <span className="text-[11px] text-emerald-300 leading-snug">
-                      Usar template aprovado — obrigatório para quem <strong>não</strong> te
-                      respondeu nas últimas 24h. Nesse modo quem vai é o texto
-                      aprovado na Meta; a mensagem escrita acima não é enviada.
-                    </span>
-                  </label>
-                  <p className="text-[11px] text-amber-400/90 leading-snug">
-                    Enviar para quem não pediu contato viola a política da Meta e pode
-                    banir seu número. Use com quem já te procurou ou deu opt-in.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* O texto foi escrito para outro canal: avisar em vez de apagar
-              o que o usuário editou. */}
-          {copyDesatualizada && (
-            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-200 text-[11px] flex items-center justify-between gap-3 animate-fadeIn">
-              <span className="leading-snug">
-                Este texto foi escrito para <strong>{NOME_DO_CANAL[canalDaCopy as Canal]}</strong> e
-                você vai enviar por <strong>{NOME_DO_CANAL[channel]}</strong>. O tamanho e o tom mudam.
-              </span>
-              <button
-                onClick={() => gerarCopy(channel)}
-                disabled={isGenerating}
-                className="shrink-0 px-2.5 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/40 font-semibold hover:bg-amber-500/30 disabled:opacity-50 flex items-center gap-1.5"
-              >
-                <RefreshCw className="w-3 h-3" /> Reescrever
+          {/* 1. por onde enviar */}
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">1. Por onde enviar</p>
+            <div className="flex flex-wrap gap-2">
+              {aba('email', <Mail className="w-4 h-4" />, 'E-mail', Boolean(lead.email),
+                lead.email ? 'Envia pelo seu e-mail configurado' : 'Este lead não tem e-mail')}
+              {aba('whatsapp', <MessageCircle className="w-4 h-4" />, 'WhatsApp', Boolean(lead.phone),
+                lead.phone ? 'Abre o WhatsApp com a mensagem pronta' : 'Este lead não tem telefone')}
+              {aba('instagram_direct', <Camera className="w-4 h-4" />, 'Instagram', Boolean(lead.socials?.instagram),
+                lead.socials?.instagram ? 'Abre a conversa com a mensagem copiada' : 'Este lead não tem Instagram')}
+              {aba('linkedin_msg', <LinkedInIcon className="w-4 h-4" title="LinkedIn" />, 'LinkedIn', Boolean(lead.socials?.linkedin),
+                lead.socials?.linkedin ? 'Abre a mensagem com o texto copiado' : 'Este lead não tem LinkedIn')}
+              <button type="button" onClick={() => setMaisCanais(v => !v)}
+                className="flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50">
+                Mais <ChevronDown className={`w-4 h-4 transition-transform ${maisCanais ? 'rotate-180' : ''}`} />
               </button>
             </div>
-          )}
-
-          {(hook || reasoning) && !generationError && (
-            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
-              {hook && (
-                <p className="text-[11px] text-slate-300 flex items-start gap-2">
-                  <Target className="w-3.5 h-3.5 text-indigo-400 mt-0.5 shrink-0" />
-                  <span><strong className="text-slate-200">Gancho usado:</strong> {hook}</span>
-                </p>
-              )}
-              {reasoning && (
-                <p className="text-[11px] text-slate-400 leading-snug pl-[22px]">
-                  <strong className="text-slate-300">Perda que a mensagem ataca:</strong> {reasoning}
-                </p>
-              )}
-            </div>
-          )}
-
-          {avisos.length > 0 && (
-            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-200">
-              <div className="font-semibold flex items-center gap-1.5 mb-1">
-                <AlertTriangle className="w-3.5 h-3.5" /> Revise antes de enviar
+            {maisCanais && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {aba('whatsapp_api', <MessageCircle className="w-4 h-4" />, 'WhatsApp API', Boolean(lead.phone),
+                  lead.phone ? 'Envia pela Cloud API da Meta' : 'Este lead não tem telefone')}
+                {aba('webhook', <Webhook className="w-4 h-4" />, 'Webhook', true,
+                  'Envia para a automação configurada em Integrações')}
               </div>
-              <ul className="list-disc pl-4 space-y-0.5">
-                {avisos.map((a, i) => <li key={i}>{a}</li>)}
-              </ul>
-            </div>
-          )}
+            )}
+            <p className="text-xs text-slate-500 mt-2.5 leading-snug">
+              {destino ? <>Para <b className="text-slate-700">{destino}</b>. </> : null}{dicaDoCanal}
+            </p>
 
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">
-              Personalização com dados de <strong className="text-slate-200">{lead.city}</strong>
-            </span>
-            <button
-              onClick={() => gerarCopy(channel)}
-              disabled={isGenerating}
-              className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Reescrevendo...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Regerar Copy com IA</span>
-                </>
-              )}
-            </button>
+            {channel === 'whatsapp_api' && (
+              <div className="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 space-y-2">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input type="checkbox" checked={usarTemplate} onChange={e => setUsarTemplate(e.target.checked)}
+                    className="mt-0.5 accent-emerald-600" />
+                  <span className="text-xs text-emerald-900 leading-snug">
+                    Usar modelo aprovado: obrigatório para quem <b>não</b> te respondeu nas últimas 24 h.
+                    Nesse modo quem vai é o texto aprovado na Meta, e não o escrito abaixo.
+                  </span>
+                </label>
+                <p className="text-xs text-amber-800 leading-snug">
+                  Enviar para quem não pediu contato viola a política da Meta e pode banir seu número.
+                </p>
+              </div>
+            )}
           </div>
 
-          {channel === 'email' && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">Assunto do E-mail</label>
+          {/* 2. a mensagem */}
+          <div>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">2. A mensagem</p>
+              <span className="text-xs text-slate-400">{palavras ? `${palavras} palavras` : ''}</span>
+            </div>
+
+            {copyDesatualizada && (
+              <div className="mb-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center justify-between gap-3">
+                <span className="leading-snug">
+                  Este texto foi escrito para <b>{NOME_DO_CANAL[canalDaCopy as Canal]}</b> e você vai enviar por{' '}
+                  <b>{NOME_DO_CANAL[channel]}</b>. Tamanho e tom mudam.
+                </span>
+                <button onClick={() => gerarCopy(channel)} disabled={isGenerating}
+                  className="shrink-0 px-3 py-1.5 rounded-lg bg-amber-100 border border-amber-300 font-bold hover:bg-amber-200 disabled:opacity-50 flex items-center gap-1.5">
+                  <RefreshCw className="w-3 h-3" /> Reescrever
+                </button>
+              </div>
+            )}
+
+            {channel === 'email' && (
               <input
                 type="text"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-xs text-slate-100 font-medium focus:outline-none focus:border-indigo-500"
+                placeholder="Assunto do e-mail"
+                aria-label="Assunto do e-mail"
+                className="w-full mb-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
               />
-            </div>
-          )}
+            )}
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-              <span>Conteúdo da Mensagem</span>
-              <span className="text-[10px] text-slate-500">
-                {body.trim() ? `${body.trim().split(/\s+/).length} palavras` : 'Variáveis: {nome}, {empresa}, {cidade}'}
-              </span>
-            </label>
-            <textarea
-              rows={6}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              className="w-full p-3.5 bg-slate-950 border border-slate-700/80 rounded-xl text-xs text-slate-200 font-mono leading-relaxed focus:outline-none focus:border-indigo-500"
-            />
-          </div>
-
-          {/* A cadência que aquece: o contato frio raramente responde no
-              primeiro toque, e repetir o mesmo pedido soa cobrança. */}
-          {seguimentos.length > 0 && (
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <CalendarClock className="w-4 h-4 text-emerald-400" />
-                Sequência de aquecimento
-                <span className="font-normal text-slate-500">— se ele não responder</span>
-              </label>
-              {seguimentos.map((f, i) => (
-                <div key={i} className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-400">
-                      {f.quando}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => copiar(f.texto, i)}
-                        className="text-[10px] text-slate-400 hover:text-slate-200 flex items-center gap-1"
-                      >
-                        {copiado === i ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                        {copiado === i ? 'Copiado' : 'Copiar'}
-                      </button>
-                      <button
-                        onClick={() => setBody(f.texto)}
-                        className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300"
-                      >
-                        Usar agora
-                      </button>
-                    </div>
-                  </div>
-                  {f.objetivo && <p className="text-[10px] text-slate-500">{f.objetivo}</p>}
-                  <p className="text-[11px] text-slate-300 whitespace-pre-line leading-relaxed">{f.texto}</p>
+            <div className="relative">
+              <textarea
+                rows={9}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                aria-label="Texto da mensagem"
+                placeholder={isGenerating ? '' : 'A mensagem aparece aqui. Você pode editar à vontade.'}
+                disabled={isGenerating && !body}
+                className={`w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-[15px] text-slate-900 leading-relaxed font-sans resize-y focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-opacity ${isGenerating ? 'opacity-40' : ''}`}
+              />
+              {isGenerating && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <span className="flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow-md border border-slate-100 text-sm font-semibold text-indigo-600">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Escrevendo para {lead.company || lead.name}…
+                  </span>
                 </div>
+              )}
+            </div>
+
+            {/* ações sobre o texto */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button onClick={() => gerarCopy(channel)} disabled={isGenerating}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 transition-colors">
+                <Sparkles className="w-4 h-4" /> Gerar outra versão
+              </button>
+              <button onClick={() => copiar(body, -1)} disabled={!body.trim()}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+                {copiado === -1 ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                {copiado === -1 ? 'Copiado' : 'Copiar'}
+              </button>
+              <button onClick={() => setVerAjuste(v => !v)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                <Wand2 className="w-4 h-4" /> Pedir um ajuste
+              </button>
+            </div>
+
+            {/* tom: troca e já reescreve */}
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              <span className="text-xs text-slate-500 mr-1">Tom:</span>
+              {TONS.map(t => (
+                <button key={t.valor} type="button" disabled={isGenerating}
+                  onClick={() => { setTone(t.valor); gerarCopy(channel, { tom: t.valor }); }}
+                  aria-pressed={tone === t.valor}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors disabled:opacity-60 ${
+                    tone === t.valor
+                      ? 'bg-slate-900 border-slate-900 text-white'
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                  }`}>
+                  {t.rotulo}
+                </button>
               ))}
             </div>
-          )}
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400">Instruções Extras para a IA (Opcional)</label>
-            <input
-              type="text"
-              value={customInstructions}
-              onChange={(e) => setCustomInstructions(e.target.value)}
-              placeholder="Ex: Mencionar desconto de 20% no primeiro mês ou foco em odontologia estética..."
-              className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-            />
-          </div>
-        </div>
+            {verAjuste && (
+              <div className="mt-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div className="flex flex-wrap gap-1.5">
+                  {AJUSTES_RAPIDOS.map(a => (
+                    <button key={a} type="button" disabled={isGenerating}
+                      onClick={() => { setCustomInstructions(a); gerarCopy(channel, { instrucoes: a }); }}
+                      className="px-3 py-1 rounded-full text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-700 disabled:opacity-60">
+                      {a}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={customInstructions}
+                    onChange={(e) => setCustomInstructions(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !isGenerating) gerarCopy(channel); }}
+                    placeholder="Ou escreva: mencionar desconto, falar de estética…"
+                    aria-label="Pedido de ajuste para a IA"
+                    className="flex-1 min-w-0 px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                  />
+                  <button onClick={() => gerarCopy(channel)} disabled={isGenerating || !customInstructions.trim()}
+                    className="px-4 py-2 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
+                    Reescrever
+                  </button>
+                </div>
+              </div>
+            )}
 
-        <div className="px-6 py-4 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between">
-          <div className="text-xs text-slate-400 flex items-center gap-1.5">
-            <Coins className="w-4 h-4 text-amber-400" />
-            {isManualChannel ? (
-              <span>Este canal abre a conversa: <strong className="text-emerald-400 font-bold">sem custo</strong></span>
-            ) : (
-              <span>Custo do disparo: <strong className="text-amber-400 font-bold">2 Créditos</strong></span>
+            {avisos.length > 0 && (
+              <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+                <div className="font-bold flex items-center gap-1.5 mb-1">
+                  <AlertTriangle className="w-3.5 h-3.5" /> Vale revisar antes de enviar
+                </div>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  {avisos.map((a, i) => <li key={i}>{a}</li>)}
+                </ul>
+              </div>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setSelectedLeadForMessage(null)}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-            >
+          {/* 3. extras recolhidos */}
+          {(hook || reasoning) && !generationError && (
+            <div className="border border-slate-200 rounded-xl">
+              <button onClick={() => setVerPorque(v => !v)} aria-expanded={verPorque}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-slate-700">
+                Por que essa mensagem
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${verPorque ? 'rotate-180' : ''}`} />
+              </button>
+              {verPorque && (
+                <div className="px-4 pb-4 space-y-2 text-sm text-slate-600 leading-relaxed">
+                  {hook && <p><b className="text-slate-800">Fato usado para abrir:</b> {hook}</p>}
+                  {reasoning && <p><b className="text-slate-800">O que ela resolve para ele:</b> {reasoning}</p>}
+                </div>
+              )}
+            </div>
+          )}
+
+          {seguimentos.length > 0 && (
+            <div className="border border-slate-200 rounded-xl">
+              <button onClick={() => setVerSequencia(v => !v)} aria-expanded={verSequencia}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-slate-700">
+                <span className="flex items-center gap-2">
+                  <CalendarClock className="w-4 h-4 text-emerald-600" />
+                  Se ele não responder: {seguimentos.length} mensagens de acompanhamento
+                </span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${verSequencia ? 'rotate-180' : ''}`} />
+              </button>
+              {verSequencia && (
+                <div className="px-4 pb-4 space-y-3">
+                  {seguimentos.map((f, i) => (
+                    <div key={i} className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <span className="text-xs font-bold uppercase tracking-wide text-emerald-700">{f.quando}</span>
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => copiar(f.texto, i)}
+                            className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 font-semibold">
+                            {copiado === i ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiado === i ? 'Copiado' : 'Copiar'}
+                          </button>
+                          <button onClick={() => setBody(f.texto)} className="text-xs font-bold text-indigo-600 hover:text-indigo-800">
+                            Usar agora
+                          </button>
+                        </div>
+                      </div>
+                      {f.objetivo && <p className="text-xs text-slate-500 mb-1.5">{f.objetivo}</p>}
+                      <p className="text-sm text-slate-800 whitespace-pre-line leading-relaxed">{f.texto}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* rodapé: o que acontece ao enviar */}
+        <div className="px-5 sm:px-6 py-4 border-t border-slate-100 bg-slate-50/70 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-xs text-slate-500 flex items-center gap-1.5">
+            <Coins className="w-4 h-4 text-amber-500" />
+            {isManualChannel
+              ? <span>Abre a conversa: <b className="text-emerald-600">sem custo</b></span>
+              : <span>Custo do envio: <b className="text-amber-600">2 créditos</b></span>}
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
+            <button onClick={fechar}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors">
               Cancelar
             </button>
             <button
               onClick={handleDispatch}
               disabled={isSending || isGenerating || !body.trim()}
-              className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all"
+              className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm flex items-center gap-2 shadow-sm transition-colors"
             >
               {isSending ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Enviando...</span>
-                </>
+                <><Loader2 className="w-4 h-4 animate-spin" /> Enviando…</>
               ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  <span>{isManualChannel ? `Abrir ${NOME_DO_CANAL[channel]}` : 'Disparar Mensagem'}</span>
-                </>
+                <><Send className="w-4 h-4" /> {isManualChannel ? `Abrir ${NOME_DO_CANAL[channel]}` : 'Enviar mensagem'}</>
               )}
             </button>
           </div>
