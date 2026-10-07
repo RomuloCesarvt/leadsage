@@ -31,6 +31,14 @@
       "dest": "/privacidade.html"
     },
     {
+      "src": "/termos/?",
+      "dest": "/termos.html"
+    },
+    {
+      "src": "/exclusao-de-dados/?",
+      "dest": "/exclusao-de-dados.html"
+    },
+    {
       "handle": "filesystem"
     },
     {

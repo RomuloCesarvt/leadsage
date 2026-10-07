@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exclusão de dados — LeadSage</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+  :root { --tinta:#1f2937; --suave:#6b7280; --linha:#e5e7eb; --azul:#2563eb; }
+  body { margin:0; background:#f8fafc; color:var(--tinta);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; line-height:1.65; }
+  main { max-width:760px; margin:0 auto; padding:40px 20px 64px; }
+  .cartao { background:#fff; border:1px solid var(--linha); border-radius:16px; padding:32px; }
+  h1 { font-size:28px; margin:0 0 4px; }
+  h2 { font-size:17px; margin:28px 0 8px; color:var(--azul); }
+  p, li { font-size:15px; }
+  ul { padding-left:20px; }
+  .data { color:var(--suave); font-size:13px; margin-bottom:24px; }
+  .topo { display:flex; align-items:center; gap:8px; margin-bottom:20px; font-weight:700; color:var(--tinta); text-decoration:none; }
+  .pendente { background:#fef3c7; padding:0 4px; border-radius:4px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; margin:8px 0; }
+  td, th { text-align:left; padding:8px; border-bottom:1px solid var(--linha); vertical-align:top; }
+</style>
+</head>
+<body>
+<main>
+  <a class="topo" href="/"><img src="/favicon.svg" width="26" height="26" alt=""> LeadSage</a>
+  <div class="cartao">
+    <h1>Exclusão de dados</h1>
+    <p class="data">Atualizada em 7 de outubro de 2026</p>
+
+    <p>Você pode apagar os dados que o LeadSage guarda sobre você a qualquer momento. Há três caminhos.</p>
+
+    <h2>1. Desconectar um canal</h2>
+    <p>Em <b>Robô de Atendimento → Configurar</b>, clique em <b>Desconectar</b> ao lado de Facebook e Instagram,
+    WhatsApp ou Telegram. Isso apaga na hora os tokens de acesso daquele canal, e o robô deixa de
+    responder por ele.</p>
+
+    <h2>2. Remover o LeadSage da sua conta do Facebook</h2>
+    <p>No Facebook, abra <b>Configurações → Segurança e login → Apps e sites</b> (ou <b>Integrações
+    comerciais</b>) e remova o LeadSage. A Meta nos avisa automaticamente e apagamos:</p>
+    <ul>
+      <li>os acessos à sua página, ao Instagram e ao WhatsApp;</li>
+      <li>as conversas recebidas por esses canais.</li>
+    </ul>
+    <p>Você recebe um código de confirmação. Para conferir o andamento, abra o endereço
+    <code>/api/robo/meta/exclusao/SEU-CÓDIGO</code> neste site.</p>
+
+    <h2>3. Apagar a conta inteira</h2>
+    <p>Envie um e-mail para <span class="pendente">[e-mail de contato]</span> a partir do e-mail da sua conta,
+    com o assunto &ldquo;Excluir meus dados&rdquo;. Apagamos a conta e tudo o que está ligado a ela (leads, sites,
+    propostas, conversas e pipeline) em até 15 dias e confirmamos por e-mail.</p>
+
+    <h2>O que não conseguimos apagar</h2>
+    <p>Registros de pagamento que a lei manda guardar ficam com o Mercado Pago e, pelo prazo legal, conosco.
+    Mensagens que você já enviou a terceiros continuam com eles.</p>
+
+    <p>Mais detalhes sobre os dados que tratamos estão na <a href="/privacidade">Política de Privacidade</a>.</p>
+
+  </div>
+</main>
+</body>
+</html>
