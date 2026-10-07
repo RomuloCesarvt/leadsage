@@ -42,7 +42,7 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
-from app import fila_envio, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta
+from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote as _quote
 from app.ai_robo import decidir as robo_decidir
@@ -1278,6 +1278,61 @@ class MetaWhatsAppRequest(BaseModel):
 
 class MetaDesconectarRequest(BaseModel):
     alvo: str
+
+
+class TelegramConectarRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=80)
+
+
+@app.post("/api/robo/telegram/conectar")
+async def telegram_conectar(req: TelegramConectarRequest, user: dict = Depends(get_current_user)):
+    """Liga o bot do usuário (criado no @BotFather) ao robô."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    uid = user.get("uid")
+    canal = await robo_conexao._canal(uid, user.get("email", ""))
+    try:
+        canal = await telegram_canal.conectar(canal, req.token, settings.APP_URL)
+    except telegram_canal.TelegramRecusou as exc:
+        raise HTTPException(status_code=400, detail=f"O Telegram recusou: {exc}")
+    canal = await robo_store.substituir_canal(uid, canal)
+    return robo_store.visao_publica(canal, settings.APP_URL)
+
+
+@app.post("/api/robo/telegram/desconectar")
+async def telegram_desconectar(user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    uid = user.get("uid")
+    canal = await robo_conexao._canal(uid, user.get("email", ""))
+    canal = await telegram_canal.desconectar(canal)
+    canal = await robo_store.substituir_canal(uid, canal)
+    return robo_store.visao_publica(canal, settings.APP_URL)
+
+
+@app.post("/api/robo/telegram/{gancho}")
+async def telegram_webhook(gancho: str, request: Request):
+    """Mensagem chegando do Telegram.
+
+    Sem login, de propósito: quem chama é o Telegram. O que autentica é o
+    segredo que definimos no cadastro do webhook, devolvido no cabeçalho.
+    Autenticada, a resposta é sempre 200 para o Telegram não reenviar.
+    """
+    canal = await robo_store.canal_por_gancho(gancho)
+    if not canal or not telegram_canal.segredo_confere(
+        canal, request.headers.get("x-telegram-bot-api-secret-token", "")
+    ):
+        raise HTTPException(status_code=401, detail="Assinatura inválida.")
+    try:
+        dados = await request.json()
+    except ValueError:
+        return {"ok": True}
+    if not isinstance(dados, dict):
+        return {"ok": True}
+    for msg in telegram_canal.ler_update(dados):
+        try:
+            await robo_service.processar(canal, msg)
+        except Exception as exc:
+            print(f"Robo: falha ao processar telegram/{msg.meta_id}: {exc}")
+    return {"ok": True}
 
 
 @app.get("/api/robo/meta/disponivel")

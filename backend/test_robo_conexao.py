@@ -118,6 +118,14 @@ def test_url_de_login_pede_o_necessario(app_meta):
     assert meta_oauth.ler_state(q["state"][0]) == "alice"
 
 
+def test_url_de_login_com_configuracao_de_empresa_nao_leva_scope(app_meta, monkeypatch):
+    monkeypatch.setattr(settings, "META_LOGIN_CONFIG_ID", "999888777")
+    q = parse_qs(urlparse(meta_oauth.url_de_login("alice")).query)
+    assert q["config_id"] == ["999888777"] and q["override_default_response_type"] == ["true"]
+    assert "scope" not in q and q["response_type"] == ["code"]
+    assert meta_oauth.ler_state(q["state"][0]) == "alice"
+
+
 def test_sem_app_configurado_nada_aparece(monkeypatch):
     monkeypatch.setattr(settings, "META_APP_ID", "")
     monkeypatch.setattr(settings, "META_APP_SECRET", "")

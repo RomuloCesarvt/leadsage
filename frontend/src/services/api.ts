@@ -288,6 +288,14 @@ export const api = {
     return await fetchWithToken('/robo/meta/desconectar', { method: 'POST', body: JSON.stringify({ alvo }) });
   },
 
+  async telegramConectar(token: string): Promise<RoboConfig> {
+    return await fetchWithToken('/robo/telegram/conectar', { method: 'POST', body: JSON.stringify({ token }) });
+  },
+
+  async telegramDesconectar(): Promise<RoboConfig> {
+    return await fetchWithToken('/robo/telegram/desconectar', { method: 'POST' });
+  },
+
   // ------------------------------------------------ pipeline e disparo
 
   async pipelineListar(): Promise<{ etapas: string[]; itens: PipelineItem[] }> {

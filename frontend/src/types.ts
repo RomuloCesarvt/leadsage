@@ -327,7 +327,7 @@ export interface PlanoAtual {
 
 // ------------------------------------------------- robo de atendimento
 
-export type RoboCanal = 'whatsapp' | 'messenger' | 'instagram';
+export type RoboCanal = 'whatsapp' | 'messenger' | 'instagram' | 'telegram';
 
 export interface RoboConfigEntrada {
   app_secret: string;
@@ -373,6 +373,9 @@ export interface RoboConfig extends Omit<RoboConfigEntrada, 'app_secret' | 'wa_t
   verify_token: string;
   whatsapp_pronto: boolean;
   meta_pronto: boolean;
+  telegram_pronto: boolean;
+  /** @ do bot do Telegram, sem o arroba */
+  tg_username: string;
   /** 'app': conectado com um clique pelo app do LeadSage; 'manual': app proprio */
   modo: 'app' | 'manual';
   page_nome: string;

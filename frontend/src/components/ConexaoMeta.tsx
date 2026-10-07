@@ -12,7 +12,7 @@
 import React, { useEffect, useState } from 'react';
 import { Check, Loader2, Unplug, AlertTriangle } from 'lucide-react';
 import { api } from '../services/api';
-import { WhatsAppIcon, InstagramIcon, FacebookIcon } from './BrandIcons';
+import { WhatsAppIcon, InstagramIcon, FacebookIcon, TelegramIcon } from './BrandIcons';
 import type { RoboConfig } from '../types';
 
 type Disponivel = { facebook: boolean; whatsapp: boolean; app_id: string; wa_config_id: string };
@@ -94,7 +94,8 @@ const cadastrarWhatsApp = async (appId: string, configId: string) => {
 
 export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) => void }> = ({ cfg, aoMudar }) => {
   const [disp, setDisp] = useState<Disponivel | null>(null);
-  const [ocupado, setOcupado] = useState<'' | 'facebook' | 'whatsapp' | 'pagina'>('');
+  const [ocupado, setOcupado] = useState<'' | 'facebook' | 'whatsapp' | 'pagina' | 'telegram'>('');
+  const [tokenTg, setTokenTg] = useState('');
   const [erro, setErro] = useState('');
 
   useEffect(() => {
@@ -134,6 +135,26 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
     } finally {
       setOcupado('');
     }
+  };
+
+  const conectarTelegram = async () => {
+    setOcupado('telegram');
+    setErro('');
+    try {
+      aoMudar(await api.telegramConectar(tokenTg.trim()));
+      setTokenTg('');
+    } catch (e: any) {
+      setErro(e?.message || 'Não foi possível conectar o bot.');
+    } finally {
+      setOcupado('');
+    }
+  };
+
+  const desconectarTelegram = async () => {
+    if (!window.confirm('Desconectar o bot do Telegram? O robô para de responder por ele.')) return;
+    setErro('');
+    try { aoMudar(await api.telegramDesconectar()); }
+    catch (e: any) { setErro(e?.message || 'Não foi possível desconectar.'); }
   };
 
   const desconectar = async (alvo: 'facebook' | 'whatsapp') => {
@@ -221,6 +242,48 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
               {ocupado === 'whatsapp' ? <Loader2 className="w-4 h-4 animate-spin" /> : <WhatsAppIcon className="w-4 h-4" />}
               Conectar WhatsApp
             </button>
+          )}
+        </div>
+
+        {/* Telegram */}
+        <div className="p-4 rounded-xl border border-slate-200 space-y-3">
+          <div className="flex flex-wrap items-center gap-4">
+            <TelegramIcon className="w-7 h-7 text-[#26A5E4]" />
+            <div className="flex-1 min-w-[160px]">
+              <p className="font-bold text-slate-800 text-sm">Telegram</p>
+              <p className="text-xs text-slate-500">
+                {cfg.telegram_pronto
+                  ? <>Conectado: <b>@{cfg.tg_username}</b> · <a className="text-blue-600 hover:underline" href={`https://t.me/${cfg.tg_username}`} target="_blank" rel="noreferrer">t.me/{cfg.tg_username}</a></>
+                  : 'O robô atende no bot da sua empresa. Quem aperta Iniciar já conversa com ele.'}
+              </p>
+            </div>
+            {cfg.telegram_pronto && (
+              <button onClick={desconectarTelegram} className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 flex items-center gap-1.5">
+                <Unplug className="w-3.5 h-3.5" /> Desconectar
+              </button>
+            )}
+          </div>
+          {!cfg.telegram_pronto && (
+            <div className="space-y-2">
+              <ol className="text-xs text-slate-600 list-decimal pl-5 space-y-0.5">
+                <li>No Telegram, abra o <b>@BotFather</b> e mande <b>/newbot</b>.</li>
+                <li>Escolha o nome e o usuário do bot. Ele devolve um token.</li>
+                <li>Cole o token abaixo.</li>
+              </ol>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  type="password" autoComplete="off" value={tokenTg} onChange={e => setTokenTg(e.target.value)}
+                  placeholder="123456789:AAE…"
+                  className="flex-1 min-w-[200px] px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white"
+                />
+                <button onClick={conectarTelegram} disabled={!tokenTg.trim() || !!ocupado}
+                  className="px-4 py-2.5 rounded-xl bg-[#26A5E4] hover:bg-[#1E96D1] disabled:opacity-40 text-white text-sm font-bold flex items-center gap-2">
+                  {ocupado === 'telegram' ? <Loader2 className="w-4 h-4 animate-spin" /> : <TelegramIcon className="w-4 h-4" />}
+                  Conectar bot
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-500">O Telegram só deixa o bot falar com quem falou com ele primeiro. Coloque o link do bot no site, no e-mail e no cartão.</p>
+            </div>
           )}
         </div>
       </div>

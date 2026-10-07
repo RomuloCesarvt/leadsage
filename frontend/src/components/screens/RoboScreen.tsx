@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
-import { WhatsAppIcon, InstagramIcon, FacebookIcon } from '../BrandIcons';
+import { WhatsAppIcon, InstagramIcon, FacebookIcon, TelegramIcon } from '../BrandIcons';
 import { ConexaoMeta } from '../ConexaoMeta';
 import { DisparoWhatsApp } from '../DisparoWhatsApp';
 import { FilaDeEnvio } from '../FilaDeEnvio';
@@ -27,12 +27,14 @@ const ICONE_CANAL: Record<RoboCanal, React.FC<{ className?: string }>> = {
   whatsapp: WhatsAppIcon,
   instagram: InstagramIcon,
   messenger: FacebookIcon,
+  telegram: TelegramIcon,
 };
 
 const NOME_CANAL: Record<RoboCanal, string> = {
   whatsapp: 'WhatsApp',
   instagram: 'Instagram',
   messenger: 'Messenger',
+  telegram: 'Telegram',
 };
 
 const quando = (iso?: string) => {

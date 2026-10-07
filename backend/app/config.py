@@ -51,6 +51,9 @@ class Settings(BaseModel):
     # Configuracao do Embedded Signup do WhatsApp (Facebook Login for
     # Business). Sem ela, o botao do WhatsApp nao aparece.
     META_WA_CONFIG_ID: str = os.getenv("META_WA_CONFIG_ID", "")
+    # Configuracao do "Login do Facebook para Empresas" (Messenger e Instagram).
+    # Apps do tipo Empresa nao aceitam `scope` na URL: as permissoes vem dela.
+    META_LOGIN_CONFIG_ID: str = os.getenv("META_LOGIN_CONFIG_ID", "")
 
     # Banco de imagens dos sites. Sem chave, usa Openverse/StockSnap
     # (gratuito, ate 960 px); com chave gratuita do Pexels, alta resolucao.

@@ -173,6 +173,8 @@ def visao_publica(canal: Optional[Dict[str, Any]], url_base: str) -> Dict[str, A
     saida["modo"] = c.get("modo") or "manual"
     saida["whatsapp_pronto"] = bool(c.get("wa_token") and c.get("wa_phone_id") and assinatura_ok)
     saida["meta_pronto"] = bool(c.get("page_token") and c.get("page_id") and assinatura_ok)
+    saida["telegram_pronto"] = bool(c.get("tg_token") and c.get("tg_secret"))
+    saida["tg_username"] = c.get("tg_username", "")
     # paginas autorizadas aguardando escolha: so nome e id, nunca o token
     saida["paginas_pendentes"] = [
         {"id": p.get("id", ""), "nome": p.get("nome", ""), "ig_usuario": p.get("ig_usuario", "")}

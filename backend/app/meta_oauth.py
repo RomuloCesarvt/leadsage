@@ -90,13 +90,19 @@ def ler_state(state: str, agora: Optional[float] = None) -> str:
 
 
 def url_de_login(uid: str) -> str:
-    return "https://www.facebook.com/{}/dialog/oauth?{}".format(VERSAO, urlencode({
+    params = {
         "client_id": settings.META_APP_ID,
         "redirect_uri": redirect_uri(),
         "state": criar_state(uid),
-        "scope": ",".join(ESCOPOS_PAGINA),
         "response_type": "code",
-    }))
+    }
+    if settings.META_LOGIN_CONFIG_ID:
+        # Login do Facebook para Empresas: as permissoes ficam na configuracao
+        params["config_id"] = settings.META_LOGIN_CONFIG_ID
+        params["override_default_response_type"] = "true"
+    else:
+        params["scope"] = ",".join(ESCOPOS_PAGINA)
+    return "https://www.facebook.com/{}/dialog/oauth?{}".format(VERSAO, urlencode(params))
 
 
 # ---------------------------------------------------------------- graph

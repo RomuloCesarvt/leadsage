@@ -22,7 +22,7 @@ GRAPH = "https://graph.facebook.com/v21.0"
 
 @dataclass
 class Recebida:
-    canal: str          # whatsapp | messenger | instagram
+    canal: str          # whatsapp | messenger | instagram | telegram
     contato: str        # wa_id, PSID ou IGSID — o endereco para responder
     nome: str
     texto: str
@@ -146,6 +146,10 @@ async def enviar(canal: str, contato: str, texto: str, cfg: Dict[str, Any]) -> s
     texto = (texto or "").strip()
     if not texto:
         raise EnvioFalhou("Mensagem vazia.")
+
+    if canal == "telegram":
+        from app import telegram_canal
+        return await telegram_canal.enviar(contato, texto, cfg)
 
     if canal == "whatsapp":
         token, origem = cfg.get("wa_token"), cfg.get("wa_phone_id")
