@@ -8,19 +8,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bot, MessageCircle, Settings2, FlaskConical, Send, UserRound, AlertTriangle,
-  Copy, Check, Power, RefreshCw, Ban, Lock, ExternalLink, ChevronLeft,
+  Copy, Check, Power, RefreshCw, Ban, Lock, ExternalLink, ChevronLeft, ListChecks,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { WhatsAppIcon, InstagramIcon, FacebookIcon } from '../BrandIcons';
 import { ConexaoMeta } from '../ConexaoMeta';
 import { DisparoWhatsApp } from '../DisparoWhatsApp';
+import { FilaDeEnvio } from '../FilaDeEnvio';
 import { OfertaDoRobo } from '../OfertaDoRobo';
 import type {
   RoboCanal, RoboConfig, RoboConfigEntrada, RoboConversa, RoboConversaResumo, RoboMensagem,
 } from '../../types';
 
-type Aba = 'conversas' | 'disparo' | 'simulador' | 'configurar';
+type Aba = 'conversas' | 'fila' | 'disparo' | 'simulador' | 'configurar';
 
 const ICONE_CANAL: Record<RoboCanal, React.FC<{ className?: string }>> = {
   whatsapp: WhatsAppIcon,
@@ -105,18 +106,20 @@ export const RoboScreen: React.FC = () => {
             <Bot className="w-7 h-7 text-blue-600" /> Robô de atendimento
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            A IA abre a conversa no WhatsApp, responde no WhatsApp, Instagram e Messenger como SDR e move o lead no pipeline.
+            A IA escreve a abordagem de cada lead: e-mail sai sozinho e WhatsApp, Instagram e LinkedIn vão para a fila, prontos para enviar. Quem responde é atendido como SDR, e o lead anda no pipeline.
           </p>
         </div>
         <div className="flex gap-1 bg-white border border-slate-200 rounded-2xl p-1 max-w-full overflow-x-auto">
           <Tab id="conversas" icon={MessageCircle} label="Conversas" />
-          <Tab id="disparo" icon={Send} label="Disparo" />
+          <Tab id="fila" icon={ListChecks} label="Fila de envio" />
+          <Tab id="disparo" icon={Send} label="Disparo WhatsApp" />
           <Tab id="simulador" icon={FlaskConical} label="Simulador" />
           <Tab id="configurar" icon={Settings2} label="Configurar" />
         </div>
       </div>
 
       {aba === 'conversas' && <Conversas onBloqueio={setBloqueado} irConfigurar={() => setAba('configurar')} />}
+      {aba === 'fila' && <FilaDeEnvio />}
       {aba === 'disparo' && <DisparoWhatsApp irConfigurar={() => setAba('configurar')} />}
       {aba === 'simulador' && <Simulador />}
       {aba === 'configurar' && retornoMeta && (

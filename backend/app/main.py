@@ -31,7 +31,7 @@ from app.ai_client import AIIndisponivel
 from app.ai_generator import AIGenerator
 from app.ai_site import gerar_conteudo_de_site
 from app.ai_docs import gerar_documento
-from app.dispatcher import OutreachDispatcher, DispatchError
+from app.dispatcher import OutreachDispatcher, DispatchError, DISPATCH_COST
 from app.credit_system import check_and_deduct_credits, get_user_balance
 import httpx
 from app.firebase_config import get_current_user, db as firestore_db
@@ -42,7 +42,7 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
-from app import robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta
+from app import fila_envio, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote as _quote
 from app.ai_robo import decidir as robo_decidir
@@ -1008,6 +1008,111 @@ async def pipeline_mover(lead_id: str, req: PipelineMoverRequest, user: dict = D
         await pipeline_store.registrar(uid, {**req.lead, "id": lead_id})
     item = await pipeline_store.mover(uid, lead_id, req.etapa, motivo="movido por você", por="voce")
     return {"etapa": pipeline_store.etapa_valida(req.etapa), "mudou": item is not None}
+
+
+# ------------------------------------------------------------- fila de envio
+
+class FilaPrepararRequest(BaseModel):
+    leads: List[Dict[str, Any]] = Field(default_factory=list, max_length=fila_envio.LOTE_MAXIMO)
+    tom: str = "Consultivo"
+
+
+def _lead_para_pitch(lead: Dict[str, Any]) -> LeadItem:
+    """O navegador manda o lead como o tem; o que faltar vira vazio, para a
+    abordagem não falhar por um campo opcional."""
+    base = {"avatar": "", "role": "", "niche": "", "company": "", "location": "", "city": "", "email": "",
+            "phone": "", "socials": {}, "quality_score": 0, "name": ""}
+    dados = {**base, **{k: v for k, v in lead.items() if v is not None}}
+    dados["socials"] = dados.get("socials") if isinstance(dados.get("socials"), dict) else {}
+    return LeadItem.model_validate(dados)
+
+
+async def _funcoes_da_fila(user: dict):
+    """As três pontas que a fila usa: escrever, enviar e cobrar."""
+    uid, email = user.get("uid"), user.get("email")
+    perfil = await get_profile(uid)
+    config = await get_integrations(uid)
+    canal_robo = await robo_store.canal_do_usuario(uid) or {}
+    produto = ""
+    if ai_oferta.ativa(canal_robo):
+        produto = ((canal_robo.get("oferta") or {}).get("nome") or "").strip()
+    produto = produto or perfil.product_description or ""
+    remetente = perfil.company_name or perfil.name or "Prospecção LeadSage"
+
+    async def gerar(lead: Dict[str, Any], canal: str, tom: str = "Consultivo") -> Dict[str, Any]:
+        pitch = await AIGenerator.generate_pitch(
+            PitchGenerationRequest(lead=_lead_para_pitch(lead), channel=canal, tone=tom,
+                                   sender_name=remetente, user_product=produto),
+            api_key=settings.GEMINI_API_KEY,
+        )
+        return {"subject": pitch.subject, "body": pitch.body, "hook": pitch.hook,
+                "follow_ups": [f.model_dump() for f in (pitch.follow_ups or [])]}
+
+    async def enviar(lead: Dict[str, Any], assunto: str, corpo: str) -> str:
+        req = DispatchRequest(lead_id=str(lead.get("id", "")), lead_name=lead.get("company") or lead.get("name") or "",
+                              lead_email=lead.get("email") or "", channel="email", subject=assunto, body=corpo)
+        resposta = await OutreachDispatcher.dispatch_message(req, 10**6, config)
+        return resposta.status
+
+    async def pode_enviar() -> bool:
+        saldo = (await get_user_balance(uid, email)).get("credits", 0)
+        return saldo >= DISPATCH_COST
+
+    async def cobrar() -> None:
+        await check_and_deduct_credits(uid, DISPATCH_COST, email)
+
+    return gerar, enviar, pode_enviar, cobrar
+
+
+@app.post("/api/robo/fila/preparar")
+async def fila_preparar(req: FilaPrepararRequest, user: dict = Depends(get_current_user)):
+    """O robô escreve a abordagem de cada lead e entrega no canal certo.
+
+    E-mail sai sozinho (com limite diário); WhatsApp, Instagram e LinkedIn
+    ficam na fila com o link pronto para a pessoa só enviar.
+    """
+    await exigir_recurso(user, "ia_abordagem", "O disparo")
+    gerar, enviar, pode_enviar, cobrar = await _funcoes_da_fila(user)
+    try:
+        return await asyncio.wait_for(
+            fila_envio.preparar_lote(user.get("uid"), req.leads,
+                                     lambda l, c: gerar(l, c, req.tom), enviar, pode_enviar, cobrar),
+            timeout=55,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="O preparo demorou demais. Envie menos leads por vez.")
+
+
+@app.get("/api/robo/fila")
+async def fila_listar(user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "ia_abordagem", "O disparo")
+    itens = await fila_envio.listar(user.get("uid"))
+    return {"itens": itens[:200], "resumo": fila_envio.resumo(itens)}
+
+
+@app.post("/api/robo/fila/enviar-aguardando")
+async def fila_enviar_aguardando(user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "ia_abordagem", "O disparo")
+    _, enviar, pode_enviar, cobrar = await _funcoes_da_fila(user)
+    return await fila_envio.enviar_aguardando(user.get("uid"), enviar, pode_enviar, cobrar)
+
+
+@app.post("/api/robo/fila/{item_id}/enviado")
+async def fila_marcar_enviado(item_id: str, user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "ia_abordagem", "O disparo")
+    item = await fila_envio.marcar_enviado(user.get("uid"), item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Item não encontrado na fila.")
+    return item
+
+
+@app.post("/api/robo/fila/{item_id}/pular")
+async def fila_pular(item_id: str, user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "ia_abordagem", "O disparo")
+    item = await fila_envio.pular(user.get("uid"), item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Item não encontrado na fila.")
+    return item
 
 
 # ------------------------------------------------------------------ disparo

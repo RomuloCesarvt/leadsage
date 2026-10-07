@@ -493,3 +493,35 @@ export interface DisparoResultado {
   ignorados: { id: string; nome?: string; motivo: string }[];
   falhas: { id: string; nome?: string; motivo: string }[];
 }
+
+
+// ------------------------------------------------------- fila de envio
+
+export type CanalFila = 'email' | 'whatsapp' | 'instagram_direct' | 'linkedin_msg';
+
+export interface ItemFila {
+  id: string;
+  lead_id: string;
+  nome: string;
+  canal: CanalFila;
+  assunto: string;
+  texto: string;
+  link: string;
+  gancho?: string;
+  seguimentos?: { quando: string; objetivo?: string; texto: string }[];
+  status: 'pendente' | 'enviado' | 'pulado' | 'aguardando_limite' | 'falhou';
+  motivo?: string;
+  criado: string;
+  enviado_em?: string;
+  enviado_por?: string;
+}
+
+export interface ResumoFila {
+  pendentes: number; aguardando_limite: number; enviados: number;
+  email_hoje: number; limite_email_dia: number; email_restante: number;
+}
+
+export interface ResultadoPreparo {
+  lead_id: string; nome: string; canal?: CanalFila;
+  resultado: 'enviado' | 'na fila' | 'aguardando' | 'falhou' | 'ignorado'; motivo?: string;
+}

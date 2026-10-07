@@ -25,7 +25,10 @@ import type {
   RoboConversaResumo,
   RoboMensagem,
   RoboTeste,
-  RaioX
+  RaioX,
+  ItemFila,
+  ResumoFila,
+  ResultadoPreparo
 } from '../types';
 import { auth } from '../lib/firebase';
 
@@ -319,6 +322,28 @@ export const api = {
     return await fetchWithToken('/raio-x', {
       method: 'POST', body: JSON.stringify({ place_id, website, instagram, refazer, lead }),
     });
+  },
+
+  // ------------------------------------------------- fila de envio
+
+  async filaListar(): Promise<{ itens: ItemFila[]; resumo: ResumoFila }> {
+    return await fetchWithToken('/robo/fila');
+  },
+
+  async filaPreparar(leads: Record<string, unknown>[], tom = 'Consultivo'): Promise<{ resultados: ResultadoPreparo[]; resumo: ResumoFila }> {
+    return await fetchWithToken('/robo/fila/preparar', { method: 'POST', body: JSON.stringify({ leads, tom }) });
+  },
+
+  async filaEnviarAguardando(): Promise<{ enviados: number; resumo: ResumoFila }> {
+    return await fetchWithToken('/robo/fila/enviar-aguardando', { method: 'POST' });
+  },
+
+  async filaMarcarEnviado(id: string): Promise<ItemFila> {
+    return await fetchWithToken(`/robo/fila/${encodeURIComponent(id)}/enviado`, { method: 'POST' });
+  },
+
+  async filaPular(id: string): Promise<ItemFila> {
+    return await fetchWithToken(`/robo/fila/${encodeURIComponent(id)}/pular`, { method: 'POST' });
   },
 
   async imagens(nicho: string, termo = ''): Promise<{ imagens: { url: string; miniatura: string; autor: string; fonte: string }[]; fonte: string }> {
