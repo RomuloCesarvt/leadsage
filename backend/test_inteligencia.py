@@ -181,8 +181,12 @@ def test_revisao_cobra_o_tamanho_do_canal():
     assert not any("limite deste canal" in p for p in revisar_copy(texto, "email"))
 
 
+def test_tudo_bem_de_cortesia_nao_conta_como_pergunta():
+    assert not any("perguntas" in p for p in revisar_copy("Oi, tudo bem? Posso te mostrar como ficaria?", "whatsapp"))
+
+
 def test_revisao_recusa_duas_perguntas():
-    assert any("perguntas" in p for p in revisar_copy("Tudo bem? Quer ver?", "whatsapp"))
+    assert any("perguntas" in p for p in revisar_copy("Posso te mostrar? Quer ver?", "whatsapp"))
 
 
 def test_revisao_cobra_pergunta_no_fim():

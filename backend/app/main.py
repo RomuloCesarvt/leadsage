@@ -42,7 +42,7 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
-from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta
+from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, abordagem_mestra
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote as _quote
 from app.ai_robo import decidir as robo_decidir
@@ -299,6 +299,15 @@ async def generate_pitch(request: Request, req: PitchGenerationRequest, user: di
     """
     await exigir_recurso(user, "ia_abordagem", "A IA de abordagem")
     try:
+        # O produto vem do cadastro do dono, nunca do navegador: e ele que
+        # garante que a mensagem so cita preco, prazo e entrega reais.
+        canal_robo = await robo_store.canal_do_usuario(user.get("uid")) or {}
+        perfil = await get_profile(user.get("uid"))
+        if not req.user_product:
+            req.user_product = perfil.product_description or ""
+        if not req.sender_name or req.sender_name == "Prospecção LeadSage":
+            req.sender_name = perfil.company_name or perfil.name or req.sender_name
+        req.service_brief = abordagem_mestra.produto(canal_robo, req.lead.model_dump(), req.user_product or "")
         return await AIGenerator.generate_pitch(req, api_key=settings.GEMINI_API_KEY)
     except AIIndisponivel as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -1051,7 +1060,8 @@ async def _funcoes_da_fila(user: dict):
     async def gerar(lead: Dict[str, Any], canal: str, tom: str = "Consultivo") -> Dict[str, Any]:
         pitch = await AIGenerator.generate_pitch(
             PitchGenerationRequest(lead=_lead_para_pitch(lead), channel=canal, tone=tom,
-                                   sender_name=remetente, user_product=produto),
+                                   sender_name=remetente, user_product=produto,
+                                   service_brief=abordagem_mestra.produto(canal_robo, lead, produto)),
             api_key=settings.GEMINI_API_KEY,
         )
         return {"subject": pitch.subject, "body": pitch.body, "hook": pitch.hook,
@@ -1558,6 +1568,9 @@ async def gerar_raio_x(req: RaioXRequest, user: dict = Depends(get_current_user)
         raise HTTPException(status_code=402, detail="Créditos insuficientes para o raio-x.")
 
     canal = await robo_store.canal_do_usuario(uid) or {}
+    perfil_rx = await get_profile(uid)
+    canal = {**canal, "_remetente": perfil_rx.company_name or perfil_rx.name or "",
+             "_produto": perfil_rx.product_description or ""}
     try:
         dados = await asyncio.wait_for(
             raio_x.montar(req.place_id, req.website or "", req.instagram or "", canal,

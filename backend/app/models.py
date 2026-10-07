@@ -113,6 +113,9 @@ class PitchGenerationRequest(BaseModel):
     custom_instructions: Optional[str] = ""
     sender_name: Optional[str] = "Prospecção LeadSage"
     user_product: Optional[str] = ""
+    # Fatos do servico que o dono vende (preco, prazo, o que inclui). Preenchido
+    # pelo servidor a partir da oferta do robo; o cliente nao precisa enviar.
+    service_brief: Optional[str] = ""
 
 class PitchGenerationResponse(BaseModel):
     lead_id: str

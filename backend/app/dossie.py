@@ -316,7 +316,9 @@ def verificar_abertura(texto: str, empresa: str, fatos: List[str], pessoa: Optio
 
 
 def _prompt_abordagem(lead: Dict[str, Any], raio: Dict[str, Any], dores: List[Dict[str, str]],
-                      empresa: Dict[str, Any], pessoas: List[Dict[str, str]], estilo: tuple, bloco_oferta: str) -> str:
+                      empresa: Dict[str, Any], pessoas: List[Dict[str, str]], estilo: tuple, bloco_oferta: str,
+                      sender: str = "") -> str:
+    from app import abordagem_mestra
     fatos = [f"- {d['titulo']}: {d['evidencia']}" for d in dores] or ["- (sem dores verificadas)"]
     gente = [f"- {p['nome']}" + (f" ({p['cargo']})" if p.get("cargo") else "") + f" — {p['fonte']}" for p in pessoas]
     gente += [f"- {s['nome']} ({s['qualificacao']}) — sócio na Receita Federal" for s in (empresa.get("socios") or [])]
@@ -338,8 +340,21 @@ PESSOAS (só trate alguém pelo nome se estiver aqui; sócio da Receita não é 
 
 ESTILO DESTE LEAD (para não ficar igual aos outros): {estilo[1]}
 
-Regras: português do Brasil, tom natural de WhatsApp, sem "prezado", sem emoji em excesso, sem promessa de resultado,
-sem inventar fato, sem preço se a oferta não tiver. A mensagem de abertura tem de 25 a 60 palavras e cita um fato concreto DESTE negócio.
+{abordagem_mestra.momento()}
+
+{abordagem_mestra.estrutura(sender)}
+
+{abordagem_mestra.GATILHOS}
+
+{abordagem_mestra.TEMPERATURA}
+
+O RAMO: {abordagem_mestra.bloco_do_ramo(lead.get('niche'))}
+
+Regras: português do Brasil, tom natural de WhatsApp, caloroso e respeitoso, sem "prezado", no máximo um emoji,
+sem promessa de resultado, sem inventar fato, sem preço se a oferta não tiver. A abertura tem de 45 a 80 palavras,
+começa cumprimentando (com o nome se houver pessoa identificada), diz quem você é em uma frase, cita um fato concreto
+DESTE negócio, liga o fato ao que o serviço resolve e termina em UMA pergunta fácil. A "proximo_passo" e a "resposta_a_objecao"
+devem soar como conversa, nunca como roteiro de call center.
 
 Responda SOMENTE um objeto JSON com estas chaves:
 "angulo": uma frase com a tese da abordagem (por que vender para este negócio, desse jeito),
@@ -379,13 +394,15 @@ def gerar_abordagem(lead: Dict[str, Any], raio: Dict[str, Any], dores: List[Dict
     estilo = estilo_do_lead(str(lead.get("id") or nome_empresa))
     pessoa = pessoas[0] if pessoas else None
     servico = ""
-    bloco = ""
+    remetente = str((canal or {}).get("_remetente") or "")
     try:
         if ai_oferta.ativa(canal or {}):
-            bloco = ai_oferta.bloco_do_servico(canal, lead)
             servico = ((canal.get("oferta") or {}).get("nome") or "").strip()
     except Exception:
-        bloco = ""
+        servico = ""
+    servico = servico or str((canal or {}).get("_produto") or "")
+    from app import abordagem_mestra
+    bloco = "O PRODUTO (use só estes fatos):\n" + abordagem_mestra.produto(canal, lead, servico)
     canal_sug = lead.get("best_channel") or melhor_canal(lead)
     reserva = abordagem_de_reserva(nome_empresa, dores, pessoa, estilo, servico, canal_sug)
 
@@ -393,7 +410,7 @@ def gerar_abordagem(lead: Dict[str, Any], raio: Dict[str, Any], dores: List[Dict
         return reserva
     try:
         client = build_client(settings.GEMINI_API_KEY)
-        dados = gerar_json(client, _prompt_abordagem(lead, raio, dores, empresa, pessoas, estilo, bloco),
+        dados = gerar_json(client, _prompt_abordagem(lead, raio, dores, empresa, pessoas, estilo, bloco, remetente),
                            obrigatorias=["abertura", "angulo"], tentativas=1)
     except (AIIndisponivel, Exception):
         return reserva

@@ -145,23 +145,23 @@ CLICHES = [
 # de um e-mail.
 FORMATO_CANAL: Dict[str, Dict[str, Any]] = {
     "email": {
-        "limite": "de 90 a 130 palavras",
-        "estrutura": "assunto curto, abertura com o dado concreto, uma frase de proposta, uma pergunta final",
-        "tom": "escrito, mas conversado; sem saudação protocolar",
+        "limite": "de 90 a 140 palavras",
+        "estrutura": "assunto curto e humano; cumprimento com o nome; quem você é em uma frase; o que viu no negócio; o que muda para ele; uma pergunta final",
+        "tom": "escrito, mas conversado, como um profissional educado escreve para alguém que não conhece",
     },
     "whatsapp": {
-        "limite": "no máximo 60 palavras",
-        "estrutura": "duas ou três frases curtas, quebradas em linhas, terminando em pergunta",
-        "tom": "mensagem de pessoa, não de empresa; sem assunto e sem assinatura formal",
+        "limite": "de 45 a 75 palavras",
+        "estrutura": "cumprimento (com o nome) e um 'tudo bem?' leve; quem você é; o que viu no negócio e o que muda para ele; uma pergunta fácil. Em linhas curtas",
+        "tom": "mensagem de pessoa, calorosa e respeitosa; sem assunto e sem assinatura formal",
     },
     "instagram_direct": {
-        "limite": "no máximo 45 palavras",
-        "estrutura": "uma frase que mostra que você viu o perfil, uma frase de proposta, uma pergunta",
-        "tom": "direto e informal, como quem manda DM de verdade",
+        "limite": "de 35 a 55 palavras",
+        "estrutura": "cumprimento; quem você é em poucas palavras; o que viu no perfil; uma pergunta fácil",
+        "tom": "informal e simpático, como quem manda DM de verdade",
     },
     "linkedin_msg": {
-        "limite": "no máximo 80 palavras",
-        "estrutura": "contexto profissional, proposta objetiva, convite para conversa",
+        "limite": "de 55 a 90 palavras",
+        "estrutura": "cumprimento; quem você é; contexto profissional do que viu; proposta objetiva; convite leve para conversar",
         "tom": "profissional, sem formalidade excessiva",
     },
 }
@@ -248,31 +248,31 @@ TONS: Dict[str, Dict[str, str]] = {
     "Consultivo": {
         "voz": "de quem entende do negocio do outro e fala de igual para igual",
         "postura": "aponta um fato, explica a consequencia em dinheiro e propoe um passo pequeno",
-        "abertura": "comece pelo dado que voce observou, nao por voce nem pela sua empresa",
+        "abertura": "cumprimente, diga quem voce e em uma frase, e so entao traga o dado que voce observou",
         "evite": "vender o servico antes de nomear o problema; adjetivo sobre si mesmo",
     },
     "Amigável": {
         "voz": "de vizinho que conhece o bairro e resolveu escrever",
         "postura": "informal, frases curtas, sem jargao, como quem manda mensagem no celular",
         "abertura": "cite algo local e concreto: o bairro, a fila, o horario, o que os clientes falam",
-        "evite": "intimidade falsa, 'tudo bem?' protocolar, exclamacao em toda frase",
+        "evite": "intimidade falsa, exclamacao em toda frase, girias demais",
     },
     "Direto": {
         "voz": "de quem respeita o tempo do outro",
         "postura": "duas ou tres frases; o problema, a proposta, a pergunta. Nada mais",
-        "abertura": "va direto ao fato, sem preambulo e sem se apresentar antes da terceira linha",
+        "abertura": "cumprimento curto e apresentacao de meia frase; em seguida o fato, sem rodeio",
         "evite": "contexto longo, historico da sua empresa, qualquer frase que nao mude a decisao",
     },
     "Autoridade": {
         "voz": "de especialista que ja viu esse cenario dezenas de vezes no mesmo setor",
         "postura": "afirma com seguranca a partir de um padrao de mercado, sem arrogancia",
-        "abertura": "abra com o padrao do setor e mostre onde esse negocio esta dentro dele",
+        "abertura": "cumprimente, apresente-se e mostre onde esse negocio esta dentro do padrao do setor",
         "evite": "soar superior, dar licao de moral, listar credenciais sem ligacao com o caso",
     },
     "Promocional": {
         "voz": "de quem tem uma condicao real e por tempo definido",
         "postura": "a oferta aparece cedo, com o limite claro, e a pergunta e sobre aceitar ou nao",
-        "abertura": "diga rapidamente o que esta oferecendo e por que agora",
+        "abertura": "cumprimente, apresente-se e diga o que esta oferecendo e por que agora",
         "evite": "urgencia inventada, desconto sem motivo, promessa de resultado numerico",
     },
 }
@@ -293,7 +293,7 @@ CADENCIA = (
     {
         "toque": 1,
         "quando": "agora",
-        "objetivo": "ser lido e reconhecido: provar que voce olhou aquele negocio",
+        "objetivo": "ser recebido com simpatia: cumprimentar, dizer quem voce e provar que olhou aquele negocio",
         "pedido": "uma pergunta que se responde com uma palavra",
     },
     {
@@ -328,6 +328,8 @@ def plano_de_aquecimento() -> str:
 # todas. Como o texto vai para um desconhecido em nome do usuario, o que
 # escapa precisa ser pego antes de chegar na tela.
 _PERGUNTA = re.compile(r"\?")
+# Cortesia de abertura nao e a pergunta da mensagem.
+_CORTESIA = re.compile(r"tudo\s+(?:bem|certo|joia|tranquilo)\s*\?|como\s+(?:vai|est[aá]s?)(?:\s+voc[eê])?\s*\?", re.I)
 _EMOJI = re.compile(
     "[" + "\U0001F300-\U0001FAFF" + "\U00002600-\U000027BF" + "\U0001F1E6-\U0001F1FF" + "]"
 )
@@ -348,10 +350,10 @@ _PROMESSA_NUMERICA = re.compile(
 )
 
 LIMITE_DE_PALAVRAS = {
-    "email": 150,
-    "whatsapp": 75,
-    "whatsapp_api": 75,
-    "instagram_direct": 60,
+    "email": 160,
+    "whatsapp": 85,
+    "whatsapp_api": 85,
+    "instagram_direct": 65,
     "linkedin_msg": 100,
     "webhook": 150,
 }
@@ -384,7 +386,7 @@ def revisar_copy(texto: str, canal: str = "email") -> List[str]:
     if palavras > limite:
         problemas.append(f"tem {palavras} palavras e o limite deste canal é {limite}")
 
-    perguntas = len(_PERGUNTA.findall(limpo))
+    perguntas = len(_PERGUNTA.findall(_CORTESIA.sub("", limpo)))
     if perguntas > 1:
         problemas.append(f"faz {perguntas} perguntas; deve fazer uma só")
     if perguntas == 0:

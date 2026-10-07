@@ -29,6 +29,7 @@ from app.ai_client import (
     generate_with_fallback,
     strip_code_fence,
 )
+from app import abordagem_mestra
 from app.copy_knowledge import (
     bloco_de_mercado,
     lista_de_cliches,
@@ -135,23 +136,37 @@ def _prompt_da_abordagem(req: PitchGenerationRequest, canal: str) -> str:
     vende = req.user_product or "serviços digitais para negócios locais"
     assina = req.sender_name or "Prospecção"
 
-    return f"""Você escreve o primeiro contato de um prestador de serviço para um
-negócio local. Não é marketing de massa: é uma mensagem por vez, para
-alguém que não pediu para ser contatado. Ela precisa parecer escrita por
-uma pessoa que olhou aquele negócio antes de escrever.
+    brief = (req.service_brief or "").strip() or abordagem_mestra.produto(None, None, vende)
+
+    return f"""Você é um vendedor consultivo brasileiro experiente em prospecção de negócios locais.
+Escreve UMA mensagem por vez, para alguém que não pediu para ser contatado, e sabe que
+contato frio só responde a quem chega com educação, clareza e algo específico sobre ele.
+A mensagem precisa soar como uma pessoa simpática que olhou aquele negócio, e não como disparo.
+
+{abordagem_mestra.momento()}
 
 QUEM ESCREVE
-- Vende: {vende}
 - Assina como: {assina}
+- Vende: {vende}
 
-PARA QUEM (tudo abaixo foi verificado — pode citar, é real)
+O PRODUTO (conheça-o bem; use só estes fatos, nunca invente preço, prazo, garantia ou resultado)
+{brief}
+
+PARA QUEM (tudo abaixo foi verificado, pode citar)
 {_dossie(lead)}
 
-GANCHOS DISPONÍVEIS (fatos prontos para abrir a mensagem; escolha UM)
+GANCHOS DISPONÍVEIS (fatos prontos; escolha UM)
 {_ganchos(lead)}
 
-COMO ESSE MERCADO FUNCIONA
+O RAMO DESTE NEGÓCIO
+{abordagem_mestra.bloco_do_ramo(lead.niche or lead.role)}
 {mercado}
+
+{abordagem_mestra.TEMPERATURA}
+
+{abordagem_mestra.estrutura(assina)}
+
+{abordagem_mestra.GATILHOS}
 
 CANAL: {canal}
 - Tom do canal: {regras_canal['tom']}
@@ -166,19 +181,10 @@ TOM PEDIDO: {req.tone}
 {('- Instrução extra do usuário (vale acima das demais): ' + req.custom_instructions) if req.custom_instructions else ''}
 
 RACIOCÍNIO ANTES DE ESCREVER (não mostre este passo no texto)
-1. Qual gancho é o mais forte para ESTE negócio, e por quê.
-2. Qual perda concreta ele sofre hoje por causa disso, na moeda do
-   negócio dele (encomenda perdida, paciente que marca em outro lugar,
-   orçamento que não chega) — nunca em jargão de marketing.
-3. Qual é o menor passo possível que ele pode aceitar sem risco.
+1. Qual fato é o mais forte para ESTE negócio e como reconhecê-lo com respeito.
+2. O que o serviço muda para o dono na moeda dele (cliente, pedido, agenda), sem jargão.
+3. Qual é o menor passo que ele aceita sem risco.
 Só então escreva.
-
-COMO ESCREVER A ABERTURA
-- Comece pelo fato escolhido. Nunca por saudação genérica, nunca por
-  você ou pela sua empresa.
-- Ligue o fato à perda. Não diga "melhorar a presença digital".
-- Ofereça uma coisa só, e pequena.
-- Termine com UMA pergunta que se responde em uma palavra.
 
 A CADÊNCIA QUE AQUECE (você escreve os três toques de uma vez)
 {plano_de_aquecimento()}
@@ -202,9 +208,10 @@ PROIBIDO
 - Emoji, a menos que o canal seja whatsapp ou instagram_direct — e no máximo um
 
 TESTE ANTES DE RESPONDER
-Se a mensagem servisse, trocando só o nome, para qualquer outro negócio
-da mesma cidade, ela está genérica. Reescreva usando algo que só vale
-para {lead.name}.
+1. Tem cumprimento, diz quem você é e o que faz? Se não, está fria: reescreva.
+2. Se servisse, trocando só o nome, para qualquer outro negócio da mesma cidade, está genérica:
+   reescreva usando algo que só vale para {lead.name}.
+3. Parece pedido de favor ou ordem? Deve parecer uma conversa que ele pode aceitar ou recusar sem constrangimento.
 
 RETORNO
 JSON puro, sem markdown, com exatamente estas chaves:
@@ -226,7 +233,9 @@ def _melhor_versao(atual: Dict[str, Any], nova: Dict[str, Any], canal: str) -> D
     """
     if not nova.get("body"):
         return atual
-    if len(revisar_copy(nova.get("body", ""), canal)) <= len(revisar_copy(atual.get("body", ""), canal)):
+    def defeitos(d):
+        return len(revisar_copy(d.get("body", ""), canal)) + len(abordagem_mestra.revisar_calor(d.get("body", ""), canal))
+    if defeitos(nova) <= defeitos(atual):
         return nova
     return atual
 
@@ -265,7 +274,7 @@ class AIGenerator:
         dados = gerar_json(client, prompt, obrigatorias=["body"])
 
         # Revisão: o que o modelo deixou passar volta para ele, nomeado.
-        problemas = revisar_copy(dados.get("body", ""), canal)
+        problemas = revisar_copy(dados.get("body", ""), canal) + abordagem_mestra.revisar_calor(dados.get("body", ""), canal)
         if problemas:
             correcao = (
                 f"{prompt}\n\n---\nVocê escreveu este corpo:\n\n{dados.get('body', '')}\n\n"
@@ -281,7 +290,7 @@ class AIGenerator:
                 # A primeira versão existe e é utilizável; os defeitos que
                 # sobraram vão como aviso para o usuário decidir.
                 pass
-            problemas = revisar_copy(dados.get("body", ""), canal)
+            problemas = revisar_copy(dados.get("body", ""), canal) + abordagem_mestra.revisar_calor(dados.get("body", ""), canal)
 
         seguimentos: List[Dict[str, str]] = []
         for item in (dados.get("follow_ups") or [])[:2]:
@@ -299,6 +308,8 @@ class AIGenerator:
             # É neles que a invenção costuma escapar — o modelo procura
             # "algo novo para dizer" e inventa um dado de mercado.
             for defeito in revisar_copy(texto, canal):
+                if "não termina em pergunta" in defeito:
+                    continue  # o toque 2 não pede nada: entregar valor sem pergunta é o desenho
                 problemas.append(f"seguimento {len(seguimentos)}: {defeito}")
 
         return PitchGenerationResponse(
