@@ -14,7 +14,7 @@ from sqlalchemy.future import select
 import json
 
 from app.config import settings
-from app.database import init_db, get_db, DBLead, DBSearchHistory
+from app.database import init_db, get_db, DBLead, DBSearchHistory, chave_do_lead, chaves_do_lead
 
 from app.models import (
     LeadSearchRequest, LeadSearchResponse, LeadItem, LeadSocialLinks,
@@ -260,6 +260,7 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
         dados = lead.model_dump()
         dados["socials"] = lead.socials.model_dump() if lead.socials else None
         registro = {k: v for k, v in dados.items() if k in colunas}
+        registro["id"] = chave_do_lead(uid, str(registro.get("id", "")))
         registro["owner_uid"] = uid
         registro["search_id"] = search_id
         await db.merge(DBLead(**registro))
@@ -370,7 +371,7 @@ async def gerar_documento_com_ia(
     lead = None
     if req.lead_id:
         resultado = await db.execute(
-            select(DBLead).where(DBLead.id == req.lead_id, DBLead.owner_uid == user.get("uid"))
+            select(DBLead).where(DBLead.id.in_(chaves_do_lead(user.get("uid"), req.lead_id)), DBLead.owner_uid == user.get("uid"))
         )
         encontrado = resultado.scalar_one_or_none()
         if encontrado:
@@ -415,7 +416,7 @@ async def dispatch_outreach(
     except DispatchError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-    result = await db.execute(select(DBLead).where(DBLead.id == req.lead_id))
+    result = await db.execute(select(DBLead).where(DBLead.id.in_(chaves_do_lead(user.get("uid"), req.lead_id)), DBLead.owner_uid == user.get("uid")))
     lead = result.scalar_one_or_none()
     if lead:
         # Um link gerado nao e uma mensagem entregue

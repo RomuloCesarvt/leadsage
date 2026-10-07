@@ -56,3 +56,21 @@ def test_sincronizar_marca_como_salvo_e_promove_sobra_de_busca(client, com_robo,
     assert r.status_code == 200
     assert rodar(pipeline_store.obter, "alice", "L9")["origem"] == "salvo"
     assert rodar(pipeline_store.obter, "alice", "L10")["origem"] == "salvo"
+
+
+def test_o_mesmo_negocio_achado_por_dois_usuarios_fica_com_cada_um(rodar):
+    """O id do lead e o do Google, igual para todos: o registro tem de ser por dono."""
+    from sqlalchemy import select
+    from app.database import chave_do_lead, chaves_do_lead, id_publico
+
+    async def _f():
+        async with AsyncSessionLocal() as s:
+            for dono in ("alice", "bob"):
+                await s.merge(DBLead(id=chave_do_lead(dono, "ChIJ123"), name=f"Padaria de {dono}", owner_uid=dono, search_id=f"s-{dono}"))
+            await s.commit()
+            alice = (await s.execute(select(DBLead).where(DBLead.id.in_(chaves_do_lead("alice", "ChIJ123")), DBLead.owner_uid == "alice"))).scalars().all()
+            bob = (await s.execute(select(DBLead).where(DBLead.owner_uid == "bob"))).scalars().all()
+            return alice, bob
+    alice, bob = rodar(_f)
+    assert [l.name for l in alice] == ["Padaria de alice"] and [l.name for l in bob] == ["Padaria de bob"]
+    assert id_publico(alice[0].id) == "ChIJ123"

@@ -13,6 +13,22 @@ AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=F
 
 Base = declarative_base()
 
+def chave_do_lead(uid: str, lead_id: str) -> str:
+    """Chave de armazenamento do lead. O id publico e o do Google (place id),
+    igual para todo mundo que achar o mesmo negocio; sem o prefixo do dono,
+    a busca de um usuario sobrescrevia o registro de outro."""
+    return f"{uid}::{lead_id}"
+
+
+def chaves_do_lead(uid: str, lead_id: str) -> list:
+    """A chave nova e a antiga (sem prefixo), para ler registros ja gravados."""
+    return [chave_do_lead(uid, lead_id), lead_id]
+
+
+def id_publico(chave: str) -> str:
+    return (chave or "").split("::", 1)[-1]
+
+
 class DBLead(Base):
     __tablename__ = "leads"
     

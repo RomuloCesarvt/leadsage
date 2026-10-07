@@ -120,6 +120,32 @@ interface AppContextType {
   setSiteEmEdicao: (site: any | null) => void;
 }
 
+const chaveDosLeads = (uid: string) => `LEADSAGE_LEADS:${uid}`;
+
+/**
+ * Os leads de uma conta. A versao antiga guardava tudo numa chave unica,
+ * compartilhada por todos os logins do aparelho; o primeiro login depois
+ * da mudanca herda essa lista e a chave antiga some, para ninguem mais
+ * enxergar o que e de outra conta.
+ */
+function lerLeadsDoDono(uid: string): LeadItem[] {
+  try {
+    let bruto = localStorage.getItem(chaveDosLeads(uid));
+    if (bruto === null) {
+      const antigo = localStorage.getItem('LEADSAGE_LEADS');
+      if (antigo !== null) {
+        bruto = antigo;
+        localStorage.setItem(chaveDosLeads(uid), antigo);
+        localStorage.removeItem('LEADSAGE_LEADS');
+      }
+    }
+    const dados = bruto ? JSON.parse(bruto) : [];
+    return Array.isArray(dados) ? dados : [];
+  } catch {
+    return [];
+  }
+}
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -127,17 +153,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  const [leads, setLeads] = useState<LeadItem[]>(() => {
-    const savedLeads = localStorage.getItem('LEADSAGE_LEADS');
-    if (savedLeads) {
-      try {
-        return JSON.parse(savedLeads);
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
-  });
+  // Os leads ficam no navegador, mas separados por conta: quem entra com
+  // outro login no mesmo aparelho nao pode ver (nem misturar) os do anterior.
+  const [leads, setLeads] = useState<LeadItem[]>([]);
+  const [donoDosLeads, setDonoDosLeads] = useState<string | null>(null);
   const [history, setHistory] = useState<SearchHistoryItem[]>([]);
   const [suggestedNiches, setSuggestedNiches] = useState<SuggestedNiche[]>([]);
   
@@ -173,6 +192,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setFirebaseUser(currentUser);
       if (currentUser) {
+        setLeads(lerLeadsDoDono(currentUser.uid));
+        setDonoDosLeads(currentUser.uid);
         // Obter dados do perfil e créditos da API backend
         try {
           const profile = await api.getProfile();
@@ -182,6 +203,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } else {
         setUser(null);
+        setLeads([]);
+        setHistory([]);
+        setDonoDosLeads(null);
       }
       setAuthLoading(false);
     });
@@ -306,8 +330,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [authLoading, user]);
 
   useEffect(() => {
-    localStorage.setItem('LEADSAGE_LEADS', JSON.stringify(leads));
-  }, [leads]);
+    if (!donoDosLeads) return;
+    try { localStorage.setItem(chaveDosLeads(donoDosLeads), JSON.stringify(leads)); } catch { /* sem espaco ou bloqueado */ }
+  }, [leads, donoDosLeads]);
 
   return (
     <AppContext.Provider

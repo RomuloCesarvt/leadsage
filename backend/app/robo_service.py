@@ -23,7 +23,7 @@ from app import meta_canais, pipeline_store, robo_store
 from app.ai_robo import Decisao, decidir
 from app.config import settings
 from app.credit_system import BancoDeCreditosIndisponivel, check_and_deduct_credits, is_admin
-from app.database import AsyncSessionLocal, DBLead
+from app.database import AsyncSessionLocal, DBLead, chaves_do_lead, id_publico
 from app.payments import tem_recurso
 from app.profile_store import get_profile
 
@@ -64,7 +64,7 @@ async def _lead_do_contato(uid: str, canal: str, contato: str) -> Optional[Dict[
     for row in rows:
         if re.sub(r"\D", "", row.phone or "")[-11:] == digitos[-11:]:
             return {
-                "id": row.id, "name": row.name, "company": row.company, "niche": row.niche,
+                "id": id_publico(row.id), "name": row.name, "company": row.company, "niche": row.niche,
                 "city": row.city, "missingDigitalAssets": row.missingDigitalAssets or [],
                 "rating": row.rating, "rating_count": row.rating_count,
                 "diagnosis": getattr(row, "diagnosis", None), "hooks": getattr(row, "hooks", None) or [],
@@ -129,14 +129,14 @@ async def _lead_por_id(uid: str, lead_id: str) -> Optional[Dict[str, Any]]:
     try:
         async with AsyncSessionLocal() as s:
             row = (
-                await s.execute(select(DBLead).where(DBLead.id == lead_id, DBLead.owner_uid == uid))
+                await s.execute(select(DBLead).where(DBLead.id.in_(chaves_do_lead(uid, lead_id)), DBLead.owner_uid == uid))
             ).scalar_one_or_none()
     except Exception:
         return None
     if not row:
         return None
     lead = {
-        "id": row.id, "name": row.name, "company": row.company, "niche": row.niche,
+        "id": id_publico(row.id), "name": row.name, "company": row.company, "niche": row.niche,
         "city": row.city, "missingDigitalAssets": row.missingDigitalAssets or [],
         "rating": row.rating, "rating_count": row.rating_count,
                 "diagnosis": getattr(row, "diagnosis", None), "hooks": getattr(row, "hooks", None) or [],
