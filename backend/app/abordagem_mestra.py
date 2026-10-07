@@ -77,18 +77,25 @@ ESTRUTURA = """COMO UMA BOA PRIMEIRA MENSAGEM É CONSTRUÍDA (nesta ordem, em pr
 3. COMO ACHOU E O QUE VIU: diga que encontrou o negócio pesquisando no Google e resuma, em uma frase, o que identificou de
    verdade no dossiê (nota, avaliações, o que clientes elogiam). Reconheça o que há de bom antes de apontar a lacuna. Nunca como crítica.
 {ponto_do_site}
-5. PERGUNTA DE BAIXO ATRITO: UMA só, no fim, que oferece duas saídas fáceis:
-   "posso te mostrar por aqui mesmo, ou prefere marcar uma conversa rápida?" (adapte as palavras ao canal e ao tom).
-   Quem pede pouco recebe resposta; quem pede reunião de cara recebe silêncio. A reunião é uma opção, nunca a exigência."""
+5. PERGUNTA DE BAIXO ATRITO: UMA só, no fim, com duas saídas fáceis e o tamanho do compromisso dito com todas as letras:
+   "posso te mostrar por aqui mesmo, ou prefere um papo rápido de uns 10 minutinhos, sem nenhuma obrigação?" (adapte ao canal e ao tom).
+   Deixe claro que a prévia é para apresentar SEM OBRIGAÇÃO nenhuma da parte dele. A conversa é opção, nunca exigência."""
 
-PONTO_SEM_SITE = """4. A LACUNA E A PRÉVIA (é o coração da mensagem): conte que NÃO encontrou um site do negócio e que quer confirmar
-   se realmente não existe (diga isso como afirmação, sem ponto de interrogação, para a pergunta final ser a única; ex.: "não encontrei o site de vocês e
-   queria confirmar se realmente ainda não existe"). Em seguida diga que
-   montou uma prévia de como o site poderia ficar e que gostaria de apresentá-la sem compromisso. Não mande link neste primeiro toque."""
+PONTO_SEM_SITE = """4. A LACUNA, O BENEFÍCIO E A PRÉVIA (é o coração da mensagem), em três frases curtas:
+   a) Diga que NÃO encontrou um site do negócio e que quer confirmar se realmente não existe (como afirmação, sem ponto de
+      interrogação, para a pergunta final ser a única; ex.: "não encontrei o site de vocês e queria confirmar se realmente ainda não existe").
+   b) Diga como um site ajudaria ESTE negócio, na moeda dele: quem pesquisa no Google chega, vê serviços, fotos, horários e avaliações,
+      e fala direto no WhatsApp, inclusive fora do horário de atendimento.
+   c) Diga que montou uma prévia de como o site dele poderia ficar e que gostaria de apresentá-la sem obrigação nenhuma.
+   Não mande link neste primeiro toque."""
 
-PONTO_COM_SITE = """4. A OPORTUNIDADE: o negócio já tem site; NÃO diga que não achou. Cite com respeito UM ponto concreto do diagnóstico
-   (lento, sem botão de WhatsApp, pouco claro no celular) e diga que montou uma prévia de como poderia ficar,
-   para apresentar sem compromisso. Não mande link neste primeiro toque."""
+PONTO_COM_SITE = """4. A OPORTUNIDADE, O BENEFÍCIO E A PRÉVIA, em três frases curtas. O negócio já tem site, então NÃO diga que não achou:
+   a) Cite com respeito UM ponto concreto, e SÓ se ele estiver listado no diagnóstico do dossiê (lento, sem botão de WhatsApp,
+      pouco claro no celular). Se o dossiê não listar problema, NÃO invente: diga apenas que olhou o site e viu espaço para
+      mostrar melhor o trabalho dele.
+   b) Diga o que isso muda para o dono: o cliente que chega pelo celular decide e chama no WhatsApp com mais facilidade.
+   c) Diga que montou uma prévia de como o site poderia ficar e que gostaria de apresentá-la sem obrigação nenhuma.
+   Não mande link neste primeiro toque."""
 
 
 def lead_sem_site(site_status: Optional[str], faltando: Any = None) -> bool:
@@ -156,8 +163,12 @@ def revisar_roteiro(texto: str, sem_site: bool) -> list:
     """A mensagem precisa trazer o que o dono pediu: a prévia e, sem site, a confirmação."""
     t = (texto or "").lower()
     problemas = []
-    if "prévia" not in t and "previa" not in t and "esboço" not in t and "esboco" not in t:
-        problemas.append("não diz que você montou uma prévia do site para apresentar sem compromisso")
+    if not re.search(r"(montei|preparei|criei|fiz|deixei)[^.?!]{0,40}(pr[eé]via|esbo[çc]o)", t):
+        problemas.append("não diz que você já montou uma prévia do site (use: \"montei uma prévia\") para apresentar sem compromisso")
     if sem_site and not re.search(r"confirmar|realmente|de fato|certeza|existe|n[aã]o tem", t):
         problemas.append("não diz que não encontrou o site e que quer confirmar se realmente não existe")
+    if not re.search(r"sem compromisso|sem obriga[çc][aã]o|sem nenhuma obriga", t):
+        problemas.append("não deixa claro que apresentar a prévia é sem compromisso nem obrigação")
+    if not re.search(r"10 ?min", t):
+        problemas.append("não oferece o papo rápido de uns 10 minutos como alternativa")
     return problemas

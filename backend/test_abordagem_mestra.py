@@ -68,11 +68,11 @@ def test_prompt_tem_o_metodo_completo():
 
 def test_roteiro_exige_previa_e_confirmacao_sem_site():
     sem_previa = "Oi! Vi sua nota 4,8. Posso te mostrar uma ideia?"
-    ok = "Oi! Não encontrei o site de vocês e queria confirmar se realmente não existe. Montei uma prévia, posso te mostrar por aqui ou marcamos uma conversa?"
-    assert len(am.revisar_roteiro(sem_previa, True)) == 2
+    ok = "Oi! Não encontrei o site de vocês e queria confirmar se realmente não existe. Montei uma prévia, sem compromisso. Posso te mostrar por aqui ou prefere um papo de 10 minutinhos?"
+    assert len(am.revisar_roteiro(sem_previa, True)) == 4
     assert am.revisar_roteiro(ok, True) == []
     # quem já tem site não precisa da confirmação, só da prévia
-    assert am.revisar_roteiro("Montei uma prévia nova do seu site. Posso mostrar?", False) == []
+    assert am.revisar_roteiro("Montei uma prévia nova do seu site, sem obrigação. Posso mostrar ou prefere 10 minutos de papo?", False) == []
 
 
 def test_lead_sem_site_reconhece_redes_e_agregadores():
