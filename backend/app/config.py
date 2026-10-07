@@ -33,6 +33,8 @@ class Settings(BaseModel):
     # documento do usuario for recriado (check_and_deduct_credits recria
     # com role="user"). Esta lista nao se perde.
     ADMIN_EMAILS: str = os.getenv("ADMIN_EMAILS", "")
+    # Contas que usam o sistema sem ver a area de assinatura e compra de creditos.
+    HIDE_SUBSCRIPTION_EMAILS: str = os.getenv("HIDE_SUBSCRIPTION_EMAILS", "")
 
     # Pagamentos. Enquanto PAYMENT_PROVIDER estiver vazio, a compra fica
     # indisponivel — o que e melhor do que conceder credito sem cobrar.
@@ -74,6 +76,10 @@ class Settings(BaseModel):
     @property
     def admin_emails(self) -> set:
         return {e.strip().lower() for e in self.ADMIN_EMAILS.split(",") if e.strip()}
+
+    @property
+    def sem_assinatura_emails(self) -> set:
+        return {e.strip().lower() for e in self.HIDE_SUBSCRIPTION_EMAILS.split(",") if e.strip()}
 
     @property
     def allowed_origins(self) -> list:

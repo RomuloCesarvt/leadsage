@@ -47,7 +47,7 @@ export const Header: React.FC<{ toggleSidebar: () => void }> = ({ toggleSidebar 
         <div className="flex items-center gap-4">
           
           <button
-            onClick={() => setIsCreditModalOpen(true)}
+            onClick={() => { if (!user?.oculta_assinatura) setIsCreditModalOpen(true); }}
             className="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-full bg-white border border-slate-200 text-sm font-bold text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition-all shadow-sm"
           >
             <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />

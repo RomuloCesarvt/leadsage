@@ -203,6 +203,8 @@ class UserProfile(BaseModel):
     # Derivado de plan_id na leitura; nunca um nome fixo. Antes dizia
     # "Pro Builder", um plano que nem existe na tabela de precos.
     plan: str = ""
+    # Derivado do e-mail na leitura (HIDE_SUBSCRIPTION_EMAILS); nunca gravado.
+    oculta_assinatura: bool = False
     avatar: str = ""
     # Preferencias de prospeccao. Ficavam so no useState da tela de
     # Configuracoes e se perdiam a cada reload.

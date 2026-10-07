@@ -88,7 +88,7 @@ const MainApp: React.FC = () => {
           {viewState === 'notifications' && <NotificationsScreen />}
           {viewState === 'settings' && <SettingsScreen />}
           {viewState === 'help' && <HelpScreen />}
-          {viewState === 'subscription' && <SubscriptionScreen />}
+          {viewState === 'subscription' && !user?.oculta_assinatura && <SubscriptionScreen />}
           
         </main>
 

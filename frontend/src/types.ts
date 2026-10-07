@@ -211,6 +211,8 @@ export interface DispatchResponse {
 }
 
 export interface UserProfile {
+  /** a conta usa o sistema sem ver assinatura e compra de créditos */
+  oculta_assinatura?: boolean;
   id: string;
   name: string;
   email: string;

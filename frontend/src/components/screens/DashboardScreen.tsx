@@ -144,12 +144,14 @@ export const DashboardScreen: React.FC = () => {
             <span>Plano: <span className="font-medium text-slate-600">{user?.plan ?? 'Free'}</span></span>
           </div>
         </div>
-        <button 
-          onClick={() => setViewState('subscription')}
-          className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm transition-colors w-full md:w-auto"
-        >
-          Ver detalhes
-        </button>
+        {!user?.oculta_assinatura && (
+          <button 
+            onClick={() => setViewState('subscription')}
+            className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm transition-colors w-full md:w-auto"
+          >
+            Ver detalhes
+          </button>
+        )}
       </div>
 
       {/* Row 4: Buscas Recentes & Funil de Vendas */}

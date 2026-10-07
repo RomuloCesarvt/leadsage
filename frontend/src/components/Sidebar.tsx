@@ -23,7 +23,7 @@ import { useApp } from '../context/AppContext';
 import { Logo } from './Logo';
 
 export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> = ({ isOpen, toggleSidebar }) => {
-  const { viewState, setViewState } = useApp() as any;
+  const { viewState, setViewState, user } = useApp() as any;
 
   const NavItem = ({ id, icon: Icon, label, disabled = false }: { id: string, icon: any, label: string, disabled?: boolean }) => (
     <button
@@ -95,7 +95,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> =
           <NavItem id="notifications" icon={Bell} label="Avisos" />
           <NavItem id="settings" icon={Settings} label="Configurações" />
           <NavItem id="help" icon={HelpCircle} label="Ajuda" />
-          <NavItem id="subscription" icon={CreditCard} label="Assinatura" />
+          {!user?.oculta_assinatura && <NavItem id="subscription" icon={CreditCard} label="Assinatura" />}
         </div>
 
       </div>

@@ -168,6 +168,7 @@ def _identidade(profile: UserProfile, user: dict) -> UserProfile:
         profile.plan = plano_de("agencia")["nome"]
     else:
         profile.plan = plano_de(profile.plan_id or "previa")["nome"]
+    profile.oculta_assinatura = (user.get("email") or "").strip().lower() in settings.sem_assinatura_emails
     return profile
 
 
