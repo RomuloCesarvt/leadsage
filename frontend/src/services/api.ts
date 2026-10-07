@@ -116,10 +116,24 @@ export const api = {
   },
 
   async generatePitch(req: PitchGenerationRequest): Promise<PitchGenerationResponse> {
-    return await fetchWithToken('/generate-pitch', {
-      method: 'POST',
-      body: JSON.stringify(req)
-    });
+    // O servidor desiste aos ~55 s; sem limite aqui a tela ficaria girando
+    // quando a conexão cai ou a função é cortada.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 62_000);
+    try {
+      return await fetchWithToken('/generate-pitch', {
+        method: 'POST',
+        body: JSON.stringify(req),
+        signal: ctrl.signal,
+      });
+    } catch (e: any) {
+      if (e?.name === 'AbortError') {
+        throw new Error('A IA demorou mais que o normal para responder. Clique em "Gerar outra versão" para tentar de novo.');
+      }
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
   },
 
   async dispatchMessage(req: DispatchRequest): Promise<DispatchResponse> {

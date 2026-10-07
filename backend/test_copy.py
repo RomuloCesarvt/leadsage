@@ -59,8 +59,8 @@ def test_todo_mercado_esta_completo():
 
 
 @pytest.mark.parametrize("canal,maximo", [
-    ("email", "140"), ("whatsapp", "75"),
-    ("instagram_direct", "55"), ("linkedin_msg", "90"),
+    ("email", "160"), ("whatsapp", "95"),
+    ("instagram_direct", "75"), ("linkedin_msg", "110"),
 ])
 def test_cada_canal_tem_limite_proprio(canal, maximo):
     """WhatsApp no celular nao comporta o mesmo texto de um e-mail."""

@@ -304,7 +304,7 @@ def abertura_pelos_fatos(empresa: str, dores: List[Dict[str, str]], pessoa: Opti
 def verificar_abertura(texto: str, empresa: str, fatos: List[str], pessoa: Optional[Dict[str, str]]) -> bool:
     """A mensagem precisa mencionar algo específico deste negócio."""
     t = (texto or "").lower()
-    if len(t.split()) < 12 or len(t.split()) > 110:
+    if len(t.split()) < 12 or len(t.split()) > 130:
         return False
     marcadores = [w.lower() for w in re.findall(r"[A-Za-zÀ-ú]{4,}", empresa)][:3]
     nome = _primeiro_nome(pessoa).lower()
@@ -342,7 +342,7 @@ ESTILO DESTE LEAD (para não ficar igual aos outros): {estilo[1]}
 
 {abordagem_mestra.momento()}
 
-{abordagem_mestra.estrutura(sender)}
+{abordagem_mestra.estrutura(sender, sem_site=abordagem_mestra.lead_sem_site(lead.get('site_status'), lead.get('missingDigitalAssets')))}
 
 {abordagem_mestra.GATILHOS}
 
@@ -351,7 +351,7 @@ ESTILO DESTE LEAD (para não ficar igual aos outros): {estilo[1]}
 O RAMO: {abordagem_mestra.bloco_do_ramo(lead.get('niche'))}
 
 Regras: português do Brasil, tom natural de WhatsApp, caloroso e respeitoso, sem "prezado", no máximo um emoji,
-sem promessa de resultado, sem inventar fato, sem preço se a oferta não tiver. A abertura tem de 45 a 80 palavras,
+sem promessa de resultado, sem inventar fato, sem preço se a oferta não tiver. A abertura tem de 55 a 90 palavras,
 começa cumprimentando (com o nome se houver pessoa identificada), diz quem você é em uma frase, cita um fato concreto
 DESTE negócio, liga o fato ao que o serviço resolve e termina em UMA pergunta fácil. A "proximo_passo" e a "resposta_a_objecao"
 devem soar como conversa, nunca como roteiro de call center.

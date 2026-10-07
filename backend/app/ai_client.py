@@ -68,7 +68,7 @@ def _e_transitorio(erro: Exception) -> bool:
     return "503" in texto or "429" in texto or "UNAVAILABLE" in texto or "RESOURCE_EXHAUSTED" in texto
 
 
-def generate_with_fallback(client, prompt: str, tentativas: int = 2) -> str:
+def generate_with_fallback(client, prompt: str, tentativas: int = 2, prazo: Optional[float] = None) -> str:
     """Tenta os modelos em ordem ate um responder. Memoriza o que funcionou.
 
     Sem o cache, um cold start pagava ~36s tentando modelos mortos antes
@@ -83,8 +83,13 @@ def generate_with_fallback(client, prompt: str, tentativas: int = 2) -> str:
     ultimo: Optional[Exception] = None
     houve_transitorio = False
 
+    def restante() -> float:
+        return 1e9 if prazo is None else prazo - time.monotonic()
+
     for rodada in range(max(1, tentativas)):
         if rodada:
+            if restante() < 8:
+                break
             time.sleep(1.5 * rodada)   # espera curta e crescente
 
         chain = list(MODEL_CHAIN)
@@ -94,8 +99,21 @@ def generate_with_fallback(client, prompt: str, tentativas: int = 2) -> str:
 
         houve_transitorio = False
         for model in chain:
+            if restante() < 4:
+                ultimo = ultimo or TimeoutError("o tempo para escrever acabou")
+                houve_transitorio = True
+                break
             try:
-                response = client.models.generate_content(model=model, contents=prompt)
+                if prazo is None:
+                    response = client.models.generate_content(model=model, contents=prompt)
+                else:
+                    # cada tentativa cabe no que sobrou do prazo: a funcao da
+                    # Vercel morre aos 60 s e a tela ficaria girando sem resposta
+                    limite_ms = int(max(3.0, min(restante(), REQUEST_TIMEOUT_MS / 1000)) * 1000)
+                    response = client.models.generate_content(
+                        model=model, contents=prompt,
+                        config=types.GenerateContentConfig(http_options=types.HttpOptions(timeout=limite_ms)),
+                    )
                 text = (response.text or "").strip()
                 if text:
                     _working_model = model
@@ -189,6 +207,7 @@ def gerar_json(
     prompt: str,
     obrigatorias: Optional[List[str]] = None,
     tentativas: int = 2,
+    prazo: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Pede JSON ao modelo e devolve dicionário — ou levanta AIIndisponivel.
 
@@ -202,7 +221,7 @@ def gerar_json(
     ultimo_erro = ""
 
     for tentativa in range(max(1, tentativas)):
-        bruto = generate_with_fallback(client, pedido)
+        bruto = generate_with_fallback(client, pedido, prazo=prazo)
         try:
             dados = json.loads(reparar_json(bruto))
             if not isinstance(dados, dict):

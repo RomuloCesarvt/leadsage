@@ -145,22 +145,22 @@ CLICHES = [
 # de um e-mail.
 FORMATO_CANAL: Dict[str, Dict[str, Any]] = {
     "email": {
-        "limite": "de 90 a 140 palavras",
+        "limite": "de 100 a 160 palavras",
         "estrutura": "assunto curto e humano; cumprimento com o nome; quem você é em uma frase; o que viu no negócio; o que muda para ele; uma pergunta final",
         "tom": "escrito, mas conversado, como um profissional educado escreve para alguém que não conhece",
     },
     "whatsapp": {
-        "limite": "de 45 a 75 palavras",
+        "limite": "de 60 a 95 palavras",
         "estrutura": "cumprimento (com o nome) e um 'tudo bem?' leve; quem você é; o que viu no negócio e o que muda para ele; uma pergunta fácil. Em linhas curtas",
         "tom": "mensagem de pessoa, calorosa e respeitosa; sem assunto e sem assinatura formal",
     },
     "instagram_direct": {
-        "limite": "de 35 a 55 palavras",
+        "limite": "de 50 a 75 palavras",
         "estrutura": "cumprimento; quem você é em poucas palavras; o que viu no perfil; uma pergunta fácil",
         "tom": "informal e simpático, como quem manda DM de verdade",
     },
     "linkedin_msg": {
-        "limite": "de 55 a 90 palavras",
+        "limite": "de 70 a 110 palavras",
         "estrutura": "cumprimento; quem você é; contexto profissional do que viu; proposta objetiva; convite leve para conversar",
         "tom": "profissional, sem formalidade excessiva",
     },
@@ -350,11 +350,11 @@ _PROMESSA_NUMERICA = re.compile(
 )
 
 LIMITE_DE_PALAVRAS = {
-    "email": 160,
-    "whatsapp": 85,
-    "whatsapp_api": 85,
-    "instagram_direct": 65,
-    "linkedin_msg": 100,
+    "email": 180,
+    "whatsapp": 105,
+    "whatsapp_api": 105,
+    "instagram_direct": 85,
+    "linkedin_msg": 120,
     "webhook": 150,
 }
 

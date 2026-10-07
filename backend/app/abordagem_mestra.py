@@ -74,12 +74,30 @@ ESTRUTURA = """COMO UMA BOA PRIMEIRA MENSAGEM É CONSTRUÍDA (nesta ordem, em pr
 1. CUMPRIMENTO humano: "{saudacao}, <nome da pessoa se estiver no dossiê>!" e, se couber no canal, um "tudo bem?" leve.
    O "tudo bem?" de cortesia não conta como a pergunta final.
 2. QUEM É VOCÊ, em uma frase curta e sem currículo: "{apresentacao}".
-3. POR QUE ESTE NEGÓCIO: UMA observação verdadeira do dossiê, dita com respeito, nunca como crítica
-   ("vi que o Google mostra X" e não "o seu site está ruim"). Se tiver avaliação boa, comece reconhecendo-a (prova social do próprio negócio).
-4. O QUE MUDA PARA ELE: ligue a observação ao que o serviço resolve, na moeda do dono (cliente que chega, pedido que fecha,
-   horário que enche). Uma frase. Não liste funcionalidades.
-5. PERGUNTA DE BAIXO ATRITO: uma só, que se responde em poucas palavras ("posso te mostrar como ficaria?", "faz sentido eu te mandar?").
-   Quem pede pouco recebe resposta; quem pede reunião de cara recebe silêncio."""
+3. COMO ACHOU E O QUE VIU: diga que encontrou o negócio pesquisando no Google e resuma, em uma frase, o que identificou de
+   verdade no dossiê (nota, avaliações, o que clientes elogiam). Reconheça o que há de bom antes de apontar a lacuna. Nunca como crítica.
+{ponto_do_site}
+5. PERGUNTA DE BAIXO ATRITO: UMA só, no fim, que oferece duas saídas fáceis:
+   "posso te mostrar por aqui mesmo, ou prefere marcar uma conversa rápida?" (adapte as palavras ao canal e ao tom).
+   Quem pede pouco recebe resposta; quem pede reunião de cara recebe silêncio. A reunião é uma opção, nunca a exigência."""
+
+PONTO_SEM_SITE = """4. A LACUNA E A PRÉVIA (é o coração da mensagem): conte que NÃO encontrou um site do negócio e que quer confirmar
+   se realmente não existe (diga isso como afirmação, sem ponto de interrogação, para a pergunta final ser a única; ex.: "não encontrei o site de vocês e
+   queria confirmar se realmente ainda não existe"). Em seguida diga que
+   montou uma prévia de como o site poderia ficar e que gostaria de apresentá-la sem compromisso. Não mande link neste primeiro toque."""
+
+PONTO_COM_SITE = """4. A OPORTUNIDADE: o negócio já tem site; NÃO diga que não achou. Cite com respeito UM ponto concreto do diagnóstico
+   (lento, sem botão de WhatsApp, pouco claro no celular) e diga que montou uma prévia de como poderia ficar,
+   para apresentar sem compromisso. Não mande link neste primeiro toque."""
+
+
+def lead_sem_site(site_status: Optional[str], faltando: Any = None) -> bool:
+    """Sem site próprio: o Google não aponta site, ou aponta só rede social/agregador/WhatsApp."""
+    if (site_status or "") in ("none", "social", "aggregator", "whatsapp"):
+        return True
+    if site_status == "own":
+        return False
+    return "website" in (faltando or [])
 
 GATILHOS = """GATILHOS QUE VOCÊ PODE USAR (escolha no máximo dois, só se forem verdadeiros)
 - Especificidade: um detalhe que só vale para este negócio prova que você olhou.
@@ -92,7 +110,8 @@ comparação com concorrente nominal, promessa de resultado."""
 
 TEMPERATURA = """TEMPERATURA E MOMENTO
 - O contato é FRIO: ele não conhece você nem pediu nada. Trate como um desconhecido educado: aquecer vem antes de vender.
-- Não peça reunião, não fale de preço, não mande link no primeiro toque. O objetivo do toque 1 é só ser respondido.
+- Não fale de preço e não mande link no primeiro toque. Oferecer a prévia sem compromisso, "por aqui mesmo ou numa conversa rápida",
+  é o convite certo; reunião nunca é exigência. O objetivo do toque 1 é ser respondido.
 - Se o ramo tem hora de pico (veja o guia do ramo), reconheça que ele deve estar ocupado e mostre que a mensagem é rápida."""
 
 
@@ -103,8 +122,11 @@ def quem_sou(sender_name: str) -> str:
     return f"Eu sou da {nome} e ajudo negócios locais a serem encontrados e escolhidos no Google"
 
 
-def estrutura(sender_name: str, agora: Optional[datetime] = None) -> str:
-    return ESTRUTURA.format(saudacao=saudacao_do_horario(agora), apresentacao=quem_sou(sender_name))
+def estrutura(sender_name: str, agora: Optional[datetime] = None, sem_site: bool = True) -> str:
+    return ESTRUTURA.format(
+        saudacao=saudacao_do_horario(agora), apresentacao=quem_sou(sender_name),
+        ponto_do_site=PONTO_SEM_SITE if sem_site else PONTO_COM_SITE,
+    )
 
 
 def bloco_do_ramo(nicho: Optional[str]) -> str:
@@ -127,4 +149,15 @@ def revisar_calor(texto: str, canal: str = "email") -> list:
         problemas.append("não começa cumprimentando (Oi/Olá/Bom dia + o nome, se souber); está seco demais")
     if not _APRESENTACAO.search(texto or ""):
         problemas.append("não diz quem está escrevendo nem o que faz; apresente-se em uma frase curta antes do motivo do contato")
+    return problemas
+
+
+def revisar_roteiro(texto: str, sem_site: bool) -> list:
+    """A mensagem precisa trazer o que o dono pediu: a prévia e, sem site, a confirmação."""
+    t = (texto or "").lower()
+    problemas = []
+    if "prévia" not in t and "previa" not in t and "esboço" not in t and "esboco" not in t:
+        problemas.append("não diz que você montou uma prévia do site para apresentar sem compromisso")
+    if sem_site and not re.search(r"confirmar|realmente|de fato|certeza|existe|n[aã]o tem", t):
+        problemas.append("não diz que não encontrou o site e que quer confirmar se realmente não existe")
     return problemas

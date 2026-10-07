@@ -64,3 +64,27 @@ def test_prompt_tem_o_metodo_completo():
         assert trecho in p, trecho
     assert "Eu sou da Sites Já" in p
     assert "Nunca por saudação" not in p
+
+
+def test_roteiro_exige_previa_e_confirmacao_sem_site():
+    sem_previa = "Oi! Vi sua nota 4,8. Posso te mostrar uma ideia?"
+    ok = "Oi! Não encontrei o site de vocês e queria confirmar se realmente não existe. Montei uma prévia, posso te mostrar por aqui ou marcamos uma conversa?"
+    assert len(am.revisar_roteiro(sem_previa, True)) == 2
+    assert am.revisar_roteiro(ok, True) == []
+    # quem já tem site não precisa da confirmação, só da prévia
+    assert am.revisar_roteiro("Montei uma prévia nova do seu site. Posso mostrar?", False) == []
+
+
+def test_lead_sem_site_reconhece_redes_e_agregadores():
+    assert am.lead_sem_site("none") and am.lead_sem_site("social") and am.lead_sem_site("aggregator")
+    assert not am.lead_sem_site("own", ["website"])
+    assert am.lead_sem_site(None, ["website"])
+    assert not am.lead_sem_site(None, [])
+
+
+def test_prompt_pede_achei_no_google_e_a_previa():
+    req = PitchGenerationRequest(lead=lead(site_status="none"), channel="whatsapp", sender_name="Sites Já", user_product="Site")
+    p = _prompt_da_abordagem(req, "whatsapp")
+    assert "pesquisando no Google" in p and "prévia" in p and "confirmar se realmente" in p
+    com_site = _prompt_da_abordagem(PitchGenerationRequest(lead=lead(site_status="own"), channel="whatsapp", sender_name="X"), "whatsapp")
+    assert "NÃO diga que não achou" in com_site

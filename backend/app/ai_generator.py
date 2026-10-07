@@ -20,6 +20,8 @@ recebia "Houve um erro ao processar com a IA: 404" dentro do campo de
 texto e podia disparar isso para o prospect. Agora sobe como falha e a
 tela mostra o que aconteceu.
 """
+import asyncio
+import time
 from typing import Any, Dict, List, Optional
 
 from app.ai_client import (
@@ -164,7 +166,7 @@ O RAMO DESTE NEGÓCIO
 
 {abordagem_mestra.TEMPERATURA}
 
-{abordagem_mestra.estrutura(assina)}
+{abordagem_mestra.estrutura(assina, sem_site=abordagem_mestra.lead_sem_site(lead.site_status, lead.missingDigitalAssets))}
 
 {abordagem_mestra.GATILHOS}
 
@@ -224,7 +226,7 @@ JSON puro, sem markdown, com exatamente estas chaves:
 """
 
 
-def _melhor_versao(atual: Dict[str, Any], nova: Dict[str, Any], canal: str) -> Dict[str, Any]:
+def _melhor_versao(atual: Dict[str, Any], nova: Dict[str, Any], canal: str, sem_site: bool = True) -> Dict[str, Any]:
     """Fica com a versão que tem menos defeitos, não com a mais recente.
 
     A reescrita costuma melhorar, mas não sempre: pedir correção às vezes
@@ -234,7 +236,7 @@ def _melhor_versao(atual: Dict[str, Any], nova: Dict[str, Any], canal: str) -> D
     if not nova.get("body"):
         return atual
     def defeitos(d):
-        return len(revisar_copy(d.get("body", ""), canal)) + len(abordagem_mestra.revisar_calor(d.get("body", ""), canal))
+        return len(revisar_copy(d.get("body", ""), canal)) + len(abordagem_mestra.revisar_calor(d.get("body", ""), canal)) + len(abordagem_mestra.revisar_roteiro(d.get("body", ""), sem_site))
     if defeitos(nova) <= defeitos(atual):
         return nova
     return atual
@@ -269,13 +271,19 @@ class AIGenerator:
                 "Informe-a em Configurações → Integrações."
             )
 
+        sem_site = abordagem_mestra.lead_sem_site(lead.site_status, lead.missingDigitalAssets)
         client = build_client(active_key)
         prompt = _prompt_da_abordagem(req, canal)
-        dados = gerar_json(client, prompt, obrigatorias=["body"])
+        # O usuario esta olhando a tela: 50 s no total (a funcao morre aos 60).
+        # As chamadas ao modelo bloqueiam, entao rodam em thread para nao
+        # travar as outras requisicoes do mesmo processo.
+        limite = time.monotonic() + 50
+        dados = await asyncio.to_thread(gerar_json, client, prompt, ["body"], 2, limite)
 
         # Revisão: o que o modelo deixou passar volta para ele, nomeado.
-        problemas = revisar_copy(dados.get("body", ""), canal) + abordagem_mestra.revisar_calor(dados.get("body", ""), canal)
-        if problemas:
+        problemas = revisar_copy(dados.get("body", ""), canal) + abordagem_mestra.revisar_calor(dados.get("body", ""), canal) + abordagem_mestra.revisar_roteiro(dados.get("body", ""), sem_site)
+        # Reescrever custa outra chamada: so vale se ainda cabe no prazo.
+        if problemas and limite - time.monotonic() > 18:
             correcao = (
                 f"{prompt}\n\n---\nVocê escreveu este corpo:\n\n{dados.get('body', '')}\n\n"
                 "A revisão encontrou os problemas abaixo. Reescreva a mensagem "
@@ -284,13 +292,13 @@ class AIGenerator:
             )
             try:
                 dados = _melhor_versao(
-                    dados, gerar_json(client, correcao, obrigatorias=["body"]), canal
+                    dados, await asyncio.to_thread(gerar_json, client, correcao, ["body"], 1, limite), canal, sem_site
                 )
             except AIIndisponivel:
                 # A primeira versão existe e é utilizável; os defeitos que
                 # sobraram vão como aviso para o usuário decidir.
                 pass
-            problemas = revisar_copy(dados.get("body", ""), canal) + abordagem_mestra.revisar_calor(dados.get("body", ""), canal)
+            problemas = revisar_copy(dados.get("body", ""), canal) + abordagem_mestra.revisar_calor(dados.get("body", ""), canal) + abordagem_mestra.revisar_roteiro(dados.get("body", ""), sem_site)
 
         seguimentos: List[Dict[str, str]] = []
         for item in (dados.get("follow_ups") or [])[:2]:
