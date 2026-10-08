@@ -422,6 +422,8 @@ export interface RoboConversaResumo {
   /** 'robo': o lead respondeu; 'envio': abordagem enviada que ainda espera resposta */
   origem?: 'robo' | 'envio';
   aguardando?: boolean;
+  /** por que o robô ficou quieto nesta conversa (desligado, pausado...) */
+  silencio?: string;
 }
 
 export interface RoboConversa extends Omit<RoboConversaResumo, 'ultima' | 'total'> {

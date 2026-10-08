@@ -248,3 +248,18 @@ def test_nao_gera_chave_quando_o_banco_esta_sem_cota(client, com_robo, monkeypat
     monkeypatch.setattr(robo_store, "firestore_falhou_agora", lambda janela_s=15.0: True)
     r = client.post("/api/robo/conector/gerar")
     assert r.status_code == 503 and "sem cota" in r.json()["detail"]
+
+
+def test_robo_desligado_diz_por_que_nao_respondeu(client, chave, rodar):
+    # o robo nunca foi ligado ("ativo" falso): a mensagem chega e o motivo volta para o Conector
+    r = client.post("/api/conector/mensagem", headers=cabecalho(chave),
+                    json={"id": "m1", "contato": "5514998003784", "nome": "Ana", "texto": "Oi, quanto custa?"})
+    assert r.status_code == 200
+    corpo = r.json()
+    assert corpo["ok"] and not corpo["respondeu"] and "desligado" in corpo["silencio"]
+    # e aparece na lista de conversas
+    lista = client.get("/api/robo/conversas").json()
+    assert "desligado" in lista[0]["silencio"]
+    # o ping tambem avisa
+    p = client.post("/api/conector/ping", headers=cabecalho(chave), json={"numero": "5514999990000", "status": "ready"})
+    assert p.json()["robo_ativo"] is False

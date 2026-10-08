@@ -209,9 +209,18 @@ async def processar(
     if conversa.get("optout"):
         return await salvar()
 
-    # 3. robo desligado
-    if not cfg.get("ativo") or not conversa.get("robo_ativo") or conversa.get("precisa_humano"):
+    # 3. robo desligado. Antes isso era silencioso: a mensagem chegava, nada acontecia e ninguem
+    # sabia por que. O motivo fica na conversa (sem travar: ligar o robo depois volta a responder).
+    if not cfg.get("ativo"):
+        conversa["silencio"] = "O robô está desligado. Ligue em Robô → Comportamento e clique em Salvar."
         return await salvar()
+    if not conversa.get("robo_ativo"):
+        conversa["silencio"] = "O robô está pausado nesta conversa."
+        return await salvar()
+    if conversa.get("precisa_humano"):
+        conversa["silencio"] = conversa.get("motivo") or "O robô passou esta conversa para você."
+        return await salvar()
+    conversa.pop("silencio", None)
 
     # 4. plano
     perfil = await get_profile(uid)

@@ -282,6 +282,20 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
     return <div className="text-slate-400 text-sm p-8 text-center">{erro || 'Carregando…'}</div>;
   }
 
+  // O interruptor grava na hora: antes ele só mudava a tela e valia depois de "Salvar", então o
+  // robô parecia ligado e continuava calado.
+  const ligarDesligar = async (ligado: boolean) => {
+    mudar('ativo', ligado);
+    try {
+      setCfg(await api.roboSalvarConfig({ ativo: ligado }));
+      setEstado('salvo');
+    } catch (e: any) {
+      mudar('ativo', !ligado);
+      setErro(e?.message || 'Não foi possível mudar o robô.');
+      setEstado('erro');
+    }
+  };
+
   const barraSalvar = (
     <div className="pt-2 flex justify-end items-center gap-4">
       {estado === 'salvo' && <span className="text-sm font-semibold text-emerald-600 flex items-center gap-1.5"><Check className="w-4 h-4" /> Salvo</span>}
@@ -309,7 +323,7 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
           </div>
           <label className="flex items-center gap-2 cursor-pointer shrink-0">
             <span className="text-sm font-bold text-slate-600">{form.ativo ? 'Ligado' : 'Desligado'}</span>
-            <input type="checkbox" checked={!!form.ativo} onChange={e => mudar('ativo', e.target.checked)} className="w-10 h-5 accent-blue-600" aria-label="Ligar o robô" />
+            <input type="checkbox" checked={!!form.ativo} onChange={e => ligarDesligar(e.target.checked)} className="w-10 h-5 accent-blue-600" aria-label="Ligar o robô" />
           </label>
         </div>
 

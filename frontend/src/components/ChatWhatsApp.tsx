@@ -70,6 +70,9 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
   const [detalhe, setDetalhe] = useState('');
   const [estado, setEstado] = useState<EstadoConector | null>(null);
   const [robo, setRobo] = useState<RoboConversaResumo[]>([]);
+  // null: ainda não sei (ou o plano não tem robô); false: desligado no geral
+  const [roboLigado, setRoboLigado] = useState<boolean | null>(null);
+  const [ligando, setLigando] = useState(false);
   const [aberto, setAberto] = useState<ChatWhats | null>(null);
   const [mensagens, setMensagens] = useState<MensagemWhats[]>([]);
   const [texto, setTexto] = useState('');
@@ -101,7 +104,15 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
 
   const carregarRobo = useCallback(async () => {
     try { setRobo(await api.roboConversas()); } catch { /* sem plano do robô: o chat funciona sem os selos */ }
+    try { setRoboLigado(Boolean((await api.roboConfig()).ativo)); } catch { setRoboLigado(null); }
   }, []);
+
+  const ligarRobo = async () => {
+    setLigando(true);
+    try { await api.roboSalvarConfig({ ativo: true }); setRoboLigado(true); }
+    catch (e: any) { setErro(e?.message || 'Não foi possível ligar o robô.'); }
+    finally { setLigando(false); }
+  };
 
   useEffect(() => {
     void carregarChats();
@@ -292,6 +303,15 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
             </div>
             <button onClick={carregarChats} title="Atualizar" className="p-2 rounded-lg text-slate-400 hover:bg-slate-100"><RefreshCw className="w-4 h-4" /></button>
           </div>
+          {roboLigado === false && (
+            <div className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 flex items-center gap-2">
+              <Bot className="w-4 h-4 shrink-0" />
+              <span className="flex-1">O robô está <b>desligado</b>: ninguém é respondido sozinho.</span>
+              <button onClick={ligarRobo} disabled={ligando} className="shrink-0 px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white font-bold disabled:opacity-60">
+                {ligando ? '…' : 'Ligar'}
+              </button>
+            </div>
+          )}
           {notaHistorico && (
             <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
               Mostrando as conversas desde que o Conector foi ligado. A leitura completa do WhatsApp está indisponível agora.
@@ -366,6 +386,9 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
               )}
             </div>
 
+            {conv?.silencio && !conv.precisa_humano && (
+              <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 text-xs text-slate-600">O robô não respondeu: {conv.silencio}</div>
+            )}
             {conv?.precisa_humano && conv.motivo && (
               <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100 text-sm text-amber-800"><b>O robô parou:</b> {conv.motivo}</div>
             )}

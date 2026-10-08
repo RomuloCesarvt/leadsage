@@ -267,6 +267,7 @@ async def listar_conversas(uid: str) -> List[Dict[str, Any]]:
         r = {k: v for k, v in c.items() if k != "mensagens"}
         msgs = c.get("mensagens") or []
         r["ultima"] = msgs[-1] if msgs else None
+        r["silencio"] = c.get("silencio", "")
         r["total"] = len(msgs)
         resumo.append(r)
     resumo.sort(key=lambda c: c.get("atualizado") or "", reverse=True)

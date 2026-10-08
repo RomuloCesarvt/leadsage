@@ -1499,7 +1499,7 @@ async def conector_ping(req: ConectorPing, request: Request):
         canal["cw_status"] = req.status
         canal["cw_versao"] = req.versao
         await _gravar_canal_do_conector(canal)
-    return {"ok": True, "limite_frio": conector_whatsapp.limite_frio_do_dia(canal)}
+    return {"ok": True, "limite_frio": conector_whatsapp.limite_frio_do_dia(canal), "robo_ativo": bool(canal.get("ativo"))}
 
 
 @app.get("/api/conector/tarefas")
@@ -1564,7 +1564,14 @@ async def conector_mensagem(req: ConectorMensagem, request: Request):
     except Exception as exc:
         print(f"Robo: falha ao processar mensagem do conector {req.id}: {exc}")
         return {"ok": False}
-    return {"ok": True, "precisa_humano": bool(conversa.get("precisa_humano"))}
+    mensagens = conversa.get("mensagens") or []
+    return {
+        "ok": True,
+        "precisa_humano": bool(conversa.get("precisa_humano")),
+        # o Conector mostra isto na janela dele: "o robô respondeu" ou por que ficou quieto
+        "respondeu": bool(mensagens) and mensagens[-1].get("de") == "robo",
+        "silencio": conversa.get("silencio", "") or ("Esta pessoa pediu para não receber mensagens." if conversa.get("optout") else ""),
+    }
 
 
 @app.get("/api/robo/meta/disponivel")

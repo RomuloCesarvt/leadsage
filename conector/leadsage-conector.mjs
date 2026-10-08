@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '2.5.0';
+export const VERSAO = '2.6.0';
 const PORTA = 2790;
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -141,6 +141,12 @@ export async function entregarMensagem(ls, m, inicioS, vistos, aviso = log) {
   if (vistos.size > 1000) vistos.delete(vistos.values().next().value);
   if (!payload) return false;
   const e = await ls.mensagem(payload);
+  if (e.ok && e.dados) {
+    // o LeadSage diz se o robô respondeu; quando fica quieto, a janela mostra o motivo
+    if (e.dados.respondeu) aviso(`Robô respondeu a ${m.de}.`);
+    else if (e.dados.silencio) aviso(`Robô NÃO respondeu a ${m.de}: ${e.dados.silencio}`);
+    else if (e.dados.precisa_humano) aviso(`Robô passou a conversa de ${m.de} para você.`);
+  }
   if (!e.ok && e.status !== 422) {
     vistos.delete(String(m.id)); // não perde a mensagem: o WhatsApp não reenvia, então avisa
     aviso(`LeadSage não recebeu a mensagem de ${m.de} (HTTP ${e.status}).`);
