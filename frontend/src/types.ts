@@ -563,3 +563,13 @@ export interface ResultadoPreparo {
   lead_id: string; nome: string; canal?: CanalFila;
   resultado: 'enviado' | 'na fila' | 'aguardando' | 'falhou' | 'ignorado'; motivo?: string;
 }
+
+export interface UsuarioAdmin {
+  uid: string;
+  email: string;
+  nome: string;
+  criado_em: string;
+  ultimo_acesso: string;
+  admin: boolean;
+  ilimitado: boolean;
+}

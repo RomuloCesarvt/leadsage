@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { api } from '../services/api';
 import { 
   Search, 
+  ShieldCheck,
   Users, 
   Kanban,
   FileText,
@@ -26,6 +28,8 @@ import { Logo } from './Logo';
 
 export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> = ({ isOpen, toggleSidebar }) => {
   const { viewState, setViewState, user } = useApp() as any;
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => { if (user) api.meuPlano().then(p => setAdmin(Boolean(p.admin))).catch(() => {}); }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const NavItem = ({ id, icon: Icon, label, disabled = false }: { id: string, icon: any, label: string, disabled?: boolean }) => (
     <button
@@ -101,6 +105,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> =
           <NavItem id="settings" icon={Settings} label="Configurações" />
           <NavItem id="help" icon={HelpCircle} label="Ajuda" />
           {!user?.oculta_assinatura && <NavItem id="subscription" icon={CreditCard} label="Assinatura" />}
+          {admin && <NavItem id="admin" icon={ShieldCheck} label="Administração" />}
         </div>
 
       </div>

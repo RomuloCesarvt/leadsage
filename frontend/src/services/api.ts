@@ -15,6 +15,7 @@ import type {
   DocumentItem,
   CreditPackage,
   PlanoAtual,
+  UsuarioAdmin,
   SiteCopyResponse,
   DocumentAIRequest,
   DocumentAIResponse,
@@ -384,6 +385,22 @@ export const api = {
 
   async conectorFila(): Promise<EstadoFilaWhats> {
     return await fetchWithToken('/robo/conector/fila');
+  },
+
+  async adminUsuarios(): Promise<UsuarioAdmin[]> {
+    return await fetchWithToken('/admin/usuarios');
+  },
+
+  async adminPipeline(uid: string): Promise<{ itens: any[] }> {
+    return await fetchWithToken(`/admin/usuarios/${encodeURIComponent(uid)}/pipeline`);
+  },
+
+  async adminPesquisas(uid: string): Promise<any[]> {
+    return await fetchWithToken(`/admin/usuarios/${encodeURIComponent(uid)}/pesquisas`);
+  },
+
+  async adminIlimitado(uid: string, ativo: boolean): Promise<{ ilimitado: boolean }> {
+    return await fetchWithToken(`/admin/usuarios/${encodeURIComponent(uid)}/ilimitado`, { method: 'POST', body: JSON.stringify({ ativo }) });
   },
 
   async whatsEstado(): Promise<{ conectado: boolean; online: boolean; fase?: string; qr?: string; codigo?: string; numero?: string }> {

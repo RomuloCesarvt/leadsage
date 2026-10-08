@@ -1,3 +1,4 @@
+import { AdminScreen } from './components/AdminScreen';
 import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
@@ -94,6 +95,7 @@ const MainApp: React.FC = () => {
           {viewState === 'notifications' && <NotificationsScreen />}
           {viewState === 'settings' && <SettingsScreen />}
           {viewState === 'help' && <HelpScreen />}
+          {viewState === 'admin' && <AdminScreen />}
           {viewState === 'subscription' && !user?.oculta_assinatura && <SubscriptionScreen />}
           
         </main>

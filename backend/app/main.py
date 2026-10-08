@@ -2095,3 +2095,7 @@ def get_suggested_niches():
         {"niche": "Corretores de Imóveis", "icon": "Home", "count": "3,400+", "avg_score": 91, "locations": ["Botucatu", "São Paulo", "Santos"]},
         {"niche": "Advogados Empresariais", "icon": "Briefcase", "count": "990+", "avg_score": 95, "locations": ["Botucatu", "São José dos Campos", "Belo Horizonte"]}
     ]
+
+
+from app import admin_painel  # noqa: E402
+app.include_router(admin_painel.router)

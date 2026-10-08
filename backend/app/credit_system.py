@@ -137,8 +137,8 @@ async def check_and_deduct_credits(
     else:
         user_data = user_doc.to_dict()
 
-    if user_data.get("role") == "admin":
-        return UNLIMITED  # Infinitos para admin
+    if user_data.get("role") == "admin" or user_data.get("ilimitado"):
+        return UNLIMITED  # Infinitos para admin ou para quem o admin liberou
 
     current_credits = user_data.get("credits", 0)
     if current_credits < amount:
@@ -174,7 +174,7 @@ async def get_user_balance(uid: str, email: Optional[str] = None) -> Dict[str, A
     credits = 0
     if user_doc.exists:
         data = user_doc.to_dict()
-        credits = UNLIMITED if data.get("role") == "admin" else data.get("credits", 0)
+        credits = UNLIMITED if (data.get("role") == "admin" or data.get("ilimitado")) else data.get("credits", 0)
 
     history_ref = user_ref.collection('history').order_by('timestamp', direction='DESCENDING').limit(20)
     history_docs = history_ref.stream()
@@ -209,3 +209,40 @@ async def add_credits(uid: str, amount: int, reason: str = "Recarga de Créditos
     })
 
     return new_credits
+
+
+async def e_ilimitado(uid: str) -> bool:
+    """O admin liberou creditos infinitos para este usuario?"""
+    if _sql_principal():
+        async with AsyncSessionLocal() as s:
+            linha = (await s.execute(select(DBCredito).where(DBCredito.uid == uid))).scalar_one_or_none()
+            return bool(linha and linha.role == "admin")
+    if db is None:
+        return False
+    try:
+        doc = db.collection("users").document(uid).get()
+        d = doc.to_dict() or {} if doc.exists else {}
+        return bool(d.get("ilimitado") or d.get("role") == "admin")
+    except Exception as exc:
+        print(f"Creditos: falha ao ler ilimitado: {exc}")
+        return False
+
+
+async def definir_ilimitado(uid: str, ativo: bool, por: str = "") -> None:
+    """Liga ou desliga os creditos infinitos de um usuario (so o admin chama)."""
+    if _sql_principal():
+        async with AsyncSessionLocal() as s:
+            linha = await _sql_garantir(s, uid)
+            linha.role = "admin" if ativo else "user"
+            s.add(_historico(uid, f"Créditos infinitos {'liberados' if ativo else 'retirados'} por {por}", 0, "credit"))
+            await s.commit()
+        return
+    if db is None:
+        _sem_banco()
+        return
+    ref = db.collection("users").document(uid)
+    ref.set({"ilimitado": bool(ativo)}, merge=True)
+    ref.collection("history").add({
+        "description": f"Créditos infinitos {'liberados' if ativo else 'retirados'} por {por}",
+        "amount": 0, "type": "credit", "timestamp": datetime.now().isoformat(),
+    })
