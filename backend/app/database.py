@@ -3,12 +3,57 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy import Column, String, Integer, Boolean, JSON, Float, Text
 
 import os
+import uuid
 
-if os.getenv("VERCEL") == "1":
-    DATABASE_URL = "sqlite+aiosqlite:////tmp/leadsage.db"
-else:
-    DATABASE_URL = "sqlite+aiosqlite:///./leadsage.db"
-engine = create_async_engine(DATABASE_URL, echo=False)
+from sqlalchemy.engine import make_url
+from sqlalchemy.pool import NullPool
+
+
+def url_do_banco(env=None) -> str:
+    """O banco do sistema.
+
+    `DATABASE_URL` (Postgres, por exemplo o Supabase) e o banco de verdade. Sem ela, SQLite:
+    em arquivo no computador de quem desenvolve e em /tmp na Vercel, onde some a cada
+    reinicio, o que so serve de reserva.
+    """
+    env = os.environ if env is None else env
+    url = (env.get("DATABASE_URL") or "").strip()
+    if url:
+        if url.startswith("postgres://"):
+            url = "postgresql://" + url[len("postgres://"):]
+        if url.startswith("postgresql://"):
+            url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+        return url
+    if env.get("VERCEL") == "1":
+        return "sqlite+aiosqlite:////tmp/leadsage.db"
+    return "sqlite+aiosqlite:///./leadsage.db"
+
+
+def _criar_engine(url: str):
+    if not url.startswith("postgresql"):
+        return create_async_engine(url, echo=False)
+    u = make_url(url)
+    # asyncpg nao aceita ?sslmode=...; o SSL vai por connect_args
+    u = u.set(query={k: v for k, v in u.query.items() if k not in ("sslmode", "pgbouncer", "supa")})
+    local = (u.host or "") in ("localhost", "127.0.0.1", "::1")
+    return create_async_engine(
+        u,
+        echo=False,
+        # funcao serverless: uma conexao por chamada, sem pool guardado entre invocacoes
+        poolclass=NullPool,
+        connect_args={
+            **({} if local else {"ssl": "require"}),
+            # o pooler do Supabase (pgbouncer, modo transacao) nao guarda comandos preparados
+            "statement_cache_size": 0,
+            "prepared_statement_cache_size": 0,
+            "prepared_statement_name_func": lambda: f"__asyncpg_{uuid.uuid4().hex}__",
+        },
+    )
+
+
+DATABASE_URL = url_do_banco()
+EH_POSTGRES = DATABASE_URL.startswith("postgresql")
+engine = _criar_engine(DATABASE_URL)
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 Base = declarative_base()
@@ -122,6 +167,8 @@ def _migrate(conn):
     create_all() cria tabelas ausentes mas nunca altera as existentes,
     entao um leadsage.db antigo quebraria ao gravar os campos novos.
     """
+    if conn.dialect.name != "sqlite":
+        return  # banco novo ja nasce com todas as colunas (create_all)
     for table in (DBLead.__tablename__, DBSearchHistory.__tablename__, DBSite.__tablename__):
         rows = conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()
         if not rows:
@@ -248,6 +295,27 @@ class DBOrder(Base):
     provider_event = Column(String, index=True, nullable=True)
     created_at = Column(String)
     paid_at = Column(String, nullable=True)
+
+
+class DBCredito(Base):
+    """Saldo de creditos por usuario (quando o banco do sistema e SQL e nao o Firestore)."""
+    __tablename__ = "creditos"
+
+    uid = Column(String, primary_key=True, index=True)
+    credits = Column(Integer, default=0)
+    role = Column(String, default="user")
+    created_at = Column(String)
+
+
+class DBCreditoHistorico(Base):
+    __tablename__ = "creditos_historico"
+
+    id = Column(String, primary_key=True)
+    uid = Column(String, index=True)
+    description = Column(String)
+    amount = Column(Integer)
+    type = Column(String)
+    timestamp = Column(String, index=True)
 
 
 async def init_db():

@@ -1,7 +1,12 @@
+import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+
+from sqlalchemy import select, update
+
 from app.firebase_config import db
 from app.config import settings
+from app.database import AsyncSessionLocal, DBCredito, DBCreditoHistorico
 
 UNLIMITED = 9999
 
@@ -32,6 +37,74 @@ def is_admin(email: Optional[str]) -> bool:
     return bool(email) and email.strip().lower() in settings.admin_emails
 
 
+def _sql_principal() -> bool:
+    """Creditos no banco SQL (Supabase) em vez do Firestore."""
+    return db is None and settings.FIRESTORE_DESLIGADO
+
+
+async def _sql_garantir(s, uid: str) -> DBCredito:
+    """A linha de creditos do usuario; a primeira vez nasce com o saldo inicial."""
+    linha = (await s.execute(select(DBCredito).where(DBCredito.uid == uid))).scalar_one_or_none()
+    if linha is None:
+        linha = DBCredito(uid=uid, credits=50, role="user", created_at=datetime.now().isoformat())
+        s.add(linha)
+        await s.flush()
+    return linha
+
+
+def _historico(uid: str, descricao: str, valor: int, tipo: str) -> DBCreditoHistorico:
+    return DBCreditoHistorico(
+        id=f"h_{uuid.uuid4().hex[:16]}", uid=uid, description=descricao, amount=valor, type=tipo,
+        timestamp=datetime.now().isoformat(),
+    )
+
+
+async def _sql_cobrar(uid: str, amount: int) -> Optional[int]:
+    async with AsyncSessionLocal() as s:
+        linha = await _sql_garantir(s, uid)
+        if linha.role == "admin":
+            await s.commit()
+            return UNLIMITED
+        # o UPDATE condicional impede dois pedidos simultaneos de gastar o mesmo saldo
+        r = await s.execute(
+            update(DBCredito).where(DBCredito.uid == uid, DBCredito.credits >= amount)
+            .values(credits=DBCredito.credits - amount)
+        )
+        if r.rowcount == 0:
+            await s.commit()
+            return None
+        s.add(_historico(uid, f"Gasto de {amount} créditos", -amount, "debit"))
+        await s.commit()
+        novo = (await s.execute(select(DBCredito.credits).where(DBCredito.uid == uid))).scalar_one()
+        return int(novo)
+
+
+async def _sql_saldo(uid: str) -> Dict[str, Any]:
+    async with AsyncSessionLocal() as s:
+        linha = (await s.execute(select(DBCredito).where(DBCredito.uid == uid))).scalar_one_or_none()
+        historico = (await s.execute(
+            select(DBCreditoHistorico).where(DBCreditoHistorico.uid == uid)
+            .order_by(DBCreditoHistorico.timestamp.desc()).limit(20)
+        )).scalars().all()
+    creditos = 0 if linha is None else (UNLIMITED if linha.role == "admin" else int(linha.credits or 0))
+    return {"credits": creditos, "history": [
+        {"description": h.description, "amount": h.amount, "type": h.type, "timestamp": h.timestamp} for h in historico]}
+
+
+async def _sql_somar(uid: str, amount: int, motivo: str) -> int:
+    async with AsyncSessionLocal() as s:
+        linha = (await s.execute(select(DBCredito).where(DBCredito.uid == uid))).scalar_one_or_none()
+        if linha is None:
+            s.add(DBCredito(uid=uid, credits=amount, role="user", created_at=datetime.now().isoformat()))
+        else:
+            await s.execute(update(DBCredito).where(DBCredito.uid == uid).values(credits=DBCredito.credits + amount))
+        s.add(_historico(uid, motivo, amount, "credit"))
+        await s.commit()
+        if linha is None:
+            return amount
+        return int((await s.execute(select(DBCredito.credits).where(DBCredito.uid == uid))).scalar_one())
+
+
 async def check_and_deduct_credits(
     uid: str, amount: int, email: Optional[str] = None
 ) -> Optional[int]:
@@ -42,6 +115,9 @@ async def check_and_deduct_credits(
     """
     if is_admin(email):
         return UNLIMITED
+
+    if _sql_principal():
+        return await _sql_cobrar(uid, amount)
 
     if db is None:
         _sem_banco()
@@ -85,6 +161,9 @@ async def get_user_balance(uid: str, email: Optional[str] = None) -> Dict[str, A
     if is_admin(email):
         return {"credits": UNLIMITED, "history": [], "is_admin": True}
 
+    if _sql_principal():
+        return await _sql_saldo(uid)
+
     if db is None:
         _sem_banco()
         return {"credits": UNLIMITED, "history": []}
@@ -104,6 +183,9 @@ async def get_user_balance(uid: str, email: Optional[str] = None) -> Dict[str, A
     return {"credits": credits, "history": history}
 
 async def add_credits(uid: str, amount: int, reason: str = "Recarga de Créditos (Pix/Cartão)") -> int:
+    if _sql_principal():
+        return await _sql_somar(uid, amount, reason)
+
     if db is None:
         _sem_banco()
         return UNLIMITED

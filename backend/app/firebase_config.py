@@ -55,7 +55,10 @@ def init_firebase():
 db = None
 try:
     init_firebase()
-    db = firestore.client()
+    if os.getenv("FIRESTORE_DESLIGADO", "") == "1":
+        print("Firestore desligado (FIRESTORE_DESLIGADO=1): os dados ficam no banco SQL.")
+    else:
+        db = firestore.client()
 except Exception as e:
     print(f"Firestore client nao inicializado: {e}")
 

@@ -28,6 +28,11 @@ class Settings(BaseModel):
     # voz alta.
     CREDITO_SEM_BANCO: bool = os.getenv("LEADSAGE_CREDITO_SEM_BANCO", "") == "1"
 
+    # "1": os dados (perfil, creditos, funil, conversas, sites) ficam no banco SQL
+    # (DATABASE_URL, por exemplo o Supabase) e o Firestore nao e usado. O login
+    # continua sendo o do Firebase.
+    FIRESTORE_DESLIGADO: bool = os.getenv("FIRESTORE_DESLIGADO", "") == "1"
+
     # E-mails com creditos ilimitados, separados por virgula.
     # O papel "admin" no Firestore continua valendo, mas some se o
     # documento do usuario for recriado (check_and_deduct_credits recria

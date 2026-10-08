@@ -15,7 +15,7 @@ from sqlalchemy.future import select
 import json
 
 from app.config import settings
-from app.database import init_db, get_db, DBLead, DBSearchHistory, chave_do_lead, chaves_do_lead
+from app.database import init_db, get_db, DBLead, DBSearchHistory, EH_POSTGRES, chave_do_lead, chaves_do_lead
 
 from app.models import (
     LeadSearchRequest, LeadSearchResponse, LeadItem, LeadSocialLinks,
@@ -148,7 +148,7 @@ def read_root():
         "status": "online",
         "service": "LeadSage AI Prospecting Engine",
         "version": "1.0.0",
-        "armazenamento": "firestore" if firestore_db is not None else "indisponivel",
+        "armazenamento": "firestore" if firestore_db is not None else ("postgres" if EH_POSTGRES else ("sqlite" if settings.FIRESTORE_DESLIGADO else "indisponivel")),
         "timestamp": datetime.now().isoformat()
     }
 
