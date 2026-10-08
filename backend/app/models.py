@@ -116,6 +116,13 @@ class PitchGenerationRequest(BaseModel):
     # Fatos do servico que o dono vende (preco, prazo, o que inclui). Preenchido
     # pelo servidor a partir da oferta do robo; o cliente nao precisa enviar.
     service_brief: Optional[str] = ""
+    # Os seguimentos custam outra chamada de IA: a tela os pede a parte, depois da primeira mensagem.
+    com_seguimentos: bool = False
+
+class FollowupsRequest(BaseModel):
+    pitch: PitchGenerationRequest
+    primeira: str
+
 
 class PitchGenerationResponse(BaseModel):
     lead_id: str

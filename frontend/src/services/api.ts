@@ -2,6 +2,7 @@ import type {
   LeadSearchRequest,
   LeadSearchResponse,
   PitchGenerationRequest,
+  FollowUp,
   PitchGenerationResponse,
   DispatchRequest,
   DispatchResponse,
@@ -134,6 +135,14 @@ export const api = {
     } finally {
       clearTimeout(timer);
     }
+  },
+
+  // Os seguimentos vem a parte: a primeira mensagem aparece em segundos e eles chegam depois.
+  async generateFollowups(pitch: PitchGenerationRequest, primeira: string): Promise<{ follow_ups: FollowUp[]; warnings: string[] }> {
+    return await fetchWithToken('/generate-followups', {
+      method: 'POST',
+      body: JSON.stringify({ pitch, primeira }),
+    });
   },
 
   async dispatchMessage(req: DispatchRequest): Promise<DispatchResponse> {

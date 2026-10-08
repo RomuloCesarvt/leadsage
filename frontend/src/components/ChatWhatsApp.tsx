@@ -75,10 +75,10 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
       setOffline(false);
       setChats(l);
     } catch (e: any) {
-      // conectado ao Conector, mas o WhatsApp ainda não está pronto
+      // o Conector respondeu, mas não conseguiu ler as conversas
       setOffline(true);
       setEstado(await conectorLocal.estado().catch(() => null));
-      setErro(e?.message || '');
+      setErro(e?.message || 'Não foi possível ler as conversas do WhatsApp.');
     }
   }, []);
 
@@ -177,6 +177,17 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
             <img src={estado.qr} alt="QR code do WhatsApp" className="w-56 h-56 mx-auto my-3" />
             <p className="text-slate-500 text-sm">WhatsApp → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b>.</p>
           </>
+        ) : estado?.fase === 'pronto' && erro ? (
+          <>
+            <h3 className="font-bold text-slate-800 mb-1">O WhatsApp está conectado, mas não consegui ler as conversas</h3>
+            <p className="text-sm text-red-600 mb-4 break-words">{erro}</p>
+            <button onClick={() => { setErro(''); void carregarChats(); }} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm">
+              Tentar de novo
+            </button>
+            <p className="text-xs text-slate-400 mt-4 max-w-md mx-auto">
+              Se continuar, feche a janela preta do Conector e abra o arquivo “Conectar-WhatsApp” de novo: ele se atualiza sozinho.
+            </p>
+          </>
         ) : estado ? (
           <>
             <h3 className="font-bold text-slate-800 mb-1">{estado.fase === 'pronto' ? 'Carregando suas conversas…' : 'Conectando o WhatsApp…'}</h3>
@@ -194,7 +205,7 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
             <p className="text-xs text-slate-400 mt-4">Já conectou? Abra o programa “Conectar-WhatsApp” no computador e espere alguns segundos.</p>
           </>
         )}
-        {erro && <p className="text-xs text-red-600 mt-3">{erro}</p>}
+        {erro && estado?.fase !== 'pronto' && <p className="text-xs text-red-600 mt-3">{erro}</p>}
       </div>
     );
   }

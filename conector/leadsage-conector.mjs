@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '2.1.0';
+export const VERSAO = '2.2.0';
 const PORTA = 2790;
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -196,27 +196,36 @@ export async function tratarChat(wa, metodo, caminho, consulta, corpo) {
   try {
     if (metodo === 'GET' && partes.length === 1) {
       const limite = Math.min(100, Math.max(1, Number(consulta.get('limite')) || 40));
-      return { status: 200, json: { chats: await wa.chats(limite) } };
+      return { status: 200, json: { chats: await comLimite(wa.chats(limite), 30000) } };
     }
     const id = decodeURIComponent(partes[1] || '');
     if (!CHAT_ID_RE.test(id)) return { status: 400, json: { erro: 'Conversa inválida.' } };
     if (metodo === 'GET' && partes[2] === 'mensagens') {
       const limite = Math.min(150, Math.max(1, Number(consulta.get('limite')) || 60));
-      return { status: 200, json: { mensagens: await wa.mensagens(id, limite) } };
+      return { status: 200, json: { mensagens: await comLimite(wa.mensagens(id, limite), 30000) } };
     }
     if (metodo === 'POST' && partes[2] === 'enviar') {
       const texto = String(corpo?.texto || '').trim();
       if (!texto) return { status: 400, json: { erro: 'Mensagem vazia.' } };
-      return { status: 200, json: { mensagem: await wa.enviarNoChat(id, texto.slice(0, 4096)) } };
+      return { status: 200, json: { mensagem: await comLimite(wa.enviarNoChat(id, texto.slice(0, 4096)), 45000) } };
     }
     if (metodo === 'POST' && partes[2] === 'lida') {
-      await wa.lida(id);
+      await comLimite(wa.lida(id), 15000);
       return { status: 200, json: { ok: true } };
     }
     return { status: 404, json: { erro: 'Rota desconhecida.' } };
   } catch (e) {
-    return { status: 502, json: { erro: String(e.message || e).slice(0, 200) } };
+    const erro = String((e && e.message) || e).slice(0, 200) || 'erro desconhecido';
+    log(`Chat: falha em ${metodo} ${caminho}: ${erro}`); // aparece na janela do Conector
+    return { status: 502, json: { erro } };
   }
+}
+
+/** Uma chamada ao WhatsApp que não responde não pode deixar a tela carregando para sempre. */
+export function comLimite(promessa, ms, rotulo = 'O WhatsApp') {
+  let t;
+  const limite = new Promise((_, rej) => { t = setTimeout(() => rej(new Error(`${rotulo} demorou demais para responder.`)), ms); });
+  return Promise.race([promessa, limite]).finally(() => clearTimeout(t));
 }
 
 // ------------------------------------------------------- WhatsApp (navegador)
@@ -284,7 +293,34 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
       }
     },
     // ---- o chat: o que o usuário vê no LeadSage, como no WhatsApp Web
+    // Leitura direta do que o WhatsApp Web já carregou na página: leve e sem as chamadas
+    // que a biblioteca faz por conversa (atualizar os dados de cada grupo, por exemplo),
+    // que travam ou quebram quando o WhatsApp muda. Se falhar, cai na biblioteca.
     async chats(limite = 40) {
+      try {
+        const brutos = await client.pupPage.evaluate((max) => {
+          const lista = window.Store.Chat.getModelsArray()
+            .filter((c) => c && c.id && !/status@broadcast|@newsletter|@broadcast$/.test(String(c.id._serialized)))
+            .sort((a, b) => (b.t || 0) - (a.t || 0))
+            .slice(0, max);
+          return lista.map((c) => {
+            const ms = c.msgs && c.msgs.getModelsArray ? c.msgs.getModelsArray() : [];
+            let u = null;
+            for (const m of ms) if (!m.isNotification && (!u || (m.t || 0) >= (u.t || 0))) u = m;
+            return {
+              id: { _serialized: String(c.id._serialized), user: String(c.id.user || '') },
+              name: String(c.formattedTitle || c.name || ''),
+              isGroup: c.id.server === 'g.us',
+              unreadCount: c.unreadCount || 0,
+              timestamp: c.t || (u && u.t) || 0,
+              lastMessage: u ? { body: String(u.body || u.caption || ''), type: u.type, fromMe: !!(u.id && u.id.fromMe), timestamp: u.t || 0 } : null,
+            };
+          });
+        }, limite);
+        return brutos.map(resumoDoChat);
+      } catch (e) {
+        log('Aviso: leitura direta das conversas falhou, usando a biblioteca:', String(e.message || e).slice(0, 160));
+      }
       const todos = await client.getChats();
       return todos
         .filter((c) => !(c.id?._serialized || '').includes('status@broadcast'))
@@ -293,6 +329,33 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
         .map(resumoDoChat);
     },
     async mensagens(chatId, limite = 60) {
+      try {
+        const brutas = await client.pupPage.evaluate(async (id, max) => {
+          const chat = await window.WWebJS.getChat(id, { getAsModel: false });
+          let msgs = chat.msgs.getModelsArray().filter((m) => !m.isNotification);
+          try {
+            // poucas mensagens carregadas: pede as anteriores, como o WhatsApp Web ao rolar
+            for (let i = 0; i < 3 && msgs.length < max; i++) {
+              const mais = await window.require('WAWebChatLoadMessages').loadEarlierMsgs({ chat });
+              if (!mais || !mais.length) break;
+              msgs = chat.msgs.getModelsArray().filter((m) => !m.isNotification);
+            }
+          } catch (_) { /* segue com o que já tem */ }
+          msgs.sort((a, b) => (a.t || 0) - (b.t || 0));
+          return msgs.slice(-max).map((m) => ({
+            id: { _serialized: String((m.id && m.id._serialized) || '') },
+            body: String(m.body || m.caption || ''),
+            type: m.type,
+            fromMe: !!(m.id && m.id.fromMe),
+            timestamp: m.t || 0,
+            ack: typeof m.ack === 'number' ? m.ack : 0,
+            hasMedia: !!(m.mediaData || m.mediaObject || m.isMedia),
+          }));
+        }, chatId, limite);
+        return brutas.map(resumoDaMensagem);
+      } catch (e) {
+        log('Aviso: leitura direta das mensagens falhou, usando a biblioteca:', String(e.message || e).slice(0, 160));
+      }
       const chat = await client.getChatById(chatId);
       const msgs = await chat.fetchMessages({ limit: limite });
       return msgs.map(resumoDaMensagem);

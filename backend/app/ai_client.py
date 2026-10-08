@@ -33,8 +33,13 @@ from google.genai import types
 # O rapido e confiavel vai primeiro; os outros ficam so como rede de
 # seguranca para quando este sair do ar.
 MODEL_CHAIN = (
+    # Medido em out/2026, mesmo pedido de abordagem: 3.5-flash (sem "pensar") responde em ~2 s;
+    # os "lite" ficaram instaveis (503) e levavam de 10 a 28 s. Os demais so entram se este
+    # recusar (429 de limite por minuto, 503).
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
     "gemini-flash-lite-latest",
-    "gemini-flash-latest",
     "gemini-3.6-flash",
 )
 
@@ -66,6 +71,92 @@ def _e_transitorio(erro: Exception) -> bool:
     """
     texto = str(erro)
     return "503" in texto or "429" in texto or "UNAVAILABLE" in texto or "RESOURCE_EXHAUSTED" in texto
+
+
+def _config(limite_ms: int, max_tokens: Optional[int], com_thinking: bool) -> "types.GenerateContentConfig":
+    kw: Dict[str, Any] = {"http_options": types.HttpOptions(timeout=limite_ms)}
+    if max_tokens:
+        kw["max_output_tokens"] = max_tokens
+    if not com_thinking:
+        # texto curto nao precisa "pensar": desligar corta segundos nos modelos que raciocinam
+        kw["thinking_config"] = types.ThinkingConfig(thinking_budget=0)
+    return types.GenerateContentConfig(**kw)
+
+
+_SEM_THINKING_NAO_SUPORTADO: set = set()
+
+
+def _tentar_modelo(client, model: str, prompt: str, limite_ms: int, max_tokens: Optional[int]) -> str:
+    quer_sem_pensar = "lite" not in model and model not in _SEM_THINKING_NAO_SUPORTADO
+    try:
+        r = client.models.generate_content(model=model, contents=prompt, config=_config(limite_ms, max_tokens, not quer_sem_pensar))
+    except Exception as exc:
+        if quer_sem_pensar and ("thinking" in str(exc).lower() or "INVALID_ARGUMENT" in str(exc)):
+            _SEM_THINKING_NAO_SUPORTADO.add(model)
+            r = client.models.generate_content(model=model, contents=prompt, config=_config(limite_ms, max_tokens, True))
+        else:
+            raise
+    texto = (r.text or "").strip()
+    if not texto:
+        raise RuntimeError(f"{model} devolveu resposta vazia")
+    return texto
+
+
+def generate_hedged(client, prompt: str, prazo: float, atraso: float = 4.0, max_tokens: Optional[int] = None) -> str:
+    """Resposta mais rapida: se o primeiro modelo demora, o proximo ja comeca em paralelo.
+
+    O Gemini as vezes leva 5 s e as vezes 80 s no mesmo pedido. Esperar o primeiro terminar
+    (ou estourar o tempo) para so entao tentar o segundo soma as esperas; aqui a primeira
+    resposta valida vence e as outras sao descartadas.
+    """
+    global _working_model
+    from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+
+    chain = list(MODEL_CHAIN)
+    if _working_model in chain:
+        chain.remove(_working_model)
+        chain.insert(0, _working_model)
+
+    executor = ThreadPoolExecutor(max_workers=len(chain))
+    em_andamento: Dict[Any, str] = {}
+    proximo = 0
+    ultimo: Optional[Exception] = None
+    transitorio = False
+
+    def lancar() -> None:
+        nonlocal proximo
+        modelo = chain[proximo]
+        proximo += 1
+        limite_ms = int(max(3.0, min(prazo - time.monotonic(), REQUEST_TIMEOUT_MS / 1000)) * 1000)
+        em_andamento[executor.submit(_tentar_modelo, client, modelo, prompt, limite_ms, max_tokens)] = modelo
+
+    lancar()
+    while True:
+        restante = prazo - time.monotonic()
+        if restante <= 0.5 or (not em_andamento and proximo >= len(chain)):
+            break
+        feitos, _ = wait(list(em_andamento), timeout=min(atraso, restante), return_when=FIRST_COMPLETED)
+        for f in feitos:
+            modelo = em_andamento.pop(f)
+            try:
+                texto = f.result()
+            except Exception as exc:
+                ultimo = exc
+                transitorio = transitorio or _e_transitorio(exc)
+                continue
+            _working_model = modelo
+            executor.shutdown(wait=False, cancel_futures=True)
+            return texto
+        # demorou, ou todos falharam: chama o proximo sem esperar os outros
+        if proximo < len(chain) and (not feitos or not em_andamento):
+            lancar()
+
+    executor.shutdown(wait=False, cancel_futures=True)
+    if transitorio or ultimo is None:
+        raise AIIndisponivel(
+            "O Gemini está com alta demanda no momento e demorou demais. Tente gerar de novo em alguns segundos."
+        )
+    raise AIIndisponivel(f"Nenhum modelo Gemini respondeu. Último erro: {ultimo}")
 
 
 def generate_with_fallback(client, prompt: str, tentativas: int = 2, prazo: Optional[float] = None) -> str:
@@ -208,6 +299,8 @@ def gerar_json(
     obrigatorias: Optional[List[str]] = None,
     tentativas: int = 2,
     prazo: Optional[float] = None,
+    rapido: bool = False,
+    max_tokens: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Pede JSON ao modelo e devolve dicionário — ou levanta AIIndisponivel.
 
@@ -221,7 +314,10 @@ def gerar_json(
     ultimo_erro = ""
 
     for tentativa in range(max(1, tentativas)):
-        bruto = generate_with_fallback(client, pedido, prazo=prazo)
+        if rapido and prazo is not None:
+            bruto = generate_hedged(client, pedido, prazo, max_tokens=max_tokens)
+        else:
+            bruto = generate_with_fallback(client, pedido, prazo=prazo)
         try:
             dados = json.loads(reparar_json(bruto))
             if not isinstance(dados, dict):

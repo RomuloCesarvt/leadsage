@@ -95,6 +95,7 @@ export const MessageEditorModal: React.FC = () => {
   const [reasoning, setReasoning] = useState<string>('');
   const [avisos, setAvisos] = useState<string[]>([]);
   const [seguimentos, setSeguimentos] = useState<FollowUp[]>([]);
+  const [carregandoSeguimentos, setCarregandoSeguimentos] = useState(false);
   const [copiado, setCopiado] = useState<number | null>(null);
   const [customInstructions, setCustomInstructions] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -123,6 +124,7 @@ export const MessageEditorModal: React.FC = () => {
         sender_name: user?.name || 'LeadSage',
         user_product: user?.product_description || ''
       });
+      setSeguimentos([]);
       setSubject(res.subject || '');
       setBody(res.body || '');
       setHook(res.hook || '');
@@ -130,6 +132,17 @@ export const MessageEditorModal: React.FC = () => {
       setAvisos(res.warnings || []);
       setSeguimentos(res.follow_ups || []);
       setCanalDaCopy((res.channel as Canal) || canal);
+      // a primeira mensagem ja esta na tela; os acompanhamentos chegam em segundo plano
+      if (!(res.follow_ups || []).length && res.body) {
+        setCarregandoSeguimentos(true);
+        api.generateFollowups({
+          lead, channel: canal, tone: opcoes.tom ?? tone,
+          sender_name: user?.name || 'LeadSage', user_product: user?.product_description || '',
+        }, res.body)
+          .then(r => { setSeguimentos(r.follow_ups || []); setAvisos(a => [...a, ...(r.warnings || [])]); })
+          .catch(() => { /* sem acompanhamento nao impede de enviar */ })
+          .finally(() => setCarregandoSeguimentos(false));
+      }
     } catch (err: any) {
       setGenerationError(err?.message || 'Não foi possível gerar a mensagem agora.');
     } finally {
@@ -524,6 +537,9 @@ export const MessageEditorModal: React.FC = () => {
             </div>
           )}
 
+          {carregandoSeguimentos && !seguimentos.length && (
+            <p className="text-xs text-slate-400 flex items-center gap-1.5 px-1"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Preparando as mensagens de acompanhamento…</p>
+          )}
           {seguimentos.length > 0 && (
             <div className="border border-slate-200 rounded-xl">
               <button onClick={() => setVerSequencia(v => !v)} aria-expanded={verSequencia}

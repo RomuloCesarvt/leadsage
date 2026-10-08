@@ -19,7 +19,7 @@ from app.database import init_db, get_db, DBLead, DBSearchHistory, EH_POSTGRES, 
 
 from app.models import (
     LeadSearchRequest, LeadSearchResponse, LeadItem, LeadSocialLinks,
-    PitchGenerationRequest, PitchGenerationResponse,
+    PitchGenerationRequest, PitchGenerationResponse, FollowupsRequest,
     DispatchRequest, DispatchResponse,
     CreditTopUpRequest, CheckoutRequest, UserProfile,
     DemoSiteRequest, DemoSiteResponse,
@@ -301,16 +301,32 @@ async def generate_pitch(request: Request, req: PitchGenerationRequest, user: di
     """
     await exigir_recurso(user, "ia_abordagem", "A IA de abordagem")
     try:
-        # O produto vem do cadastro do dono, nunca do navegador: e ele que
-        # garante que a mensagem so cita preco, prazo e entrega reais.
-        canal_robo = await robo_store.canal_do_usuario(user.get("uid")) or {}
-        perfil = await get_profile(user.get("uid"))
-        if not req.user_product:
-            req.user_product = perfil.product_description or ""
-        if not req.sender_name or req.sender_name == "Prospecção LeadSage":
-            req.sender_name = perfil.company_name or perfil.name or req.sender_name
-        req.service_brief = abordagem_mestra.produto(canal_robo, req.lead.model_dump(), req.user_product or "")
+        await _preparar_pitch(user, req)
         return await AIGenerator.generate_pitch(req, api_key=settings.GEMINI_API_KEY)
+    except AIIndisponivel as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+async def _preparar_pitch(user: dict, req: PitchGenerationRequest) -> None:
+    """O produto vem do cadastro do dono, nunca do navegador: e ele que garante que a
+    mensagem so cita preco, prazo e entrega reais."""
+    canal_robo = await robo_store.canal_do_usuario(user.get("uid")) or {}
+    perfil = await get_profile(user.get("uid"))
+    if not req.user_product:
+        req.user_product = perfil.product_description or ""
+    if not req.sender_name or req.sender_name == "Prospecção LeadSage":
+        req.sender_name = perfil.company_name or perfil.name or req.sender_name
+    req.service_brief = abordagem_mestra.produto(canal_robo, req.lead.model_dump(), req.user_product or "")
+
+
+@app.post("/api/generate-followups")
+async def generate_followups(req: FollowupsRequest, user: dict = Depends(get_current_user)):
+    """As duas mensagens de acompanhamento, pedidas a parte para a primeira aparecer mais rapido."""
+    await exigir_recurso(user, "ia_abordagem", "A IA de abordagem")
+    try:
+        await _preparar_pitch(user, req.pitch)
+        seguimentos, avisos = await AIGenerator.generate_followups(req.pitch, req.primeira, api_key=settings.GEMINI_API_KEY)
+        return {"follow_ups": seguimentos, "warnings": avisos}
     except AIIndisponivel as e:
         raise HTTPException(status_code=503, detail=str(e))
 

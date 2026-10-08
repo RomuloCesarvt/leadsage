@@ -33,6 +33,7 @@ from app.ai_client import (
 )
 from app import abordagem_mestra
 from app.copy_knowledge import (
+    LIMITE_DE_PALAVRAS,
     bloco_de_mercado,
     lista_de_cliches,
     plano_de_aquecimento,
@@ -134,95 +135,72 @@ def _prompt_da_abordagem(req: PitchGenerationRequest, canal: str) -> str:
     lead = req.lead
     tom = regras_do_tom(req.tone)
     regras_canal = regras_do_canal(canal)
-    mercado = bloco_de_mercado(lead.niche, lead.role)
     vende = req.user_product or "serviços digitais para negócios locais"
     assina = req.sender_name or "Prospecção"
+    sem_site = abordagem_mestra.lead_sem_site(lead.site_status, lead.missingDigitalAssets)
 
     brief = (req.service_brief or "").strip() or abordagem_mestra.produto(None, None, vende)
 
-    return f"""Você é um vendedor consultivo brasileiro experiente em prospecção de negócios locais.
-Escreve UMA mensagem por vez, para alguém que não pediu para ser contatado, e sabe que
-contato frio só responde a quem chega com educação, clareza e algo específico sobre ele.
-A mensagem precisa soar como uma pessoa simpática que olhou aquele negócio, e não como disparo.
+    return f"""Você é um vendedor consultivo brasileiro. Escreva UMA primeira mensagem de prospecção
+para um negócio local que não pediu contato: simpática, específica sobre ele, nunca com cara de disparo.
 
 {abordagem_mestra.momento()}
 
-QUEM ESCREVE
-- Assina como: {assina}
-- Vende: {vende}
+QUEM ESCREVE: {assina}. Vende: {vende}.
 
-O PRODUTO (conheça-o bem; use só estes fatos, nunca invente preço, prazo, garantia ou resultado)
+O PRODUTO (use só estes fatos; nunca invente preço, prazo, garantia ou resultado)
 {brief}
 
-PARA QUEM (tudo abaixo foi verificado, pode citar)
+O NEGÓCIO (verificado, pode citar)
 {_dossie(lead)}
 
-GANCHOS DISPONÍVEIS (fatos prontos; escolha UM)
-{_ganchos(lead)}
+Ganchos prontos (escolha UM): {_ganchos(lead)}
 
 O RAMO DESTE NEGÓCIO
 {abordagem_mestra.bloco_do_ramo(lead.niche or lead.role)}
-{mercado}
 
 {abordagem_mestra.TEMPERATURA}
 
-{abordagem_mestra.estrutura(assina, sem_site=abordagem_mestra.lead_sem_site(lead.site_status, lead.missingDigitalAssets))}
+{abordagem_mestra.estrutura(assina, sem_site=sem_site)}
 
 {abordagem_mestra.GATILHOS}
 
-CANAL: {canal}
-- Tom do canal: {regras_canal['tom']}
-- Tamanho: {regras_canal['limite']}
-- Estrutura: {regras_canal['estrutura']}
+CANAL: {canal}. Tom: {regras_canal['tom']}. Tamanho: {regras_canal['limite']}. Estrutura: {regras_canal['estrutura']}.
+TOM PEDIDO: {req.tone}. Voz: {tom['voz']}. Postura: {tom['postura']}. Abertura: {tom['abertura']}. Evite: {tom['evite']}.
+{('Instrução extra do usuário (vale acima das demais): ' + req.custom_instructions) if req.custom_instructions else ''}
 
-TOM PEDIDO: {req.tone}
-- Voz: {tom['voz']}
-- Postura: {tom['postura']}
-- Abertura: {tom['abertura']}
-- Evite: {tom['evite']}
-{('- Instrução extra do usuário (vale acima das demais): ' + req.custom_instructions) if req.custom_instructions else ''}
+PROIBIDO: clichês ({lista_de_cliches()}); inventar dado que não está acima; prometer resultado numérico;
+elogio vazio; mais de uma pergunta; link no primeiro contato; emoji (exceto no whatsapp e instagram_direct, no máximo um).
+TESTE: tem cumprimento, diz quem você é e o que faz? Serviria para outro negócio trocando só o nome? Então reescreva
+com algo que só vale para {lead.name}.
 
-RACIOCÍNIO ANTES DE ESCREVER (não mostre este passo no texto)
-1. Qual fato é o mais forte para ESTE negócio e como reconhecê-lo com respeito.
-2. O que o serviço muda para o dono na moeda dele (cliente, pedido, agenda), sem jargão.
-3. Qual é o menor passo que ele aceita sem risco.
-Só então escreva.
+LIMITE RÍGIDO: o "body" tem no máximo {LIMITE_DE_PALAVRAS.get(canal, 150) - 10} palavras. Frases curtas, uma ideia por linha.
 
-A CADÊNCIA QUE AQUECE (você escreve os três toques de uma vez)
+RETORNO: JSON puro com as chaves "subject" (assunto curto; vazio se o canal não for email),
+"body" (a mensagem, com quebras de linha reais), "gancho" (o fato que abriu, até 12 palavras) e
+"raciocinio" (o que o serviço resolve para ele, em uma frase).
+"""
+
+
+def _prompt_dos_seguimentos(req: PitchGenerationRequest, canal: str, primeira: str) -> str:
+    lead = req.lead
+    return f"""Escreva 2 mensagens de acompanhamento para quem NÃO respondeu a primeira mensagem de prospecção.
+
+PRIMEIRA MENSAGEM JÁ ENVIADA ({canal}):
+{primeira}
+
+DADOS VERIFICADOS DO NEGÓCIO (única fonte de fatos novos)
+{_dossie(lead)}
+
+O PRODUTO: {(req.service_brief or req.user_product or "serviços digitais").strip()[:600]}
+
 {plano_de_aquecimento()}
-O toque 2 e o toque 3 são curtos: no máximo 45 palavras cada, no mesmo
-canal, e não repetem o argumento do toque 1 com outras palavras — cada
-um traz algo que ainda não foi dito.
-O material novo do toque 2 sai dos dados verificados acima: outro gancho
-da lista, outra avaliação, o horário, a descrição do Google. NUNCA uma
-estatística de mercado, um número sobre concorrente ("a padaria vizinha
-recebe 15 encomendas") ou um percentual de resultado. A proibição de
-inventar vale para os três toques, não só para o primeiro.
+Cada uma tem no máximo 45 palavras, é no mesmo canal, não repete o argumento da primeira e traz algo novo
+tirado dos dados acima (outro gancho, outra avaliação, o horário). NUNCA estatística de mercado, número de
+concorrente, percentual de resultado, preço ou prazo inventado. Clichês proibidos: {lista_de_cliches()}.
 
-PROIBIDO
-- Estes clichês, em qualquer variação: {lista_de_cliches()}
-- Inventar dado que não está acima (faturamento, número de clientes,
-  nome do dono, concorrente, prazo, preço)
-- Prometer resultado numérico que você não pode garantir
-- Elogio vazio: "adorei o trabalho de vocês", "vi que vocês são referência"
-- Mais de uma pergunta por mensagem
-- Link no primeiro contato
-- Emoji, a menos que o canal seja whatsapp ou instagram_direct — e no máximo um
-
-TESTE ANTES DE RESPONDER
-1. Tem cumprimento, diz quem você é e o que faz? Se não, está fria: reescreva.
-2. Se servisse, trocando só o nome, para qualquer outro negócio da mesma cidade, está genérica:
-   reescreva usando algo que só vale para {lead.name}.
-3. Parece pedido de favor ou ordem? Deve parecer uma conversa que ele pode aceitar ou recusar sem constrangimento.
-
-RETORNO
-JSON puro, sem markdown, com exatamente estas chaves:
-- "subject": assunto curto e concreto (string vazia se o canal não for email)
-- "body": o texto do primeiro contato, com quebras de linha reais
-- "gancho": qual fato você usou para abrir, em até 12 palavras
-- "raciocinio": a perda concreta que você identificou, em uma frase
-- "follow_ups": lista com exatamente 2 objetos, cada um com "quando"
-  (ex.: "3 dias depois"), "objetivo" (uma frase) e "texto" (a mensagem)
+RETORNO: JSON puro com a chave "follow_ups": lista de exatamente 2 objetos com "quando" (ex.: "3 dias depois"),
+"objetivo" (uma frase) e "texto" (a mensagem).
 """
 
 
@@ -274,51 +252,22 @@ class AIGenerator:
         sem_site = abordagem_mestra.lead_sem_site(lead.site_status, lead.missingDigitalAssets)
         client = build_client(active_key)
         prompt = _prompt_da_abordagem(req, canal)
-        # O usuario esta olhando a tela: 50 s no total (a funcao morre aos 60).
-        # As chamadas ao modelo bloqueiam, entao rodam em thread para nao
-        # travar as outras requisicoes do mesmo processo.
-        limite = time.monotonic() + 50
-        dados = await asyncio.to_thread(gerar_json, client, prompt, ["body"], 2, limite)
+        # O usuario esta olhando a tela. Uma chamada so, com resposta curta e modelos em
+        # paralelo se o primeiro demorar; as chamadas bloqueiam, entao rodam em thread.
+        # Antes eram duas chamadas (escrever e depois reescrever) com os seguimentos
+        # junto: 15 a 40 s. Os seguimentos agora vem a parte, e o que a revisao local
+        # acha vira aviso na tela em vez de outra ida ao modelo.
+        limite = time.monotonic() + 40
+        dados = await asyncio.to_thread(gerar_json, client, prompt, ["body"], 2, limite, True, 600)
 
-        # Revisão: o que o modelo deixou passar volta para ele, nomeado.
-        problemas = revisar_copy(dados.get("body", ""), canal) + abordagem_mestra.revisar_calor(dados.get("body", ""), canal) + abordagem_mestra.revisar_roteiro(dados.get("body", ""), sem_site)
-        # Reescrever custa outra chamada: so vale se ainda cabe no prazo.
-        if problemas and limite - time.monotonic() > 18:
-            correcao = (
-                f"{prompt}\n\n---\nVocê escreveu este corpo:\n\n{dados.get('body', '')}\n\n"
-                "A revisão encontrou os problemas abaixo. Reescreva a mensagem "
-                "corrigindo TODOS eles, mantendo o gancho e o tom, e devolva o "
-                "mesmo JSON completo:\n- " + "\n- ".join(problemas)
-            )
-            try:
-                dados = _melhor_versao(
-                    dados, await asyncio.to_thread(gerar_json, client, correcao, ["body"], 1, limite), canal, sem_site
-                )
-            except AIIndisponivel:
-                # A primeira versão existe e é utilizável; os defeitos que
-                # sobraram vão como aviso para o usuário decidir.
-                pass
-            problemas = revisar_copy(dados.get("body", ""), canal) + abordagem_mestra.revisar_calor(dados.get("body", ""), canal) + abordagem_mestra.revisar_roteiro(dados.get("body", ""), sem_site)
+        problemas = (revisar_copy(dados.get("body", ""), canal)
+                     + abordagem_mestra.revisar_calor(dados.get("body", ""), canal)
+                     + abordagem_mestra.revisar_roteiro(dados.get("body", ""), sem_site))
 
         seguimentos: List[Dict[str, str]] = []
-        for item in (dados.get("follow_ups") or [])[:2]:
-            if not isinstance(item, dict):
-                continue
-            texto = str(item.get("texto") or item.get("body") or "").strip()
-            if not texto:
-                continue
-            seguimentos.append({
-                "quando": str(item.get("quando") or "").strip() or "alguns dias depois",
-                "objetivo": str(item.get("objetivo") or "").strip(),
-                "texto": texto,
-            })
-            # Os seguimentos passam pela mesma revisão do primeiro toque.
-            # É neles que a invenção costuma escapar — o modelo procura
-            # "algo novo para dizer" e inventa um dado de mercado.
-            for defeito in revisar_copy(texto, canal):
-                if "não termina em pergunta" in defeito:
-                    continue  # o toque 2 não pede nada: entregar valor sem pergunta é o desenho
-                problemas.append(f"seguimento {len(seguimentos)}: {defeito}")
+        if getattr(req, "com_seguimentos", False):
+            seguimentos, extras = await AIGenerator.generate_followups(req, str(dados.get("body") or ""), api_key=active_key)
+            problemas += extras
 
         return PitchGenerationResponse(
             lead_id=lead.id,
@@ -332,6 +281,39 @@ class AIGenerator:
             warnings=problemas,
             placeholders=placeholders,
         )
+
+    @staticmethod
+    async def generate_followups(req: PitchGenerationRequest, primeira: str, api_key: str = None):
+        """As duas mensagens de acompanhamento. Vem depois da primeira, em segundo plano na tela."""
+        canal = (getattr(req, "channel", "") or "email").strip()
+        active_key = api_key or settings.GEMINI_API_KEY
+        if not active_key:
+            raise AIIndisponivel("A IA de abordagem não está configurada: falta a chave do Gemini.")
+        client = build_client(active_key)
+        dados = await asyncio.to_thread(
+            gerar_json, client, _prompt_dos_seguimentos(req, canal, primeira), ["follow_ups"], 2,
+            time.monotonic() + 40, True, 500,
+        )
+        seguimentos: List[Dict[str, str]] = []
+        avisos: List[str] = []
+        for item in (dados.get("follow_ups") or [])[:2]:
+            if not isinstance(item, dict):
+                continue
+            texto = str(item.get("texto") or item.get("body") or "").strip()
+            if not texto:
+                continue
+            seguimentos.append({
+                "quando": str(item.get("quando") or "").strip() or "alguns dias depois",
+                "objetivo": str(item.get("objetivo") or "").strip(),
+                "texto": texto,
+            })
+            # É neles que a invenção costuma escapar: o modelo procura "algo novo para dizer"
+            # e inventa um dado de mercado.
+            for defeito in revisar_copy(texto, canal):
+                if "não termina em pergunta" in defeito:
+                    continue  # o toque 2 não pede nada: entregar valor sem pergunta é o desenho
+                avisos.append(f"seguimento {len(seguimentos)}: {defeito}")
+        return seguimentos, avisos
 
     @staticmethod
     async def generate_demo_site(req, api_key: str = None) -> dict:
