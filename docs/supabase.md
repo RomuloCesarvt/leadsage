@@ -30,7 +30,7 @@ Supabase entrega. Nada muda para o usuário final.
 5. **Ligar na Vercel** (Project Settings → Environment Variables, Production):
    - `DATABASE_URL` = a conexão do pooler
    - `FIRESTORE_DESLIGADO` = `1`
-   e faça um novo deploy (*Redeploy*). Confira em `/api/health`: `"armazenamento": "postgres"`.
+   e faça um novo deploy (*Redeploy*). Confira em `/api/status`: `"armazenamento": "postgres"`.
 6. **Voltar atrás**, se precisar: remova `FIRESTORE_DESLIGADO` e faça outro deploy. O Firestore
    continua intacto, porque a migração só lê dele.
 

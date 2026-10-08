@@ -19,7 +19,7 @@ Gemini porque respondem em cerca de 1 segundo (chips próprios para IA).
 1. Crie a conta e a chave no site do motor (Groq é o melhor primeiro passo).
 2. Vercel → projeto → *Settings → Environment Variables* → adicione a variável (ambiente *Production*).
 3. Faça um novo deploy (*Redeploy*).
-4. Confira em `https://leadsageofc.vercel.app/api/health`: o campo `"ia"` lista os motores ligados,
+4. Confira em `https://leadsageofc.vercel.app/api/status`: o campo `"ia"` lista os motores ligados,
    por exemplo `["groq", "gemini"]`.
 
 O modelo é escolhido sozinho a partir do que a sua conta enxerga, preferindo `gpt-oss-120b` e
