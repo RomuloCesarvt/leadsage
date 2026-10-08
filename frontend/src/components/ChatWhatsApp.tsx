@@ -68,7 +68,10 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
   const [erro, setErro] = useState('');
   const [busca, setBusca] = useState('');
   const [filtro, setFiltro] = useState<Filtro>('todas');
-  const fim = useRef<HTMLDivElement>(null);
+  const painel = useRef<HTMLDivElement>(null);
+  const [limite, setLimite] = useState(60);
+  const [carregandoMais, setCarregandoMais] = useState(false);
+  const alturaAntes = useRef(0);
 
   const carregarChats = useCallback(async () => {
     try {
@@ -98,9 +101,9 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
     return () => { a(); b(); };
   }, [carregarChats, carregarRobo]);
 
-  const carregarMensagens = useCallback(async (id: string) => {
+  const carregarMensagens = useCallback(async (id: string, max: number) => {
     try {
-      const m = await conectorLocal.mensagens(id, 80);
+      const m = await conectorLocal.mensagens(id, max);
       if (m) setMensagens(m);
     } catch (e: any) { setErro(e?.message || 'Não foi possível carregar a conversa.'); }
   }, []);
@@ -110,12 +113,46 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
     setMensagens([]);
     setErro('');
     setAviso('');
-    void carregarMensagens(aberto.id);
+    setLimite(60);
+    void carregarMensagens(aberto.id, 60);
     conectorLocal.lida(aberto.id).then(carregarChats).catch(() => {});
-    return sondar(() => { void carregarMensagens(aberto.id); }, 3000);
   }, [aberto?.id, carregarMensagens, carregarChats]);
 
-  useEffect(() => { fim.current?.scrollIntoView({ behavior: 'smooth' }); }, [mensagens.length, aberto?.id]);
+  // atualiza a conversa aberta; o mesmo limite vale para as mensagens antigas já carregadas
+  useEffect(() => {
+    if (!aberto) return;
+    return sondar(() => { void carregarMensagens(aberto.id, limite); }, 3000);
+  }, [aberto?.id, limite, carregarMensagens]);
+
+  // Rola SÓ a lista de mensagens (nunca a página): ao abrir, vai para o fim; com mensagem nova,
+  // só desce se você já estava perto do fim, para não puxar quem está lendo o histórico.
+  const ultimoId = useRef('');
+  useEffect(() => { ultimoId.current = ''; }, [aberto?.id]);
+  useEffect(() => {
+    const el = painel.current;
+    if (!el || !mensagens.length) return;
+    const fimId = mensagens[mensagens.length - 1].id;
+    if (alturaAntes.current) {
+      // acabou de carregar mensagens mais antigas: mantém o que você estava vendo no mesmo lugar
+      el.scrollTop = el.scrollHeight - alturaAntes.current;
+      alturaAntes.current = 0;
+    } else if (!ultimoId.current) {
+      el.scrollTop = el.scrollHeight;
+    } else if (fimId !== ultimoId.current && el.scrollHeight - el.scrollTop - el.clientHeight < 160) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    }
+    ultimoId.current = fimId;
+  }, [mensagens]);
+
+  const carregarMaisAntigas = async () => {
+    if (!aberto || carregandoMais) return;
+    setCarregandoMais(true);
+    alturaAntes.current = painel.current?.scrollHeight || 0;
+    const novo = limite + 60;
+    setLimite(novo);
+    await carregarMensagens(aberto.id, novo);
+    setCarregandoMais(false);
+  };
 
   // a conversa do robô que corresponde a um chat (pelo telefone)
   const doRobo = useMemo(() => {
@@ -233,9 +270,9 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
 
   // ------------------------------------------------------------------ chat
   return (
-    <div className="flex-1 min-h-[600px] bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex">
+    <div className="h-[calc(100dvh-230px)] min-h-[460px] max-h-[920px] bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex">
       {/* lista */}
-      <div className={`w-full md:w-96 border-r border-slate-100 flex-col ${aberto ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`w-full md:w-96 border-r border-slate-100 flex-col min-h-0 ${aberto ? 'hidden md:flex' : 'flex'}`}>
         <div className="px-3 pt-3 pb-2 border-b border-slate-100 space-y-2.5">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -261,7 +298,7 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
           {!filtrados.length && <p className="text-sm text-slate-400 text-center py-10 px-4">Nenhuma conversa aqui.</p>}
           {filtrados.map(c => {
             const r = conversaDoRobo(c);
@@ -296,7 +333,7 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
       </div>
 
       {/* conversa */}
-      <div className={`flex-1 flex-col min-w-0 ${aberto ? 'flex' : 'hidden md:flex'}`}>
+      <div className={`flex-1 flex-col min-w-0 min-h-0 ${aberto ? 'flex' : 'hidden md:flex'}`}>
         {!aberto ? (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-sm gap-2 bg-[#f4f1ea]">
             <WhatsAppIcon className="w-12 h-12 text-slate-300" />
@@ -327,7 +364,15 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
               <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100 text-sm text-amber-800"><b>O robô parou:</b> {conv.motivo}</div>
             )}
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-3 space-y-1 bg-[#f4f1ea]">
+            <div ref={painel} data-painel="mensagens" className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-4 py-3 space-y-1 bg-[#f4f1ea]">
+              {mensagens.length >= limite && (
+                <div className="flex justify-center pb-2">
+                  <button onClick={carregarMaisAntigas} disabled={carregandoMais}
+                    className="text-xs font-bold text-emerald-700 bg-white/90 hover:bg-white rounded-full px-4 py-1.5 shadow-sm disabled:opacity-60">
+                    {carregandoMais ? 'Carregando…' : 'Ver mensagens anteriores'}
+                  </button>
+                </div>
+              )}
               {mensagens.map((m, i) => {
                 const nova = i === 0 || dia(m.quando) !== dia(mensagens[i - 1].quando);
                 return (
@@ -349,10 +394,9 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
                   </React.Fragment>
                 );
               })}
-              <div ref={fim} />
             </div>
 
-            <div className="p-3 border-t border-slate-100 bg-white">
+            <div className="p-3 border-t border-slate-100 bg-white shrink-0">
               {aviso && <p className="text-xs text-amber-700 mb-2">{aviso}</p>}
               {erro && <p className="text-xs text-red-600 mb-2">{erro}</p>}
               <div className="flex gap-2">

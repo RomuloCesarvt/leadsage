@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '2.3.0';
+export const VERSAO = '2.4.0';
 const PORTA = 2790;
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -266,7 +266,7 @@ export async function tratarChat(wa, metodo, caminho, consulta, corpo) {
     const id = decodeURIComponent(partes[1] || '');
     if (!CHAT_ID_RE.test(id)) return { status: 400, json: { erro: 'Conversa inválida.' } };
     if (metodo === 'GET' && partes[2] === 'mensagens') {
-      const limite = Math.min(150, Math.max(1, Number(consulta.get('limite')) || 60));
+      const limite = Math.min(400, Math.max(1, Number(consulta.get('limite')) || 60));
       return { status: 200, json: await (async () => { const mensagens = await comLimite(wa.mensagens(id, limite), 30000); return { mensagens, fonte: wa.diagnostico?.().fonteMensagens || '' }; })() };
     }
     if (metodo === 'POST' && partes[2] === 'enviar') {
@@ -366,11 +366,13 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
         // confere se o número existe no WhatsApp antes de tentar: número inválido é sinal ruim para a conta
         const id = await client.getNumberId(telefone);
         if (!id) return { ok: false, erro: 'esse número não está no WhatsApp' };
-        const chat = await client.getChatById(id._serialized);
-        await chat.sendStateTyping();
+        // "digitando…" direto pela página: client.getChatById quebra nas versões atuais do WhatsApp Web
+        // ("r"), e antes isso derrubava TODO envio do robô. O indicador é só um detalhe humano.
+        const estado = (e) => client.pupPage.evaluate((i, st) => window.WWebJS.sendChatstate(st, i), id._serialized, e).catch(() => {});
+        await estado('typing');
         await dormir(Math.min(9000, Math.max(800, digitandoMs || 0)));
         await client.sendMessage(id._serialized, texto);
-        await chat.clearState().catch(() => {});
+        await estado('stop');
         return { ok: true };
       } catch (e) {
         return { ok: false, erro: String(e.message || e).slice(0, 160) };
@@ -383,7 +385,12 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
     async chats(limite = 40) {
       try {
         const brutos = await client.pupPage.evaluate((max) => {
-          const lista = window.Store.Chat.getModelsArray()
+          // nas versões atuais do WhatsApp Web as coleções vêm do require; window.Store era o caminho antigo
+          let colecao = null;
+          try { colecao = window.require('WAWebCollections').Chat; } catch (_) { /* tenta o antigo */ }
+          if (!colecao && window.Store) colecao = window.Store.Chat;
+          if (!colecao) throw new Error('coleção de conversas indisponível nesta versão do WhatsApp Web');
+          const lista = colecao.getModelsArray()
             .filter((c) => c && c.id && !/status@broadcast|@newsletter|@broadcast$/.test(String(c.id._serialized)))
             .sort((a, b) => (b.t || 0) - (a.t || 0))
             .slice(0, max);
@@ -429,7 +436,7 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
           let msgs = chat.msgs.getModelsArray().filter((m) => !m.isNotification);
           try {
             // poucas mensagens carregadas: pede as anteriores, como o WhatsApp Web ao rolar
-            for (let i = 0; i < 3 && msgs.length < max; i++) {
+            for (let i = 0; i < 8 && msgs.length < max; i++) {
               const mais = await window.require('WAWebChatLoadMessages').loadEarlierMsgs({ chat });
               if (!mais || !mais.length) break;
               msgs = chat.msgs.getModelsArray().filter((m) => !m.isNotification);
@@ -471,8 +478,7 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
     async lida(chatId) {
       historico.lida(chatId);
       try {
-        const chat = await client.getChatById(chatId);
-        await chat.sendSeen();
+        await client.sendSeen(chatId);
       } catch (e) { diag.erros.lida = String(e.message || e).slice(0, 200); }
     },
     parar: () => client.destroy().catch(() => {}),

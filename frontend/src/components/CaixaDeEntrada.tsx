@@ -53,7 +53,7 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
   const [canal, setCanal] = useState<RoboCanal | 'todos'>('todos');
   const [situacao, setSituacao] = useState<Situacao>('todas');
   const [busca, setBusca] = useState('');
-  const fim = useRef<HTMLDivElement>(null);
+  const painel = useRef<HTMLDivElement>(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -78,7 +78,8 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
     }, 20000);
   }, [aberta?.id, aberta?.somente_leitura]);
 
-  useEffect(() => { fim.current?.scrollIntoView({ behavior: 'smooth' }); }, [aberta?.mensagens.length]);
+  // rola só a lista de mensagens, nunca a página
+  useEffect(() => { const el = painel.current; if (el) el.scrollTop = el.scrollHeight; }, [aberta?.id, aberta?.mensagens.length]);
 
   const contagem = useMemo(() => {
     const por: Record<string, number> = {};
@@ -150,9 +151,9 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
   const chips: (RoboCanal | 'todos')[] = ['todos', ...CANAIS.filter(c => SEMPRE.includes(c) || contagem[c])];
 
   return (
-    <div className="flex-1 min-h-[560px] bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex">
+    <div className="h-[calc(100dvh-230px)] min-h-[460px] max-h-[920px] bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex">
       {/* lista com filtros */}
-      <div className={`w-full md:w-96 border-r border-slate-100 flex-col ${aberta ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`w-full md:w-96 border-r border-slate-100 flex-col min-h-0 ${aberta ? 'hidden md:flex' : 'flex'}`}>
         <div className="px-3 pt-3 pb-2 border-b border-slate-100 space-y-2.5">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -204,7 +205,7 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
           {!filtradas.length && (
             <p className="text-sm text-slate-400 text-center py-10 px-4">Nenhuma conversa com esses filtros.</p>
           )}
@@ -256,7 +257,7 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
       </div>
 
       {/* conversa */}
-      <div className={`flex-1 flex-col min-w-0 ${aberta ? 'flex' : 'hidden md:flex'}`}>
+      <div className={`flex-1 flex-col min-w-0 min-h-0 ${aberta ? 'flex' : 'hidden md:flex'}`}>
         {!aberta ? (
           <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
             Escolha uma conversa
@@ -301,9 +302,8 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2 bg-slate-50/50">
+            <div ref={painel} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 space-y-2 bg-slate-50/50">
               {aberta.mensagens.map((m, i) => <Balao key={i} m={m} />)}
-              <div ref={fim} />
             </div>
 
             {aberta.somente_leitura ? (
