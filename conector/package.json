@@ -1,12 +1,16 @@
 {
   "name": "leadsage-conector",
-  "version": "1.0.0",
-  "description": "Liga o WhatsApp do seu computador (OpenWA) ao robo do LeadSage",
+  "version": "2.0.0",
+  "description": "O WhatsApp do seu computador conversando com o robo do LeadSage",
   "type": "module",
   "private": true,
   "engines": { "node": ">=18" },
   "scripts": {
     "start": "node leadsage-conector.mjs",
     "test": "node --test teste.mjs"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "whatsapp-web.js": "^1.34.7"
   }
 }

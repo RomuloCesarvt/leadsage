@@ -1,28 +1,84 @@
 /**
- * WhatsApp pelo computador do usuário (Conector + OpenWA).
+ * WhatsApp pelo computador do usuário (Conector).
  *
  * Conexão NÃO oficial: o WhatsApp pode restringir o número. A tela diz isso
- * antes de gerar a chave e só libera o botão depois do "li e entendi". A chave
- * aparece uma única vez; depois só o prefixo e o estado (online/offline).
+ * antes de gerar a chave e só libera o botão depois do "li e entendi".
+ *
+ * O caminho do usuário é um arquivo só: o .bat já leva a chave dentro, instala o
+ * que falta, baixa o Conector e abre a página do QR code. A chave aparece uma
+ * única vez; depois só o prefixo e o estado (online/offline).
  */
 import React, { useState } from 'react';
-import { AlertTriangle, Check, Copy, Download, Loader2, Unplug, Wifi, WifiOff } from 'lucide-react';
+import { AlertTriangle, Download, Loader2, Unplug, Wifi, WifiOff } from 'lucide-react';
 import { api } from '../services/api';
 import { WhatsAppIcon } from './BrandIcons';
 import type { RoboConfig } from '../types';
 
-const ARQUIVOS = [
-  { nome: 'leadsage-conector.mjs', rotulo: 'Conector' },
-  { nome: 'exemplo.env', rotulo: 'Configuração' },
-  { nome: 'iniciar.bat', rotulo: 'Iniciar (Windows)' },
-  { nome: 'LEIA-ME.md', rotulo: 'Passo a passo' },
-];
+/** O arquivo que o usuário baixa: leva a chave, instala o que falta e abre o Conector. */
+export function arquivoDoConector(chave: string, site: string): string {
+  const linhas = [
+    '@echo off',
+    'chcp 65001 >nul',
+    'title LeadSage - WhatsApp pelo computador',
+    'setlocal',
+    `set "SITE=${site}"`,
+    'set "PASTA=%LOCALAPPDATA%\\LeadSageConector"',
+    'if not exist "%PASTA%" mkdir "%PASTA%"',
+    'cd /d "%PASTA%"',
+    `> config.json echo {"chave":"${chave}","site":"${site}"}`,
+    'set "TEM_NODE="',
+    'where node >nul 2>nul && set "TEM_NODE=1"',
+    'if not defined TEM_NODE if exist "%ProgramFiles%\\nodejs\\node.exe" set "PATH=%ProgramFiles%\\nodejs;%PATH%" & set "TEM_NODE=1"',
+    'if not defined TEM_NODE (',
+    '  echo Instalando o Node.js, so na primeira vez...',
+    '  winget install -e --id OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements',
+    '  if exist "%ProgramFiles%\\nodejs\\node.exe" set "PATH=%ProgramFiles%\\nodejs;%PATH%" & set "TEM_NODE=1"',
+    ')',
+    'if not defined TEM_NODE (',
+    '  echo Nao consegui instalar o Node.js sozinho. Vou abrir a pagina de download; instale e abra este arquivo de novo.',
+    '  start https://nodejs.org/pt',
+    '  pause',
+    '  exit /b 1',
+    ')',
+    'echo Baixando o Conector...',
+    `powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; foreach($f in 'package.json','leadsage-conector.mjs'){ Invoke-WebRequest -UseBasicParsing ('%SITE%/conector/'+$f) -OutFile $f }"`,
+    'if errorlevel 1 (',
+    '  echo Nao consegui baixar o Conector. Confira a internet e tente de novo.',
+    '  pause',
+    '  exit /b 1',
+    ')',
+    'if not exist node_modules\\whatsapp-web.js (',
+    '  echo Instalando os componentes, so na primeira vez. Pode levar 1 minuto...',
+    '  set "PUPPETEER_SKIP_DOWNLOAD=true"',
+    '  call npm install --omit=dev --no-audit --no-fund',
+    '  if errorlevel 1 (',
+    '    echo A instalacao falhou. Tente de novo.',
+    '    pause',
+    '    exit /b 1',
+    '  )',
+    ')',
+    'echo Abrindo o Conector. Uma pagina com o QR code vai abrir. Deixe esta janela aberta.',
+    'node leadsage-conector.mjs',
+    'pause',
+  ];
+  return linhas.join('\r\n') + '\r\n';
+}
+
+function baixar(nome: string, conteudo: string) {
+  const url = URL.createObjectURL(new Blob([conteudo], { type: 'application/octet-stream' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nome;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
 
 export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) => void }> = ({ cfg, aoMudar }) => {
   const [entendi, setEntendi] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const [chave, setChave] = useState('');
-  const [copiado, setCopiado] = useState(false);
   const [erro, setErro] = useState('');
 
   const gerar = async () => {
@@ -50,14 +106,6 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
     } catch (e: any) {
       setErro(e?.message || 'Não foi possível desligar.');
     }
-  };
-
-  const copiar = async () => {
-    try {
-      await navigator.clipboard.writeText(chave);
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 1500);
-    } catch { /* o navegador bloqueou a área de transferência */ }
   };
 
   return (
@@ -106,36 +154,29 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
         </div>
       )}
 
-      {chave && (
-        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 space-y-2">
-          <p className="text-xs font-bold text-emerald-900">Sua chave (aparece só agora, guarde-a):</p>
-          <div className="flex gap-2">
-            <code className="flex-1 min-w-0 px-3 py-2 bg-white border border-emerald-200 rounded-lg text-xs text-slate-800 break-all select-all">{chave}</code>
-            <button onClick={copiar} className="px-3 py-2 rounded-lg bg-white border border-emerald-200 text-xs font-bold text-emerald-800 hover:bg-emerald-100 flex items-center gap-1.5">
-              {copiado ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {copiado ? 'Copiado' : 'Copiar'}
-            </button>
-          </div>
-        </div>
-      )}
-
       {cfg.conector_criado && (
-        <div className="space-y-2">
-          {!chave && <p className="text-[11px] text-slate-500">Chave {cfg.conector_prefixo}… (a chave completa só aparece ao gerar). Perdeu? Gere outra.</p>}
-          <ol className="text-xs text-slate-600 list-decimal pl-5 space-y-0.5">
-            <li>Instale o <b>Docker Desktop</b> e o <b>Node.js 18+</b> no computador.</li>
-            <li>Baixe os arquivos abaixo numa pasta e siga o <b>Passo a passo</b>.</li>
-            <li>Coloque a chave acima no arquivo <b>.env</b>, abra o Conector e escaneie o QR code com o celular.</li>
+        <div className="space-y-3">
+          <ol className="text-sm text-slate-700 list-decimal pl-5 space-y-1">
+            <li>Baixe o arquivo e <b>dê dois cliques</b> nele (no computador onde o WhatsApp vai ficar).</li>
+            <li>Uma página abre com o <b>QR code</b>. No celular: WhatsApp → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b>.</li>
+            <li>Pronto. Esta tela passa a mostrar <b>Conectado</b>. Deixe a janela preta aberta.</li>
           </ol>
-          <div className="flex flex-wrap gap-2">
-            {ARQUIVOS.map(a => (
-              <a key={a.nome} href={`/conector/${a.nome}`} download
-                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5">
-                <Download className="w-3.5 h-3.5" /> {a.rotulo}
-              </a>
-            ))}
-          </div>
+          {chave ? (
+            <button onClick={() => baixar('Conectar-WhatsApp.bat', arquivoDoConector(chave, window.location.origin))}
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-2">
+              <Download className="w-4 h-4" /> Baixar Conectar-WhatsApp.bat
+            </button>
+          ) : (
+            <p className="text-xs text-slate-500">
+              O arquivo leva a sua chave ({cfg.conector_prefixo}…), que só aparece ao gerar. Para baixar de novo, gere outra chave.
+            </p>
+          )}
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            Na primeira vez ele instala o que falta (cerca de 1 minuto) e usa o Edge ou o Chrome que você já tem. Se o Windows avisar
+            “protegeu o computador”, clique em <b>Mais informações → Executar assim mesmo</b>. Só para Windows por enquanto.
+          </p>
           <p className="text-[11px] text-slate-500">
-            Hoje: <b>{cfg.conector_frio_hoje}</b> de <b>{cfg.conector_frio_limite}</b> abordagens frias permitidas. O limite sobe a cada dia de uso.
+            Hoje: <b>{cfg.conector_frio_hoje}</b> de <b>{cfg.conector_frio_limite}</b> abordagens frias permitidas (o limite sobe a cada dia).
             O computador precisa ficar ligado com o Conector aberto para o robô responder.
           </p>
         </div>

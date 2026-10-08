@@ -1,3 +1,4 @@
-estado.json
-qr.png
-.env
+config.json
+sessao/
+.wwebjs_cache/
+node_modules/

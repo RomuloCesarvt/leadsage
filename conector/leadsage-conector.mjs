@@ -1,52 +1,56 @@
 #!/usr/bin/env node
 /**
- * LeadSage Conector: liga o WhatsApp do seu computador (via OpenWA) ao robô do LeadSage.
+ * LeadSage Conector: o WhatsApp do seu computador conversando com o robô do LeadSage.
  *
- * Quem liga para quem: este programa pergunta ao LeadSage o que enviar e avisa
- * quando um lead responde. O LeadSage nunca precisa alcançar o seu computador.
+ * Tudo em um programa só: abre o WhatsApp Web no Edge/Chrome que você já tem,
+ * mostra o QR code numa página local, e depois só fica atendendo.
  *
- *   OpenWA (local, :2785)  <-->  este Conector  <-->  LeadSage (nuvem)
+ *   WhatsApp Web (este computador)  <-->  este Conector  <-->  LeadSage (nuvem)
  *
- * Sem dependências: só o Node 18 ou mais novo.
+ * Quem liga para quem: o Conector pergunta ao LeadSage o que enviar e avisa quando
+ * um lead responde. O LeadSage nunca precisa alcançar o seu computador, e nenhuma
+ * porta é aberta no seu roteador.
  *
- * ATENÇÃO: o OpenWA usa o WhatsApp Web, não a API oficial. O WhatsApp pode
- * restringir o número. Use um número secundário, deixe os limites ligados e
- * não aumente o ritmo de envio por conta própria.
+ * ATENÇÃO: é o WhatsApp Web automatizado, não a API oficial. O WhatsApp pode
+ * restringir o número. Use um número secundário e não aumente o ritmo de envio.
  */
 import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { exec } from 'node:child_process';
+import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '1.0.0';
-
-// ------------------------------------------------------------ configuração
-
-export function lerConfig(env = process.env) {
-  const c = {
-    leadsageUrl: (env.LEADSAGE_URL || 'https://leadsageofc.vercel.app').replace(/\/+$/, ''),
-    chave: (env.LEADSAGE_KEY || '').trim(),
-    openwaUrl: (env.OPENWA_URL || 'http://localhost:2785').replace(/\/+$/, ''),
-    openwaKey: (env.OPENWA_KEY || '').trim(),
-    sessao: (env.OPENWA_SESSION || 'leadsage').trim(),
-    arquivoEstado: env.CONECTOR_ESTADO || join(AQUI, 'estado.json'),
-    // intervalo de leitura das mensagens recebidas (só fala com o OpenWA local)
-    leituraMs: Number(env.CONECTOR_LEITURA_MS || 3000),
-  };
-  const faltando = [];
-  if (!/^lsc_[A-Za-z0-9_-]{30,60}$/.test(c.chave)) faltando.push('LEADSAGE_KEY (a chave que o LeadSage mostra em Robô > WhatsApp pelo computador)');
-  if (!c.openwaKey) faltando.push('OPENWA_KEY (a chave de API do OpenWA, no arquivo data/.api-key dele)');
-  return { c, faltando };
-}
+export const VERSAO = '2.0.0';
+const PORTA = 2790;
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (...a) => console.log(new Date().toLocaleTimeString('pt-BR'), ...a);
 
-// ------------------------------------------------------------------ clientes
+// ------------------------------------------------------------- configuração
 
-async function http(url, { metodo = 'GET', cabecalhos = {}, corpo, tempoMs = 20000 } = {}) {
+const CHAVE_RE = /^lsc_[A-Za-z0-9_-]{30,60}$/;
+
+export async function lerConfig(arquivo = join(AQUI, 'config.json'), env = process.env) {
+  let c = {};
+  try { c = JSON.parse(await readFile(arquivo, 'utf8')); } catch { /* ainda não existe */ }
+  return {
+    arquivo,
+    chave: String(env.LEADSAGE_KEY || c.chave || '').trim(),
+    site: String(env.LEADSAGE_URL || c.site || 'https://leadsageofc.vercel.app').replace(/\/+$/, ''),
+  };
+}
+
+export async function gravarConfig(cfg) {
+  await writeFile(cfg.arquivo, JSON.stringify({ chave: cfg.chave, site: cfg.site }), 'utf8');
+}
+
+export const chaveValida = (k) => CHAVE_RE.test(String(k || '').trim());
+
+// ------------------------------------------------------------------ LeadSage
+
+async function http_(url, { metodo = 'GET', cabecalhos = {}, corpo, tempoMs = 20000 } = {}) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), tempoMs);
   try {
@@ -60,172 +64,53 @@ async function http(url, { metodo = 'GET', cabecalhos = {}, corpo, tempoMs = 200
     let dados = null;
     try { dados = texto ? JSON.parse(texto) : null; } catch { dados = { bruto: texto }; }
     return { ok: r.ok, status: r.status, dados };
+  } catch (e) {
+    return { ok: false, status: 0, dados: { erro: String(e.message || e) } };
   } finally {
     clearTimeout(t);
   }
 }
 
-export function clienteLeadsage(c) {
-  const h = { 'x-conector-key': c.chave };
-  const base = `${c.leadsageUrl}/api/conector`;
+export function clienteLeadsage({ site, chave }) {
+  const h = { 'x-conector-key': chave };
+  const base = `${site}/api/conector`;
   return {
-    ping: (numero, status) => http(`${base}/ping`, { metodo: 'POST', cabecalhos: h, corpo: { numero: numero || '', status: status || '', versao: VERSAO } }),
-    tarefas: () => http(`${base}/tarefas`, { cabecalhos: h }),
-    resultado: (id, ok, erro = '') => http(`${base}/tarefas/${encodeURIComponent(id)}/resultado`, { metodo: 'POST', cabecalhos: h, corpo: { ok, erro } }),
-    mensagem: (m) => http(`${base}/mensagem`, { metodo: 'POST', cabecalhos: h, corpo: m, tempoMs: 60000 }),
+    ping: (numero, status) => http_(`${base}/ping`, { metodo: 'POST', cabecalhos: h, corpo: { numero: numero || '', status: status || '', versao: VERSAO } }),
+    tarefas: () => http_(`${base}/tarefas`, { cabecalhos: h }),
+    resultado: (id, ok, erro = '') => http_(`${base}/tarefas/${encodeURIComponent(id)}/resultado`, { metodo: 'POST', cabecalhos: h, corpo: { ok, erro } }),
+    mensagem: (m) => http_(`${base}/mensagem`, { metodo: 'POST', cabecalhos: h, corpo: m, tempoMs: 60000 }),
   };
-}
-
-export function clienteOpenwa(c) {
-  const h = { 'x-api-key': c.openwaKey };
-  const base = `${c.openwaUrl}/api`;
-  return {
-    saude: () => http(`${base}/health`),
-    sessoes: () => http(`${base}/sessions`, { cabecalhos: h }),
-    criarSessao: (nome) => http(`${base}/sessions`, { metodo: 'POST', cabecalhos: h, corpo: { name: nome } }),
-    iniciar: (id) => http(`${base}/sessions/${id}/start`, { metodo: 'POST', cabecalhos: h }),
-    sessao: (id) => http(`${base}/sessions/${id}`, { cabecalhos: h }),
-    qr: (id) => http(`${base}/sessions/${id}/qr`, { cabecalhos: h }),
-    enviarTexto: (id, chatId, text) => http(`${base}/sessions/${id}/messages/send-text`, { metodo: 'POST', cabecalhos: h, corpo: { chatId, text }, tempoMs: 45000 }),
-    recebidas: (id, desdeMs) => http(
-      `${base}/sessions/${id}/messages?direction=incoming&orderBy=timestamp&inlineMedia=false&limit=100&since=${desdeMs}`,
-      { cabecalhos: h },
-    ),
-    telefoneDoContato: (id, contato) => http(`${base}/sessions/${id}/contacts/${encodeURIComponent(contato)}/phone`, { cabecalhos: h }),
-  };
-}
-
-// ------------------------------------------------------------------- estado
-
-export async function lerEstado(arquivo) {
-  try {
-    const e = JSON.parse(await readFile(arquivo, 'utf8'));
-    return { desde: Number(e.desde) || 0, vistos: Array.isArray(e.vistos) ? e.vistos : [] };
-  } catch {
-    return { desde: 0, vistos: [] };
-  }
-}
-
-export async function gravarEstado(arquivo, estado) {
-  const limpo = { desde: estado.desde, vistos: estado.vistos.slice(-500) };
-  await writeFile(arquivo, JSON.stringify(limpo), 'utf8');
 }
 
 // ------------------------------------------------------------------ regras
-
-/** O número em dígitos de um chatId individual, ou '' para grupo, status e canal. */
-export function telefoneDoChat(chatId) {
-  const m = /^(\d{10,15})@(c\.us|s\.whatsapp\.net)$/.exec(String(chatId || ''));
-  return m ? m[1] : '';
-}
-
-/** Uma mensagem do OpenWA vira o que o LeadSage espera, ou nada (grupo, mídia sem texto, vazia). */
-export function paraLeadsage(msg, telefone) {
-  const texto = String(msg.body || '').trim();
-  if (!telefone) return null;
-  if (!texto) {
-    const rotulos = { image: '[imagem]', video: '[vídeo]', audio: '[áudio]', voice: '[áudio]', document: '[documento]', sticker: '[figurinha]', location: '[localização]' };
-    const r = rotulos[msg.type];
-    if (!r) return null;
-    return { id: String(msg.waMessageId || msg.id), contato: telefone, nome: msg.chatName || '', texto: r, momento: Number(msg.timestamp) || 0 };
-  }
-  return { id: String(msg.waMessageId || msg.id), contato: telefone, nome: msg.chatName || '', texto, momento: Number(msg.timestamp) || 0 };
-}
 
 /** Atraso humano antes de enviar: o do LeadSage mais um pouco de variação. */
 export function atrasoHumano(digitandoMs, aleatorio = Math.random) {
   return Math.round(Math.max(800, Number(digitandoMs) || 0) * (0.8 + aleatorio() * 0.5));
 }
 
-// ------------------------------------------------------------ OpenWA: sessão
+const ROTULO_MIDIA = { image: '[imagem]', video: '[vídeo]', audio: '[áudio]', ptt: '[áudio]', document: '[documento]', sticker: '[figurinha]', location: '[localização]', vcard: '[contato]' };
 
-function listaDe(dados) {
-  if (Array.isArray(dados)) return dados;
-  return dados?.sessions || dados?.data || [];
+/**
+ * Uma mensagem recebida vira o que o LeadSage espera, ou nada.
+ * `m` tem o formato de um adaptador: { id, de (dígitos), nome, texto, tipo, grupo, minha, momento }.
+ */
+export function paraLeadsage(m, inicioS = 0) {
+  if (!m || m.grupo || m.minha) return null;
+  if (!/^\d{10,15}$/.test(String(m.de || ''))) return null;
+  if (inicioS && Number(m.momento) && Number(m.momento) < inicioS - 10) return null; // histórico antigo
+  const texto = String(m.texto || '').trim() || ROTULO_MIDIA[m.tipo] || '';
+  if (!texto) return null;
+  return { id: String(m.id), contato: m.de, nome: String(m.nome || ''), texto, momento: Number(m.momento) || 0 };
 }
 
-export async function garantirSessao(owa, nome, aviso = log) {
-  const lista = await owa.sessoes();
-  if (!lista.ok) throw new Error(`OpenWA recusou a chave (HTTP ${lista.status}). Confira OPENWA_KEY.`);
-  let s = listaDe(lista.dados).find((x) => x.name === nome || x.id === nome);
-  if (!s) {
-    const c = await owa.criarSessao(nome);
-    if (!c.ok) throw new Error(`Não consegui criar a sessão no OpenWA (HTTP ${c.status}).`);
-    s = c.dados?.data || c.dados;
-    aviso(`Sessão "${nome}" criada.`);
-  }
-  const id = s.id;
-  if (!id) throw new Error('O OpenWA não devolveu o id da sessão.');
-  const resp = await owa.sessao(id);
-  const atual = resp.dados?.data || resp.dados || s;
-  if (!['ready', 'authenticating', 'initializing', 'qr_ready'].includes(atual.status)) {
-    await owa.iniciar(id);
-  }
-  return id;
-}
+// ------------------------------------------------------- ciclo: o que enviar
 
-async function mostrarQr(owa, id) {
-  const r = await owa.qr(id);
-  const img = r.dados?.qrCode || r.dados?.data?.qrCode;
-  if (!img || !img.startsWith('data:image')) return false;
-  const arquivo = join(AQUI, 'qr.png');
-  await writeFile(arquivo, Buffer.from(img.split(',')[1], 'base64'));
-  log(`Escaneie o QR code: WhatsApp > Aparelhos conectados > Conectar um aparelho. Arquivo: ${arquivo}`);
-  if (process.platform === 'win32') exec(`start "" "${arquivo}"`);
-  else if (process.platform === 'darwin') exec(`open "${arquivo}"`);
-  return true;
-}
-
-export async function esperarPronta(owa, id, aviso = log, { tentativas = 120, pausaMs = 3000 } = {}) {
-  let qrMostrado = false;
-  for (let i = 0; i < tentativas; i++) {
-    const r = await owa.sessao(id);
-    const s = r.dados?.data || r.dados || {};
-    if (s.status === 'ready') return s;
-    if (s.status === 'qr_ready' && !qrMostrado) qrMostrado = await mostrarQr(owa, id);
-    if (['failed', 'disconnected'].includes(s.status) && i > 3) await owa.iniciar(id);
-    await dormir(pausaMs);
-  }
-  throw new Error('A sessão do WhatsApp não ficou pronta. Escaneie o QR e tente de novo.');
-}
-
-// --------------------------------------------------------------- ciclo: entrada
-
-/** Lê o que chegou no WhatsApp e entrega ao LeadSage. Devolve quantas mensagens novas. */
-export async function lerEEntregar(owa, ls, id, estado, aviso = log) {
-  const r = await owa.recebidas(id, estado.desde ? estado.desde * 1000 : 0);
-  if (!r.ok) return 0;
-  const msgs = (r.dados?.messages || []).slice().sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-  let novas = 0;
-  for (const m of msgs) {
-    const chave = String(m.waMessageId || m.id);
-    if (estado.vistos.includes(chave)) continue;
-    let tel = telefoneDoChat(m.chatId);
-    if (!tel && String(m.chatId || '').endsWith('@lid')) {
-      const p = await owa.telefoneDoContato(id, m.chatId);
-      const dig = String(p.dados?.phone || p.dados?.data?.phone || '').replace(/\D/g, '');
-      if (/^\d{10,15}$/.test(dig)) tel = dig;
-    }
-    const payload = paraLeadsage(m, tel);
-    estado.vistos.push(chave);
-    estado.desde = Math.max(estado.desde, Number(m.timestamp) || 0);
-    if (!payload) continue;
-    const e = await ls.mensagem(payload);
-    if (!e.ok && e.status !== 422) {
-      // não perde a mensagem: sai da lista de vistos e tenta no próximo ciclo
-      estado.vistos.pop();
-      aviso(`LeadSage não recebeu a mensagem (HTTP ${e.status}); tento de novo.`);
-      break;
-    }
-    novas++;
-  }
-  return novas;
-}
-
-// ---------------------------------------------------------------- ciclo: saída
-
-/** Pergunta o que enviar e envia, com pausa humana. Devolve {enviadas, proximaEm}. */
-export async function enviarPendentes(owa, ls, id, aviso = log, dorme = dormir) {
+/**
+ * Pergunta ao LeadSage o que enviar e envia, com pausa humana.
+ * `wa.enviar(telefone, texto, digitandoMs)` devolve { ok, erro }.
+ */
+export async function enviarPendentes(ls, wa, aviso = log, dorme = dormir) {
   const t = await ls.tarefas();
   if (!t.ok) {
     if (t.status === 401) throw new Error('A chave do Conector foi revogada ou está errada. Gere outra no LeadSage.');
@@ -233,76 +118,229 @@ export async function enviarPendentes(owa, ls, id, aviso = log, dorme = dormir) 
   }
   let enviadas = 0;
   for (const tarefa of t.dados.tarefas || []) {
-    await dorme(atrasoHumano(tarefa.digitando_ms));
-    const r = await owa.enviarTexto(id, `${tarefa.contato}@c.us`, tarefa.texto);
+    await dorme(1000 + Math.floor(Math.random() * 2000)); // respira antes de cada mensagem
+    const r = await wa.enviar(tarefa.contato, tarefa.texto, atrasoHumano(tarefa.digitando_ms));
     if (r.ok) {
       enviadas++;
       await ls.resultado(tarefa.id, true);
       aviso(`Enviado (${tarefa.tipo}) para ${tarefa.contato}`);
     } else {
-      const erro = r.dados?.message || r.dados?.error || `HTTP ${r.status}`;
-      await ls.resultado(tarefa.id, false, String(erro).slice(0, 200));
-      aviso(`Falhou o envio para ${tarefa.contato}: ${erro}`);
+      await ls.resultado(tarefa.id, false, String(r.erro || 'falhou').slice(0, 200));
+      aviso(`Falhou o envio para ${tarefa.contato}: ${r.erro}`);
     }
   }
   if (t.dados.motivo_sem_frio) aviso(`Abordagem fria em espera: ${t.dados.motivo_sem_frio}`);
   return { enviadas, proximaEm: Number(t.dados.proxima_em) || 30 };
 }
 
-// -------------------------------------------------------------------- principal
-
-export async function executar(cfg) {
-  const { c, faltando } = cfg;
-  if (faltando.length) {
-    console.error('Falta configurar:\n - ' + faltando.join('\n - '));
-    process.exit(1);
+/** Entrega ao LeadSage uma mensagem recebida. Devolve true se foi aceita. */
+export async function entregarMensagem(ls, m, inicioS, vistos, aviso = log) {
+  if (vistos.has(String(m.id))) return false;
+  const payload = paraLeadsage(m, inicioS);
+  vistos.add(String(m.id));
+  if (vistos.size > 1000) vistos.delete(vistos.values().next().value);
+  if (!payload) return false;
+  const e = await ls.mensagem(payload);
+  if (!e.ok && e.status !== 422) {
+    vistos.delete(String(m.id)); // não perde a mensagem: o WhatsApp não reenvia, então avisa
+    aviso(`LeadSage não recebeu a mensagem de ${m.de} (HTTP ${e.status}).`);
+    return false;
   }
-  const owa = clienteOpenwa(c);
-  const ls = clienteLeadsage(c);
+  return true;
+}
 
-  const saude = await owa.saude().catch(() => ({ ok: false }));
-  if (!saude.ok) throw new Error(`Não encontrei o OpenWA em ${c.openwaUrl}. Ele precisa estar ligado (docker compose up -d).`);
+// ------------------------------------------------------- WhatsApp (navegador)
 
-  const id = await garantirSessao(owa, c.sessao);
-  const sessao = await esperarPronta(owa, id);
-  const numero = String(sessao.phone || sessao.phoneNumber || sessao.me || '').replace(/\D/g, '');
-  log(`WhatsApp pronto${numero ? ` (${numero})` : ''}. Conectando ao LeadSage...`);
+export function acharNavegador(existe = existsSync, plataforma = process.platform, env = process.env) {
+  const lista = plataforma === 'win32'
+    ? [
+        `${env['ProgramFiles(x86)'] || 'C:/Program Files (x86)'}/Microsoft/Edge/Application/msedge.exe`,
+        `${env.ProgramFiles || 'C:/Program Files'}/Microsoft/Edge/Application/msedge.exe`,
+        `${env.ProgramFiles || 'C:/Program Files'}/Google/Chrome/Application/chrome.exe`,
+        `${env['ProgramFiles(x86)'] || 'C:/Program Files (x86)'}/Google/Chrome/Application/chrome.exe`,
+        `${env.LOCALAPPDATA || ''}/Google/Chrome/Application/chrome.exe`,
+      ]
+    : plataforma === 'darwin'
+      ? ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge']
+      : ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/microsoft-edge'];
+  return lista.find((p) => p && existe(p)) || '';
+}
 
-  const p = await ls.ping(numero, 'ready');
-  if (!p.ok) throw new Error(`O LeadSage recusou o Conector (HTTP ${p.status}). Confira LEADSAGE_KEY e LEADSAGE_URL.`);
-  log('Conectado. Deixe esta janela aberta: ela atende enquanto estiver rodando.');
+/** Liga o WhatsApp Web. Devolve um adaptador { enviar, parar } e chama os ouvintes. */
+async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
+  const navegador = acharNavegador();
+  if (!navegador) throw new Error('Não achei o Microsoft Edge nem o Google Chrome neste computador. Instale um deles e abra de novo.');
+  const { default: pkg } = await import('whatsapp-web.js');
+  const { Client, LocalAuth } = pkg;
+  const client = new Client({
+    authStrategy: new LocalAuth({ dataPath: join(AQUI, 'sessao') }),
+    puppeteer: { executablePath: navegador, headless: true, args: ['--no-sandbox', '--disable-gpu'] },
+  });
 
-  const estado = await lerEstado(c.arquivoEstado);
-  // na primeira vez, só mensagens a partir de agora (não responde conversas antigas)
-  if (!estado.desde) estado.desde = Math.floor(Date.now() / 1000) - 5;
-
-  let proximaSaida = 0;
-  let ultimoPing = Date.now();
-  for (;;) {
+  client.on('qr', (qr) => aoQr(qr));
+  client.on('ready', () => aoPronto(String(client.info?.wid?.user || '')));
+  client.on('disconnected', (motivo) => aoCair(String(motivo || 'desconectado')));
+  client.on('auth_failure', (m) => aoCair(`falha de autenticação: ${m}`));
+  client.on('message', async (msg) => {
     try {
-      const novas = await lerEEntregar(owa, ls, id, estado);
-      if (novas) { await gravarEstado(c.arquivoEstado, estado); proximaSaida = 0; }
-      if (Date.now() >= proximaSaida) {
-        const r = await enviarPendentes(owa, ls, id);
-        proximaSaida = Date.now() + r.proximaEm * 1000;
-      }
-      if (Date.now() - ultimoPing > 55000) { await ls.ping(numero, 'ready'); ultimoPing = Date.now(); }
+      if (msg.fromMe || msg.isStatus || (msg.from || '').endsWith('@g.us') || (msg.from || '').includes('broadcast')) return;
+      const contato = await msg.getContact().catch(() => null);
+      const digitos = String(contato?.number || (msg.from || '').split('@')[0]).replace(/\D/g, '');
+      aoReceber({
+        id: msg.id?._serialized || msg.id?.id, de: digitos, nome: contato?.pushname || contato?.name || '',
+        texto: msg.body, tipo: msg.type === 'chat' ? 'text' : msg.type, grupo: false, minha: false, momento: msg.timestamp,
+      });
     } catch (e) {
-      if (/revogada|errada/.test(String(e.message))) { console.error(e.message); process.exit(2); }
-      log('Aviso:', e.message);
+      log('Aviso ao ler mensagem:', e.message);
     }
-    await dormir(c.leituraMs);
-  }
+  });
+
+  await client.initialize();
+
+  return {
+    async enviar(telefone, texto, digitandoMs) {
+      try {
+        // confere se o número existe no WhatsApp antes de tentar: número inválido é sinal ruim para a conta
+        const id = await client.getNumberId(telefone);
+        if (!id) return { ok: false, erro: 'esse número não está no WhatsApp' };
+        const chat = await client.getChatById(id._serialized);
+        await chat.sendStateTyping();
+        await dormir(Math.min(9000, Math.max(800, digitandoMs || 0)));
+        await client.sendMessage(id._serialized, texto);
+        await chat.clearState().catch(() => {});
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, erro: String(e.message || e).slice(0, 160) };
+      }
+    },
+    parar: () => client.destroy().catch(() => {}),
+  };
+}
+
+// ------------------------------------------------------ página local (QR)
+
+const PAGINA = `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LeadSage · WhatsApp pelo computador</title>
+<body style="margin:0;font:16px system-ui,sans-serif;background:#f8fafc;color:#0f172a;display:grid;place-items:center;min-height:100vh">
+<main style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:32px;max-width:420px;width:calc(100% - 32px);text-align:center;box-shadow:0 20px 50px -30px rgba(15,23,42,.4)">
+<h1 style="font-size:20px;margin:0 0 6px">LeadSage · WhatsApp</h1>
+<p id="msg" style="color:#64748b;margin:0 0 18px">Iniciando…</p>
+<div id="area"></div>
+<p style="color:#94a3b8;font-size:12px;margin:18px 0 0">Deixe esta janela do programa aberta. Você pode fechar esta página.</p>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+async function atualizar() {
+  let e; try { e = await (await fetch('/estado')).json(); } catch { $('msg').textContent = 'Programa fechado. Abra o Conector de novo.'; return; }
+  $('msg').textContent = e.mensagem;
+  const a = $('area');
+  if (e.fase === 'qr') a.innerHTML = '<img alt="QR code" style="width:260px;height:260px" src="' + e.qr + '"><p style="font-size:14px;color:#475569">No celular: WhatsApp → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b> e aponte para o código.</p>';
+  else if (e.fase === 'pronto') a.innerHTML = '<div style="font-size:54px">✅</div><p style="color:#047857;font-weight:700">Conectado' + (e.numero ? ' · ' + e.numero : '') + '</p>';
+  else if (e.fase === 'sem_chave') a.innerHTML = '<input id="k" placeholder="lsc_..." style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:10px"><button onclick="salvar()" style="margin-top:10px;width:100%;padding:11px;border:0;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer">Conectar</button>';
+  else if (e.fase === 'erro') a.innerHTML = '<div style="font-size:44px">⚠️</div>';
+  else a.innerHTML = '<div style="font-size:44px">⏳</div>';
+}
+async function salvar() {
+  const r = await fetch('/chave', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chave: $('k').value }) });
+  const d = await r.json(); if (!d.ok) alert(d.erro || 'Chave inválida');
+}
+atualizar(); setInterval(atualizar, 2000);
+</script></body></html>`;
+
+function servidorLocal(estado, aoReceberChave) {
+  return http.createServer(async (req, res) => {
+    const saida = (status, tipo, corpo) => { res.writeHead(status, { 'content-type': tipo, 'cache-control': 'no-store' }); res.end(corpo); };
+    if (req.url === '/estado') return saida(200, 'application/json', JSON.stringify(estado));
+    if (req.method === 'POST' && req.url === '/chave') {
+      let corpo = '';
+      for await (const parte of req) corpo += parte;
+      let k = '';
+      try { k = String(JSON.parse(corpo).chave || '').trim(); } catch { /* corpo inválido */ }
+      if (!chaveValida(k)) return saida(200, 'application/json', JSON.stringify({ ok: false, erro: 'Essa chave não parece a do LeadSage.' }));
+      await aoReceberChave(k);
+      return saida(200, 'application/json', JSON.stringify({ ok: true }));
+    }
+    return saida(200, 'text/html; charset=utf-8', PAGINA);
+  });
+}
+
+function abrirNoNavegador(url) {
+  if (process.env.CONECTOR_SEM_ABRIR) return;
+  if (process.platform === 'win32') exec(`start "" "${url}"`);
+  else if (process.platform === 'darwin') exec(`open "${url}"`);
+  else exec(`xdg-open "${url}"`);
+}
+
+// ---------------------------------------------------------------- principal
+
+export async function executar() {
+  const cfg = await lerConfig();
+  const estado = { fase: chaveValida(cfg.chave) ? 'iniciando' : 'sem_chave', mensagem: 'Iniciando…', qr: '', numero: '' };
+  let iniciarTudo = () => {};
+
+  const srv = servidorLocal(estado, async (k) => {
+    cfg.chave = k;
+    await gravarConfig(cfg);
+    estado.fase = 'iniciando';
+    estado.mensagem = 'Chave salva. Ligando o WhatsApp…';
+    iniciarTudo();
+  });
+  srv.on('error', (e) => { console.error(e.code === 'EADDRINUSE' ? 'O Conector já está aberto em outra janela.' : e.message); process.exit(1); });
+  await new Promise((r) => srv.listen(PORTA, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${PORTA}`;
+  abrirNoNavegador(url);
+  log(`LeadSage Conector ${VERSAO}. Se a página não abrir, acesse ${url}`);
+
+  if (estado.fase === 'sem_chave') estado.mensagem = 'Cole a chave que o LeadSage mostrou.';
+
+  let ligado = false;
+  iniciarTudo = async () => {
+    if (ligado || !chaveValida(cfg.chave)) return;
+    ligado = true;
+    const ls = clienteLeadsage(cfg);
+    const vistos = new Set();
+    const inicioS = Math.floor(Date.now() / 1000);
+    const QRCode = (await import('qrcode')).default;
+    let wa = null;
+    let pronto = false;
+    let proximaSaida = 0;
+    let ultimoPing = 0;
+
+    try {
+      estado.mensagem = 'Abrindo o WhatsApp Web…';
+      wa = await iniciarWhatsApp({
+        aoQr: async (qr) => { estado.fase = 'qr'; estado.mensagem = 'Escaneie o QR code com o celular.'; estado.qr = await QRCode.toDataURL(qr, { width: 300, margin: 1 }); },
+        aoPronto: async (numero) => {
+          pronto = true; estado.fase = 'pronto'; estado.numero = numero; estado.qr = ''; estado.mensagem = 'Tudo certo. O robô está atendendo.';
+          const p = await ls.ping(numero, 'ready');
+          if (p.status === 401) { estado.fase = 'erro'; estado.mensagem = 'A chave é inválida ou foi revogada. Gere outra no LeadSage.'; }
+          ultimoPing = Date.now();
+          log(`WhatsApp pronto${numero ? ` (${numero})` : ''}.`);
+        },
+        aoCair: (motivo) => { pronto = false; estado.fase = 'erro'; estado.mensagem = `WhatsApp desconectado (${motivo}). Feche e abra o Conector.`; log(estado.mensagem); },
+        aoReceber: async (m) => { if (pronto && await entregarMensagem(ls, m, inicioS, vistos)) proximaSaida = 0; },
+      });
+    } catch (e) {
+      estado.fase = 'erro'; estado.mensagem = e.message; log('Erro:', e.message); ligado = false; return;
+    }
+
+    for (;;) {
+      try {
+        if (pronto && Date.now() >= proximaSaida) {
+          const r = await enviarPendentes(ls, wa);
+          proximaSaida = Date.now() + r.proximaEm * 1000;
+        }
+        if (pronto && Date.now() - ultimoPing > 55000) { await ls.ping(estado.numero, 'ready'); ultimoPing = Date.now(); }
+      } catch (e) {
+        if (/revogada|errada/.test(String(e.message))) { estado.fase = 'erro'; estado.mensagem = e.message; log(e.message); await wa?.parar(); return; }
+        log('Aviso:', e.message);
+      }
+      await dormir(3000);
+    }
+  };
+  await iniciarTudo();
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  // .env simples ao lado do programa
-  const envPath = join(AQUI, '.env');
-  if (existsSync(envPath)) {
-    for (const linha of (await readFile(envPath, 'utf8')).split(/\r?\n/)) {
-      const m = /^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/.exec(linha);
-      if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
-    }
-  }
-  executar(lerConfig()).catch((e) => { console.error('Erro:', e.message); process.exit(1); });
+  executar().catch((e) => { console.error('Erro:', e.message); process.exit(1); });
 }

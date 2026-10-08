@@ -1,13 +1,14 @@
-"""WhatsApp pelo computador do próprio usuário (Conector + OpenWA).
+"""WhatsApp pelo computador do próprio usuário (Conector).
 
-O Conector é um programa que roda no PC do usuário, ao lado do OpenWA
-(gateway de código aberto que se liga ao WhatsApp pelo QR code). Quem chama
-quem: o Conector liga para o LeadSage, nunca o contrário, porque a nuvem não
-alcança um computador atrás do roteador.
+O Conector é um programa que roda no PC do usuário: abre o WhatsApp Web no Edge/Chrome
+que ele já tem, mostra o QR code e passa a atender. Quem chama quem: o Conector liga
+para o LeadSage, nunca o contrário, porque a nuvem não alcança um computador atrás do
+roteador.
 
     Conector --(chave)--> /api/conector/mensagem   o lead respondeu; o robô decide
     Conector --(chave)--> /api/conector/tarefas    o que enviar agora
     Conector --(chave)--> /api/conector/tarefas/{id}/resultado
+    Extensão --(chave)--> /api/conector/responder  sugere resposta, sem guardar nada
 
 Duas filas saem por aqui: as **respostas** do robô (e as do dono, pela tela) e
 as **abordagens frias** preparadas na Fila de envio. Só as frias têm limite:
