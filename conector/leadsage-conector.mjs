@@ -516,8 +516,10 @@ atualizar(); setInterval(atualizar, 2000);
 </script></body></html>`;
 
 /** Origens que podem ler o estado: o LeadSage mostra o QR code dentro do próprio app. */
-export function origensPermitidas(site) {
+export function origensPermitidas(site, extras = process.env.CONECTOR_ORIGENS_EXTRA || '') {
   const lista = new Set(['https://leadsageofc.vercel.app']);
+  // só para desenvolvimento e testes automáticos (ex.: http://localhost:5173), separadas por vírgula
+  for (const o of String(extras).split(',').map((x) => x.trim()).filter(Boolean)) lista.add(o);
   try { lista.add(new URL(site).origin); } catch { /* site inválido: fica só o padrão */ }
   return lista;
 }

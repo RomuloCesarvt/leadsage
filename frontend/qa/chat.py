@@ -22,6 +22,8 @@ MENS = {
 }
 MUITAS = [{"id": f"x{i}", "texto": f"Mensagem número {i} " + ("com texto um pouco mais longo " * (i % 4)), "minha": i % 3 == 0, "quando": AGORA - (400 - i) * 60, "tipo": "text", "midia": False, "status": 3} for i in range(400)]
 CHATS.append({"id": "5514955556666@c.us", "nome": "Conversa longa", "grupo": False, "telefone": "5514955556666", "naoLidas": 0, "quando": AGORA - 10, "ultima": {"texto": "fim", "minha": False}})
+for _i in range(90):
+    CHATS.append({"id": f"55149{_i:08d}@c.us", "nome": f"Contato {_i}", "grupo": False, "telefone": f"55149{_i:08d}", "naoLidas": 0, "quando": AGORA - 5000 - _i * 100, "ultima": {"texto": f"mensagem {_i}", "minha": False}})
 ENVIADAS = []
 
 
@@ -106,6 +108,16 @@ async def main():
             if not ENVIADAS: problemas.append(f"{nome}: nao enviou pelo conector")
             if not any(m == "POST" and c.endswith("/robo") for m, c in chamadas): problemas.append(f"{nome}: nao pausou o robo ao assumir")
             if not await pag.locator("text=Você assumiu esta conversa").count(): problemas.append(f"{nome}: faltou o aviso de que assumiu")
+            # a lista de contatos rola com a roda do mouse
+            if w > 800:
+                lista_el = pag.locator("button:has(p.truncate)").first
+                box = await lista_el.bounding_box()
+                antes = await pag.evaluate("() => { const b = document.querySelector('button p.truncate').closest('div.overflow-y-auto'); return b.scrollTop; }")
+                await pag.mouse.move(box["x"] + 100, box["y"] + 20)
+                await pag.mouse.wheel(0, 900); await pag.wait_for_timeout(400)
+                depois = await pag.evaluate("() => { const b = document.querySelector('button p.truncate').closest('div.overflow-y-auto'); return { st: b.scrollTop, sh: b.scrollHeight, ch: b.clientHeight }; }")
+                if depois["st"] <= antes: problemas.append(f"{nome}: a lista de contatos nao rolou {depois}")
+                await pag.mouse.wheel(0, -2000); await pag.wait_for_timeout(200)
             # conversa longa: o campo de digitar tem de ficar a vista e so a lista de mensagens rola
             if w > 800:
                 await pag.get_by_label("Buscar conversa").fill("longa"); await pag.wait_for_timeout(300)
