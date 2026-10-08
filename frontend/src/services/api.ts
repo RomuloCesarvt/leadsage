@@ -306,6 +306,14 @@ export const api = {
     return await fetchWithToken('/robo/telegram/conectar', { method: 'POST', body: JSON.stringify({ token }) });
   },
 
+  async conectorGerar(): Promise<RoboConfig & { chave: string }> {
+    return await fetchWithToken('/robo/conector/gerar', { method: 'POST' });
+  },
+
+  async conectorRevogar(): Promise<RoboConfig> {
+    return await fetchWithToken('/robo/conector/revogar', { method: 'POST' });
+  },
+
   async telegramDesconectar(): Promise<RoboConfig> {
     return await fetchWithToken('/robo/telegram/desconectar', { method: 'POST' });
   },

@@ -1,7 +1,8 @@
+import time
 import re
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 import asyncio
 from typing import List, Dict, Any, Optional
 
@@ -42,7 +43,7 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
-from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, abordagem_mestra
+from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, abordagem_mestra, conector_whatsapp
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote as _quote
 from app.ai_robo import decidir as robo_decidir
@@ -1353,6 +1354,165 @@ async def telegram_webhook(gancho: str, request: Request):
         except Exception as exc:
             print(f"Robo: falha ao processar telegram/{msg.meta_id}: {exc}")
     return {"ok": True}
+
+
+# ------------------------------------------------- WhatsApp pelo computador (Conector)
+
+class ConectorPing(BaseModel):
+    numero: str = Field(default="", max_length=40)
+    status: str = Field(default="", max_length=40)
+    versao: str = Field(default="", max_length=20)
+
+
+class ConectorMensagem(BaseModel):
+    id: str = Field(min_length=1, max_length=160)
+    contato: str = Field(min_length=8, max_length=40)
+    nome: str = Field(default="", max_length=120)
+    texto: str = Field(min_length=1, max_length=4000)
+    momento: int = 0
+
+
+class ConectorResultado(BaseModel):
+    ok: bool
+    erro: str = Field(default="", max_length=300)
+
+
+# A chave e conferida a cada chamada do Conector; guardar o canal por alguns
+# segundos poupa leituras do Firestore (que cobra por documento lido).
+_CACHE_CONECTOR: Dict[str, Any] = {}
+_CACHE_CONECTOR_S = 15
+
+
+async def _canal_do_conector(request: Request) -> Dict[str, Any]:
+    chave = request.headers.get("x-conector-key", "")
+    if not conector_whatsapp.chave_valida(chave):
+        raise HTTPException(status_code=401, detail="Chave do Conector inválida.")
+    h = conector_whatsapp.hash_da_chave(chave)
+    quando, canal = _CACHE_CONECTOR.get(h, (0.0, None))
+    if canal is None or time.monotonic() - quando > _CACHE_CONECTOR_S:
+        canal = await conector_whatsapp.canal_da_chave(chave)
+        if canal is None:
+            _CACHE_CONECTOR.pop(h, None)
+            raise HTTPException(status_code=401, detail="Chave do Conector inválida ou revogada.")
+        _CACHE_CONECTOR[h] = (time.monotonic(), canal)
+    return canal
+
+
+async def _gravar_canal_do_conector(canal: Dict[str, Any]) -> None:
+    await robo_store.substituir_canal(canal["uid"], canal)
+    if canal.get("cw_hash"):
+        _CACHE_CONECTOR[canal["cw_hash"]] = (time.monotonic(), canal)
+
+
+@app.post("/api/robo/conector/gerar")
+async def conector_gerar(user: dict = Depends(get_current_user)):
+    """Cria (ou troca) a chave que liga o Conector do PC a esta conta. Aparece uma vez."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    uid = user.get("uid")
+    canal = await robo_conexao._canal(uid, user.get("email", ""))
+    antigo = canal.get("cw_hash")
+    chave = await conector_whatsapp.criar_chave(canal)
+    await robo_store.registrar_ativo("conector", canal["cw_hash"], uid, canal["gancho"])
+    canal = await robo_store.substituir_canal(uid, canal)
+    if antigo:
+        _CACHE_CONECTOR.pop(antigo, None)
+    return {"chave": chave, **robo_store.visao_publica(canal, settings.APP_URL)}
+
+
+@app.post("/api/robo/conector/revogar")
+async def conector_revogar(user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    uid = user.get("uid")
+    canal = await robo_conexao._canal(uid, user.get("email", ""))
+    antigo = canal.get("cw_hash")
+    canal = await conector_whatsapp.revogar(canal)
+    canal = await robo_store.substituir_canal(uid, canal)
+    if antigo:
+        _CACHE_CONECTOR.pop(antigo, None)
+    return robo_store.visao_publica(canal, settings.APP_URL)
+
+
+@app.post("/api/conector/ping")
+async def conector_ping(req: ConectorPing, request: Request):
+    """O Conector avisa que está vivo e qual número está ligado."""
+    canal = await _canal_do_conector(request)
+    agora_dt = datetime.now(timezone.utc)
+    visto = conector_whatsapp._ler_data(canal.get("cw_visto"))
+    mudou = (req.numero and req.numero != canal.get("cw_numero")) or (req.status != canal.get("cw_status", ""))
+    if mudou or not visto or (agora_dt - visto).total_seconds() > 50:
+        canal["cw_visto"] = agora_dt.isoformat()
+        canal.setdefault("cw_primeiro", canal["cw_visto"])
+        if req.numero:
+            canal["cw_numero"] = re.sub(r"\D", "", req.numero)[:20]
+        canal["cw_status"] = req.status
+        canal["cw_versao"] = req.versao
+        await _gravar_canal_do_conector(canal)
+    return {"ok": True, "limite_frio": conector_whatsapp.limite_frio_do_dia(canal)}
+
+
+@app.get("/api/conector/tarefas")
+async def conector_tarefas(request: Request):
+    canal = await _canal_do_conector(request)
+    if not canal.get("cw_primeiro"):
+        canal["cw_primeiro"] = datetime.now(timezone.utc).isoformat()
+    antes = (canal.get("cw_ultimo_frio"), canal.get("cw_frio_n"), canal.get("cw_primeiro"))
+    resposta = await conector_whatsapp.tarefas(canal)
+    if antes != (canal.get("cw_ultimo_frio"), canal.get("cw_frio_n"), canal.get("cw_primeiro")):
+        await _gravar_canal_do_conector(canal)
+    return resposta
+
+
+@app.post("/api/conector/tarefas/{tarefa_id}/resultado")
+async def conector_resultado(tarefa_id: str, req: ConectorResultado, request: Request):
+    canal = await _canal_do_conector(request)
+    if not await conector_whatsapp.registrar_resultado(canal, tarefa_id, req.ok, req.erro):
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
+    return {"ok": True}
+
+
+class ConectorFala(BaseModel):
+    de: str = Field(pattern="^(contato|voce)$")
+    texto: str = Field(max_length=1500)
+
+
+class ConectorResponder(BaseModel):
+    mensagens: List[ConectorFala] = Field(min_length=1, max_length=30)
+    telefone: str = Field(default="", max_length=40)
+
+
+@app.post("/api/conector/responder")
+async def conector_responder(req: ConectorResponder, request: Request):
+    """Sugere a resposta para a conversa que a extensão leu na tela. Não guarda nada."""
+    canal = await _canal_do_conector(request)
+    telefone = conector_whatsapp.telefone_whatsapp(req.telefone) if req.telefone else ""
+    try:
+        return await robo_service.responder_sem_guardar(canal, [m.model_dump() for m in req.mensagens], telefone)
+    except PermissionError as exc:
+        raise HTTPException(status_code=402, detail=str(exc))
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="A IA demorou para responder. Tente de novo.")
+    except Exception as exc:
+        print(f"Robo: falha ao sugerir resposta: {exc}")
+        raise HTTPException(status_code=503, detail="Não foi possível gerar a resposta agora.")
+
+
+@app.post("/api/conector/mensagem")
+async def conector_mensagem(req: ConectorMensagem, request: Request):
+    """Um lead respondeu no WhatsApp do usuário. O robô decide e enfileira a resposta."""
+    canal = await _canal_do_conector(request)
+    contato = conector_whatsapp.telefone_whatsapp(req.contato)
+    if not 10 <= len(contato) <= 15:
+        raise HTTPException(status_code=422, detail="Número de contato inválido.")
+    canal["cw_atividade"] = datetime.now(timezone.utc).isoformat()
+    await _gravar_canal_do_conector(canal)
+    msg = meta_canais.Recebida(canal="whatsapp", contato=contato, nome=req.nome.strip(),
+                               texto=req.texto.strip(), meta_id=req.id, momento=req.momento)
+    try:
+        conversa = await robo_service.processar(canal, msg)
+    except Exception as exc:
+        print(f"Robo: falha ao processar mensagem do conector {req.id}: {exc}")
+        return {"ok": False}
+    return {"ok": True, "precisa_humano": bool(conversa.get("precisa_humano"))}
 
 
 @app.get("/api/robo/meta/disponivel")

@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "cd frontend && npm install && npm run build && cd .. && rm -rf dist && mv frontend/dist dist"
+    "build": "cd frontend && npm install && npm run build && cd .. && mkdir -p frontend/dist/conector && cp conector/leadsage-conector.mjs conector/exemplo.env conector/iniciar.bat conector/LEIA-ME.md frontend/dist/conector/ && rm -rf dist && mv frontend/dist dist"
   }
 }

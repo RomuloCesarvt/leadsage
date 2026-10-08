@@ -307,3 +307,61 @@ async def responder_como_humano(
     conversa["atualizado"] = robo_store.agora()
     await robo_store.salvar_conversa(uid, conversa)
     return conversa
+
+
+async def responder_sem_guardar(
+    cfg: Dict[str, Any],
+    mensagens: list,
+    telefone: str = "",
+    canal: str = "whatsapp",
+    gerar: Optional[Callable[[str], Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Sugere a resposta para uma conversa que o usuário está lendo, sem guardar nada.
+
+    É o caminho da extensão: ela lê a conversa na tela, manda os últimos trechos e
+    recebe a resposta. A conversa não passa por nenhum banco nosso. Quem escreveu
+    antes (o robô, o dono) chega como "voce" e entra no prompt como fala do vendedor.
+    """
+    uid, email = cfg["uid"], cfg.get("email", "")
+    perfil = await get_profile(uid)
+    if not is_admin(email) and not tem_recurso(perfil.plan_id or "previa", "robo_ia"):
+        raise PermissionError("seu plano não inclui o robô de atendimento")
+
+    historico = [
+        {"de": "contato" if m.get("de") == "contato" else "robo", "texto": str(m.get("texto") or "")[:1500],
+         "em": robo_store.agora()}
+        for m in mensagens[-30:] if str(m.get("texto") or "").strip()
+    ]
+    if not historico or historico[-1]["de"] != "contato":
+        return {"mensagens": [], "motivo": "a última mensagem não é do contato; não há o que responder"}
+
+    lead = await _lead_do_contato(uid, canal, telefone) if telefone else None
+    raio = None
+    if lead:
+        try:
+            from app import raio_x
+            raio = await raio_x.ler_cache(uid, lead["id"])
+        except Exception:
+            raio = None
+
+    gerador = gerar or _gerador_padrao()
+    decisao: Decisao = await asyncio.wait_for(
+        asyncio.to_thread(decidir, historico, canal, perfil.model_dump(), cfg, lead, gerador, raio, None),
+        timeout=PRAZO_IA,
+    )
+    textos = decisao.mensagens or ([decisao.resposta] if decisao.resposta else [])
+    if textos and decisao.usou_ia:
+        try:
+            saldo = await check_and_deduct_credits(uid, CUSTO_RESPOSTA, email)
+        except BancoDeCreditosIndisponivel:
+            saldo = None
+        if saldo is None:
+            return {"mensagens": [], "motivo": "sem créditos para o robô responder"}
+    return {
+        "mensagens": textos,
+        "passar_para_humano": bool(decisao.passar_para_humano),
+        "optout": bool(decisao.optout),
+        "motivo": decisao.motivo or "",
+        "etapa": (decisao.sdr or {}).get("etapa", ""),
+        "temperatura": (decisao.sdr or {}).get("temperatura", ""),
+    }

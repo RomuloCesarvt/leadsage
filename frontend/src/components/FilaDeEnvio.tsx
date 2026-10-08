@@ -149,7 +149,7 @@ export const FilaDeEnvio: React.FC = () => {
     finally { setTrabalhando(''); }
   };
 
-  const naFila = itens.filter(i => ['pendente', 'aguardando_limite', 'falhou'].includes(i.status));
+  const naFila = itens.filter(i => ['pendente', 'enviando', 'aguardando_limite', 'falhou'].includes(i.status));
   const enviados = itens.filter(i => i.status === 'enviado').slice(0, 8);
   const aguardando = naFila.filter(i => i.status === 'aguardando_limite' && i.canal === 'email');
 
@@ -232,7 +232,7 @@ export const FilaDeEnvio: React.FC = () => {
               {enviados.map(i => (
                 <li key={i.id} className="text-xs text-slate-700 flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-emerald-600" /><b className="text-slate-900">{i.nome}</b>
-                  <span>{NOME_CANAL[i.canal]} · {i.enviado_por === 'robô' ? 'enviado pelo robô' : 'enviado por você'}</span>
+                  <span>{NOME_CANAL[i.canal]} · {i.enviado_por === 'robô' ? 'enviado pelo robô' : i.enviado_por === 'conector' ? 'enviado pelo Conector' : 'enviado por você'}</span>
                 </li>
               ))}
             </ul>
@@ -281,7 +281,10 @@ export const FilaDeEnvio: React.FC = () => {
             {item.assunto && <p className="text-xs font-semibold text-slate-700 mb-1">Assunto: {item.assunto}</p>}
             <p className="text-[13px] text-slate-800 leading-relaxed whitespace-pre-line bg-slate-50 border border-slate-100 rounded-xl p-3 max-h-40 overflow-y-auto">{item.texto}</p>
 
-            {item.status !== 'pendente' && item.motivo && (
+            {item.status === 'enviando' && (
+              <p className="text-xs mt-2 flex gap-1.5 text-sky-800"><Clock className="w-3.5 h-3.5 shrink-0 mt-0.5" /> O Conector do seu computador está enviando esta mensagem.</p>
+            )}
+            {item.status !== 'pendente' && item.status !== 'enviando' && item.motivo && (
               <p className={`text-xs mt-2 flex gap-1.5 ${item.status === 'falhou' ? 'text-red-700' : 'text-amber-800'}`}>
                 {item.status === 'falhou' ? <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> : <Clock className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
                 {item.motivo}

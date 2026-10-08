@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "LeadSage Copiloto",
+  "version": "0.1.0",
+  "description": "Sugere a resposta do robô do LeadSage na conversa aberta do WhatsApp Web. Você revisa e envia.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://leadsageofc.vercel.app/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["conversa.js", "whatsapp.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": { "default_popup": "popup.html", "default_title": "LeadSage Copiloto" }
+}

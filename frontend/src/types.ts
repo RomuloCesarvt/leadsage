@@ -380,6 +380,15 @@ export interface RoboConfig extends Omit<RoboConfigEntrada, 'app_secret' | 'wa_t
   whatsapp_pronto: boolean;
   meta_pronto: boolean;
   telegram_pronto: boolean;
+  /** WhatsApp pelo computador (Conector + OpenWA) */
+  conector_criado: boolean;
+  conector_prefixo: string;
+  conector_online: boolean;
+  conector_visto: string;
+  conector_numero: string;
+  conector_status: string;
+  conector_frio_hoje: number;
+  conector_frio_limite: number;
   /** @ do bot do Telegram, sem o arroba */
   tg_username: string;
   /** 'app': conectado com um clique pelo app do LeadSage; 'manual': app proprio */
@@ -518,7 +527,7 @@ export interface ItemFila {
   link: string;
   gancho?: string;
   seguimentos?: { quando: string; objetivo?: string; texto: string }[];
-  status: 'pendente' | 'enviado' | 'pulado' | 'aguardando_limite' | 'falhou';
+  status: 'pendente' | 'enviando' | 'enviado' | 'pulado' | 'aguardando_limite' | 'falhou';
   motivo?: string;
   criado: string;
   enviado_em?: string;

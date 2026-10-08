@@ -13,6 +13,7 @@ import React, { useEffect, useState } from 'react';
 import { Check, Loader2, Unplug, AlertTriangle } from 'lucide-react';
 import { api } from '../services/api';
 import { WhatsAppIcon, InstagramIcon, FacebookIcon, TelegramIcon } from './BrandIcons';
+import { ConectorWhatsApp } from './ConectorWhatsApp';
 import type { RoboConfig } from '../types';
 
 type Disponivel = { facebook: boolean; whatsapp: boolean; app_id: string; wa_config_id: string };
@@ -286,6 +287,8 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
             </div>
           )}
         </div>
+
+        <ConectorWhatsApp cfg={cfg} aoMudar={aoMudar} />
       </div>
 
       {erro && <p className="text-sm text-red-600 mt-3">{erro}</p>}

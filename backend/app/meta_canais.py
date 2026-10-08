@@ -153,6 +153,10 @@ async def enviar(canal: str, contato: str, texto: str, cfg: Dict[str, Any]) -> s
 
     if canal == "whatsapp":
         token, origem = cfg.get("wa_token"), cfg.get("wa_phone_id")
+        if not (token and origem) and cfg.get("cw_hash"):
+            # sem a API oficial, mas com o Conector: a resposta sai pelo WhatsApp do PC
+            from app import conector_whatsapp
+            return await conector_whatsapp.enfileirar_resposta(cfg, contato, texto)
         if not (token and origem):
             raise EnvioFalhou("WhatsApp não conectado.")
         url = f"{GRAPH}/{origem}/messages"

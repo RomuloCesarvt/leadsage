@@ -174,6 +174,8 @@ def visao_publica(canal: Optional[Dict[str, Any]], url_base: str) -> Dict[str, A
     saida["whatsapp_pronto"] = bool(c.get("wa_token") and c.get("wa_phone_id") and assinatura_ok)
     saida["meta_pronto"] = bool(c.get("page_token") and c.get("page_id") and assinatura_ok)
     saida["telegram_pronto"] = bool(c.get("tg_token") and c.get("tg_secret"))
+    from app import conector_whatsapp
+    saida.update(conector_whatsapp.visao(c))
     saida["tg_username"] = c.get("tg_username", "")
     # paginas autorizadas aguardando escolha: so nome e id, nunca o token
     saida["paginas_pendentes"] = [
@@ -248,7 +250,7 @@ async def listar_conversas(uid: str) -> List[Dict[str, Any]]:
 
 # usuario_meta: quem do Facebook autorizou — e por ele que chega o pedido
 # de exclusao de dados quando a pessoa remove o LeadSage da conta dela.
-TIPOS_DE_ATIVO = ("pagina", "instagram", "whatsapp", "usuario_meta")
+TIPOS_DE_ATIVO = ("pagina", "instagram", "whatsapp", "usuario_meta", "conector")
 
 
 def _chave_ativo(tipo: str, ativo_id: str) -> str:
