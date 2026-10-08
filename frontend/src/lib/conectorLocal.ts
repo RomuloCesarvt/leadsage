@@ -7,7 +7,20 @@
  */
 export const CONECTOR_URL = 'http://127.0.0.1:2790';
 
-export type EstadoConector = { fase: string; qr: string; mensagem: string; numero: string };
+export type EstadoConector = { fase: string; qr: string; mensagem: string; numero: string; versao?: string };
+
+/** De onde o Conector tirou a lista: da página do WhatsApp Web, da biblioteca ou do histórico que ele mesmo guardou. */
+export type FonteLista = 'pagina' | 'biblioteca' | 'historico' | '';
+
+/** A versão mínima do Conector que tem o chat completo. */
+export const VERSAO_MINIMA = '2.2.0';
+
+export const versaoAntiga = (v?: string) => {
+  const a = (v || '0').split('.').map(Number);
+  const b = VERSAO_MINIMA.split('.').map(Number);
+  for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== b[i]) return (a[i] || 0) < b[i]; }
+  return false;
+};
 
 export type ChatWhats = {
   id: string;
@@ -29,9 +42,14 @@ export type MensagemWhats = {
   status: number;
 };
 
+// Só para testes automáticos: outra porta, para não esbarrar num Conector de verdade aberto.
+const base = () => {
+  try { return localStorage.getItem('LEADSAGE_CONECTOR_URL') || CONECTOR_URL; } catch { return CONECTOR_URL; }
+};
+
 async function chamar<T>(caminho: string, init?: RequestInit): Promise<T | null> {
   try {
-    const r = await fetch(`${CONECTOR_URL}${caminho}`, { cache: 'no-store', ...init });
+    const r = await fetch(`${base()}${caminho}`, { cache: 'no-store', ...init });
     if (!r.ok) {
       const corpo = await r.json().catch(() => ({}));
       throw new Error(corpo.erro || `Erro ${r.status}`);
@@ -45,10 +63,11 @@ async function chamar<T>(caminho: string, init?: RequestInit): Promise<T | null>
 
 export const conectorLocal = {
   estado: () => chamar<EstadoConector>('/estado'),
-  async chats(limite = 60): Promise<ChatWhats[] | null> {
-    const r = await chamar<{ chats: ChatWhats[] }>(`/chats?limite=${limite}`);
-    return r ? r.chats : null;
+  async chats(limite = 60): Promise<{ chats: ChatWhats[]; fonte: FonteLista } | null> {
+    const r = await chamar<{ chats: ChatWhats[]; fonte?: FonteLista }>(`/chats?limite=${limite}`);
+    return r ? { chats: r.chats, fonte: r.fonte || '' } : null;
   },
+  diagnostico: () => chamar<Record<string, any>>('/diagnostico'),
   async mensagens(id: string, limite = 80): Promise<MensagemWhats[] | null> {
     const r = await chamar<{ mensagens: MensagemWhats[] }>(`/chats/${encodeURIComponent(id)}/mensagens?limite=${limite}`);
     return r ? r.mensagens : null;

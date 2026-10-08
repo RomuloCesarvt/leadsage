@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '2.2.0';
+export const VERSAO = '2.3.0';
 const PORTA = 2790;
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -149,6 +149,68 @@ export async function entregarMensagem(ls, m, inicioS, vistos, aviso = log) {
   return true;
 }
 
+// ------------------------------------------------- histórico próprio (reserva do chat)
+
+/**
+ * Guarda no computador as conversas que o Conector viu passar (mensagens recebidas e enviadas).
+ *
+ * É a reserva do chat: se ler a página do WhatsApp Web falhar (o WhatsApp muda o código dele de
+ * tempos em tempos), a lista de conversas e as mensagens saem daqui, em vez de a tela ficar
+ * vazia. Só tem o que aconteceu depois que o Conector foi ligado.
+ */
+export function criarHistorico(arquivo, { maxMensagens = 300, maxChats = 300 } = {}) {
+  let chats = {};
+  let pendente = null;
+
+  const salvar = () => {
+    if (!arquivo || pendente) return;
+    pendente = setTimeout(async () => {
+      pendente = null;
+      try { await writeFile(arquivo, JSON.stringify({ chats }), 'utf8'); } catch { /* disco cheio ou sem permissão: segue em memória */ }
+    }, 2000);
+    pendente.unref?.();
+  };
+
+  return {
+    async carregar() {
+      if (!arquivo) return;
+      try { chats = JSON.parse(await readFile(arquivo, 'utf8')).chats || {}; } catch { chats = {}; }
+    },
+    registrar({ chatId, nome, grupo, mensagem }) {
+      if (!chatId || !mensagem || !mensagem.id) return;
+      const c = chats[chatId] || (chats[chatId] = { id: chatId, nome: '', grupo: Boolean(grupo), telefone: '', naoLidas: 0, quando: 0, ultima: null, mensagens: [] });
+      if (c.mensagens.some((m) => m.id === mensagem.id)) return; // o WhatsApp avisa duas vezes
+      if (nome && !mensagem.minha) c.nome = nome;
+      c.telefone = c.telefone || (/^(\d{10,15})@c\.us$/.exec(chatId) || [])[1] || '';
+      c.nome = c.nome || c.telefone || chatId.split('@')[0];
+      c.mensagens.push(mensagem);
+      c.mensagens.sort((a, b) => a.quando - b.quando);
+      if (c.mensagens.length > maxMensagens) c.mensagens.splice(0, c.mensagens.length - maxMensagens);
+      if (!mensagem.minha) c.naoLidas += 1;
+      const u = c.mensagens[c.mensagens.length - 1];
+      c.quando = u.quando;
+      c.ultima = { texto: u.texto, minha: u.minha };
+      const ids = Object.keys(chats);
+      if (ids.length > maxChats) {
+        ids.sort((a, b) => chats[a].quando - chats[b].quando).slice(0, ids.length - maxChats).forEach((i) => delete chats[i]);
+      }
+      salvar();
+    },
+    chats(limite = 40) {
+      return Object.values(chats)
+        .sort((a, b) => b.quando - a.quando)
+        .slice(0, limite)
+        .map(({ mensagens, ...resumo }) => resumo);
+    },
+    mensagens(chatId, limite = 60) {
+      return (chats[chatId]?.mensagens || []).slice(-limite);
+    },
+    lida(chatId) {
+      if (chats[chatId]) { chats[chatId].naoLidas = 0; salvar(); }
+    },
+  };
+}
+
 // ------------------------------------------------------- o chat (como o WhatsApp Web)
 
 /** Um chat da lista: nome, última mensagem, não lidas, número quando for pessoa. */
@@ -194,15 +256,18 @@ export async function tratarChat(wa, metodo, caminho, consulta, corpo) {
   if (!wa) return { status: 503, json: { erro: 'O WhatsApp ainda não está conectado.' } };
   const partes = caminho.split('/').filter(Boolean); // ['chats', id, 'mensagens']
   try {
+    if (metodo === 'GET' && partes.length === 1 && partes[0] === 'diagnostico') {
+      return { status: 200, json: wa.diagnostico ? wa.diagnostico() : {} };
+    }
     if (metodo === 'GET' && partes.length === 1) {
       const limite = Math.min(100, Math.max(1, Number(consulta.get('limite')) || 40));
-      return { status: 200, json: { chats: await comLimite(wa.chats(limite), 30000) } };
+      return { status: 200, json: await (async () => { const chats = await comLimite(wa.chats(limite), 30000); return { chats, fonte: wa.diagnostico?.().fonteChats || '' }; })() };
     }
     const id = decodeURIComponent(partes[1] || '');
     if (!CHAT_ID_RE.test(id)) return { status: 400, json: { erro: 'Conversa inválida.' } };
     if (metodo === 'GET' && partes[2] === 'mensagens') {
       const limite = Math.min(150, Math.max(1, Number(consulta.get('limite')) || 60));
-      return { status: 200, json: { mensagens: await comLimite(wa.mensagens(id, limite), 30000) } };
+      return { status: 200, json: await (async () => { const mensagens = await comLimite(wa.mensagens(id, limite), 30000); return { mensagens, fonte: wa.diagnostico?.().fonteMensagens || '' }; })() };
     }
     if (metodo === 'POST' && partes[2] === 'enviar') {
       const texto = String(corpo?.texto || '').trim();
@@ -247,6 +312,9 @@ export function acharNavegador(existe = existsSync, plataforma = process.platfor
 
 /** Liga o WhatsApp Web. Devolve um adaptador { enviar, parar } e chama os ouvintes. */
 async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
+  const historico = criarHistorico(join(AQUI, 'historico.json'));
+  await historico.carregar();
+  const diag = { fonteChats: '', fonteMensagens: '', erros: {} };
   const navegador = acharNavegador();
   if (!navegador) throw new Error('Não achei o Microsoft Edge nem o Google Chrome neste computador. Instale um deles e abra de novo.');
   const { default: pkg } = await import('whatsapp-web.js');
@@ -260,6 +328,22 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
   client.on('ready', () => aoPronto(String(client.info?.wid?.user || '')));
   client.on('disconnected', (motivo) => aoCair(String(motivo || 'desconectado')));
   client.on('auth_failure', (m) => aoCair(`falha de autenticação: ${m}`));
+  // todas as mensagens que passam (recebidas, enviadas por você, pelo celular ou pelo LeadSage)
+  // alimentam o histórico próprio, que é a reserva do chat
+  client.on('message_create', async (msg) => {
+    try {
+      const id = msg.fromMe ? msg.to : msg.from;
+      if (!id || msg.isStatus || String(id).includes('broadcast') || String(id).includes('@newsletter')) return;
+      historico.registrar({
+        chatId: id,
+        grupo: String(id).endsWith('@g.us'),
+        nome: msg._data?.notifyName || '',
+        mensagem: resumoDaMensagem(msg),
+      });
+    } catch (e) {
+      log('Aviso ao guardar mensagem no histórico:', e.message);
+    }
+  });
   client.on('message', async (msg) => {
     try {
       if (msg.fromMe || msg.isStatus || (msg.from || '').endsWith('@g.us') || (msg.from || '').includes('broadcast')) return;
@@ -317,16 +401,26 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
             };
           });
         }, limite);
+        diag.fonteChats = 'pagina';
         return brutos.map(resumoDoChat);
       } catch (e) {
-        log('Aviso: leitura direta das conversas falhou, usando a biblioteca:', String(e.message || e).slice(0, 160));
+        diag.erros.chatsPagina = String(e.message || e).slice(0, 300);
+        log('Aviso: leitura direta das conversas falhou, tentando a biblioteca:', diag.erros.chatsPagina.slice(0, 160));
       }
-      const todos = await client.getChats();
-      return todos
-        .filter((c) => !(c.id?._serialized || '').includes('status@broadcast'))
-        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
-        .slice(0, limite)
-        .map(resumoDoChat);
+      try {
+        const todos = await client.getChats();
+        diag.fonteChats = 'biblioteca';
+        return todos
+          .filter((c) => !(c.id?._serialized || '').includes('status@broadcast'))
+          .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+          .slice(0, limite)
+          .map(resumoDoChat);
+      } catch (e) {
+        diag.erros.chatsBiblioteca = String(e.message || e).slice(0, 300);
+        log('Aviso: a biblioteca também falhou; mostrando o histórico guardado:', diag.erros.chatsBiblioteca.slice(0, 160));
+      }
+      diag.fonteChats = 'historico';
+      return historico.chats(limite);
     },
     async mensagens(chatId, limite = 60) {
       try {
@@ -352,21 +446,34 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
             hasMedia: !!(m.mediaData || m.mediaObject || m.isMedia),
           }));
         }, chatId, limite);
+        diag.fonteMensagens = 'pagina';
         return brutas.map(resumoDaMensagem);
       } catch (e) {
-        log('Aviso: leitura direta das mensagens falhou, usando a biblioteca:', String(e.message || e).slice(0, 160));
+        diag.erros.mensagensPagina = String(e.message || e).slice(0, 300);
+        log('Aviso: leitura direta das mensagens falhou, tentando a biblioteca:', diag.erros.mensagensPagina.slice(0, 160));
       }
-      const chat = await client.getChatById(chatId);
-      const msgs = await chat.fetchMessages({ limit: limite });
-      return msgs.map(resumoDaMensagem);
+      try {
+        const chat = await client.getChatById(chatId);
+        const msgs = await chat.fetchMessages({ limit: limite });
+        diag.fonteMensagens = 'biblioteca';
+        return msgs.map(resumoDaMensagem);
+      } catch (e) {
+        diag.erros.mensagensBiblioteca = String(e.message || e).slice(0, 300);
+      }
+      diag.fonteMensagens = 'historico';
+      return historico.mensagens(chatId, limite);
     },
+    diagnostico: () => ({ ...diag, historicoChats: historico.chats(1000).length }),
     async enviarNoChat(chatId, texto) {
       const enviada = await client.sendMessage(chatId, texto);
       return resumoDaMensagem(enviada);
     },
     async lida(chatId) {
-      const chat = await client.getChatById(chatId);
-      await chat.sendSeen();
+      historico.lida(chatId);
+      try {
+        const chat = await client.getChatById(chatId);
+        await chat.sendSeen();
+      } catch (e) { diag.erros.lida = String(e.message || e).slice(0, 200); }
     },
     parar: () => client.destroy().catch(() => {}),
   };
@@ -425,7 +532,7 @@ function servidorLocal(estado, aoReceberChave, permitidas, obterWa) {
     const saida = (status, tipo, corpo) => { res.writeHead(status, { 'content-type': tipo, 'cache-control': 'no-store', ...cors }); res.end(corpo); };
     if (req.method === 'OPTIONS') return saida(204, 'text/plain', '');
     const url = new URL(req.url, 'http://127.0.0.1');
-    if (url.pathname === '/chats' || url.pathname.startsWith('/chats/')) {
+    if (url.pathname === '/diagnostico' || url.pathname === '/chats' || url.pathname.startsWith('/chats/')) {
       if (!chatPermitido(origem, req.headers.host, permitidas)) return saida(403, 'application/json', JSON.stringify({ erro: 'Acesso negado.' }));
       let corpo = null;
       if (req.method === 'POST') {
@@ -461,7 +568,7 @@ function abrirNoNavegador(url) {
 
 export async function executar() {
   const cfg = await lerConfig();
-  const estado = { fase: chaveValida(cfg.chave) ? 'iniciando' : 'sem_chave', mensagem: 'Iniciando…', qr: '', numero: '' };
+  const estado = { fase: chaveValida(cfg.chave) ? 'iniciando' : 'sem_chave', mensagem: 'Iniciando…', qr: '', numero: '', versao: VERSAO };
   let iniciarTudo = () => {};
   let waAtual = null;
 

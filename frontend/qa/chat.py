@@ -59,7 +59,7 @@ class H(BaseHTTPRequestHandler):
 
 
 async def main():
-    srv = HTTPServer(("127.0.0.1", 2790), H)
+    srv = HTTPServer(("127.0.0.1", 2791), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     problemas = []
     medir.RESPOSTAS["/api/robo/conversas"] = [{"id": "whatsapp_5514998003784", "canal": "whatsapp", "contato": "5514998003784", "nome": "Padaria Doce Vida", "lead_id": "", "robo_ativo": True,
@@ -70,6 +70,7 @@ async def main():
         for nome, w, h in [("desktop", 1280, 800), ("celular", 390, 844)]:
             ctx = await nav.new_context(viewport={"width": w, "height": h})
             chamadas = []
+            await ctx.add_init_script("localStorage.setItem('LEADSAGE_CONECTOR_URL', 'http://127.0.0.1:2791')")
             async def api(route):
                 caminho = route.request.url.split("localhost:5198")[-1].split("?")[0]
                 chamadas.append((route.request.method, caminho))

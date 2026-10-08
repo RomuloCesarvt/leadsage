@@ -9,7 +9,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Check, CheckCheck, ChevronLeft, Clock, Power, RefreshCw, Search, Send, Wifi } from 'lucide-react';
 import { api } from '../services/api';
-import { conectorLocal, type ChatWhats, type EstadoConector, type MensagemWhats } from '../lib/conectorLocal';
+import { conectorLocal, versaoAntiga, type ChatWhats, type EstadoConector, type FonteLista, type MensagemWhats } from '../lib/conectorLocal';
 import { sondar } from '../lib/sondagem';
 import { WhatsAppIcon } from './BrandIcons';
 import type { RoboConversaResumo } from '../types';
@@ -56,6 +56,8 @@ const Tique: React.FC<{ status: number }> = ({ status }) => {
 export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar }) => {
   const [chats, setChats] = useState<ChatWhats[] | null>(null);
   const [offline, setOffline] = useState(false);
+  const [fonte, setFonte] = useState<FonteLista>('');
+  const [detalhe, setDetalhe] = useState('');
   const [estado, setEstado] = useState<EstadoConector | null>(null);
   const [robo, setRobo] = useState<RoboConversaResumo[]>([]);
   const [aberto, setAberto] = useState<ChatWhats | null>(null);
@@ -73,12 +75,14 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
       const l = await conectorLocal.chats(80);
       if (l === null) { setOffline(true); setEstado(await conectorLocal.estado().catch(() => null)); return; }
       setOffline(false);
-      setChats(l);
+      setChats(l.chats);
+      setFonte(l.fonte);
     } catch (e: any) {
       // o Conector respondeu, mas não conseguiu ler as conversas
       setOffline(true);
       setEstado(await conectorLocal.estado().catch(() => null));
       setErro(e?.message || 'Não foi possível ler as conversas do WhatsApp.');
+      conectorLocal.diagnostico().then(d => setDetalhe(d ? JSON.stringify(d.erros || d, null, 1) : '')).catch(() => {});
     }
   }, []);
 
@@ -181,6 +185,17 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
           <>
             <h3 className="font-bold text-slate-800 mb-1">O WhatsApp está conectado, mas não consegui ler as conversas</h3>
             <p className="text-sm text-red-600 mb-4 break-words">{erro}</p>
+            {versaoAntiga(estado.versao) && (
+              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+                O Conector aberto no seu computador é uma versão antiga ({estado.versao || 'antes da 2.2'}). Feche a janela preta e abra o arquivo “Conectar-WhatsApp” de novo: ele se atualiza sozinho e o chat passa a funcionar.
+              </p>
+            )}
+            {detalhe && (
+              <details className="text-left max-w-md mx-auto mb-4">
+                <summary className="text-xs text-slate-400 cursor-pointer">Detalhe técnico</summary>
+                <pre className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-2 overflow-x-auto whitespace-pre-wrap">{detalhe}</pre>
+              </details>
+            )}
             <button onClick={() => { setErro(''); void carregarChats(); }} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm">
               Tentar de novo
             </button>
@@ -214,6 +229,8 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
 
   const conv = conversaDoRobo(aberto);
 
+  const notaHistorico = fonte === 'historico';
+
   // ------------------------------------------------------------------ chat
   return (
     <div className="flex-1 min-h-[600px] bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex">
@@ -228,6 +245,11 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
             </div>
             <button onClick={carregarChats} title="Atualizar" className="p-2 rounded-lg text-slate-400 hover:bg-slate-100"><RefreshCw className="w-4 h-4" /></button>
           </div>
+          {notaHistorico && (
+            <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+              Mostrando as conversas desde que o Conector foi ligado. A leitura completa do WhatsApp está indisponível agora.
+            </p>
+          )}
           <div className="flex gap-1.5 flex-wrap" role="tablist" aria-label="Filtrar conversas">
             {FILTROS.map(f => (
               <button key={f.id} role="tab" aria-selected={filtro === f.id} onClick={() => setFiltro(f.id)}

@@ -1,13 +1,13 @@
 {
   "name": "leadsage-conector",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "O WhatsApp do seu computador conversando com o robo do LeadSage",
   "type": "module",
   "private": true,
   "engines": { "node": ">=18" },
   "scripts": {
     "start": "node leadsage-conector.mjs",
-    "test": "node --test teste.mjs teste-chat.mjs"
+    "test": "node --test teste.mjs teste-chat.mjs teste-historico.mjs"
   },
   "dependencies": {
     "qrcode": "^1.5.4",
