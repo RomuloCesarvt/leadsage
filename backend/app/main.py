@@ -937,6 +937,9 @@ async def robo_salvar_config(req: RoboConfigRequest, user: dict = Depends(get_cu
     if "oferta" in dados:
         dados["oferta"] = ai_oferta.normalizar(dados["oferta"])
     canal = await robo_store.salvar_canal(user.get("uid"), user.get("email", ""), dados)
+    if canal.get("cw_hash"):
+        # o Conector guarda o canal por alguns segundos; ligar o robo tem de valer na hora
+        _CACHE_CONECTOR.pop(canal["cw_hash"], None)
     return robo_store.visao_publica(canal, settings.APP_URL)
 
 
@@ -1490,6 +1493,56 @@ async def conector_revogar(user: dict = Depends(get_current_user)):
     return robo_store.visao_publica(canal, settings.APP_URL)
 
 
+class ConectorEnviar(BaseModel):
+    lead_id: str = Field(min_length=1, max_length=160)
+    nome: str = Field(default="", max_length=160)
+    telefone: str = Field(min_length=3, max_length=40)
+    texto: str = Field(min_length=1, max_length=4000)
+
+
+@app.get("/api/robo/conector/fila")
+async def conector_fila(user: dict = Depends(get_current_user)):
+    """Como esta o envio de WhatsApp: Conector online, quantas esperam, quanto saiu hoje."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    canal = await robo_store.canal_do_usuario(user.get("uid")) or {}
+    return await conector_whatsapp.estado_da_fila({**canal, "uid": user.get("uid")})
+
+
+@app.post("/api/robo/fila/{item_id}/enviar-agora")
+async def fila_enviar_agora(item_id: str, user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    uid = user.get("uid")
+    if not await conector_whatsapp.enviar_agora(uid, item_id):
+        raise HTTPException(status_code=404, detail="Esse item não está esperando para sair pelo WhatsApp.")
+    canal = await robo_store.canal_do_usuario(uid) or {}
+    return await conector_whatsapp.estado_da_fila({**canal, "uid": uid})
+
+
+@app.post("/api/robo/conector/enviar")
+async def conector_enviar(req: ConectorEnviar, user: dict = Depends(get_current_user)):
+    """Uma mensagem escrita no editor, para sair pelo WhatsApp do usuário (pelo Conector)."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    uid = user.get("uid")
+    canal = await robo_store.canal_do_usuario(uid) or {}
+    if not canal.get("cw_hash"):
+        raise HTTPException(status_code=409, detail="Conecte o WhatsApp pelo computador antes (Robô → Canais).")
+    telefone = conector_whatsapp.telefone_whatsapp(req.telefone)
+    if not 12 <= len(telefone) <= 15:
+        raise HTTPException(status_code=422, detail="Telefone inválido para WhatsApp.")
+    item = {
+        "id": f"f_{req.lead_id}", "lead_id": req.lead_id, "nome": req.nome or telefone, "canal": "whatsapp", "assunto": "",
+        "texto": req.texto.strip(), "link": "", "gancho": "", "seguimentos": [],
+        "contato": {"email": "", "phone": telefone, "instagram": "", "linkedin": ""},
+        "status": "pendente", "prioridade": 1, "criado": robo_store.agora(),
+    }
+    await fila_envio._gravar(uid, item)
+    try:
+        await pipeline_store.registrar(uid, {"id": req.lead_id, "company": req.nome, "name": req.nome, "phone": telefone})
+    except Exception as exc:
+        print(f"Conector: não registrou no pipeline: {exc}")
+    return await conector_whatsapp.estado_da_fila({**canal, "uid": uid})
+
+
 @app.post("/api/conector/ping")
 async def conector_ping(req: ConectorPing, request: Request):
     """O Conector avisa que está vivo e qual número está ligado."""
@@ -1554,6 +1607,24 @@ async def conector_responder(req: ConectorResponder, request: Request):
         raise HTTPException(status_code=503, detail="Não foi possível gerar a resposta agora.")
 
 
+class ConectorReprocessar(BaseModel):
+    contato: str = Field(default="", max_length=40)
+
+
+@app.post("/api/conector/reprocessar")
+async def conector_reprocessar(req: ConectorReprocessar, request: Request):
+    """O robô tenta de novo as mensagens que ficaram sem resposta (a IA falhou, o Conector estava fechado)."""
+    canal = await _canal_do_conector(request)
+    contato = conector_whatsapp.telefone_whatsapp(req.contato) if req.contato else ""
+    try:
+        return await asyncio.wait_for(robo_service.responder_pendentes(canal, contato=contato), timeout=50)
+    except asyncio.TimeoutError:
+        return {"processadas": 0, "respondidas": 0, "motivo": "demorou"}
+    except Exception as exc:
+        print(f"Robo: falha ao reprocessar pendentes: {exc}")
+        return {"processadas": 0, "respondidas": 0, "motivo": "erro"}
+
+
 @app.post("/api/conector/mensagem")
 async def conector_mensagem(req: ConectorMensagem, request: Request):
     """Um lead respondeu no WhatsApp do usuário. O robô decide e enfileira a resposta."""
@@ -1576,6 +1647,8 @@ async def conector_mensagem(req: ConectorMensagem, request: Request):
         "precisa_humano": bool(conversa.get("precisa_humano")),
         # o Conector mostra isto na janela dele: "o robô respondeu" ou por que ficou quieto
         "respondeu": bool(mensagens) and mensagens[-1].get("de") == "robo",
+        # a IA falhou desta vez: o Conector pede para tentar de novo em instantes
+        "tentar_de_novo": bool(conversa.get("falhas_ia")) and not conversa.get("precisa_humano"),
         "silencio": conversa.get("silencio", "") or ("Esta pessoa pediu para não receber mensagens." if conversa.get("optout") else ""),
     }
 

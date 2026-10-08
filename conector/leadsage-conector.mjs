@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '2.8.0';
+export const VERSAO = '2.9.0';
 const PORTA = 2790;
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -79,6 +79,7 @@ export function clienteLeadsage({ site, chave }) {
     tarefas: () => http_(`${base}/tarefas`, { cabecalhos: h }),
     resultado: (id, ok, erro = '') => http_(`${base}/tarefas/${encodeURIComponent(id)}/resultado`, { metodo: 'POST', cabecalhos: h, corpo: { ok, erro } }),
     mensagem: (m) => http_(`${base}/mensagem`, { metodo: 'POST', cabecalhos: h, corpo: m, tempoMs: 60000 }),
+    reprocessar: (contato = '') => http_(`${base}/reprocessar`, { metodo: 'POST', cabecalhos: h, corpo: { contato }, tempoMs: 60000 }),
   };
 }
 
@@ -155,6 +156,27 @@ export async function entregarMensagem(ls, m, inicioS, vistos, aviso = log, aoRe
     return false;
   }
   return true;
+}
+
+// ------------------------------------------------- tentar de novo o que ficou sem resposta
+
+/**
+ * A IA às vezes falha ou demora. Antes o lead ficava sem resposta até escrever de novo; agora o
+ * Conector pede ao LeadSage para tentar outra vez, algumas vezes, com espera crescente.
+ * Devolve true se o robô respondeu em alguma tentativa.
+ */
+export async function tentarDeNovo(ls, contato, { esperas = [15000, 45000, 120000], dorme = dormir, aviso = log } = {}) {
+  for (let i = 0; i < esperas.length; i++) {
+    await dorme(esperas[i]);
+    const r = await ls.reprocessar(contato);
+    if (r.ok && r.dados && r.dados.respondidas > 0) {
+      aviso(`Robô respondeu a ${contato} na tentativa ${i + 2}.`);
+      return true;
+    }
+    if (r.ok && r.dados && !r.dados.processadas) return false; // nada pendente: já foi resolvido
+  }
+  aviso(`Robô não conseguiu responder a ${contato}: responda você.`);
+  return false;
 }
 
 // ------------------------------------------------- "digitando…" enquanto a IA pensa
@@ -724,6 +746,7 @@ export async function executar() {
     let pronto = false;
     let proximaSaida = 0;
     let ultimoPing = 0;
+    let ultimaVarredura = Date.now();
     let roboAtivo = true; // o ping diz; com o robô desligado não faz sentido mostrar "digitando…"
     const lerRobo = (p) => { if (p?.dados && typeof p.dados.robo_ativo === 'boolean') roboAtivo = p.dados.robo_ativo; };
 
@@ -737,13 +760,17 @@ export async function executar() {
           lerRobo(p);
           if (p.status === 401) { estado.fase = 'erro'; estado.mensagem = 'A chave é inválida ou foi revogada. Gere outra no LeadSage.'; }
           ultimoPing = Date.now();
+          setTimeout(() => ls.reprocessar('').then((r) => { if (r.dados?.respondidas) log(`Robô respondeu a ${r.dados.respondidas} conversa(s) que estavam sem resposta.`); }).catch(() => {}), 10000);
           log(`WhatsApp pronto${numero ? ` (${numero})` : ''}.`);
         },
         aoCair: (motivo) => { pronto = false; estado.fase = 'erro'; estado.mensagem = `WhatsApp desconectado (${motivo}). Feche e abra o Conector.`; log(estado.mensagem); },
         aoReceber: async (m) => {
           if (!pronto) return;
           if (roboAtivo && !m.grupo) waAtual?.digitar(m.de, true);
-          const entregue = await entregarMensagem(ls, m, inicioS, vistos, log, (d) => { if (!d.respondeu) waAtual?.digitar(m.de, false); });
+          const entregue = await entregarMensagem(ls, m, inicioS, vistos, log, (d) => {
+            if (!d.respondeu) waAtual?.digitar(m.de, false);
+            if (d.tentar_de_novo) tentarDeNovo(ls, m.de).catch(() => {});
+          });
           if (entregue) proximaSaida = 0;
           else waAtual?.digitar(m.de, false);
         },
@@ -759,6 +786,7 @@ export async function executar() {
           const r = await enviarPendentes(ls, wa);
           proximaSaida = Date.now() + r.proximaEm * 1000;
         }
+        if (pronto && Date.now() - ultimaVarredura > 15 * 60 * 1000) { ultimaVarredura = Date.now(); ls.reprocessar('').catch(() => {}); }
         if (pronto && Date.now() - ultimoPing > 90000) { lerRobo(await ls.ping(estado.numero, 'ready')); ultimoPing = Date.now(); }
       } catch (e) {
         if (/revogada|errada/.test(String(e.message))) { estado.fase = 'erro'; estado.mensagem = e.message; log(e.message); await wa?.parar(); return; }

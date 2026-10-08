@@ -263,3 +263,55 @@ def test_robo_desligado_diz_por_que_nao_respondeu(client, chave, rodar):
     # o ping tambem avisa
     p = client.post("/api/conector/ping", headers=cabecalho(chave), json={"numero": "5514999990000", "status": "ready"})
     assert p.json()["robo_ativo"] is False
+
+
+def test_estado_da_fila_diz_por_que_nao_sai(client, chave, rodar):
+    rodar(fila_envio._gravar, "alice", fila_item("L1"))
+    # conector criado mas nunca falou: fechado
+    e = client.get("/api/robo/conector/fila").json()
+    assert e["pendentes"] == 1 and not e["online"] and "fechado" in e["motivo"]
+    client.post("/api/conector/ping", headers=cabecalho(chave), json={"numero": "5514999990000", "status": "ready"})
+    e = client.get("/api/robo/conector/fila").json()
+    assert e["online"] and e["limite_hoje"] == cw.FRIO_INICIAL and "instantes" in e["motivo"]
+
+
+def test_enviar_agora_dispensa_o_intervalo_mas_nao_o_limite(client, chave, rodar):
+    rodar(pipeline_store.registrar, "alice", {"id": "L1", "company": "Padaria A", "phone": "14998003784"})
+    rodar(fila_envio._gravar, "alice", fila_item("L1"))
+    rodar(fila_envio._gravar, "alice", fila_item("L2", "14998003785", "Padaria B"))
+    # a primeira sai; a segunda esperaria o intervalo
+    assert len(client.get("/api/conector/tarefas", headers=cabecalho(chave)).json()["tarefas"]) == 1
+    assert client.get("/api/conector/tarefas", headers=cabecalho(chave)).json()["tarefas"] == []
+    # "enviar agora" na segunda: passa na frente do intervalo
+    r = client.post("/api/robo/fila/f_L2/enviar-agora")
+    assert r.status_code == 200
+    t = client.get("/api/conector/tarefas", headers=cabecalho(chave)).json()
+    assert [x["id"] for x in t["tarefas"]] == ["fila:f_L2"]
+
+
+def test_enviar_agora_nao_fura_o_limite_do_dia(client, chave, rodar):
+    cfg = rodar(robo_store.canal_do_usuario, "alice")
+    agora = datetime.now(timezone.utc)
+    cfg.update({"cw_frio_dia": agora.strftime("%Y-%m-%d"), "cw_frio_n": cw.FRIO_INICIAL, "cw_primeiro": agora.isoformat()})
+    rodar(fila_envio._gravar, "alice", {**fila_item("L1"), "prioridade": 1})
+    t = rodar(cw.tarefas, cfg)
+    assert t["tarefas"] == [] and "limite de hoje" in t["motivo_sem_frio"]
+
+
+def test_enviar_agora_item_inexistente(client, chave):
+    assert client.post("/api/robo/fila/f_nada/enviar-agora").status_code == 404
+
+
+def test_editor_envia_pelo_conector(client, chave, rodar):
+    r = client.post("/api/robo/conector/enviar", json={"lead_id": "L9", "nome": "Padaria Nova", "telefone": "(14) 99800-3786", "texto": "Boa tarde! Montei uma prévia."})
+    assert r.status_code == 200 and r.json()["pendentes"] == 1
+    item = rodar(fila_envio.obter, "alice", "f_L9")
+    assert item["prioridade"] == 1 and item["contato"]["phone"] == "5514998003786"
+    t = client.get("/api/conector/tarefas", headers=cabecalho(chave)).json()
+    assert t["tarefas"][0]["contato"] == "5514998003786" and "responder SAIR" in t["tarefas"][0]["texto"]
+    assert client.post("/api/robo/conector/enviar", json={"lead_id": "L1", "telefone": "123", "texto": "oi"}).status_code == 422
+
+
+def test_editor_sem_conector_conectado_diz_o_que_fazer(client, com_robo):
+    r = client.post("/api/robo/conector/enviar", json={"lead_id": "L9", "telefone": "14998003786", "texto": "oi"})
+    assert r.status_code == 409 and "Conecte" in r.json()["detail"]

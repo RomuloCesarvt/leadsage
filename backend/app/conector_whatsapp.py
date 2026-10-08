@@ -270,17 +270,21 @@ async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Di
     if ultimo:
         espera = max(0, INTERVALO_FRIO_S - int((agora - ultimo).total_seconds()))
 
+    pendentes = sorted(
+        (i for i in itens if i.get("canal") == "whatsapp" and _disponivel(i, agora)
+         and len(telefone_whatsapp((i.get("contato") or {}).get("phone", ""))) >= 12),
+        # quem o usuario mandou enviar agora vai na frente
+        key=lambda i: (0 if i.get("prioridade") else 1, i.get("criado") or ""),
+    )
+    # "Enviar agora" dispensa o intervalo entre abordagens, nao o limite do dia (esse protege o numero)
+    prioritario = bool(pendentes and pendentes[0].get("prioridade"))
+
     motivo_sem_frio = ""
     if frios_hoje >= limite:
         motivo_sem_frio = f"limite de hoje atingido ({frios_hoje}/{limite}); o número ganha volume a cada dia"
-    elif espera:
+    elif espera and not prioritario:
         motivo_sem_frio = f"intervalo entre abordagens ({espera}s)"
     elif not saida:
-        pendentes = sorted(
-            (i for i in itens if i.get("canal") == "whatsapp" and _disponivel(i, agora)
-             and len(telefone_whatsapp((i.get("contato") or {}).get("phone", ""))) >= 12),
-            key=lambda i: i.get("criado") or "",
-        )
         if pendentes:
             i = pendentes[0]
             i["status"], i["enviando_em"] = "enviando", agora.isoformat()
@@ -299,6 +303,46 @@ async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Di
         # quanto o Conector espera antes de perguntar de novo: depressa só com conversa em andamento
         "proxima_em": 4 if (saida or quente) else 120,
     }
+
+
+async def estado_da_fila(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Dict[str, Any]:
+    """O que o usuario precisa ver na Fila de envio sobre o WhatsApp: se o Conector esta de pe,
+    quantas esperam, quanto ja saiu hoje e quando sai a proxima. Sem isso a fila parece parada."""
+    agora = agora or _agora_dt()
+    itens = [i for i in await _fila_whatsapp(canal["uid"]) if i.get("canal") == "whatsapp"]
+    hoje = agora.strftime("%Y-%m-%d")
+    frios_hoje = int(canal.get("cw_frio_n") or 0) if canal.get("cw_frio_dia") == hoje else 0
+    limite = limite_frio_do_dia(canal, agora)
+    ultimo = _ler_data(canal.get("cw_ultimo_frio"))
+    espera = max(0, INTERVALO_FRIO_S - int((agora - ultimo).total_seconds())) if ultimo else 0
+    pendentes = [i for i in itens if i.get("status") == "pendente"]
+    if not canal.get("cw_hash"):
+        motivo = "O WhatsApp pelo computador ainda não foi conectado."
+    elif not online(canal, agora):
+        motivo = "O Conector está fechado. Abra o programa “Conectar-WhatsApp” no computador."
+    elif frios_hoje >= limite:
+        motivo = f"Limite de hoje atingido ({frios_hoje} de {limite}). O número ganha volume a cada dia."
+    elif pendentes and espera:
+        motivo = f"Próxima abordagem em cerca de {espera} segundos (intervalo de segurança)."
+    elif pendentes:
+        motivo = "A próxima sai em instantes."
+    else:
+        motivo = ""
+    return {
+        "conectado": bool(canal.get("cw_hash")), "online": online(canal, agora),
+        "pendentes": len(pendentes), "enviando": sum(1 for i in itens if i.get("status") == "enviando"),
+        "enviadas_hoje": frios_hoje, "limite_hoje": limite, "espera_s": espera, "motivo": motivo,
+    }
+
+
+async def enviar_agora(uid: str, item_id: str) -> bool:
+    """Poe um item da fila na frente: dispensa o intervalo (o limite do dia continua valendo)."""
+    item = await fila_envio.obter(uid, item_id)
+    if not item or item.get("canal") != "whatsapp" or item.get("status") not in ("pendente", "falhou", "enviando"):
+        return False
+    item["status"], item["prioridade"], item["motivo"] = "pendente", 1, ""
+    await fila_envio._gravar(uid, item)
+    return True
 
 
 async def registrar_resultado(canal: Dict[str, Any], tarefa_id: str, ok: bool, erro: str = "") -> bool:

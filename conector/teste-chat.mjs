@@ -169,3 +169,22 @@ test('entregar mensagem avisa a resposta do LeadSage (respondeu ou nao)', async 
   assert.equal(await entregarMensagem(ls, m, 0, new Set(), () => {}, (d) => respostas.push(d)), true);
   assert.equal(respostas[0].respondeu, false);
 });
+
+test('tentar de novo: para quando o robo responde, e desiste depois de algumas vezes', async () => {
+  const { tentarDeNovo } = await import('./leadsage-conector.mjs');
+  const esperas = [];
+  const dorme = async (ms) => { esperas.push(ms); };
+  let n = 0;
+  const ls = { reprocessar: async () => { n++; return { ok: true, dados: n >= 2 ? { processadas: 1, respondidas: 1 } : { processadas: 1, respondidas: 0 } }; } };
+  assert.equal(await tentarDeNovo(ls, '5511999990000', { esperas: [10, 20, 30], dorme, aviso: () => {} }), true);
+  assert.deepEqual(esperas, [10, 20]);                 // a terceira nem foi preciso
+
+  n = -99;
+  const avisos = [];
+  const ruim = { reprocessar: async () => ({ ok: true, dados: { processadas: 1, respondidas: 0 } }) };
+  assert.equal(await tentarDeNovo(ruim, '1', { esperas: [1, 1, 1], dorme: async () => {}, aviso: (t) => avisos.push(t) }), false);
+  assert.match(avisos.at(-1), /responda você/);
+
+  const resolvido = { reprocessar: async () => ({ ok: true, dados: { processadas: 0, respondidas: 0 } }) };
+  assert.equal(await tentarDeNovo(resolvido, '1', { esperas: [1, 1], dorme: async () => {}, aviso: () => {} }), false);
+});

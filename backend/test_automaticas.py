@@ -127,3 +127,74 @@ def test_gente_repetindo_frase_curta_nao_e_robo():
     msgs = [{"de": "contato", "texto": "oi"}, {"de": "robo", "texto": "Oi!"}, {"de": "contato", "texto": "oi"}]
     assert not parece_automatica("oi", msgs)
     assert not parece_automatica("???", [{"de": "contato", "texto": "???"}, {"de": "contato", "texto": "???"}])
+
+
+# ------------------------------------------------ responder o que ficou sem resposta
+
+def conversa_base(contato, mensagens, **extra):
+    from app import robo_store
+    return {"id": robo_store.id_da_conversa("whatsapp", contato), "canal": "whatsapp", "contato": contato, "nome": "Lead",
+            "lead_id": "", "robo_ativo": True, "optout": False, "precisa_humano": False, "motivo": "",
+            "mensagens": mensagens, "criado": robo_store.agora(), "atualizado": robo_store.agora(), **extra}
+
+
+def fala(de, texto, n=0):
+    return {"de": de, "texto": texto, "em": "x", "meta_id": f"{de}{n}"}
+
+
+def test_varredura_responde_so_o_que_ficou_sem_resposta(com_robo, rodar):
+    from app import robo_store
+    rodar(robo_store.salvar_conversa, "alice", conversa_base("5511900000001", [fala("contato", "???", 1)]))                  # sem resposta
+    rodar(robo_store.salvar_conversa, "alice", conversa_base("5511900000002", [fala("contato", "oi", 1), fala("robo", "Olá!", 2)]))  # ja respondida
+    rodar(robo_store.salvar_conversa, "alice", conversa_base("5511900000003", [fala("contato", "pare", 1)], optout=True))
+    rodar(robo_store.salvar_conversa, "alice", conversa_base("5511900000004", [fala("contato", "Digite 1 para vendas", 1)], contato_robo=True, robo_ativo=False))
+    rodar(robo_store.salvar_conversa, "alice", conversa_base("5511900000005", [fala("contato", "me ajuda", 1)], precisa_humano=True, motivo="pediu desconto"))
+    envio = Envio()
+    r = rodar(robo_service.responder_pendentes, cfg(), gerar=ia("Claro! Posso ajudar."), enviar=envio)
+    assert r == {"processadas": 1, "respondidas": 1}
+    assert envio.enviados == ["Claro! Posso ajudar."]
+    # rodar de novo nao repete: a conversa agora termina numa fala do robo
+    assert rodar(robo_service.responder_pendentes, cfg(), gerar=ia("de novo"), enviar=envio)["processadas"] == 0
+    assert len(envio.enviados) == 1
+
+
+def test_varredura_respeita_o_robo_desligado(com_robo, rodar):
+    from app import robo_store
+    rodar(robo_store.salvar_conversa, "alice", conversa_base("5511900000001", [fala("contato", "???", 1)]))
+    envio = Envio()
+    r = rodar(robo_service.responder_pendentes, {**cfg(), "ativo": False}, gerar=ia("x"), enviar=envio)
+    assert r["processadas"] == 0 and envio.enviados == []
+
+
+def test_reprocessar_um_contato_nao_duplica_a_mensagem(com_robo, rodar):
+    from app import robo_store
+    rodar(robo_store.salvar_conversa, "alice", conversa_base("5511900000001", [fala("contato", "???", 1)], falhas_ia=1))
+    envio = Envio()
+    r = rodar(robo_service.responder_pendentes, cfg(), contato="5511900000001", gerar=ia("Oi! Estou aqui."), enviar=envio)
+    assert r == {"processadas": 1, "respondidas": 1}
+    conversa = rodar(robo_store.obter_conversa, "alice", robo_store.id_da_conversa("whatsapp", "5511900000001"))
+    assert [m["de"] for m in conversa["mensagens"]] == ["contato", "robo"]      # a pergunta nao foi duplicada
+    assert conversa["falhas_ia"] == 0
+
+
+def test_rota_de_reprocessar_e_dica_de_tentar_de_novo(client, com_robo, rodar, monkeypatch):
+    from app import robo_store
+    r = client.post("/api/robo/conector/gerar")
+    chave = r.json()["chave"]
+    h = {"x-conector-key": chave}
+    assert client.post("/api/conector/reprocessar", json={}).status_code == 401
+    assert client.post("/api/conector/reprocessar", headers=h, json={}).json()["processadas"] == 0   # robo ainda desligado
+
+    # a IA falha na primeira mensagem: o servidor pede para tentar de novo
+    def quebrada(prompt):
+        raise RuntimeError("503")
+
+    monkeypatch.setattr(robo_service, "_gerador_padrao", lambda: quebrada)
+    client.put("/api/robo/config", json={"ativo": True})
+    resp = client.post("/api/conector/mensagem", headers=h, json={"id": "m1", "contato": "5511900000009", "nome": "Ana", "texto": "oi, vocês fazem sites?"}).json()
+    assert resp["ok"] and not resp["respondeu"] and resp["tentar_de_novo"] is True
+
+    # e na nova tentativa (IA ja boa) ele responde
+    monkeypatch.setattr(robo_service, "_gerador_padrao", lambda: ia("Fazemos sim! Posso te mostrar?"))
+    resp = client.post("/api/conector/reprocessar", headers=h, json={"contato": "5511900000009"}).json()
+    assert resp == {"processadas": 1, "respondidas": 1}

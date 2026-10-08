@@ -1,6 +1,6 @@
 {
   "name": "leadsage-conector",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "description": "O WhatsApp do seu computador conversando com o robo do LeadSage",
   "type": "module",
   "private": true,

@@ -3,6 +3,7 @@ import type {
   LeadSearchResponse,
   PitchGenerationRequest,
   FollowUp,
+  EstadoFilaWhats,
   PitchGenerationResponse,
   DispatchRequest,
   DispatchResponse,
@@ -379,6 +380,18 @@ export const api = {
 
   async filaMarcarEnviado(id: string): Promise<ItemFila> {
     return await fetchWithToken(`/robo/fila/${encodeURIComponent(id)}/enviado`, { method: 'POST' });
+  },
+
+  async conectorFila(): Promise<EstadoFilaWhats> {
+    return await fetchWithToken('/robo/conector/fila');
+  },
+
+  async filaEnviarAgora(id: string): Promise<EstadoFilaWhats> {
+    return await fetchWithToken(`/robo/fila/${encodeURIComponent(id)}/enviar-agora`, { method: 'POST' });
+  },
+
+  async conectorEnviar(dados: { lead_id: string; nome: string; telefone: string; texto: string }): Promise<EstadoFilaWhats> {
+    return await fetchWithToken('/robo/conector/enviar', { method: 'POST', body: JSON.stringify(dados) });
   },
 
   async filaPular(id: string): Promise<ItemFila> {

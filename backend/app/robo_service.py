@@ -190,7 +190,10 @@ async def processar(
     msg: meta_canais.Recebida,
     gerar: Optional[Callable[[str], Dict[str, Any]]] = None,
     enviar: Optional[Enviar] = None,
+    reprocessar: bool = False,
 ) -> Dict[str, Any]:
+    """`reprocessar`: a mensagem ja esta na conversa e ficou sem resposta (a IA falhou ou demorou);
+    tenta responder de novo, sem repetir a mensagem nem tratar como reenvio."""
     enviar = enviar or meta_canais.enviar
     uid, email = cfg["uid"], cfg.get("email", "")
     cid = robo_store.id_da_conversa(msg.canal, msg.contato)
@@ -203,12 +206,13 @@ async def processar(
     }
 
     # 1. reenvio da Meta
-    if any(m.get("meta_id") == msg.meta_id for m in conversa["mensagens"]):
+    if not reprocessar and any(m.get("meta_id") == msg.meta_id for m in conversa["mensagens"]):
         return conversa
 
-    conversa["mensagens"].append({
-        "de": "contato", "texto": msg.texto, "em": robo_store.agora(), "meta_id": msg.meta_id,
-    })
+    if not reprocessar:
+        conversa["mensagens"].append({
+            "de": "contato", "texto": msg.texto, "em": robo_store.agora(), "meta_id": msg.meta_id,
+        })
     if msg.nome:
         conversa["nome"] = msg.nome
     conversa["ultima_entrada"] = robo_store.agora()
@@ -415,3 +419,61 @@ async def responder_sem_guardar(
         "etapa": (decisao.sdr or {}).get("etapa", ""),
         "temperatura": (decisao.sdr or {}).get("temperatura", ""),
     }
+
+
+# ----------------------------------------------------- varrer o que ficou sem resposta
+
+def _sem_resposta(c: Dict[str, Any]) -> bool:
+    """A ultima fala e do contato, o robo pode e deve responder."""
+    ultima = c.get("ultima") or {}
+    if ultima.get("de") != "contato" or c.get("optout") or c.get("contato_robo") or not c.get("robo_ativo", True):
+        return False
+    if c.get("precisa_humano") and not _motivo_transitorio(c.get("motivo", "")):
+        return False
+    return True
+
+
+async def responder_pendentes(
+    cfg: Dict[str, Any],
+    contato: str = "",
+    janela_horas: float = 24,
+    maximo: int = 5,
+    gerar: Optional[Callable[[str], Dict[str, Any]]] = None,
+    enviar: Optional[Enviar] = None,
+    canal: str = "whatsapp",
+) -> Dict[str, Any]:
+    """Responde as mensagens que chegaram e ficaram sem resposta (a IA falhou, o Conector estava fechado...).
+
+    Com `contato`, so aquele; sem, varre as conversas recentes. Antes uma falha da IA deixava a
+    pessoa sem resposta ate ela escrever de novo: agora o robo volta sozinho.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    uid = cfg["uid"]
+    if not cfg.get("ativo"):
+        return {"processadas": 0, "respondidas": 0, "motivo": "robo desligado"}
+    if contato:
+        resumos = [{"id": robo_store.id_da_conversa(canal, contato)}]
+    else:
+        corte = (datetime.now(timezone.utc) - timedelta(hours=janela_horas)).isoformat()
+        resumos = [
+            c for c in await robo_store.listar_conversas(uid)
+            if c.get("canal") == canal and _sem_resposta(c) and str(c.get("atualizado") or "") >= corte[:19]
+        ]
+    processadas = respondidas = 0
+    for r in resumos[:maximo]:
+        conversa = await robo_store.obter_conversa(uid, r["id"])
+        if not conversa or not conversa.get("mensagens"):
+            continue
+        ultima = conversa["mensagens"][-1]
+        if ultima.get("de") != "contato" or conversa.get("optout") or conversa.get("contato_robo"):
+            continue
+        msg = meta_canais.Recebida(
+            canal=conversa.get("canal", canal), contato=conversa.get("contato", ""), nome=conversa.get("nome", ""),
+            texto=ultima.get("texto", ""), meta_id=ultima.get("meta_id", ""), momento=0,
+        )
+        processadas += 1
+        nova = await processar(cfg, msg, gerar=gerar, enviar=enviar, reprocessar=True)
+        if (nova.get("mensagens") or [{}])[-1].get("de") == "robo":
+            respondidas += 1
+    return {"processadas": processadas, "respondidas": respondidas}

@@ -406,6 +406,18 @@ export interface RoboMensagem {
   em?: string;
 }
 
+/** Como está o envio de WhatsApp pelo Conector: online, quantas esperam, quanto saiu hoje. */
+export interface EstadoFilaWhats {
+  conectado: boolean;
+  online: boolean;
+  pendentes: number;
+  enviando: number;
+  enviadas_hoje: number;
+  limite_hoje: number;
+  espera_s: number;
+  motivo: string;
+}
+
 export interface RoboConversaResumo {
   id: string;
   canal: RoboCanal;

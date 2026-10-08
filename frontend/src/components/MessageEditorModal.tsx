@@ -26,7 +26,7 @@ import { LinkedInIcon } from './BrandIcons';
 import { Avatar } from './Avatar';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
-import type { FollowUp } from '../types';
+import type { EstadoFilaWhats, FollowUp } from '../types';
 
 type Canal = 'email' | 'whatsapp' | 'whatsapp_api' | 'instagram_direct' | 'linkedin_msg' | 'webhook';
 
@@ -96,6 +96,8 @@ export const MessageEditorModal: React.FC = () => {
   const [avisos, setAvisos] = useState<string[]>([]);
   const [seguimentos, setSeguimentos] = useState<FollowUp[]>([]);
   const [carregandoSeguimentos, setCarregandoSeguimentos] = useState(false);
+  // o WhatsApp do próprio usuário, pelo Conector: quando está de pé, o botão envia de verdade
+  const [whats, setWhats] = useState<EstadoFilaWhats | null>(null);
   const [copiado, setCopiado] = useState<number | null>(null);
   const [customInstructions, setCustomInstructions] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -166,6 +168,7 @@ export const MessageEditorModal: React.FC = () => {
     setVerSequencia(false);
     setVerAjuste(false);
     setCustomInstructions('');
+    api.conectorFila().then(setWhats).catch(() => setWhats(null));
     gerarCopy(inicial, { instrucoes: '' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead?.id]);
@@ -187,6 +190,16 @@ export const MessageEditorModal: React.FC = () => {
     setDispatchError(null);
 
     try {
+      // WhatsApp com o Conector de pé: sai pelo número do próprio usuário, na fila de segurança
+      if (channel === 'whatsapp' && whats?.online && lead.phone) {
+        const estado = await api.conectorEnviar({
+          lead_id: lead.id, nome: lead.company || lead.name, telefone: lead.phone, texto: body,
+        });
+        setWhats(estado);
+        setLeads(prev => prev.map(l => (l.id === lead.id ? { ...l, outreach_status: 'Aguardando envio' } : l)));
+        setSuccessMessage(estado.motivo || 'Na fila do Conector: sai em instantes pelo seu WhatsApp.');
+        return;
+      }
       const res = await api.dispatchMessage({
         lead_id: lead.id,
         lead_name: lead.name,
@@ -272,7 +285,7 @@ export const MessageEditorModal: React.FC = () => {
     : '';
 
   const dicaDoCanal =
-    channel === 'whatsapp' ? 'Abre o WhatsApp com a mensagem já preenchida. Sem custo.'
+    channel === 'whatsapp' ? (whats?.online ? `Sai pelo seu WhatsApp conectado (hoje ${whats.enviadas_hoje} de ${whats.limite_hoje}). Sem custo.` : 'Abre o WhatsApp com a mensagem já preenchida. Sem custo.')
     : channel === 'instagram_direct' || channel === 'linkedin_msg'
       ? 'Abre a conversa e copia a mensagem: é só colar (Ctrl+V) e enviar. Sem custo.'
     : channel === 'email' ? 'Sai pelo seu e-mail configurado.'
@@ -598,7 +611,7 @@ export const MessageEditorModal: React.FC = () => {
               {isSending ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Enviando…</>
               ) : (
-                <><Send className="w-4 h-4" /> {isManualChannel ? `Abrir ${NOME_DO_CANAL[channel]}` : 'Enviar mensagem'}</>
+                <><Send className="w-4 h-4" /> {channel === 'whatsapp' && whats?.online ? 'Enviar pelo meu WhatsApp' : isManualChannel ? `Abrir ${NOME_DO_CANAL[channel]}` : 'Enviar mensagem'}</>
               )}
             </button>
           </div>

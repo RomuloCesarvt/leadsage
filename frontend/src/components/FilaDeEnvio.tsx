@@ -7,12 +7,13 @@
  * deixa um robô abrir conversa fria de graça e sem risco para a conta.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bot, Mail, Send, Check, Copy, ExternalLink, SkipForward, Loader2, RefreshCw, AlertTriangle, Clock } from 'lucide-react';
+import { Bot, Mail, Send, Check, Copy, ExternalLink, SkipForward, Loader2, RefreshCw, AlertTriangle, Clock, Wifi, WifiOff } from 'lucide-react';
 import { api } from '../services/api';
 import { useApp } from '../context/AppContext';
 import { WhatsAppIcon, InstagramIcon, LinkedInIcon } from './BrandIcons';
 import { ehSalvo } from '../lib/leadsSalvos';
-import type { CanalFila, ItemFila, LeadItem, ResultadoPreparo, ResumoFila } from '../types';
+import { sondar } from '../lib/sondagem';
+import type { CanalFila, EstadoFilaWhats, ItemFila, LeadItem, ResultadoPreparo, ResumoFila } from '../types';
 
 const SEM_CONTATO_AINDA = new Set(['', 'Novo Lead', 'Novos', 'Novo']);
 const LOTE = 8;
@@ -59,6 +60,7 @@ export const FilaDeEnvio: React.FC = () => {
   const [resultados, setResultados] = useState<ResultadoPreparo[]>([]);
   const [copiado, setCopiado] = useState('');
   const [trabalhando, setTrabalhando] = useState('');
+  const [whats, setWhats] = useState<EstadoFilaWhats | null>(null);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -74,7 +76,13 @@ export const FilaDeEnvio: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => { void carregar(); }, [carregar]);
+  const carregarWhats = useCallback(async () => {
+    try { setWhats(await api.conectorFila()); } catch { setWhats(null); }
+  }, []);
+
+  useEffect(() => { void carregar(); void carregarWhats(); }, [carregar, carregarWhats]);
+  // a fila anda sozinha (o Conector envia): a tela acompanha, com a aba à vista
+  useEffect(() => sondar(() => { void carregar(); void carregarWhats(); }, 15000), [carregar, carregarWhats]);
 
   // a seleção que veio de Meus Leads vale para esta visita; ao sair, zera
   useEffect(() => () => setLeadsParaContato([]), [setLeadsParaContato]);
@@ -132,6 +140,13 @@ export const FilaDeEnvio: React.FC = () => {
     setTrabalhando(id);
     try { await api.filaMarcarEnviado(id); await carregar(); await atualizarPipeline(); }
     catch (e: any) { setErro(e?.message || 'Não foi possível marcar como enviado.'); }
+    finally { setTrabalhando(''); }
+  };
+
+  const enviarAgora = async (id: string) => {
+    setTrabalhando(id);
+    try { setWhats(await api.filaEnviarAgora(id)); await carregar(); }
+    catch (e: any) { setErro(e?.message || 'Não foi possível enviar agora.'); }
     finally { setTrabalhando(''); }
   };
 
@@ -254,6 +269,16 @@ export const FilaDeEnvio: React.FC = () => {
               {resumo.pendentes} para enviar · {resumo.enviados} enviados · e-mails hoje: {resumo.email_hoje}/{resumo.limite_email_dia}
             </p>
           )}
+          {whats?.conectado && (
+            <div className={`mt-3 p-3 rounded-xl border text-xs leading-snug ${whats.online ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
+              <p className="font-bold flex items-center gap-1.5">
+                {whats.online ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
+                WhatsApp: {whats.online ? 'conectado' : 'Conector fechado'}
+                <span className="font-normal ml-auto">hoje {whats.enviadas_hoje} de {whats.limite_hoje}</span>
+              </p>
+              {whats.motivo && <p className="mt-1">{whats.motivo}</p>}
+            </div>
+          )}
           {aguardando.length > 0 && (
             <button
               onClick={enviarAguardando}
@@ -300,6 +325,17 @@ export const FilaDeEnvio: React.FC = () => {
               </details>
             )}
 
+            {item.canal === 'whatsapp' && whats?.online && ['pendente', 'falhou'].includes(item.status) && (
+              <div className="flex flex-wrap items-center gap-2 mt-3 p-2.5 rounded-xl bg-emerald-50 border border-emerald-100">
+                <p className="text-[11px] text-emerald-900 flex-1 min-w-[140px]">
+                  {item.status === 'falhou' ? 'Não saiu. ' : ''}O Conector envia sozinho, com intervalo de segurança.
+                </p>
+                <button onClick={() => enviarAgora(item.id)} disabled={trabalhando === item.id}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 disabled:opacity-60">
+                  <Send className="w-3.5 h-3.5" /> {item.status === 'falhou' ? 'Tentar de novo' : 'Enviar agora'}
+                </button>
+              </div>
+            )}
             {item.canal !== 'email' && (
               <div className="flex flex-wrap gap-2 mt-3">
                 {item.link && (
