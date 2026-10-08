@@ -5,47 +5,25 @@
  * depois conversa livremente. No Instagram e no Messenger ele só RESPONDE a
  * quem escreveu: a API da Meta não permite iniciar conversa com contato frio.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Bot, MessageCircle, Settings2, FlaskConical, Send, UserRound, AlertTriangle,
-  Copy, Check, Power, RefreshCw, Ban, Lock, ExternalLink, ChevronLeft, ListChecks,
+  Bot, MessageCircle, Settings2, FlaskConical, Send, AlertTriangle,
+  Copy, Check, Lock, ExternalLink, ListChecks,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
-import { WhatsAppIcon, InstagramIcon, FacebookIcon, TelegramIcon } from '../BrandIcons';
+import { WhatsAppIcon, InstagramIcon, FacebookIcon } from '../BrandIcons';
 import { ConexaoMeta } from '../ConexaoMeta';
 import { DisparoWhatsApp } from '../DisparoWhatsApp';
 import { FilaDeEnvio } from '../FilaDeEnvio';
-import { sondar } from '../../lib/sondagem';
+import { CaixaDeEntrada } from '../CaixaDeEntrada';
+import { Balao } from '../conversaUi';
 import { OfertaDoRobo } from '../OfertaDoRobo';
 import type {
-  RoboCanal, RoboConfig, RoboConfigEntrada, RoboConversa, RoboConversaResumo, RoboMensagem,
+  RoboConfig, RoboConfigEntrada, RoboMensagem,
 } from '../../types';
 
 type Aba = 'conversas' | 'fila' | 'disparo' | 'simulador' | 'configurar';
-
-const ICONE_CANAL: Record<RoboCanal, React.FC<{ className?: string }>> = {
-  whatsapp: WhatsAppIcon,
-  instagram: InstagramIcon,
-  messenger: FacebookIcon,
-  telegram: TelegramIcon,
-};
-
-const NOME_CANAL: Record<RoboCanal, string> = {
-  whatsapp: 'WhatsApp',
-  instagram: 'Instagram',
-  messenger: 'Messenger',
-  telegram: 'Telegram',
-};
-
-const quando = (iso?: string) => {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const hoje = new Date();
-  return d.toDateString() === hoje.toDateString()
-    ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-    : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-};
 
 const campo =
   'w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 ' +
@@ -123,7 +101,7 @@ export const RoboScreen: React.FC = () => {
         </div>
       </div>
 
-      {aba === 'conversas' && <Conversas onBloqueio={setBloqueado} irConfigurar={() => setAba('configurar')} />}
+      {aba === 'conversas' && <CaixaDeEntrada onBloqueio={setBloqueado} irConfigurar={() => setAba('configurar')} />}
       {aba === 'fila' && <FilaDeEnvio />}
       {aba === 'disparo' && <DisparoWhatsApp irConfigurar={() => setAba('configurar')} />}
       {aba === 'simulador' && <Simulador />}
@@ -143,257 +121,7 @@ export const RoboScreen: React.FC = () => {
   );
 };
 
-// ================================================================ conversas
 
-const Conversas: React.FC<{ onBloqueio: (m: string) => void; irConfigurar: () => void }> = ({
-  onBloqueio, irConfigurar,
-}) => {
-  const [lista, setLista] = useState<RoboConversaResumo[] | null>(null);
-  const [aberta, setAberta] = useState<RoboConversa | null>(null);
-  const [texto, setTexto] = useState('');
-  const [enviando, setEnviando] = useState(false);
-  const [erro, setErro] = useState('');
-  const fim = useRef<HTMLDivElement>(null);
-
-  const carregar = useCallback(async () => {
-    try {
-      setLista(await api.roboConversas());
-    } catch (e: any) {
-      if (/plano|dispon/i.test(e?.message || '')) onBloqueio(e.message);
-      else setErro(e?.message || 'Não foi possível carregar as conversas.');
-      setLista([]);
-    }
-  }, [onBloqueio]);
-
-  // Sem push do servidor: a lista é consultada de tempos em tempos.
-  useEffect(() => {
-    carregar();
-    return sondar(carregar, 45000);
-  }, [carregar]);
-
-  useEffect(() => {
-    if (!aberta) return;
-    return sondar(async () => {
-      try { setAberta(await api.roboConversa(aberta.id)); } catch { /* segue com o que tem */ }
-    }, 20000);
-  }, [aberta?.id]);
-
-  useEffect(() => { fim.current?.scrollIntoView({ behavior: 'smooth' }); }, [aberta?.mensagens.length]);
-
-  const abrir = async (id: string) => {
-    setErro('');
-    try { setAberta(await api.roboConversa(id)); } catch (e: any) { setErro(e.message); }
-  };
-
-  const alternarRobo = async () => {
-    if (!aberta) return;
-    setErro('');
-    try {
-      setAberta(await api.roboLigar(aberta.id, !aberta.robo_ativo));
-      carregar();
-    } catch (e: any) { setErro(e.message); }
-  };
-
-  const responder = async () => {
-    if (!aberta || !texto.trim()) return;
-    setEnviando(true);
-    setErro('');
-    try {
-      setAberta(await api.roboResponder(aberta.id, texto.trim()));
-      setTexto('');
-      carregar();
-    } catch (e: any) {
-      setErro(e.message);
-    } finally {
-      setEnviando(false);
-    }
-  };
-
-  if (lista === null) {
-    return <div className="text-slate-400 text-sm p-8 text-center">Carregando conversas…</div>;
-  }
-
-  if (!lista.length) {
-    return (
-      <div className="bg-white border border-slate-200 rounded-2xl p-10 shadow-sm text-center">
-        <MessageCircle className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-        <h3 className="font-bold text-slate-800 mb-1">Nenhuma conversa ainda</h3>
-        <p className="text-slate-500 text-sm max-w-md mx-auto mb-5">
-          Quando um lead responder à sua abordagem no WhatsApp, Instagram ou Messenger,
-          a conversa aparece aqui — e o robô já responde.
-        </p>
-        <button onClick={irConfigurar} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm">
-          Conectar canais
-        </button>
-        {erro && <p className="text-sm text-red-600 mt-4">{erro}</p>}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex-1 min-h-[520px] bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex">
-      {/* lista */}
-      <div className={`w-full md:w-80 border-r border-slate-100 flex-col ${aberta ? 'hidden md:flex' : 'flex'}`}>
-        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-          <span className="text-sm font-bold text-slate-700">{lista.length} conversa(s)</span>
-          <button onClick={carregar} title="Atualizar" className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {lista.map(c => {
-            const Icone = ICONE_CANAL[c.canal] || MessageCircle;
-            return (
-              <button
-                key={c.id}
-                onClick={() => abrir(c.id)}
-                className={`w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-slate-50 flex gap-3 ${
-                  aberta?.id === c.id ? 'bg-blue-50/60' : ''
-                }`}
-              >
-                <Icone className="w-8 h-8 shrink-0 mt-0.5" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-sm text-slate-800 truncate">{c.nome || c.contato}</span>
-                    <span className="text-[11px] text-slate-400 shrink-0">{quando(c.atualizado)}</span>
-                  </div>
-                  <p className="text-xs text-slate-500 truncate">
-                    {c.ultima?.de === 'robo' ? '🤖 ' : c.ultima?.de === 'voce' ? 'Você: ' : ''}
-                    {c.ultima?.texto}
-                  </p>
-                  <div className="mt-1 flex gap-1.5">
-                    {c.precisa_humano && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">precisa de você</span>
-                    )}
-                    {c.optout && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">saiu</span>
-                    )}
-                    {!c.optout && !c.precisa_humano && (
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        c.robo_ativo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                      }`}>
-                        {c.robo_ativo ? 'robô' : 'pausado'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* conversa */}
-      <div className={`flex-1 flex-col min-w-0 ${aberta ? 'flex' : 'hidden md:flex'}`}>
-        {!aberta ? (
-          <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
-            Escolha uma conversa
-          </div>
-        ) : (
-          <>
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
-              <button onClick={() => setAberta(null)} className="md:hidden p-1 text-slate-400">
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <div className="min-w-0 flex-1">
-                <p className="font-bold text-slate-800 truncate">{aberta.nome || aberta.contato}</p>
-                <p className="text-xs text-slate-500">{NOME_CANAL[aberta.canal]} · {aberta.contato}</p>
-              </div>
-              {aberta.optout ? (
-                <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                  <Ban className="w-4 h-4" /> pediu para sair
-                </span>
-              ) : (
-                <button
-                  onClick={alternarRobo}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 ${
-                    aberta.robo_ativo
-                      ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  <Power className="w-3.5 h-3.5" />
-                  {aberta.robo_ativo ? 'Robô respondendo' : 'Robô pausado'}
-                </button>
-              )}
-            </div>
-
-            {aberta.precisa_humano && aberta.motivo && (
-              <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100 text-sm text-amber-800 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span><b>O robô parou:</b> {aberta.motivo}</span>
-              </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2 bg-slate-50/50">
-              {aberta.mensagens.map((m, i) => <Balao key={i} m={m} />)}
-              <div ref={fim} />
-            </div>
-
-            <div className="p-3 border-t border-slate-100">
-              {erro && <p className="text-xs text-red-600 mb-2">{erro}</p>}
-              <div className="flex gap-2">
-                <textarea
-                  value={texto}
-                  onChange={e => setTexto(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); responder(); }
-                  }}
-                  rows={1}
-                  disabled={aberta.optout}
-                  placeholder={aberta.optout ? 'Esta pessoa pediu para não receber mais mensagens' : 'Responder você mesmo (pausa o robô nesta conversa)'}
-                  className={`${campo} resize-none`}
-                />
-                <button
-                  onClick={responder}
-                  disabled={enviando || !texto.trim() || aberta.optout}
-                  className="px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white"
-                  title="Enviar"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const Balao: React.FC<{ m: RoboMensagem }> = ({ m }) => {
-  const meu = m.de !== 'contato';
-  return (
-    <div className={`flex ${meu ? 'justify-end' : 'justify-start'}`}>
-      <div
-        className={`max-w-[78%] px-3.5 py-2 rounded-2xl text-sm whitespace-pre-wrap ${
-          m.de === 'contato'
-            ? 'bg-white border border-slate-200 text-slate-800 rounded-bl-md'
-            : m.de === 'robo'
-              ? 'bg-blue-50 border border-blue-100 text-slate-800 rounded-br-md'
-              : 'bg-blue-600 text-white rounded-br-md'
-        }`}
-      >
-        {m.de === 'robo' && (
-          <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600 mb-0.5">
-            <Bot className="w-3 h-3" /> robô
-          </span>
-        )}
-        {m.de === 'voce' && (
-          <span className="flex items-center gap-1 text-[10px] font-bold text-blue-100 mb-0.5">
-            <UserRound className="w-3 h-3" /> você
-          </span>
-        )}
-        {m.texto}
-        {m.em && (
-          <span className={`block text-[10px] mt-1 text-right ${m.de === 'voce' ? 'text-blue-100' : 'text-slate-400'}`}>
-            {quando(m.em)}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-};
 
 // ================================================================ simulador
 

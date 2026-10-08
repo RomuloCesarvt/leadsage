@@ -179,7 +179,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // os dois caiam no painel inicial como se nada tivesse acontecido.
   const [viewState, setViewState] = useState<string>(() => {
     const pedida = new URLSearchParams(window.location.search).get('tela') || '';
-    const telas: Record<string, string> = { 'nova-busca': 'hero', leads: 'workspace', robo: 'robo' };
+    const telas: Record<string, string> = { 'nova-busca': 'hero', leads: 'workspace', robo: 'robo', conversas: 'conversas' };
     return telas[pedida] || 'dashboard';
   });
   const [siteEmEdicao, setSiteEmEdicao] = useState<any | null>(null);
@@ -319,7 +319,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Enquanto olha o pipeline ou o robo, traz o que o robo moveu sem precisar recarregar.
   useEffect(() => {
-    if (!user || (viewState !== 'pipeline' && viewState !== 'robo')) return;
+    if (!user || (viewState !== 'pipeline' && viewState !== 'robo' && viewState !== 'conversas')) return;
     return sondar(() => { void atualizarPipeline(); }, 90000);
   }, [user, viewState, atualizarPipeline]);
 

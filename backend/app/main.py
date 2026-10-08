@@ -43,7 +43,7 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
-from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, abordagem_mestra, conector_whatsapp
+from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, abordagem_mestra, conector_whatsapp, caixa_de_entrada
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote as _quote
 from app.ai_robo import decidir as robo_decidir
@@ -1187,12 +1187,24 @@ async def robo_disparar(req: DisparoRequest, user: dict = Depends(get_current_us
 @app.get("/api/robo/conversas")
 async def robo_conversas(user: dict = Depends(get_current_user)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    return await robo_store.listar_conversas(user.get("uid"))
+    uid = user.get("uid")
+    conversas = await robo_store.listar_conversas(uid)
+    try:
+        itens = await fila_envio.listar(uid)
+    except Exception as exc:
+        print(f"Caixa de entrada: sem a fila de envio: {exc}")
+        itens = []
+    return caixa_de_entrada.juntar(conversas, itens)
 
 
 @app.get("/api/robo/conversas/{cid}")
 async def robo_conversa(cid: str, user: dict = Depends(get_current_user)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    if cid.startswith(caixa_de_entrada.PREFIXO_ENVIO):
+        item = await fila_envio.obter(user.get("uid"), cid[len(caixa_de_entrada.PREFIXO_ENVIO):])
+        if not item or item.get("status") not in ("enviado", "enviando"):
+            raise HTTPException(status_code=404, detail="Conversa não encontrada.")
+        return caixa_de_entrada.conversa_do_envio(item)
     conversa = await robo_store.obter_conversa(user.get("uid"), cid)
     if not conversa:
         raise HTTPException(status_code=404, detail="Conversa não encontrada.")
@@ -1225,6 +1237,11 @@ async def robo_ligar_desligar(cid: str, req: RoboAtivoRequest, user: dict = Depe
 @app.post("/api/robo/conversas/{cid}/responder")
 async def robo_responder(cid: str, req: RoboTextoRequest, user: dict = Depends(get_current_user)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    if cid.startswith(caixa_de_entrada.PREFIXO_ENVIO):
+        raise HTTPException(
+            status_code=409,
+            detail="Esta pessoa ainda não respondeu. Quando responder, a conversa se abre aqui e você pode escrever.",
+        )
     try:
         return await robo_service.responder_como_humano(user.get("uid"), cid, req.texto)
     except LookupError as exc:

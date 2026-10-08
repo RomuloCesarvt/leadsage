@@ -333,7 +333,7 @@ export interface PlanoAtual {
 
 // ------------------------------------------------- robo de atendimento
 
-export type RoboCanal = 'whatsapp' | 'messenger' | 'instagram' | 'telegram';
+export type RoboCanal = 'whatsapp' | 'messenger' | 'instagram' | 'telegram' | 'email' | 'linkedin';
 
 export interface RoboConfigEntrada {
   app_secret: string;
@@ -419,10 +419,14 @@ export interface RoboConversaResumo {
   atualizado: string;
   ultima: RoboMensagem | null;
   total: number;
+  /** 'robo': o lead respondeu; 'envio': abordagem enviada que ainda espera resposta */
+  origem?: 'robo' | 'envio';
+  aguardando?: boolean;
 }
 
 export interface RoboConversa extends Omit<RoboConversaResumo, 'ultima' | 'total'> {
   mensagens: RoboMensagem[];
+  somente_leitura?: boolean;
 }
 
 export interface RoboTeste {

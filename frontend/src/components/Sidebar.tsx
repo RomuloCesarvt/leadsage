@@ -18,7 +18,8 @@ import {
   HelpCircle,
   CreditCard,
   Bot,
-  ListChecks
+  ListChecks,
+  MessagesSquare
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Logo } from './Logo';
@@ -77,6 +78,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> =
         <div className="space-y-1">
           <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Ferramentas de Vendas</p>
           <NavItem id="ai-outreach" icon={MessageSquare} label="IA de Abordagem" />
+          <NavItem id="conversas" icon={MessagesSquare} label="Conversas" />
           <NavItem id="robo" icon={Bot} label="Robô de Atendimento" />
           <NavItem id="proposals" icon={FileText} label="Propostas" />
           <NavItem id="contracts" icon={ScrollText} label="Contratos" />

@@ -15,6 +15,7 @@ import { DemoSiteModal } from './components/DemoSiteModal';
 import { LeadProfilePanel } from './components/LeadProfilePanel';
 import { HistoryScreen } from './components/screens/HistoryScreen';
 import { LoginScreen } from './components/screens/LoginScreen';
+import { ConversasScreen } from './components/screens/ConversasScreen';
 import { PipelineScreen } from './components/screens/PipelineScreen';
 import { ProposalsScreen } from './components/screens/ProposalsScreen';
 
@@ -76,6 +77,7 @@ const MainApp: React.FC = () => {
 
           {/* Ferramentas de Vendas */}
           {viewState === 'ai-outreach' && <AIOutreachScreen />}
+          {viewState === 'conversas' && <ConversasScreen />}
           {viewState === 'robo' && <RoboScreen />}
           {viewState === 'proposals' && <ProposalsScreen />}
           {viewState === 'contracts' && <ContractsScreen />}
