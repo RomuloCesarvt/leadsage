@@ -29,7 +29,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> =
 
   const NavItem = ({ id, icon: Icon, label, disabled = false }: { id: string, icon: any, label: string, disabled?: boolean }) => (
     <button
-      onClick={() => !disabled && setViewState(id)}
+      onClick={() => { if (disabled) return; setViewState(id); if (window.innerWidth < 768 && isOpen) toggleSidebar(); }}
       disabled={disabled}
       className={`w-full py-2.5 px-3 rounded-xl flex items-center gap-3 text-sm font-semibold transition-all ${
         viewState === id 
