@@ -1407,16 +1407,32 @@ async def _gravar_canal_do_conector(canal: Dict[str, Any]) -> None:
         _CACHE_CONECTOR[canal["cw_hash"]] = (time.monotonic(), canal)
 
 
+MSG_BANCO_SEM_COTA = (
+    "O banco de dados do LeadSage está sem cota agora (limite do plano gratuito do Firebase), "
+    "e uma chave gerada neste estado não funcionaria. Tente de novo depois das 4h da manhã (horário de Brasília), "
+    "quando a cota volta, ou assim que o faturamento do Firebase for ativado."
+)
+
+
+def _exigir_banco_disponivel() -> None:
+    if robo_store.firestore_falhou_agora():
+        raise HTTPException(status_code=503, detail=MSG_BANCO_SEM_COTA)
+
+
 @app.post("/api/robo/conector/gerar")
 async def conector_gerar(user: dict = Depends(get_current_user)):
     """Cria (ou troca) a chave que liga o Conector do PC a esta conta. Aparece uma vez."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     uid = user.get("uid")
     canal = await robo_conexao._canal(uid, user.get("email", ""))
+    _exigir_banco_disponivel()
     antigo = canal.get("cw_hash")
     chave = await conector_whatsapp.criar_chave(canal)
     await robo_store.registrar_ativo("conector", canal["cw_hash"], uid, canal["gancho"])
     canal = await robo_store.substituir_canal(uid, canal)
+    if robo_store.firestore_falhou_agora():
+        # a gravação caiu no banco temporário: a chave não valeria na próxima chamada
+        raise HTTPException(status_code=503, detail=MSG_BANCO_SEM_COTA)
     if antigo:
         _CACHE_CONECTOR.pop(antigo, None)
     return {"chave": chave, **robo_store.visao_publica(canal, settings.APP_URL)}

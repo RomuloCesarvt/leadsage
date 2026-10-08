@@ -110,7 +110,24 @@ async def canal_por_gancho(gancho: str) -> Optional[Dict[str, Any]]:
     return await _sql_get(f"canal:{gancho}")
 
 
+# O canal do usuario custa duas leituras no Firestore e e pedido em quase toda
+# chamada do robo. Guardado por alguns segundos so quando veio do Firestore; toda
+# escrita deste processo o esquece.
+_CANAIS: Dict[str, Any] = {}
+_CANAIS_TTL_S = 20
+
+
 async def canal_do_usuario(uid: str) -> Optional[Dict[str, Any]]:
+    guardado = _CANAIS.get(uid)
+    if guardado and time.monotonic() - guardado[0] < _CANAIS_TTL_S:
+        return dict(guardado[1])
+    canal = await _canal_do_usuario(uid)
+    if canal is not None and firestore_db is not None and not firestore_falhou_agora(2.0):
+        _CANAIS[uid] = (time.monotonic(), dict(canal))
+    return canal
+
+
+async def _canal_do_usuario(uid: str) -> Optional[Dict[str, Any]]:
     gancho = None
     if firestore_db is not None:
         try:
@@ -162,8 +179,10 @@ async def salvar_canal(uid: str, email: str, mudancas: Dict[str, Any]) -> Dict[s
             firestore_db.collection("users").document(uid).set(
                 {"robo_gancho": gancho}, merge=True
             )
+            _CANAIS.pop(uid, None)
             return atual
         except Exception as exc:
+            _FALHA[0] = time.monotonic()
             print(f"Falha ao gravar canal do robo: {exc}")
     await _sql_put(f"canal:{gancho}", uid, "canal", atual)
     return atual
@@ -280,6 +299,7 @@ async def registrar_ativo(tipo: str, ativo_id: str, uid: str, gancho: str) -> No
             firestore_db.collection("robo_ativos").document(chave).set(dados)
             return
         except Exception as exc:
+            _FALHA[0] = time.monotonic()
             print(f"Falha ao registrar ativo do robo: {exc}")
     await _sql_put(f"ativo:{chave}", uid, "ativo", dados)
 
@@ -331,8 +351,10 @@ async def substituir_canal(uid: str, canal: Dict[str, Any]) -> Dict[str, Any]:
     if firestore_db is not None:
         try:
             firestore_db.collection("robo_canais").document(canal["gancho"]).set(canal)
+            _CANAIS.pop(canal.get("uid", ""), None)
             return canal
         except Exception as exc:
+            _FALHA[0] = time.monotonic()
             print(f"Falha ao gravar canal do robo: {exc}")
     await _sql_put(f"canal:{canal['gancho']}", uid, "canal", canal)
     return canal

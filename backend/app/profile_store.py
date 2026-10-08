@@ -8,6 +8,7 @@ Grava no Firestore quando ha credencial (producao) e cai para SQLite no
 dev local. No Vercel o SQLite fica em /tmp e e efemero, por isso o
 Firestore e o caminho duravel.
 """
+import time
 from typing import Any, Dict, Optional
 
 from sqlalchemy import select
@@ -61,13 +62,28 @@ async def _save_sqlite(uid: str, data: Dict[str, Any]) -> None:
         await session.commit()
 
 
+# Quase toda rota le o perfil (plano, creditos). Guardado por alguns segundos
+# so quando a leitura veio do Firestore; gravar no processo o esquece.
+_PERFIS: Dict[str, Any] = {}
+_PERFIS_TTL_S = 20
+
+
+def esquecer_perfil(uid: str) -> None:
+    _PERFIS.pop(uid, None)
+
+
 async def get_profile(uid: str) -> UserProfile:
     """Perfil salvo do usuario, ou os defaults quando ainda nao gravou nada."""
+    guardado = _PERFIS.get(uid)
+    if guardado and time.monotonic() - guardado[0] < _PERFIS_TTL_S:
+        return guardado[1].model_copy(deep=True)
     stored: Optional[Dict[str, Any]] = None
+    veio_do_firestore = False
 
     if firestore_db is not None:
         try:
             doc = firestore_db.collection("users").document(uid).get()
+            veio_do_firestore = True
             if doc.exists:
                 stored = (doc.to_dict() or {}).get("profile")
         except Exception as exc:
@@ -84,10 +100,13 @@ async def get_profile(uid: str) -> UserProfile:
         # leitura: inclui os campos de sistema
         for key, value in _clean(stored, sistema=True).items():
             setattr(profile, key, value)
+    if veio_do_firestore:
+        _PERFIS[uid] = (time.monotonic(), profile.model_copy(deep=True))
     return profile
 
 
 async def save_profile(uid: str, payload: Dict[str, Any]) -> UserProfile:
+    esquecer_perfil(uid)
     data = _clean(payload)
 
     written = False
@@ -112,7 +131,9 @@ async def conceder_plano(uid: str, plano: str, sites: int, plan_id: str = "") ->
     Passa por fora de EDITABLE_FIELDS: estes campos existem justamente
     para nao serem editaveis pelo usuario.
     """
+    esquecer_perfil(uid)
     atual = await get_profile(uid)
+    esquecer_perfil(uid)
     dados = {"plan": plano, "sites_quota": (atual.sites_quota or 0) + sites}
     if plan_id:
         dados["plan_id"] = plan_id

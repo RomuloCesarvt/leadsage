@@ -241,3 +241,10 @@ def test_banco_indisponivel_nao_vira_chave_revogada(client, chave, monkeypatch):
     assert r.status_code == 503 and "banco de dados" in r.json()["detail"]
     monkeypatch.setattr(robo_store, "firestore_falhou_agora", lambda janela_s=15.0: False)
     assert client.get("/api/conector/tarefas", headers=cabecalho(chave)).status_code == 401
+
+
+def test_nao_gera_chave_quando_o_banco_esta_sem_cota(client, com_robo, monkeypatch):
+    """Uma chave gravada no banco temporario nao valeria na chamada seguinte: melhor recusar com a verdade."""
+    monkeypatch.setattr(robo_store, "firestore_falhou_agora", lambda janela_s=15.0: True)
+    r = client.post("/api/robo/conector/gerar")
+    assert r.status_code == 503 and "sem cota" in r.json()["detail"]
