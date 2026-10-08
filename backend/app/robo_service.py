@@ -162,6 +162,24 @@ async def _site_do_lead(uid: str, lead_id: str) -> str:
     return ""
 
 
+# Falhas passageiras da IA (demorou, limite, instabilidade) nao podem prender a conversa: a proxima
+# mensagem do lead tem de ser respondida normalmente. So depois de varias seguidas o dono e chamado.
+_TRANSITORIOS = ("a IA demorou", "a IA não respondeu", "a IA não produziu")
+MAX_FALHAS_IA = 3
+MAX_AUTOMATICAS = 3
+
+
+def _motivo_transitorio(motivo: str) -> bool:
+    return any((motivo or "").startswith(t) for t in _TRANSITORIOS)
+
+
+def _falha_da_ia(conversa: Dict[str, Any], motivo: str) -> None:
+    conversa["falhas_ia"] = int(conversa.get("falhas_ia") or 0) + 1
+    conversa["silencio"] = f"{motivo.capitalize()}. Tenta de novo na próxima mensagem."
+    if conversa["falhas_ia"] >= MAX_FALHAS_IA:
+        _marcar(conversa, f"{motivo} ({conversa['falhas_ia']} vezes seguidas) — responda você")
+
+
 def _marcar(conversa: Dict[str, Any], motivo: str) -> None:
     conversa["precisa_humano"] = True
     conversa["motivo"] = motivo
@@ -214,6 +232,11 @@ async def processar(
     if conversa.get("optout"):
         return await salvar()
 
+    # a IA falhou antes por um motivo passageiro: nao prende a conversa, tenta de novo agora
+    if conversa.get("precisa_humano") and _motivo_transitorio(conversa.get("motivo", "")):
+        conversa["precisa_humano"] = False
+        conversa["motivo"] = ""
+
     # 3. robo desligado. Antes isso era silencioso: a mensagem chegava, nada acontecia e ninguem
     # sabia por que. O motivo fica na conversa (sem travar: ligar o robo depois volta a responder).
     if not cfg.get("ativo"):
@@ -253,11 +276,24 @@ async def processar(
             timeout=PRAZO_IA,
         )
     except asyncio.TimeoutError:
-        _marcar(conversa, "a IA demorou demais para responder — responda você")
+        _falha_da_ia(conversa, "a IA demorou demais para responder")
         return await salvar()
     except Exception as exc:
-        _marcar(conversa, f"a IA não respondeu ({type(exc).__name__}) — responda você")
+        _falha_da_ia(conversa, f"a IA não respondeu ({type(exc).__name__})")
         return await salvar()
+    conversa["falhas_ia"] = 0
+
+    # Do outro lado tem um robo (atendimento automatico): nao responde. A terceira seguida tira o
+    # contato da lista do robo, para nao ficar gastando IA e parecendo spam para outro robo.
+    if decisao.automatica:
+        conversa["automaticas"] = int(conversa.get("automaticas") or 0) + 1
+        conversa["silencio"] = "Parece uma resposta automática (outro robô): o robô não respondeu."
+        if conversa["automaticas"] >= MAX_AUTOMATICAS:
+            conversa["robo_ativo"] = False
+            conversa["contato_robo"] = True
+            conversa["silencio"] = f"Parece outro robô ({conversa['automaticas']} mensagens automáticas): saiu da lista do robô."
+        return await salvar()
+    conversa["automaticas"] = 0
 
     if decisao.sdr:
         conversa["sdr"] = decisao.sdr

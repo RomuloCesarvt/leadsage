@@ -1246,6 +1246,11 @@ async def robo_ligar_desligar(cid: str, req: RoboAtivoRequest, user: dict = Depe
     if req.ativo:
         conversa["precisa_humano"] = False
         conversa["motivo"] = ""
+        # religar na mao vale mais do que a suspeita de robo: recomeça a contar do zero
+        conversa["contato_robo"] = False
+        conversa["automaticas"] = 0
+        conversa["falhas_ia"] = 0
+        conversa.pop("silencio", None)
     conversa["atualizado"] = robo_store.agora()
     await robo_store.salvar_conversa(uid, conversa)
     return conversa

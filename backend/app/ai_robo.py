@@ -66,6 +66,8 @@ class Decisao:
     mensagens: List[str] = field(default_factory=list)
     # memoria da negociacao: etapa, temperatura, o que foi descoberto
     sdr: Dict[str, Any] = field(default_factory=dict)
+    # a mensagem do outro lado parece de um robo (atendimento automatico): nao se responde
+    automatica: bool = False
 
 
 def _normal(texto: str) -> str:
@@ -125,6 +127,48 @@ def recusou(texto: str) -> bool:
     return any(t == r or t.startswith(r + " ") or t.endswith(" " + r) for r in RECUSAS)
 
 
+# Sinais de atendimento automatico. Peso 2 = quase so robo escreve assim; peso 1 = pode ser gente,
+# so conta junto com outro sinal. "Qual o horario de atendimento?" (peso 1) de um lead de verdade
+# nao pode ser tratado como robo.
+SINAIS_DE_ROBO = (
+    (2, "atendimento automatico"), (2, "mensagem automatica"), (2, "resposta automatica"),
+    (2, "assistente virtual"), (2, "este e um atendimento"), (2, "protocolo de atendimento"), (2, "seu protocolo"),
+    (2, "digite 1"), (2, "digite 2"), (2, "digite o numero"), (2, "responda com o numero"),
+    (2, "escolha uma das opcoes"), (2, "selecione uma opcao"), (2, "para continuar o atendimento"),
+    (2, "sobre qual deles"), (2, "agradece seu contato"), (2, "agradecemos o seu contato"),
+    (2, "agradecemos seu contato"), (2, "agradeco o seu contato"), (2, "agradeco o contato"),
+    (2, "sua parcela"), (2, "sua fatura"), (2, "seu boleto"),
+    (1, "obrigado por entrar em contato"), (1, "obrigada por entrar em contato"), (1, "em caso de duvidas"),
+    (1, "retornaremos"), (1, "responderemos assim que"), (1, "em breve"), (1, "nosso horario"),
+    (1, "fora do horario"), (1, "horario de atendimento"), (1, "no momento nao estamos"),
+    (1, "clique no botao"), (1, "clique no link"), (1, "acesse o link"), (1, "estamos chegando"),
+)
+
+
+def parece_automatica(texto: str, mensagens: Optional[List[Dict[str, Any]]] = None) -> bool:
+    """O outro lado e um robo? Pelo jeito da frase, e por repetir a mesma mensagem."""
+    bruto = texto or ""
+    t = _normal(bruto)
+    if not t or e_so_midia(bruto):
+        return False
+    # com os numeros: "digite 1" perde o 1 em _normal
+    com_numeros = re.sub(r"[^a-z0-9 ]+", " ", unicodedata.normalize("NFKD", bruto).encode("ascii", "ignore").decode().lower())
+    pontos = sum(peso for peso, trecho in SINAIS_DE_ROBO if trecho in t or trecho in com_numeros)
+    if re.search(r"https?://", bruto):
+        pontos += 1
+    if len(re.findall(r"(?m)^\s*(?:[1-9][\).\-]|[•➡✅])", bruto)) >= 2:
+        pontos += 2  # lista de opcoes numeradas
+    # a mesma frase de novo e de novo: gente nao repete mensagem palavra por palavra
+    # (so frase longa: "oi", "???" e "ok" repetidos sao de gente)
+    if mensagens and len(com_numeros.strip()) >= 25:
+        def chave(x: str) -> str:
+            return re.sub(r"[^a-z0-9 ]+", " ", unicodedata.normalize("NFKD", x or "").encode("ascii", "ignore").decode().lower()).strip()
+        iguais = sum(1 for m in mensagens if m.get("de") == "contato" and chave(m.get("texto", "")) == com_numeros.strip())
+        if iguais >= 2:
+            pontos += 2
+    return pontos >= 2
+
+
 def e_so_midia(texto: str) -> bool:
     return bool(re.fullmatch(r"\[[^\]]+\]", (texto or "").strip()))
 
@@ -181,6 +225,11 @@ def decidir(
 
     if e_so_midia(texto):
         return Decisao(passar_para_humano=True, motivo=f"mandou {texto} — o robô não interpreta mídia")
+
+    # outro robo do outro lado: nao responde (nem gasta IA nem credito) e a conversa nao vira um
+    # papo de dois robos; o servico conta quantas vieram para tirar o contato da lista do robo
+    if parece_automatica(texto, mensagens):
+        return Decisao(automatica=True, motivo="parece uma resposta automática (outro robô)")
 
     if respostas_seguidas_do_robo(mensagens) >= MAX_RESPOSTAS_SEGUIDAS:
         return Decisao(

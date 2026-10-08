@@ -188,7 +188,7 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
     return (chats || []).filter(c => {
       if (filtro === 'grupos' ? !c.grupo : c.grupo) return false;
       if (filtro === 'naoLidas' && !c.naoLidas) return false;
-      if (filtro === 'robo' && !conversaDoRobo(c)) return false;
+      if (filtro === 'robo') { const r = conversaDoRobo(c); if (!r || r.contato_robo || !r.robo_ativo) return false; }
       return !q || `${c.nome} ${c.telefone}`.toLowerCase().includes(q);
     });
   }, [chats, filtro, busca, doRobo]);
@@ -343,7 +343,10 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
                   </div>
                   <div className="flex items-center gap-2">
                     <p className="text-xs text-slate-500 truncate flex-1">{c.ultima?.minha ? 'Você: ' : ''}{c.ultima?.texto}</p>
-                    {r && (
+                    {r && r.contato_robo && (
+                      <span title="Parece outro robô: fora da lista do robô" className="shrink-0 text-[10px] font-bold text-slate-500 bg-slate-100 rounded px-1.5 py-0.5">outro robô</span>
+                    )}
+                    {r && !r.contato_robo && (
                       <span title={r.precisa_humano ? 'O robô precisa de você' : r.robo_ativo ? 'O robô atende' : 'Robô pausado'}
                         className={`shrink-0 ${r.precisa_humano ? 'text-amber-600' : r.robo_ativo ? 'text-blue-600' : 'text-slate-400'}`}>
                         <Bot className="w-4 h-4" />
@@ -386,7 +389,12 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
               )}
             </div>
 
-            {conv?.silencio && !conv.precisa_humano && (
+            {conv?.contato_robo && (
+              <div className="px-4 py-2 bg-slate-50 border-b border-slate-200 text-xs text-slate-600">
+                Parece <b>outro robô</b> (atendimento automático): o robô parou de responder para não ficar conversando com uma máquina. Se for uma pessoa, use <b>Robô pausado</b> para religar.
+              </div>
+            )}
+            {conv?.silencio && !conv.precisa_humano && !conv.contato_robo && (
               <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 text-xs text-slate-600">O robô não respondeu: {conv.silencio}</div>
             )}
             {conv?.precisa_humano && conv.motivo && (

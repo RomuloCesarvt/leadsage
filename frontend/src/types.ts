@@ -424,6 +424,8 @@ export interface RoboConversaResumo {
   aguardando?: boolean;
   /** por que o robô ficou quieto nesta conversa (desligado, pausado...) */
   silencio?: string;
+  /** o contato parece outro robô (3 mensagens automáticas seguidas): saiu da lista do robô */
+  contato_robo?: boolean;
 }
 
 export interface RoboConversa extends Omit<RoboConversaResumo, 'ultima' | 'total'> {
