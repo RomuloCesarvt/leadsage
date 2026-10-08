@@ -308,7 +308,9 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
 
   // ------------------------------------------------------------------ chat
   return (
-    <div className="h-[calc(100dvh-230px)] min-h-[460px] max-h-[920px] bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex">
+    <div className={aberto
+      ? 'fixed inset-0 z-50 bg-white flex md:static md:z-auto md:h-[calc(100dvh-230px)] md:min-h-[460px] md:max-h-[920px] md:border md:border-slate-200 md:rounded-2xl md:shadow-sm md:overflow-hidden'
+      : 'h-[calc(100dvh-170px)] min-h-[460px] md:h-[calc(100dvh-230px)] md:max-h-[920px] bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex'}>
       {/* lista */}
       <div className={`w-full md:w-96 border-r border-slate-100 flex-col min-h-0 ${aberto ? 'hidden md:flex' : 'flex'}`}>
         <div className="px-3 pt-3 pb-2 border-b border-slate-100 space-y-2.5">
@@ -316,7 +318,7 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar ou começar uma conversa" aria-label="Buscar conversa"
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white" />
+                className="w-full pl-9 pr-3 py-2.5 md:py-2 text-base md:text-sm bg-slate-50 border border-slate-200 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white" />
             </div>
             <button onClick={carregarChats} title="Atualizar" className="p-2 rounded-lg text-slate-400 hover:bg-slate-100"><RefreshCw className="w-4 h-4" /></button>
           </div>
@@ -342,7 +344,7 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
           <div className="flex gap-1.5 flex-wrap" role="tablist" aria-label="Filtrar conversas">
             {FILTROS.map(f => (
               <button key={f.id} role="tab" aria-selected={filtro === f.id} onClick={() => setFiltro(f.id)}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+                className={`px-3.5 py-2 md:px-3 md:py-1.5 rounded-full text-sm md:text-xs font-bold border transition-colors ${
                   filtro === f.id ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
                 {f.rotulo}{f.id === 'naoLidas' && naoLidasTotal ? ` (${naoLidasTotal})` : ''}
               </button>
@@ -356,15 +358,15 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
             const r = conversaDoRobo(c);
             return (
               <button key={c.id} onClick={() => setAberto(c)}
-                className={`w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-slate-50 flex gap-3 ${aberto?.id === c.id ? 'bg-emerald-50/60' : ''}`}>
-                <Avatar nome={c.nome} className="w-10 h-10" />
+                className={`w-full text-left px-4 py-3.5 md:py-3 border-b border-slate-50 hover:bg-slate-50 flex gap-3 ${aberto?.id === c.id ? 'bg-emerald-50/60' : ''}`}>
+                <Avatar nome={c.nome} className="w-12 h-12 md:w-10 md:h-10 text-lg md:text-base" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-sm text-slate-800 truncate">{c.nome}</span>
+                    <span className="font-bold text-base md:text-sm text-slate-800 truncate">{c.nome}</span>
                     <span className={`text-[11px] shrink-0 ${c.naoLidas ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>{dataCurta(c.quando)}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <p className="text-xs text-slate-500 truncate flex-1">{c.ultima?.minha ? 'Você: ' : ''}{c.ultima?.texto}</p>
+                    <p className="text-sm md:text-xs text-slate-500 truncate flex-1">{c.ultima?.minha ? 'Você: ' : ''}{c.ultima?.texto}</p>
                     {r && r.contato_robo && (
                       <span title="Parece outro robô: fora da lista do robô" className="shrink-0 text-[10px] font-bold text-slate-500 bg-slate-100 rounded px-1.5 py-0.5">outro robô</span>
                     )}
@@ -395,11 +397,11 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
           </div>
         ) : (
           <>
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
-              <button onClick={() => setAberto(null)} className="md:hidden p-1 text-slate-400" aria-label="Voltar"><ChevronLeft className="w-5 h-5" /></button>
-              <Avatar nome={aberto.nome} className="w-9 h-9" />
+            <div className="px-3 md:px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] md:pt-3 border-b border-slate-100 flex items-center gap-3 bg-white shrink-0">
+              <button onClick={() => setAberto(null)} className="md:hidden p-2 -ml-1 text-slate-600 rounded-full active:bg-slate-100" aria-label="Voltar"><ChevronLeft className="w-6 h-6" /></button>
+              <Avatar nome={aberto.nome} className="w-10 h-10 md:w-9 md:h-9" />
               <div className="min-w-0 flex-1">
-                <p className="font-bold text-slate-800 truncate">{aberto.nome}</p>
+                <p className="font-bold text-base text-slate-800 truncate">{aberto.nome}</p>
                 <p className="text-xs text-slate-500">{aberto.grupo ? 'Grupo' : aberto.telefone ? `+${aberto.telefone}` : ''}</p>
               </div>
               {conv && (
@@ -423,7 +425,7 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
               <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100 text-sm text-amber-800"><b>O robô parou:</b> {conv.motivo}</div>
             )}
 
-            <div ref={painel} data-painel="mensagens" className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-4 py-3 space-y-1 bg-[#f4f1ea]">
+            <div ref={painel} data-painel="mensagens" className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-3 md:px-4 py-3 space-y-1.5 md:space-y-1 bg-[#f4f1ea]">
               {mensagens.length >= limite && (
                 <div className="flex justify-center pb-2">
                   <button onClick={carregarMaisAntigas} disabled={carregandoMais}
@@ -442,11 +444,11 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
                       </div>
                     )}
                     <div className={`flex ${m.minha ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[78%] px-3 py-1.5 rounded-xl text-sm text-slate-800 whitespace-pre-wrap break-words shadow-sm ${
+                      <div className={`max-w-[85%] md:max-w-[78%] px-3.5 md:px-3 py-2 md:py-1.5 rounded-2xl md:rounded-xl text-base md:text-sm leading-snug text-slate-800 whitespace-pre-wrap break-words shadow-sm ${
                         m.minha ? 'bg-[#d9fdd3] rounded-tr-sm' : 'bg-white rounded-tl-sm'} ${m.texto.startsWith('[') ? 'italic text-slate-500' : ''}`}>
                         {m.miniatura && <img src={m.miniatura} alt="" className="rounded-lg mb-1 max-h-60 max-w-full object-contain" />}
                         {m.miniatura && m.texto.startsWith('[') ? '' : m.texto}
-                        <span className="float-right ml-3 mt-1.5 flex items-center gap-1 text-[10px] text-slate-400">
+                        <span className="float-right ml-3 mt-2 flex items-center gap-1 text-[11px] md:text-[10px] text-slate-400">
                           {hora(m.quando)} {m.minha && <Tique status={m.status} />}
                         </span>
                       </div>
@@ -456,16 +458,16 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
               })}
             </div>
 
-            <div className="p-3 border-t border-slate-100 bg-white shrink-0">
+            <div className="p-2.5 md:p-3 pb-[max(0.625rem,env(safe-area-inset-bottom))] border-t border-slate-100 bg-white shrink-0">
               {aviso && <p className="text-xs text-amber-700 mb-2">{aviso}</p>}
               {erro && <p className="text-xs text-red-600 mb-2">{erro}</p>}
               <div className="flex gap-2">
                 <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={1} aria-label="Mensagem"
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void enviar(); } }}
                   placeholder="Digite uma mensagem"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white resize-none" />
+                  className="w-full px-4 py-3 md:py-2.5 bg-slate-50 border border-slate-200 rounded-2xl md:rounded-xl text-base md:text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white resize-none" />
                 <button onClick={enviar} disabled={enviando || !texto.trim()} title="Enviar"
-                  className="px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white"><Send className="w-4 h-4" /></button>
+                  className="px-5 md:px-4 rounded-2xl md:rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white"><Send className="w-5 h-5 md:w-4 md:h-4" /></button>
               </div>
             </div>
           </>
