@@ -96,3 +96,15 @@ test('miniatura em base64 nao vira texto: legenda nas midias, miniatura a parte'
   const c = resumoDoChat({ id: { _serialized: '5514998003784@c.us', user: '5514998003784' }, name: 'Ana', lastMessage: { type: 'image', body: thumb, caption: '', fromMe: false } });
   assert.equal(c.ultima.texto, '[imagem]');
 });
+
+test('contato novo (@lid): telefone vem do titulo da conversa', async () => {
+  const { telefoneDoTitulo, ehLid } = await import('./leadsage-conector.mjs');
+  assert.equal(telefoneDoTitulo('+55 11 96462-3668'), '5511964623668');
+  assert.equal(telefoneDoTitulo('+1 (866) 839-2077'), '18668392077');
+  assert.equal(telefoneDoTitulo('Padaria Doce Vida'), '');
+  assert.equal(telefoneDoTitulo('128625865191513'), ''); // id interno nao e telefone
+  assert.ok(ehLid('128625865191513@lid') && !ehLid('5511964623668@c.us'));
+  const c = resumoDoChat({ id: { _serialized: '128625865191513@lid', user: '128625865191513' }, name: '+55 11 96462-3668', lastMessage: null });
+  assert.equal(c.telefone, '5511964623668');
+  assert.equal(resumoDoChat({ id: { _serialized: '128625865191513@lid', user: '1' }, name: 'Gabriel' }).telefone, '');
+});

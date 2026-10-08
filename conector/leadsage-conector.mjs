@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '2.6.0';
+export const VERSAO = '2.7.0';
 const PORTA = 2790;
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -234,11 +234,22 @@ export function textoDaMensagem(tipo, body, caption) {
   return pareceBase64(body) ? '' : String(body || '').trim();
 }
 
+/** "+55 11 96462-3668" -> "5511964623668"; nome de pessoa ou grupo -> "". */
+export function telefoneDoTitulo(titulo) {
+  const t = String(titulo || '').trim();
+  if (!/^\+?[\d\s().-]{10,24}$/.test(t)) return '';
+  const d = t.replace(/\D/g, '');
+  return d.length >= 10 && d.length <= 13 ? d : '';
+}
+
+/** Em contato novo o WhatsApp usa um id interno (@lid), que não é telefone: a resposta TEM de ir para esse id. */
+export const ehLid = (chatId) => String(chatId || '').endsWith('@lid');
+
 export function resumoDoChat(chat) {
   const id = chat.id?._serialized || '';
   const grupo = Boolean(chat.isGroup) || id.endsWith('@g.us');
   const ultima = chat.lastMessage || null;
-  const telefone = id.endsWith('@c.us') ? String(chat.id.user || '').replace(/\D/g, '') : '';
+  const telefone = id.endsWith('@c.us') ? String(chat.id.user || '').replace(/\D/g, '') : (ehLid(id) ? telefoneDoTitulo(chat.name) : '');
   return {
     id,
     nome: chat.name || telefone || id.split('@')[0],
@@ -339,6 +350,8 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
   const historico = criarHistorico(join(AQUI, 'historico.json'));
   await historico.carregar();
   const diag = { fonteChats: '', fonteMensagens: '', erros: {} };
+  // telefone (ou id interno) -> id da conversa de verdade, para a resposta ir para o lugar certo
+  const destinos = new Map();
   const navegador = acharNavegador();
   if (!navegador) throw new Error('Não achei o Microsoft Edge nem o Google Chrome neste computador. Instale um deles e abra de novo.');
   const { default: pkg } = await import('whatsapp-web.js');
@@ -372,7 +385,20 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
     try {
       if (msg.fromMe || msg.isStatus || (msg.from || '').endsWith('@g.us') || (msg.from || '').includes('broadcast')) return;
       const contato = await msg.getContact().catch(() => null);
-      const digitos = String(contato?.number || (msg.from || '').split('@')[0]).replace(/\D/g, '');
+      let digitos = String(contato?.number || (msg.from || '').split('@')[0]).replace(/\D/g, '');
+      if (ehLid(msg.from)) {
+        // contato novo (@lid): o telefone aparece no título da conversa quando ele não está salvo
+        try {
+          const titulo = await client.pupPage.evaluate((id) => {
+            const col = window.require('WAWebCollections').Chat;
+            const ch = col.get(id) || col.getModelsArray().find((c) => c.id._serialized === id);
+            return ch ? String(ch.formattedTitle || ch.name || '') : '';
+          }, msg.from);
+          const fone = telefoneDoTitulo(titulo);
+          if (fone) digitos = fone;
+        } catch (e) { /* segue com o id interno */ }
+      }
+      destinos.set(digitos, msg.from);
       aoReceber({
         id: msg.id?._serialized || msg.id?.id, de: digitos, nome: contato?.pushname || contato?.name || '',
         texto: msg.body, tipo: msg.type === 'chat' ? 'text' : msg.type, grupo: false, minha: false, momento: msg.timestamp,
@@ -387,8 +413,12 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
   return {
     async enviar(telefone, texto, digitandoMs) {
       try {
-        // confere se o número existe no WhatsApp antes de tentar: número inválido é sinal ruim para a conta
-        const id = await client.getNumberId(telefone);
+        // Quem já escreveu para nós tem o id da conversa guardado: responde para ele, sem procurar o número.
+        // Para número novo (abordagem), confere se existe no WhatsApp: número inválido é sinal ruim para a conta.
+        let id = null;
+        const conhecido = destinos.get(telefone) || (telefone.length >= 14 ? `${telefone}@lid` : '');
+        if (conhecido) id = { _serialized: conhecido };
+        else id = await client.getNumberId(telefone);
         if (!id) return { ok: false, erro: 'esse número não está no WhatsApp' };
         // "digitando…" direto pela página: client.getChatById quebra nas versões atuais do WhatsApp Web
         // ("r"), e antes isso derrubava TODO envio do robô. O indicador é só um detalhe humano.
