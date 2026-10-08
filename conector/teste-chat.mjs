@@ -25,7 +25,7 @@ test('chat sem nome usa o numero', () => {
 
 test('resumo da mensagem', () => {
   const m = resumoDaMensagem({ id: { _serialized: 'true_55@c.us_ABC' }, body: ' Oi ', fromMe: true, timestamp: 1760000200, type: 'chat', ack: 3, hasMedia: false });
-  assert.deepEqual(m, { id: 'true_55@c.us_ABC', texto: 'Oi', minha: true, quando: 1760000200, tipo: 'text', midia: false, status: 3 });
+  assert.deepEqual(m, { id: 'true_55@c.us_ABC', texto: 'Oi', minha: true, quando: 1760000200, tipo: 'text', midia: false, miniatura: '', status: 3 });
   assert.equal(resumoDaMensagem({ id: { id: 'x' }, body: '', type: 'ptt', hasMedia: true, timestamp: 1 }).texto, '[áudio]');
 });
 
@@ -77,4 +77,22 @@ test('so o LeadSage e a pagina local acessam o chat', () => {
   assert.ok(!chatPermitido('https://site-malicioso.test', '127.0.0.1:2790', ok));
   assert.ok(chatPermitido('', '127.0.0.1:2790', ok));       // a propria pagina local
   assert.ok(!chatPermitido('', 'rebind.exemplo.com:2790', ok)); // DNS rebinding
+});
+
+test('miniatura em base64 nao vira texto: legenda nas midias, miniatura a parte', async () => {
+  const { pareceBase64, textoDaMensagem } = await import('./leadsage-conector.mjs');
+  const thumb = '/9j/2wCEABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ' + 'A'.repeat(200);
+  assert.ok(pareceBase64(thumb));
+  assert.ok(!pareceBase64('Oi, tudo bem? Quanto custa o site de vocês?'));
+  assert.equal(textoDaMensagem('image', thumb, 'Olha o logo'), 'Olha o logo');
+  assert.equal(textoDaMensagem('image', thumb, ''), '');
+  assert.equal(textoDaMensagem('chat', 'Oi!', ''), 'Oi!');
+  assert.equal(textoDaMensagem('chat', thumb, ''), ''); // corpo "de texto" que e so base64 tambem some
+  const m = resumoDaMensagem({ id: { _serialized: 'x' }, type: 'image', body: thumb, caption: '', fromMe: false, timestamp: 1, hasMedia: true });
+  assert.equal(m.texto, '[imagem]');
+  assert.ok(m.miniatura.startsWith('data:image/jpeg;base64,/9j/'));
+  const t = resumoDaMensagem({ id: { _serialized: 'y' }, type: 'chat', body: 'Oi', fromMe: true, timestamp: 2 });
+  assert.equal(t.miniatura, '');
+  const c = resumoDoChat({ id: { _serialized: '5514998003784@c.us', user: '5514998003784' }, name: 'Ana', lastMessage: { type: 'image', body: thumb, caption: '', fromMe: false } });
+  assert.equal(c.ultima.texto, '[imagem]');
 });

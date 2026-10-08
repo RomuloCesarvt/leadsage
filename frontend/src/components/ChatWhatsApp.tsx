@@ -7,7 +7,7 @@
  * e pausa sozinho quando você assume uma conversa respondendo por aqui.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Check, CheckCheck, ChevronLeft, Clock, Power, RefreshCw, Search, Send, Wifi } from 'lucide-react';
+import { Bot, Check, CheckCheck, ChevronLeft, Clock, Power, RefreshCw, Search, Send, UserRound, Wifi } from 'lucide-react';
 import { api } from '../services/api';
 import { conectorLocal, versaoAntiga, type ChatWhats, type EstadoConector, type FonteLista, type MensagemWhats } from '../lib/conectorLocal';
 import { sondar } from '../lib/sondagem';
@@ -22,6 +22,16 @@ const FILTROS: { id: Filtro; rotulo: string }[] = [
   { id: 'robo', rotulo: 'Com o robô' },
   { id: 'grupos', rotulo: 'Grupos' },
 ];
+
+/** A letra do nome, ou um ícone de pessoa quando o contato só tem número. */
+const Avatar: React.FC<{ nome: string; className: string }> = ({ nome, className }) => {
+  const letra = (nome || '').trim().match(/\p{L}/u)?.[0];
+  return (
+    <div className={`${className} rounded-full bg-slate-200 text-slate-600 font-bold flex items-center justify-center shrink-0`}>
+      {letra ? letra.toUpperCase() : <UserRound className="w-1/2 h-1/2 text-slate-400" />}
+    </div>
+  );
+};
 
 const ultimos10 = (t: string) => (t || '').replace(/\D/g, '').slice(-10);
 
@@ -305,9 +315,7 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
             return (
               <button key={c.id} onClick={() => setAberto(c)}
                 className={`w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-slate-50 flex gap-3 ${aberto?.id === c.id ? 'bg-emerald-50/60' : ''}`}>
-                <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-600 font-bold flex items-center justify-center shrink-0">
-                  {(c.nome || '?').trim().charAt(0).toUpperCase()}
-                </div>
+                <Avatar nome={c.nome} className="w-10 h-10" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-bold text-sm text-slate-800 truncate">{c.nome}</span>
@@ -344,9 +352,7 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
           <>
             <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
               <button onClick={() => setAberto(null)} className="md:hidden p-1 text-slate-400" aria-label="Voltar"><ChevronLeft className="w-5 h-5" /></button>
-              <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-600 font-bold flex items-center justify-center shrink-0">
-                {(aberto.nome || '?').trim().charAt(0).toUpperCase()}
-              </div>
+              <Avatar nome={aberto.nome} className="w-9 h-9" />
               <div className="min-w-0 flex-1">
                 <p className="font-bold text-slate-800 truncate">{aberto.nome}</p>
                 <p className="text-xs text-slate-500">{aberto.grupo ? 'Grupo' : aberto.telefone ? `+${aberto.telefone}` : ''}</p>
@@ -383,9 +389,10 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
                       </div>
                     )}
                     <div className={`flex ${m.minha ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[78%] px-3 py-1.5 rounded-xl text-sm text-slate-800 whitespace-pre-wrap shadow-sm ${
+                      <div className={`max-w-[78%] px-3 py-1.5 rounded-xl text-sm text-slate-800 whitespace-pre-wrap break-words shadow-sm ${
                         m.minha ? 'bg-[#d9fdd3] rounded-tr-sm' : 'bg-white rounded-tl-sm'} ${m.texto.startsWith('[') ? 'italic text-slate-500' : ''}`}>
-                        {m.texto}
+                        {m.miniatura && <img src={m.miniatura} alt="" className="rounded-lg mb-1 max-h-60 max-w-full object-contain" />}
+                        {m.miniatura && m.texto.startsWith('[') ? '' : m.texto}
                         <span className="float-right ml-3 mt-1.5 flex items-center gap-1 text-[10px] text-slate-400">
                           {hora(m.quando)} {m.minha && <Tique status={m.status} />}
                         </span>

@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '2.4.0';
+export const VERSAO = '2.5.0';
 const PORTA = 2790;
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -214,6 +214,20 @@ export function criarHistorico(arquivo, { maxMensagens = 300, maxChats = 300 } =
 // ------------------------------------------------------- o chat (como o WhatsApp Web)
 
 /** Um chat da lista: nome, última mensagem, não lidas, número quando for pessoa. */
+const TIPOS_DE_TEXTO = new Set(['chat', 'text', 'vcard', 'multi_vcard', 'location', 'revoked', 'unknown', 'call_log', 'e2e_notification']);
+
+/** Em mensagem de mídia o WhatsApp põe a miniatura em base64 no campo "body". Isso não é texto. */
+export function pareceBase64(texto) {
+  const t = String(texto || '');
+  return t.length > 120 && !/\s/.test(t.slice(0, 200)) && /^[A-Za-z0-9+/=]+$/.test(t.slice(0, 200));
+}
+
+/** O texto de verdade de uma mensagem: a legenda nas mídias, o corpo no resto, nunca a miniatura. */
+export function textoDaMensagem(tipo, body, caption) {
+  if (!TIPOS_DE_TEXTO.has(tipo)) return String(caption || '').trim();
+  return pareceBase64(body) ? '' : String(body || '').trim();
+}
+
 export function resumoDoChat(chat) {
   const id = chat.id?._serialized || '';
   const grupo = Boolean(chat.isGroup) || id.endsWith('@g.us');
@@ -227,7 +241,7 @@ export function resumoDoChat(chat) {
     naoLidas: Number(chat.unreadCount) || 0,
     quando: Number(chat.timestamp) || Number(ultima?.timestamp) || 0,
     ultima: ultima
-      ? { texto: String(ultima.body || '').trim() || ROTULO_MIDIA[ultima.type] || '', minha: Boolean(ultima.fromMe) }
+      ? { texto: textoDaMensagem(ultima.type, ultima.body, ultima.caption) || ROTULO_MIDIA[ultima.type] || '', minha: Boolean(ultima.fromMe) }
       : null,
   };
 }
@@ -236,17 +250,21 @@ export function resumoDaMensagem(msg) {
   const tipo = msg.type === 'chat' ? 'text' : msg.type;
   return {
     id: msg.id?._serialized || msg.id?.id || '',
-    texto: String(msg.body || '').trim() || ROTULO_MIDIA[tipo] || '',
+    texto: textoDaMensagem(tipo, msg.body, msg.caption) || ROTULO_MIDIA[tipo] || '',
     minha: Boolean(msg.fromMe),
     quando: Number(msg.timestamp) || 0,
     tipo,
     midia: Boolean(msg.hasMedia),
+    // a miniatura que o próprio WhatsApp já mandou junto (pequena); a foto inteira não é baixada
+    miniatura: ['image', 'video', 'sticker'].includes(tipo) && pareceBase64(msg.body) && String(msg.body).length < 90000
+      ? `data:${tipo === 'sticker' ? 'image/webp' : 'image/jpeg'};base64,${String(msg.body)}`
+      : '',
     // 0 pendente, 1 enviada, 2 entregue, 3 lida
     status: Number.isFinite(msg.ack) ? msg.ack : 0,
   };
 }
 
-const CHAT_ID_RE = /^[0-9A-Za-z._-]{5,40}@(c\.us|g\.us|lid)$/;
+const CHAT_ID_RE = /^[0-9A-Za-z._-]{1,40}@(c\.us|g\.us|lid)$/;
 
 /**
  * As rotas do chat. Devolve { status, json }; fica separada do servidor para ser testada
@@ -404,7 +422,7 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
               isGroup: c.id.server === 'g.us',
               unreadCount: c.unreadCount || 0,
               timestamp: c.t || (u && u.t) || 0,
-              lastMessage: u ? { body: String(u.body || u.caption || ''), type: u.type, fromMe: !!(u.id && u.id.fromMe), timestamp: u.t || 0 } : null,
+              lastMessage: u ? { body: String(u.body || ''), caption: String(u.caption || ''), type: u.type, fromMe: !!(u.id && u.id.fromMe), timestamp: u.t || 0 } : null,
             };
           });
         }, limite);
@@ -445,7 +463,8 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
           msgs.sort((a, b) => (a.t || 0) - (b.t || 0));
           return msgs.slice(-max).map((m) => ({
             id: { _serialized: String((m.id && m.id._serialized) || '') },
-            body: String(m.body || m.caption || ''),
+            body: String(m.body || ''),
+            caption: String(m.caption || ''),
             type: m.type,
             fromMe: !!(m.id && m.id.fromMe),
             timestamp: m.t || 0,
@@ -473,7 +492,14 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
     diagnostico: () => ({ ...diag, historicoChats: historico.chats(1000).length }),
     async enviarNoChat(chatId, texto) {
       const enviada = await client.sendMessage(chatId, texto);
-      return resumoDaMensagem(enviada);
+      // nas versões atuais a biblioteca pode devolver nada mesmo com a mensagem enviada;
+      // falhar aqui faria a tela mostrar erro e a pessoa reenviar (mensagem em dobro)
+      if (!enviada || !enviada.id) {
+        return { id: `local_${Date.now()}`, texto, minha: true, quando: Math.floor(Date.now() / 1000), tipo: 'text', midia: false, miniatura: '', status: 1 };
+      }
+      const resumo = resumoDaMensagem(enviada);
+      historico.registrar({ chatId, grupo: chatId.endsWith('@g.us'), mensagem: resumo });
+      return resumo;
     },
     async lida(chatId) {
       historico.lida(chatId);

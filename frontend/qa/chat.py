@@ -90,7 +90,7 @@ async def main():
             await medir.ir_para(pag, "Conversas", w)
             await pag.wait_for_timeout(900)
             n = await pag.locator("button:has(p.truncate)").count()
-            if n != 4: problemas.append(f"{nome}: esperava 4 conversas de pessoas (sem o grupo), vieram {n}")
+            if n != 94: problemas.append(f"{nome}: esperava 94 conversas de pessoas (sem o grupo), vieram {n}")
             await pag.get_by_role("tab", name="Não lidas").click(); await pag.wait_for_timeout(200)
             if await pag.locator("button:has(p.truncate)").count() != 1: problemas.append(f"{nome}: filtro nao lidas")
             await pag.get_by_role("tab", name="Com o robô").click(); await pag.wait_for_timeout(200)

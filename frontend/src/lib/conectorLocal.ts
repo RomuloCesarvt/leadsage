@@ -39,6 +39,8 @@ export type MensagemWhats = {
   quando: number;
   tipo: string;
   midia: boolean;
+  /** miniatura que o próprio WhatsApp mandou junto (data URL), quando é foto, vídeo ou figurinha */
+  miniatura?: string;
   status: number;
 };
 
