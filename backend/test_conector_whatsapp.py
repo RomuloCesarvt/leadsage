@@ -77,7 +77,7 @@ def test_ping_marca_online_e_guarda_o_numero(client, chave):
 def test_online_expira():
     agora = datetime.now(timezone.utc)
     assert cw.online({"cw_visto": agora.isoformat()})
-    assert not cw.online({"cw_visto": (agora - timedelta(seconds=200)).isoformat()})
+    assert not cw.online({"cw_visto": (agora - timedelta(seconds=400)).isoformat()})
     assert not cw.online({})
 
 
@@ -225,3 +225,19 @@ def test_responder_exige_chave_e_ultima_do_contato(client, chave):
     assert r.status_code == 200 and r.json()["mensagens"] == []
     assert client.post("/api/conector/responder", headers=cabecalho(chave),
                        json={"mensagens": [{"de": "alguem", "texto": "oi"}]}).status_code == 422
+
+
+def test_banco_indisponivel_nao_vira_chave_revogada(client, chave, monkeypatch):
+    """Cota do Firestore estourada: o Conector precisa receber 503 (tenta de novo), nao 401 (desiste)."""
+    from app import main as principal
+    principal._CACHE_CONECTOR.clear()
+
+    async def nada(_chave):
+        return None
+
+    monkeypatch.setattr(cw, "canal_da_chave", nada)
+    monkeypatch.setattr(robo_store, "firestore_falhou_agora", lambda janela_s=15.0: True)
+    r = client.get("/api/conector/tarefas", headers=cabecalho(chave))
+    assert r.status_code == 503 and "banco de dados" in r.json()["detail"]
+    monkeypatch.setattr(robo_store, "firestore_falhou_agora", lambda janela_s=15.0: False)
+    assert client.get("/api/conector/tarefas", headers=cabecalho(chave)).status_code == 401

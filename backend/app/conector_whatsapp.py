@@ -36,7 +36,7 @@ from app.meta_canais import EnvioFalhou
 
 PREFIXO = "lsc_"
 CHAVE_RE = re.compile(r"^lsc_[A-Za-z0-9_-]{30,60}$")
-ONLINE_SEGUNDOS = 90
+ONLINE_SEGUNDOS = 200
 INTERVALO_FRIO_S = 90          # entre uma abordagem fria e a seguinte
 FRIO_INICIAL = 5               # por dia, no primeiro dia da conexão
 FRIO_POR_DIA = 3               # quanto o limite cresce a cada dia
@@ -297,7 +297,7 @@ async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Di
     return {
         "tarefas": saida, "frios_hoje": frios_hoje, "limite_frio": limite, "motivo_sem_frio": motivo_sem_frio,
         # quanto o Conector espera antes de perguntar de novo: depressa só com conversa em andamento
-        "proxima_em": 4 if (saida or quente) else 30,
+        "proxima_em": 4 if (saida or quente) else 120,
     }
 
 

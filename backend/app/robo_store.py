@@ -16,6 +16,7 @@ Firestore quando ha credencial, SQLite no dev — como o resto do app.
 """
 import re
 import secrets
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -46,6 +47,16 @@ CAMPOS_CANAL = (
     "page_nome", "ig_usuario", "waba_id", "wa_pin",
 )
 SEGREDOS = ("app_secret", "wa_token", "page_token", "wa_pin")
+
+
+# Quando o Firestore falha (cota do plano gratuito, rede), o app cai no banco
+# temporario e quem pergunta recebe "nao existe". Guardar o instante da falha
+# deixa a rota dizer "banco indisponivel" em vez de "chave revogada".
+_FALHA = [0.0]
+
+
+def firestore_falhou_agora(janela_s: float = 15.0) -> bool:
+    return time.monotonic() - _FALHA[0] < janela_s
 
 
 def agora() -> str:
@@ -94,6 +105,7 @@ async def canal_por_gancho(gancho: str) -> Optional[Dict[str, Any]]:
             doc = firestore_db.collection("robo_canais").document(gancho).get()
             return doc.to_dict() if doc.exists else None
         except Exception as exc:
+            _FALHA[0] = time.monotonic()
             print(f"Falha ao ler canal do robo: {exc}")
     return await _sql_get(f"canal:{gancho}")
 
@@ -105,6 +117,7 @@ async def canal_do_usuario(uid: str) -> Optional[Dict[str, Any]]:
             doc = firestore_db.collection("users").document(uid).get()
             gancho = (doc.to_dict() or {}).get("robo_gancho") if doc.exists else None
         except Exception as exc:
+            _FALHA[0] = time.monotonic()
             print(f"Falha ao ler o gancho do robo: {exc}")
     if gancho:
         return await canal_por_gancho(gancho)
@@ -299,6 +312,7 @@ async def canal_por_ativo(tipo: str, ativo_id: str) -> Optional[Dict[str, Any]]:
             doc = firestore_db.collection("robo_ativos").document(chave).get()
             dados = doc.to_dict() if doc.exists else None
         except Exception as exc:
+            _FALHA[0] = time.monotonic()
             print(f"Falha ao ler ativo do robo: {exc}")
     if dados is None:
         dados = await _sql_get(f"ativo:{chave}")

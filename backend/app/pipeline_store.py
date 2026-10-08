@@ -12,6 +12,7 @@ fica em /tmp na Vercel e some a cada reinicio, o Firestore nao.
 Firestore quando ha credencial, SQLite no dev — como o resto do app.
 """
 import re
+import time
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import select
@@ -93,7 +94,19 @@ async def _ler(uid: str, lead_id: str) -> Optional[Dict[str, Any]]:
         return dict(row.data or {}) if row else None
 
 
+# O Firestore cobra por documento lido e a tela pergunta a lista com frequencia:
+# guardar a resposta por alguns segundos corta a conta sem esconder mudanca
+# (toda escrita deste processo esvazia o guardado do dono).
+_LISTA: Dict[str, Any] = {}
+_LISTA_TTL_S = 25
+
+
+def _esquecer_lista(uid: str) -> None:
+    _LISTA.pop(uid, None)
+
+
 async def _gravar(uid: str, item: Dict[str, Any]) -> None:
+    _esquecer_lista(uid)
     item["atualizado"] = agora()
     if firestore_db is not None:
         try:
@@ -113,6 +126,9 @@ async def _gravar(uid: str, item: Dict[str, Any]) -> None:
 
 
 async def listar(uid: str) -> List[Dict[str, Any]]:
+    guardado = _LISTA.get(uid)
+    if guardado and time.monotonic() - guardado[0] < _LISTA_TTL_S:
+        return [dict(i) for i in guardado[1]]
     itens: List[Dict[str, Any]] = []
     lido = False
     if firestore_db is not None:
@@ -128,6 +144,8 @@ async def listar(uid: str) -> List[Dict[str, Any]]:
     for i in itens:
         i["etapa"] = etapa_valida(i.get("etapa", "")) or "Novo Lead"
     itens.sort(key=lambda i: i.get("atualizado") or "", reverse=True)
+    if lido:
+        _LISTA[uid] = (time.monotonic(), [dict(i) for i in itens])
     return itens
 
 
@@ -216,6 +234,7 @@ async def achar_por_telefone(uid: str, telefone: str) -> Optional[Dict[str, Any]
 
 
 async def apagar(uid: str, lead_id: str) -> None:
+    _esquecer_lista(uid)
     if firestore_db is not None:
         try:
             _doc(uid, lead_id).delete()

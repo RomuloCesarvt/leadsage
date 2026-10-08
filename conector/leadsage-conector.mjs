@@ -247,9 +247,22 @@ async function salvar() {
 atualizar(); setInterval(atualizar, 2000);
 </script></body></html>`;
 
-function servidorLocal(estado, aoReceberChave) {
+/** Origens que podem ler o estado: o LeadSage mostra o QR code dentro do próprio app. */
+export function origensPermitidas(site) {
+  const lista = new Set(['https://leadsageofc.vercel.app']);
+  try { lista.add(new URL(site).origin); } catch { /* site inválido: fica só o padrão */ }
+  return lista;
+}
+
+function servidorLocal(estado, aoReceberChave, permitidas) {
   return http.createServer(async (req, res) => {
-    const saida = (status, tipo, corpo) => { res.writeHead(status, { 'content-type': tipo, 'cache-control': 'no-store' }); res.end(corpo); };
+    const origem = req.headers.origin || '';
+    const cors = permitidas.has(origem)
+      ? { 'access-control-allow-origin': origem, vary: 'Origin', 'access-control-allow-private-network': 'true',
+          'access-control-allow-methods': 'GET, OPTIONS', 'access-control-allow-headers': 'content-type' }
+      : {};
+    const saida = (status, tipo, corpo) => { res.writeHead(status, { 'content-type': tipo, 'cache-control': 'no-store', ...cors }); res.end(corpo); };
+    if (req.method === 'OPTIONS') return saida(204, 'text/plain', '');
     if (req.url === '/estado') return saida(200, 'application/json', JSON.stringify(estado));
     if (req.method === 'POST' && req.url === '/chave') {
       let corpo = '';
@@ -284,12 +297,14 @@ export async function executar() {
     estado.fase = 'iniciando';
     estado.mensagem = 'Chave salva. Ligando o WhatsApp…';
     iniciarTudo();
-  });
+  }, origensPermitidas(cfg.site));
   srv.on('error', (e) => { console.error(e.code === 'EADDRINUSE' ? 'O Conector já está aberto em outra janela.' : e.message); process.exit(1); });
   await new Promise((r) => srv.listen(PORTA, '127.0.0.1', r));
   const url = `http://127.0.0.1:${PORTA}`;
-  abrirNoNavegador(url);
-  log(`LeadSage Conector ${VERSAO}. Se a página não abrir, acesse ${url}`);
+  // Abre o próprio LeadSage (a aba onde o usuário já está logado): o QR code aparece lá dentro.
+  // A página local continua disponível como reserva.
+  abrirNoNavegador(`${cfg.site}/?tela=robo&aba=configurar`);
+  log(`LeadSage Conector ${VERSAO}. O QR code aparece no LeadSage. Se não aparecer, abra ${url}`);
 
   if (estado.fase === 'sem_chave') estado.mensagem = 'Cole a chave que o LeadSage mostrou.';
 
@@ -330,7 +345,7 @@ export async function executar() {
           const r = await enviarPendentes(ls, wa);
           proximaSaida = Date.now() + r.proximaEm * 1000;
         }
-        if (pronto && Date.now() - ultimoPing > 55000) { await ls.ping(estado.numero, 'ready'); ultimoPing = Date.now(); }
+        if (pronto && Date.now() - ultimoPing > 90000) { await ls.ping(estado.numero, 'ready'); ultimoPing = Date.now(); }
       } catch (e) {
         if (/revogada|errada/.test(String(e.message))) { estado.fase = 'erro'; estado.mensagem = e.message; log(e.message); await wa?.parar(); return; }
         log('Aviso:', e.message);

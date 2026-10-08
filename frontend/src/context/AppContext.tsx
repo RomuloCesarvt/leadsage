@@ -5,6 +5,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { rodandoNativo } from '../lib/pwa';
 import { colherRedirecionamento } from '../lib/autenticacao';
+import { sondar } from '../lib/sondagem';
 import { ehSalvo, salvoPeloServidor } from '../lib/leadsSalvos';
 import type { LeadItem, PipelineItem, SearchHistoryItem, SuggestedNiche, UserProfile } from '../types';
 
@@ -319,8 +320,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Enquanto olha o pipeline ou o robo, traz o que o robo moveu sem precisar recarregar.
   useEffect(() => {
     if (!user || (viewState !== 'pipeline' && viewState !== 'robo')) return;
-    const id = setInterval(() => { void atualizarPipeline(); }, 20000);
-    return () => clearInterval(id);
+    return sondar(() => { void atualizarPipeline(); }, 90000);
   }, [user, viewState, atualizarPipeline]);
 
   useEffect(() => {

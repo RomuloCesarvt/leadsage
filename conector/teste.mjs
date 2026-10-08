@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   acharNavegador, atrasoHumano, chaveValida, clienteLeadsage, entregarMensagem, enviarPendentes,
-  gravarConfig, lerConfig, paraLeadsage,
+  gravarConfig, lerConfig, origensPermitidas, paraLeadsage,
 } from './leadsage-conector.mjs';
 
 function servidor(rotas) {
@@ -140,4 +140,12 @@ test('acha o Edge ou o Chrome instalado', () => {
   assert.match(acharNavegador(so('C:/Program Files/Google/Chrome/Application/chrome.exe'), 'win32', env), /chrome/);
   assert.equal(acharNavegador(() => false, 'win32', env), '');
   assert.match(acharNavegador(so('/usr/bin/chromium'), 'linux', {}), /chromium/);
+});
+
+test('so o LeadSage pode ler o estado local (QR code)', () => {
+  const o = origensPermitidas('https://leadsageofc.vercel.app');
+  assert.ok(o.has('https://leadsageofc.vercel.app'));
+  assert.ok(!o.has('https://site-malicioso.test'));
+  assert.ok(origensPermitidas('https://meu.dominio.com').has('https://meu.dominio.com'));
+  assert.equal(origensPermitidas('lixo').size, 1);
 });

@@ -8,10 +8,11 @@
  * que falta, baixa o Conector e abre a página do QR code. A chave aparece uma
  * única vez; depois só o prefixo e o estado (online/offline).
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AlertTriangle, Download, Loader2, Unplug, Wifi, WifiOff } from 'lucide-react';
 import { api } from '../services/api';
 import { WhatsAppIcon } from './BrandIcons';
+import { sondar } from '../lib/sondagem';
 import type { RoboConfig } from '../types';
 
 /** O arquivo que o usuário baixa: leva a chave, instala o que falta e abre o Conector. */
@@ -75,11 +76,37 @@ function baixar(nome: string, conteudo: string) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
+const PAGINA_LOCAL = 'http://127.0.0.1:2790';
+
+type EstadoLocal = { fase: string; qr: string; mensagem: string; numero: string };
+
+/** O que o Conector do computador está mostrando (QR code, conectado...), lido da página local dele. */
+function useConectorLocal(ativo: boolean): EstadoLocal | null {
+  const [estado, setEstado] = useState<EstadoLocal | null>(null);
+  useEffect(() => {
+    if (!ativo) { setEstado(null); return; }
+    let vivo = true;
+    const ler = async () => {
+      try {
+        const r = await fetch(`${PAGINA_LOCAL}/estado`, { cache: 'no-store' });
+        if (vivo && r.ok) setEstado(await r.json());
+      } catch {
+        if (vivo) setEstado(null); // Conector fechado, ou o navegador bloqueou o acesso local
+      }
+    };
+    void ler();
+    const parar = sondar(ler, 2500);
+    return () => { vivo = false; parar(); };
+  }, [ativo]);
+  return estado;
+}
+
 export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) => void }> = ({ cfg, aoMudar }) => {
   const [entendi, setEntendi] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const [chave, setChave] = useState('');
   const [erro, setErro] = useState('');
+  const local = useConectorLocal(cfg.conector_criado && !cfg.conector_online);
 
   const gerar = async () => {
     if (cfg.conector_criado && !window.confirm('Gerar uma chave nova derruba o Conector que está rodando agora. Continuar?')) return;
@@ -158,9 +185,18 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
         <div className="space-y-3">
           <ol className="text-sm text-slate-700 list-decimal pl-5 space-y-1">
             <li>Baixe o arquivo e <b>dê dois cliques</b> nele (no computador onde o WhatsApp vai ficar).</li>
-            <li>Uma página abre com o <b>QR code</b>. No celular: WhatsApp → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b>.</li>
+            <li>O <b>QR code aparece aqui mesmo</b>, nesta tela. No celular: WhatsApp → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b>.</li>
             <li>Pronto. Esta tela passa a mostrar <b>Conectado</b>. Deixe a janela preta aberta.</li>
           </ol>
+          {local?.fase === 'qr' && local.qr && (
+            <div className="p-4 rounded-xl bg-white border border-emerald-200 flex flex-col items-center gap-2 text-center">
+              <img src={local.qr} alt="QR code do WhatsApp" className="w-56 h-56" />
+              <p className="text-xs text-slate-600">No celular: WhatsApp → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b> e aponte para o código.</p>
+            </div>
+          )}
+          {local && local.fase !== 'qr' && local.fase !== 'pronto' && (
+            <p className="text-xs text-slate-600 flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> {local.mensagem}</p>
+          )}
           {chave ? (
             <button onClick={() => baixar('Conectar-WhatsApp.bat', arquivoDoConector(chave, window.location.origin))}
               className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-2">
@@ -174,6 +210,7 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
           <p className="text-[11px] text-slate-500 leading-relaxed">
             Na primeira vez ele instala o que falta (cerca de 1 minuto) e usa o Edge ou o Chrome que você já tem. Se o Windows avisar
             “protegeu o computador”, clique em <b>Mais informações → Executar assim mesmo</b>. Só para Windows por enquanto.
+            Se o QR não aparecer aqui (alguns navegadores bloqueiam), <a className="text-blue-600 hover:underline" href={PAGINA_LOCAL} target="_blank" rel="noreferrer">abra a página do Conector</a>.
           </p>
           <p className="text-[11px] text-slate-500">
             Hoje: <b>{cfg.conector_frio_hoje}</b> de <b>{cfg.conector_frio_limite}</b> abordagens frias permitidas (o limite sobe a cada dia).

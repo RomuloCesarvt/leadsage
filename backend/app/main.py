@@ -1393,6 +1393,9 @@ async def _canal_do_conector(request: Request) -> Dict[str, Any]:
         canal = await conector_whatsapp.canal_da_chave(chave)
         if canal is None:
             _CACHE_CONECTOR.pop(h, None)
+            if robo_store.firestore_falhou_agora():
+                # o banco não respondeu: não dá para saber se a chave vale. Não é "revogada".
+                raise HTTPException(status_code=503, detail="O LeadSage está com o banco de dados indisponível agora. O Conector tenta de novo.")
             raise HTTPException(status_code=401, detail="Chave do Conector inválida ou revogada.")
         _CACHE_CONECTOR[h] = (time.monotonic(), canal)
     return canal
@@ -1439,7 +1442,7 @@ async def conector_ping(req: ConectorPing, request: Request):
     agora_dt = datetime.now(timezone.utc)
     visto = conector_whatsapp._ler_data(canal.get("cw_visto"))
     mudou = (req.numero and req.numero != canal.get("cw_numero")) or (req.status != canal.get("cw_status", ""))
-    if mudou or not visto or (agora_dt - visto).total_seconds() > 50:
+    if mudou or not visto or (agora_dt - visto).total_seconds() > 80:
         canal["cw_visto"] = agora_dt.isoformat()
         canal.setdefault("cw_primeiro", canal["cw_visto"])
         if req.numero:

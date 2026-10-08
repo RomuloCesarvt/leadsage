@@ -16,6 +16,7 @@ import { WhatsAppIcon, InstagramIcon, FacebookIcon, TelegramIcon } from '../Bran
 import { ConexaoMeta } from '../ConexaoMeta';
 import { DisparoWhatsApp } from '../DisparoWhatsApp';
 import { FilaDeEnvio } from '../FilaDeEnvio';
+import { sondar } from '../../lib/sondagem';
 import { OfertaDoRobo } from '../OfertaDoRobo';
 import type {
   RoboCanal, RoboConfig, RoboConfigEntrada, RoboConversa, RoboConversaResumo, RoboMensagem,
@@ -62,7 +63,7 @@ export const RoboScreen: React.FC = () => {
   }, []);
   const { leadsParaContato } = useApp() as any;
   // vindo de Meus Leads com leads marcados: abre direto a Fila de envio
-  const [aba, setAba] = useState<Aba>(retornoMeta ? 'configurar' : (leadsParaContato?.length ? 'fila' : 'conversas'));
+  const [aba, setAba] = useState<Aba>(retornoMeta || new URLSearchParams(window.location.search).get('aba') === 'configurar' ? 'configurar' : (leadsParaContato?.length ? 'fila' : 'conversas'));
   const [bloqueado, setBloqueado] = useState('');
 
   useEffect(() => {
@@ -167,16 +168,14 @@ const Conversas: React.FC<{ onBloqueio: (m: string) => void; irConfigurar: () =>
   // Sem push do servidor: a lista é consultada de tempos em tempos.
   useEffect(() => {
     carregar();
-    const t = setInterval(carregar, 10000);
-    return () => clearInterval(t);
+    return sondar(carregar, 45000);
   }, [carregar]);
 
   useEffect(() => {
     if (!aberta) return;
-    const t = setInterval(async () => {
+    return sondar(async () => {
       try { setAberta(await api.roboConversa(aberta.id)); } catch { /* segue com o que tem */ }
-    }, 6000);
-    return () => clearInterval(t);
+    }, 20000);
   }, [aberta?.id]);
 
   useEffect(() => { fim.current?.scrollIntoView({ behavior: 'smooth' }); }, [aberta?.mensagens.length]);
