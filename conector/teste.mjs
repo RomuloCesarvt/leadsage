@@ -111,7 +111,7 @@ test('envia as tarefas, avisa o resultado e relata falha', async () => {
     },
   };
   const r = await enviarPendentes(clienteLeadsage({ site: ls.url, chave: CHAVE }), wa, () => {}, semEspera);
-  assert.deepEqual(r, { enviadas: 1, proximaEm: 4 });
+  assert.equal(r.enviadas, 1); assert.equal(r.proximaEm, 4);
   assert.equal(enviados[0].tel, '5514998003784');
   assert.ok(enviados[0].digitando >= 800);
   const resultados = ls.chamadas.filter((x) => x.caminho.endsWith('/resultado'));
@@ -130,7 +130,7 @@ test('chave revogada derruba o conector com mensagem clara', async () => {
 test('LeadSage fora do ar nao derruba: tenta de novo mais tarde', async () => {
   const cli = clienteLeadsage({ site: 'http://127.0.0.1:9', chave: CHAVE });
   const r = await enviarPendentes(cli, { enviar: async () => ({ ok: true }) }, () => {}, semEspera);
-  assert.deepEqual(r, { enviadas: 0, proximaEm: 30 });
+  assert.equal(r.enviadas, 0); assert.equal(r.proximaEm, 30);
 });
 
 test('acha o Edge ou o Chrome instalado', () => {

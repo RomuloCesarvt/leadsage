@@ -7,7 +7,7 @@
  */
 export const CONECTOR_URL = 'http://127.0.0.1:2790';
 
-export type EstadoConector = { fase: string; qr: string; mensagem: string; numero: string; versao?: string };
+export type EstadoConector = { fase: string; qr: string; mensagem: string; numero: string; versao?: string; codigo?: string };
 
 /** De onde o Conector tirou a lista: da página do WhatsApp Web, da biblioteca ou do histórico que ele mesmo guardou. */
 export type FonteLista = 'pagina' | 'biblioteca' | 'historico' | '';

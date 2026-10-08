@@ -214,7 +214,7 @@ async def _obter_saida(uid: str, sid: str) -> Optional[Dict[str, Any]]:
         return dict(row.data or {}) if row else None
 
 
-async def enfileirar_resposta(cfg: Dict[str, Any], contato: str, texto: str) -> str:
+async def enfileirar_resposta(cfg: Dict[str, Any], contato: str, texto: str, chat_id: str = "") -> str:
     """Uma resposta (do robô ou do dono) que o Conector vai enviar. Devolve o id."""
     if not cfg.get("cw_hash"):
         raise EnvioFalhou("WhatsApp pelo computador não conectado.")
@@ -224,7 +224,7 @@ async def enfileirar_resposta(cfg: Dict[str, Any], contato: str, texto: str) -> 
     sid = f"s_{uuid.uuid4().hex[:12]}"
     await _gravar(cfg["uid"], {
         "id": sid, "tipo": "resposta", "contato": telefone_whatsapp(contato), "texto": texto[:4096],
-        "status": "pendente", "criado": robo_store.agora(), "tentativas": 0,
+        "status": "pendente", "criado": robo_store.agora(), "tentativas": 0, "chat_id": chat_id or "",
     })
     return sid
 
@@ -258,7 +258,7 @@ async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Di
             s["status"], s["enviando_em"] = "enviando", agora.isoformat()
             await _gravar(uid, s)
             saida.append({"id": s["id"], "tipo": "resposta", "contato": s["contato"], "texto": s["texto"],
-                          "digitando_ms": _digitando_ms(s["texto"])})
+                          "chat_id": s.get("chat_id", ""), "digitando_ms": _digitando_ms(s["texto"])})
 
     itens = await _fila_whatsapp(uid)
     hoje = agora.strftime("%Y-%m-%d")
@@ -298,10 +298,14 @@ async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Di
 
     ativo_recente = _ler_data(canal.get("cw_atividade"))
     quente = bool(ativo_recente and (agora - ativo_recente).total_seconds() < 600)
+    # o celular esta olhando: o Conector precisa perguntar depressa e mandar o espelho
+    from app import espelho_whatsapp
+    pedidos = await espelho_whatsapp.pedidos_para_o_conector(uid, agora)
     return {
         "tarefas": saida, "frios_hoje": frios_hoje, "limite_frio": limite, "motivo_sem_frio": motivo_sem_frio,
         # quanto o Conector espera antes de perguntar de novo: depressa só com conversa em andamento
-        "proxima_em": 4 if (saida or quente) else 120,
+        "proxima_em": 3 if pedidos["remoto"] else (4 if (saida or quente) else 45),
+        **pedidos,
     }
 
 

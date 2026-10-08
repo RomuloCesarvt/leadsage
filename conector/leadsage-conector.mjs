@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '2.9.0';
+export const VERSAO = '3.0.0';
 const PORTA = 2790;
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -75,7 +75,8 @@ export function clienteLeadsage({ site, chave }) {
   const h = { 'x-conector-key': chave };
   const base = `${site}/api/conector`;
   return {
-    ping: (numero, status) => http_(`${base}/ping`, { metodo: 'POST', cabecalhos: h, corpo: { numero: numero || '', status: status || '', versao: VERSAO } }),
+    ping: (numero, status, extra = {}) => http_(`${base}/ping`, { metodo: 'POST', cabecalhos: h, corpo: { numero: numero || '', status: status || '', versao: VERSAO, ...extra } }),
+    espelho: (corpo) => http_(`${base}/espelho`, { metodo: 'POST', cabecalhos: h, corpo, tempoMs: 30000 }),
     tarefas: () => http_(`${base}/tarefas`, { cabecalhos: h }),
     resultado: (id, ok, erro = '') => http_(`${base}/tarefas/${encodeURIComponent(id)}/resultado`, { metodo: 'POST', cabecalhos: h, corpo: { ok, erro } }),
     mensagem: (m) => http_(`${base}/mensagem`, { metodo: 'POST', cabecalhos: h, corpo: m, tempoMs: 60000 }),
@@ -121,7 +122,7 @@ export async function enviarPendentes(ls, wa, aviso = log, dorme = dormir) {
   for (const tarefa of t.dados.tarefas || []) {
     // respira antes de cada mensagem; resposta a quem acabou de escrever sai logo (o indicador de digitação já deu o tempo)
     await dorme(tarefa.tipo === 'resposta' ? 200 + Math.floor(Math.random() * 500) : 1000 + Math.floor(Math.random() * 2000));
-    const r = await wa.enviar(tarefa.contato, tarefa.texto, atrasoHumano(tarefa.digitando_ms));
+    const r = await wa.enviar(tarefa.contato, tarefa.texto, atrasoHumano(tarefa.digitando_ms), tarefa.chat_id || '');
     if (r.ok) {
       enviadas++;
       await ls.resultado(tarefa.id, true);
@@ -132,18 +133,22 @@ export async function enviarPendentes(ls, wa, aviso = log, dorme = dormir) {
     }
   }
   if (t.dados.motivo_sem_frio) aviso(`Abordagem fria em espera: ${t.dados.motivo_sem_frio}`);
-  return { enviadas, proximaEm: Number(t.dados.proxima_em) || 30 };
+  return {
+    enviadas, proximaEm: Number(t.dados.proxima_em) || 30,
+    // o que o celular pediu: olhar, quais conversas, conectar pelo numero
+    pedidos: { remoto: Boolean(t.dados.remoto), abrir: t.dados.abrir || [], parear: t.dados.parear || '' },
+  };
 }
 
 /** Entrega ao LeadSage uma mensagem recebida. Devolve true se foi aceita. */
-export async function entregarMensagem(ls, m, inicioS, vistos, aviso = log, aoResposta = null) {
+export async function entregarMensagem(ls, m, inicioS, vistos, aviso = log, aoResposta = null, { adiar = false } = {}) {
   if (vistos.has(String(m.id))) return false;
   const payload = paraLeadsage(m, inicioS);
   vistos.add(String(m.id));
   if (vistos.size > 1000) vistos.delete(vistos.values().next().value);
   if (!payload) return false;
-  const e = await ls.mensagem(payload);
-  if (e.ok && e.dados) {
+  const e = await ls.mensagem(adiar ? { ...payload, adiar: true } : payload);
+  if (e.ok && e.dados && !adiar) {
     if (aoResposta) aoResposta(e.dados);
     // o LeadSage diz se o robô respondeu; quando fica quieto, a janela mostra o motivo
     if (e.dados.respondeu) aviso(`Robô respondeu a ${m.de}.`);
@@ -156,6 +161,28 @@ export async function entregarMensagem(ls, m, inicioS, vistos, aviso = log, aoRe
     return false;
   }
   return true;
+}
+
+// ------------------------------------------------- esperar o lead terminar de escrever
+
+/**
+ * Quem escreve "boa tarde", depois "vocês fazem sites?", depois "tem preço?" em três mensagens
+ * quer UMA resposta, depois que terminar. O agrupador espera `silencioMs` sem mensagem nova (e no
+ * máximo `maxMs` desde a primeira) e então chama `disparar(contato)` uma vez só.
+ */
+export function criarAgrupador(disparar, { silencioMs = 5000, maxMs = 15000, agora = () => Date.now() } = {}) {
+  const itens = new Map(); // contato -> { desde, timer }
+  return {
+    registrar(contato) {
+      const it = itens.get(contato) || { desde: agora() };
+      clearTimeout(it.timer);
+      const espera = Math.max(0, Math.min(silencioMs, maxMs - (agora() - it.desde)));
+      it.timer = setTimeout(() => { itens.delete(contato); Promise.resolve(disparar(contato)).catch(() => {}); }, espera);
+      it.timer.unref?.();
+      itens.set(contato, it);
+    },
+    esperando: (contato) => itens.has(contato),
+  };
 }
 
 // ------------------------------------------------- tentar de novo o que ficou sem resposta
@@ -414,7 +441,7 @@ export function acharNavegador(existe = existsSync, plataforma = process.platfor
 }
 
 /** Liga o WhatsApp Web. Devolve um adaptador { enviar, parar } e chama os ouvintes. */
-async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
+async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoCodigo = () => {}, parear = '' }) {
   const historico = criarHistorico(join(AQUI, 'historico.json'));
   await historico.carregar();
   const diag = { fonteChats: '', fonteMensagens: '', erros: {} };
@@ -430,10 +457,13 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
   const { Client, LocalAuth } = pkg;
   const client = new Client({
     authStrategy: new LocalAuth({ dataPath: join(AQUI, 'sessao') }),
+    // conectar pelo numero do telefone: o WhatsApp devolve um codigo para digitar no proprio celular (sem 2o aparelho)
+    ...(parear ? { pairWithPhoneNumber: { phoneNumber: parear, showNotification: true } } : {}),
     puppeteer: { executablePath: navegador, headless: true, args: ['--no-sandbox', '--disable-gpu'] },
   });
 
   client.on('qr', (qr) => aoQr(qr));
+  client.on('code', (codigo) => aoCodigo(String(codigo)));
   client.on('ready', () => aoPronto(String(client.info?.wid?.user || '')));
   client.on('disconnected', (motivo) => aoCair(String(motivo || 'desconectado')));
   client.on('auth_failure', (m) => aoCair(`falha de autenticação: ${m}`));
@@ -483,12 +513,12 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
   await client.initialize();
 
   return {
-    async enviar(telefone, texto, digitandoMs) {
+    async enviar(telefone, texto, digitandoMs, chatId = '') {
       try {
         // Quem já escreveu para nós tem o id da conversa guardado: responde para ele, sem procurar o número.
         // Para número novo (abordagem), confere se existe no WhatsApp: número inválido é sinal ruim para a conta.
         let id = null;
-        const conhecido = destinos.get(telefone) || (telefone.length >= 14 ? `${telefone}@lid` : '');
+        const conhecido = chatId || destinos.get(telefone) || (telefone.length >= 14 ? `${telefone}@lid` : '');
         if (conhecido) id = { _serialized: conhecido };
         else id = await client.getNumberId(telefone);
         if (!id) return { ok: false, erro: 'esse número não está no WhatsApp' };
@@ -713,7 +743,7 @@ function abrirNoNavegador(url) {
 
 export async function executar() {
   const cfg = await lerConfig();
-  const estado = { fase: chaveValida(cfg.chave) ? 'iniciando' : 'sem_chave', mensagem: 'Iniciando…', qr: '', numero: '', versao: VERSAO };
+  const estado = { fase: chaveValida(cfg.chave) ? 'iniciando' : 'sem_chave', mensagem: 'Iniciando…', qr: '', codigo: '', numero: '', versao: VERSAO };
   let iniciarTudo = () => {};
   let waAtual = null;
 
@@ -747,47 +777,116 @@ export async function executar() {
     let proximaSaida = 0;
     let ultimoPing = 0;
     let ultimaVarredura = Date.now();
+    let pedidos = { remoto: false, abrir: [], parear: '' };
+    let pareando = '';
+    let ultimoEspelhoChats = 0;
+    const ultimoEspelhoMsgs = new Map();
+    const responderAgora = async (contato) => {
+      if (roboAtivo) waAtual?.digitar(contato, true); // "digitando…" enquanto a IA pensa
+      const r = await ls.reprocessar(contato);
+      const d = r.dados || {};
+      if (d.respondidas > 0) { log(`Robô respondeu a ${contato}.`); proximaSaida = 0; return; }
+      waAtual?.digitar(contato, false);
+      if (d.silencio) log(`Robô NÃO respondeu a ${contato}: ${d.silencio}`);
+      if (d.tentar_de_novo) tentarDeNovo(ls, contato).catch(() => {});
+    };
+    const agrupador = criarAgrupador(responderAgora);
     let roboAtivo = true; // o ping diz; com o robô desligado não faz sentido mostrar "digitando…"
-    const lerRobo = (p) => { if (p?.dados && typeof p.dados.robo_ativo === 'boolean') roboAtivo = p.dados.robo_ativo; };
+    const lerPing = (p) => {
+      if (!p?.dados) return;
+      if (typeof p.dados.robo_ativo === 'boolean') roboAtivo = p.dados.robo_ativo;
+      if ('remoto' in p.dados) pedidos = { remoto: Boolean(p.dados.remoto), abrir: p.dados.abrir || [], parear: p.dados.parear || '' };
+    };
+    // a tela do celular enxerga a conexão pelo servidor: QR code, código de pareamento, pronto
+    const empurrarEstado = async () => {
+      const p = await ls.ping(estado.numero, estado.fase === 'pronto' ? 'ready' : estado.fase, {
+        fase: estado.fase, qr: estado.fase === 'qr' ? estado.qr : '', codigo: estado.codigo || '',
+      });
+      ultimoPing = Date.now();
+      lerPing(p);
+      return p;
+    };
 
-    try {
-      estado.mensagem = 'Abrindo o WhatsApp Web…';
+    const ligarWhatsApp = async (parear = '') => {
+      estado.mensagem = parear ? 'Pedindo o código ao WhatsApp…' : 'Abrindo o WhatsApp Web…';
       wa = await iniciarWhatsApp({
-        aoQr: async (qr) => { estado.fase = 'qr'; estado.mensagem = 'Escaneie o QR code com o celular.'; estado.qr = await QRCode.toDataURL(qr, { width: 300, margin: 1 }); },
+        parear,
+        aoQr: async (qr) => {
+          estado.fase = 'qr'; estado.codigo = ''; estado.mensagem = 'Escaneie o QR code com o celular.';
+          estado.qr = await QRCode.toDataURL(qr, { width: 300, margin: 1 });
+          empurrarEstado().catch(() => {});
+        },
+        aoCodigo: (codigo) => {
+          estado.fase = 'codigo'; estado.codigo = codigo; estado.qr = '';
+          estado.mensagem = `No WhatsApp: Aparelhos conectados > Conectar com número de telefone > digite ${codigo}.`;
+          log(`Código de pareamento: ${codigo}`);
+          empurrarEstado().catch(() => {});
+        },
         aoPronto: async (numero) => {
-          pronto = true; estado.fase = 'pronto'; estado.numero = numero; estado.qr = ''; estado.mensagem = 'Tudo certo. O robô está atendendo.';
-          const p = await ls.ping(numero, 'ready');
-          lerRobo(p);
+          pronto = true; pareando = ''; estado.fase = 'pronto'; estado.numero = numero; estado.qr = ''; estado.codigo = '';
+          estado.mensagem = 'Tudo certo. O robô está atendendo.';
+          const p = await empurrarEstado();
           if (p.status === 401) { estado.fase = 'erro'; estado.mensagem = 'A chave é inválida ou foi revogada. Gere outra no LeadSage.'; }
-          ultimoPing = Date.now();
           setTimeout(() => ls.reprocessar('').then((r) => { if (r.dados?.respondidas) log(`Robô respondeu a ${r.dados.respondidas} conversa(s) que estavam sem resposta.`); }).catch(() => {}), 10000);
           log(`WhatsApp pronto${numero ? ` (${numero})` : ''}.`);
         },
-        aoCair: (motivo) => { pronto = false; estado.fase = 'erro'; estado.mensagem = `WhatsApp desconectado (${motivo}). Feche e abra o Conector.`; log(estado.mensagem); },
+        aoCair: (motivo) => {
+          pronto = false; estado.fase = 'erro'; estado.mensagem = `WhatsApp desconectado (${motivo}). Feche e abra o Conector.`; log(estado.mensagem);
+          empurrarEstado().catch(() => {});
+        },
         aoReceber: async (m) => {
           if (!pronto) return;
-          if (roboAtivo && !m.grupo) waAtual?.digitar(m.de, true);
-          const entregue = await entregarMensagem(ls, m, inicioS, vistos, log, (d) => {
-            if (!d.respondeu) waAtual?.digitar(m.de, false);
-            if (d.tentar_de_novo) tentarDeNovo(ls, m.de).catch(() => {});
-          });
-          if (entregue) proximaSaida = 0;
-          else waAtual?.digitar(m.de, false);
+          // guarda a mensagem; a resposta vem quando o lead parar de escrever
+          const guardada = await entregarMensagem(ls, m, inicioS, vistos, log, null, { adiar: true });
+          if (guardada) agrupador.registrar(m.de);
         },
       });
+      waAtual = wa;
+    };
+
+    try {
+      // um pedido de pareamento feito antes de ligar vale já na primeira vez
+      const p0 = await ls.ping(estado.numero, 'iniciando', { fase: 'iniciando' });
+      lerPing(p0);
+      pareando = pedidos.parear || '';
+      await ligarWhatsApp(pareando);
     } catch (e) {
       estado.fase = 'erro'; estado.mensagem = e.message; log('Erro:', e.message); ligado = false; return;
     }
-    waAtual = wa;
+
+    // o celular está olhando: manda a lista de conversas e as mensagens das conversas abertas
+    const espelhar = async () => {
+      const agora = Date.now();
+      if (agora - ultimoEspelhoChats > 5000) {
+        ultimoEspelhoChats = agora;
+        await ls.espelho({ chats: await wa.chats(80) });
+      }
+      for (const id of pedidos.abrir) {
+        if (agora - (ultimoEspelhoMsgs.get(id) || 0) > 3000) {
+          ultimoEspelhoMsgs.set(id, agora);
+          await ls.espelho({ chat_id: id, mensagens: await wa.mensagens(id, 60) });
+        }
+      }
+    };
 
     for (;;) {
       try {
         if (pronto && Date.now() >= proximaSaida) {
           const r = await enviarPendentes(ls, wa);
           proximaSaida = Date.now() + r.proximaEm * 1000;
+          pedidos = r.pedidos || pedidos;
         }
+        if (pronto && pedidos.remoto) await espelhar();
         if (pronto && Date.now() - ultimaVarredura > 15 * 60 * 1000) { ultimaVarredura = Date.now(); ls.reprocessar('').catch(() => {}); }
-        if (pronto && Date.now() - ultimoPing > 90000) { lerRobo(await ls.ping(estado.numero, 'ready')); ultimoPing = Date.now(); }
+        // sem conexão ainda: mostra o QR no celular e fica de olho num pedido de pareamento
+        if (!pronto && Date.now() - ultimoPing > 15000) await empurrarEstado();
+        if (pronto && Date.now() - ultimoPing > 90000) await empurrarEstado();
+        if (!pronto && estado.fase === 'qr' && pedidos.parear && pedidos.parear !== pareando) {
+          pareando = pedidos.parear;
+          log(`Conectar pelo número ${pareando}: pedindo o código...`);
+          await wa?.parar();
+          await ligarWhatsApp(pareando);
+        }
       } catch (e) {
         if (/revogada|errada/.test(String(e.message))) { estado.fase = 'erro'; estado.mensagem = e.message; log(e.message); await wa?.parar(); return; }
         log('Aviso:', e.message);

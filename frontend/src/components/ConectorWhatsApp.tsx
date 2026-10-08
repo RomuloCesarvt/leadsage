@@ -9,7 +9,7 @@
  * única vez; depois só o prefixo e o estado (online/offline).
  */
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, Download, Loader2, Unplug, Wifi, WifiOff } from 'lucide-react';
+import { AlertTriangle, Download, Loader2, Smartphone, Unplug, Wifi, WifiOff } from 'lucide-react';
 import { api } from '../services/api';
 import { WhatsAppIcon } from './BrandIcons';
 import { sondar } from '../lib/sondagem';
@@ -101,12 +101,46 @@ function useConectorLocal(ativo: boolean): EstadoLocal | null {
   return estado;
 }
 
+type EstadoRemoto = Awaited<ReturnType<typeof api.whatsEstado>>;
+
+/** O que o Conector contou ao servidor: QR code, código de pareamento, online. Vale em qualquer aparelho, inclusive o celular. */
+function useEstadoRemoto(ativo: boolean): EstadoRemoto | null {
+  const [estado, setEstado] = useState<EstadoRemoto | null>(null);
+  useEffect(() => {
+    if (!ativo) { setEstado(null); return; }
+    let vivo = true;
+    const ler = async () => { try { const e = await api.whatsEstado(); if (vivo) setEstado(e); } catch { /* sem plano ou sem rede */ } };
+    void ler();
+    const parar = sondar(ler, 4000);
+    return () => { vivo = false; parar(); };
+  }, [ativo]);
+  return estado;
+}
+
+const noCelular = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
 export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) => void }> = ({ cfg, aoMudar }) => {
   const [entendi, setEntendi] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const [chave, setChave] = useState('');
   const [erro, setErro] = useState('');
   const local = useConectorLocal(cfg.conector_criado && !cfg.conector_online);
+  const remoto = useEstadoRemoto(cfg.conector_criado);
+  const [numeroParear, setNumeroParear] = useState('');
+  const [pedindo, setPedindo] = useState(false);
+  const [pedido, setPedido] = useState(false);
+  const celular = noCelular();
+  // o QR/código que aparece aqui vem do computador (local) ou, no celular, do servidor
+  const qr = local?.fase === 'qr' && local.qr ? local.qr : remoto?.fase === 'qr' && remoto.qr ? remoto.qr : '';
+  const codigo = remoto?.fase === 'codigo' ? remoto.codigo || '' : '';
+
+  const parear = async () => {
+    setPedindo(true);
+    setErro('');
+    try { await api.conectorParear(numeroParear); setPedido(true); }
+    catch (e: any) { setErro(e?.message || 'Não foi possível pedir o código.'); }
+    finally { setPedindo(false); }
+  };
 
   const gerar = async () => {
     if (cfg.conector_criado && !window.confirm('Gerar uma chave nova derruba o Conector que está rodando agora. Continuar?')) return;
@@ -184,20 +218,44 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
       {cfg.conector_criado && (
         <div className="space-y-3">
           <ol className="text-sm text-slate-700 list-decimal pl-5 space-y-1">
-            <li>Baixe o arquivo e <b>dê dois cliques</b> nele (no computador onde o WhatsApp vai ficar).</li>
-            <li>O <b>QR code aparece aqui mesmo</b>, nesta tela. No celular: WhatsApp → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b>.</li>
+            <li>{celular ? <>No <b>computador</b> onde o WhatsApp vai ficar ligado, abra o LeadSage e baixe o arquivo de conexão.</> : <>Baixe o arquivo e <b>dê dois cliques</b> nele (no computador onde o WhatsApp vai ficar).</>}</li>
+            <li>O <b>QR code aparece aqui mesmo</b>, nesta tela. No celular: WhatsApp → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b>. Só tem este celular? Use a opção <b>conectar pelo número</b> abaixo.</li>
             <li>Pronto. Esta tela passa a mostrar <b>Conectado</b>. Deixe a janela preta aberta.</li>
           </ol>
-          {local?.fase === 'qr' && local.qr && (
+          {qr && (
             <div className="p-4 rounded-xl bg-white border border-emerald-200 flex flex-col items-center gap-2 text-center">
-              <img src={local.qr} alt="QR code do WhatsApp" className="w-56 h-56" />
+              <img src={qr} alt="QR code do WhatsApp" className="w-56 h-56" />
               <p className="text-xs text-slate-600">No celular: WhatsApp → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b> e aponte para o código.</p>
             </div>
           )}
           {local && local.fase !== 'qr' && local.fase !== 'pronto' && (
             <p className="text-xs text-slate-600 flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> {local.mensagem}</p>
           )}
-          {chave ? (
+          {codigo && (
+            <div className="p-4 rounded-xl bg-white border border-emerald-200 text-center space-y-1">
+              <p className="text-xs text-slate-600">Digite este código no WhatsApp deste celular:</p>
+              <p className="text-3xl font-mono font-black tracking-widest text-emerald-700 select-all">{codigo}</p>
+              <p className="text-[11px] text-slate-500">WhatsApp → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b> → <b>Conectar com número de telefone</b>.</p>
+            </div>
+          )}
+          {!cfg.conector_online && !remoto?.codigo && (
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+              <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5" /> Conectar pelo número (sem escanear)</p>
+              <p className="text-[11px] text-slate-500">Para quem só tem o celular na mão: o WhatsApp devolve um código de 8 caracteres e você digita nele. O Conector continua rodando no computador.</p>
+              <div className="flex gap-2">
+                <input value={numeroParear} onChange={e => setNumeroParear(e.target.value)} inputMode="tel" placeholder="(14) 99999-9999" aria-label="Número do WhatsApp"
+                  className="flex-1 min-w-0 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500" />
+                <button onClick={parear} disabled={pedindo || numeroParear.replace(/\D/g, '').length < 10}
+                  className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 disabled:opacity-40 text-white text-xs font-bold">
+                  {pedindo ? '…' : 'Pedir código'}
+                </button>
+              </div>
+              {pedido && <p className="text-[11px] text-emerald-700">Pedido enviado. O código aparece aqui em instantes (com o Conector aberto no computador, pode levar até 1 minuto).</p>}
+            </div>
+          )}
+          {celular ? (
+            <p className="text-xs text-slate-500">O arquivo do Conector é para Windows: baixe-o no computador. Depois, daqui do celular você vê as conversas, responde, dispara e o robô atende.</p>
+          ) : chave ? (
             <button onClick={() => baixar('Conectar-WhatsApp.bat', arquivoDoConector(chave, window.location.origin))}
               className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-2">
               <Download className="w-4 h-4" /> Baixar Conectar-WhatsApp.bat

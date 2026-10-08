@@ -188,3 +188,40 @@ test('tentar de novo: para quando o robo responde, e desiste depois de algumas v
   const resolvido = { reprocessar: async () => ({ ok: true, dados: { processadas: 0, respondidas: 0 } }) };
   assert.equal(await tentarDeNovo(resolvido, '1', { esperas: [1, 1], dorme: async () => {}, aviso: () => {} }), false);
 });
+
+test('agrupador: varias mensagens seguidas disparam uma resposta so, depois do silencio', async () => {
+  const { criarAgrupador } = await import('./leadsage-conector.mjs');
+  const disparos = [];
+  const a = criarAgrupador((c) => disparos.push(c), { silencioMs: 60, maxMs: 1000 });
+  a.registrar('5511');
+  await new Promise((r) => setTimeout(r, 30));
+  a.registrar('5511');                      // chegou outra: recomeça a espera
+  await new Promise((r) => setTimeout(r, 30));
+  a.registrar('5511');
+  assert.ok(a.esperando('5511'));
+  assert.deepEqual(disparos, []);           // ainda esperando o lead terminar
+  await new Promise((r) => setTimeout(r, 120));
+  assert.deepEqual(disparos, ['5511']);     // uma vez só
+  assert.ok(!a.esperando('5511'));
+});
+
+test('agrupador: contatos diferentes nao se misturam e ha um teto de espera', async () => {
+  const { criarAgrupador } = await import('./leadsage-conector.mjs');
+  const disparos = [];
+  const a = criarAgrupador((c) => disparos.push(c), { silencioMs: 80, maxMs: 120 });
+  a.registrar('A'); a.registrar('B');
+  // 'A' continua escrevendo sem parar: o teto de 120 ms garante que a resposta sai mesmo assim
+  for (let i = 0; i < 4; i++) { await new Promise((r) => setTimeout(r, 40)); a.registrar('A'); }
+  await new Promise((r) => setTimeout(r, 150));
+  assert.ok(disparos.includes('B') && disparos.includes('A'));
+  assert.equal(disparos.filter((c) => c === 'B').length, 1);
+});
+
+test('entregar com adiar so guarda: marca a mensagem para o servidor nao responder ainda', async () => {
+  const { entregarMensagem } = await import('./leadsage-conector.mjs');
+  const enviados = [];
+  const ls = { mensagem: async (p) => { enviados.push(p); return { ok: true, status: 200, dados: { ok: true, adiado: true } }; } };
+  const m = { id: 'q1', de: '5511999990000', texto: 'oi', tipo: 'text', momento: 0 };
+  assert.equal(await entregarMensagem(ls, m, 0, new Set(), () => {}, null, { adiar: true }), true);
+  assert.equal(enviados[0].adiar, true);
+});

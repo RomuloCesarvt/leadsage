@@ -191,9 +191,14 @@ async def processar(
     gerar: Optional[Callable[[str], Dict[str, Any]]] = None,
     enviar: Optional[Enviar] = None,
     reprocessar: bool = False,
+    adiar: bool = False,
 ) -> Dict[str, Any]:
     """`reprocessar`: a mensagem ja esta na conversa e ficou sem resposta (a IA falhou ou demorou);
-    tenta responder de novo, sem repetir a mensagem nem tratar como reenvio."""
+    tenta responder de novo, sem repetir a mensagem nem tratar como reenvio.
+
+    `adiar`: so guarda a mensagem (e liga ao lead); a resposta vem depois, quando o lead parar de
+    escrever (o Conector chama `responder_pendentes`). Quem manda "boa tarde", "vocês fazem sites?",
+    "tem preço?" em tres mensagens recebe uma resposta so, e nao tres."""
     enviar = enviar or meta_canais.enviar
     uid, email = cfg["uid"], cfg.get("email", "")
     cid = robo_store.id_da_conversa(msg.canal, msg.contato)
@@ -231,6 +236,9 @@ async def processar(
     async def salvar() -> Dict[str, Any]:
         await robo_store.salvar_conversa(uid, conversa)
         return conversa
+
+    if adiar:
+        return await salvar()
 
     # 2. quem pediu para sair nao recebe mais nada do robo
     if conversa.get("optout"):
@@ -461,6 +469,7 @@ async def responder_pendentes(
             if c.get("canal") == canal and _sem_resposta(c) and str(c.get("atualizado") or "") >= corte[:19]
         ]
     processadas = respondidas = 0
+    ultima_conversa: Dict[str, Any] = {}
     for r in resumos[:maximo]:
         conversa = await robo_store.obter_conversa(uid, r["id"])
         if not conversa or not conversa.get("mensagens"):
@@ -474,6 +483,12 @@ async def responder_pendentes(
         )
         processadas += 1
         nova = await processar(cfg, msg, gerar=gerar, enviar=enviar, reprocessar=True)
+        ultima_conversa = nova
         if (nova.get("mensagens") or [{}])[-1].get("de") == "robo":
             respondidas += 1
-    return {"processadas": processadas, "respondidas": respondidas}
+    return {
+        "processadas": processadas, "respondidas": respondidas,
+        # para o Conector decidir se tenta de novo e o que mostrar
+        "tentar_de_novo": bool(ultima_conversa.get("falhas_ia")) and not ultima_conversa.get("precisa_humano"),
+        "silencio": ultima_conversa.get("silencio", ""),
+    }

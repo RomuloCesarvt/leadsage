@@ -151,7 +151,7 @@ def test_varredura_responde_so_o_que_ficou_sem_resposta(com_robo, rodar):
     rodar(robo_store.salvar_conversa, "alice", conversa_base("5511900000005", [fala("contato", "me ajuda", 1)], precisa_humano=True, motivo="pediu desconto"))
     envio = Envio()
     r = rodar(robo_service.responder_pendentes, cfg(), gerar=ia("Claro! Posso ajudar."), enviar=envio)
-    assert r == {"processadas": 1, "respondidas": 1}
+    assert (r["processadas"], r["respondidas"]) == (1, 1)
     assert envio.enviados == ["Claro! Posso ajudar."]
     # rodar de novo nao repete: a conversa agora termina numa fala do robo
     assert rodar(robo_service.responder_pendentes, cfg(), gerar=ia("de novo"), enviar=envio)["processadas"] == 0
@@ -171,7 +171,7 @@ def test_reprocessar_um_contato_nao_duplica_a_mensagem(com_robo, rodar):
     rodar(robo_store.salvar_conversa, "alice", conversa_base("5511900000001", [fala("contato", "???", 1)], falhas_ia=1))
     envio = Envio()
     r = rodar(robo_service.responder_pendentes, cfg(), contato="5511900000001", gerar=ia("Oi! Estou aqui."), enviar=envio)
-    assert r == {"processadas": 1, "respondidas": 1}
+    assert (r["processadas"], r["respondidas"]) == (1, 1)
     conversa = rodar(robo_store.obter_conversa, "alice", robo_store.id_da_conversa("whatsapp", "5511900000001"))
     assert [m["de"] for m in conversa["mensagens"]] == ["contato", "robo"]      # a pergunta nao foi duplicada
     assert conversa["falhas_ia"] == 0
@@ -197,4 +197,33 @@ def test_rota_de_reprocessar_e_dica_de_tentar_de_novo(client, com_robo, rodar, m
     # e na nova tentativa (IA ja boa) ele responde
     monkeypatch.setattr(robo_service, "_gerador_padrao", lambda: ia("Fazemos sim! Posso te mostrar?"))
     resp = client.post("/api/conector/reprocessar", headers=h, json={"contato": "5511900000009"}).json()
-    assert resp == {"processadas": 1, "respondidas": 1}
+    assert (resp["processadas"], resp["respondidas"]) == (1, 1)
+
+
+def test_tres_mensagens_seguidas_viram_uma_resposta_so(com_robo, rodar):
+    from app import robo_store
+    envio = Envio()
+    for i, texto in enumerate(["boa tarde", "vocês fazem sites?", "quanto custa mais ou menos?"]):
+        c = rodar(robo_service.processar, cfg(), msg(texto, i), gerar=ia("nao deveria responder ainda"), enviar=envio, adiar=True)
+    assert envio.enviados == []                          # guardou as tres, sem responder nenhuma
+    assert [m["de"] for m in c["mensagens"]] == ["contato"] * 3
+    # quando o lead para de escrever, UMA resposta que enxerga as tres
+    prompts = []
+
+    def gerador(prompt):
+        prompts.append(prompt)
+        return {"mensagens": ["Fazemos sim! Posso te mostrar uma prévia?"], "etapa": "descoberta", "temperatura": "morno"}
+
+    r = rodar(robo_service.responder_pendentes, cfg(), contato="5511964623668", gerar=gerador, enviar=envio)
+    assert r["processadas"] == 1 and r["respondidas"] == 1
+    assert envio.enviados == ["Fazemos sim! Posso te mostrar uma prévia?"]
+    assert "quanto custa" in prompts[0] and "vocês fazem sites" in prompts[0] and "boa tarde" in prompts[0]
+
+
+def test_reprocessar_devolve_a_dica_de_tentar_de_novo(com_robo, rodar):
+    def quebrada(prompt):
+        raise RuntimeError("503")
+
+    rodar(robo_service.processar, cfg(), msg("oi, vocês fazem sites?", 1), gerar=quebrada, enviar=Envio(), adiar=True)
+    r = rodar(robo_service.responder_pendentes, cfg(), contato="5511964623668", gerar=quebrada, enviar=Envio())
+    assert r["respondidas"] == 0 and r["tentar_de_novo"] is True

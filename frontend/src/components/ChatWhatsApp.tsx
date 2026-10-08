@@ -10,6 +10,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bot, Check, CheckCheck, ChevronLeft, Clock, Power, RefreshCw, Search, Send, UserRound, Wifi } from 'lucide-react';
 import { api } from '../services/api';
 import { conectorLocal, versaoAntiga, type ChatWhats, type EstadoConector, type FonteLista, type MensagemWhats } from '../lib/conectorLocal';
+import { whats } from '../lib/whats';
 import { sondar } from '../lib/sondagem';
 import { WhatsAppIcon } from './BrandIcons';
 import type { RoboConversaResumo } from '../types';
@@ -67,6 +68,9 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
   const [chats, setChats] = useState<ChatWhats[] | null>(null);
   const [offline, setOffline] = useState(false);
   const [fonte, setFonte] = useState<FonteLista>('');
+  // true quando o chat vem pelo servidor (celular): o Conector local não alcança este aparelho
+  const [remoto, setRemoto] = useState(false);
+  const [idade, setIdade] = useState(0);
   const [detalhe, setDetalhe] = useState('');
   const [estado, setEstado] = useState<EstadoConector | null>(null);
   const [robo, setRobo] = useState<RoboConversaResumo[]>([]);
@@ -88,15 +92,17 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
 
   const carregarChats = useCallback(async () => {
     try {
-      const l = await conectorLocal.chats(80);
-      if (l === null) { setOffline(true); setEstado(await conectorLocal.estado().catch(() => null)); return; }
+      const l = await whats.chats(80);
+      if (l === null) { setOffline(true); setEstado(await whats.estado().catch(() => null)); return; }
       setOffline(false);
       setChats(l.chats);
       setFonte(l.fonte);
+      setRemoto(l.remoto);
+      setIdade(l.idade_s ?? 0);
     } catch (e: any) {
       // o Conector respondeu, mas não conseguiu ler as conversas
       setOffline(true);
-      setEstado(await conectorLocal.estado().catch(() => null));
+      setEstado(await whats.estado().catch(() => null));
       setErro(e?.message || 'Não foi possível ler as conversas do WhatsApp.');
       conectorLocal.diagnostico().then(d => setDetalhe(d ? JSON.stringify(d.erros || d, null, 1) : '')).catch(() => {});
     }
@@ -124,10 +130,10 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
 
   const carregarMensagens = useCallback(async (id: string, max: number) => {
     try {
-      const m = await conectorLocal.mensagens(id, max);
+      const m = await whats.mensagens(id, max, remoto);
       if (m) setMensagens(m);
     } catch (e: any) { setErro(e?.message || 'Não foi possível carregar a conversa.'); }
-  }, []);
+  }, [remoto]);
 
   useEffect(() => {
     if (!aberto) return;
@@ -136,14 +142,14 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
     setAviso('');
     setLimite(60);
     void carregarMensagens(aberto.id, 60);
-    conectorLocal.lida(aberto.id).then(carregarChats).catch(() => {});
-  }, [aberto?.id, carregarMensagens, carregarChats]);
+    whats.lida(aberto.id, remoto).then(carregarChats).catch(() => {});
+  }, [aberto?.id, carregarMensagens, carregarChats]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // atualiza a conversa aberta; o mesmo limite vale para as mensagens antigas já carregadas
   useEffect(() => {
     if (!aberto) return;
-    return sondar(() => { void carregarMensagens(aberto.id, limite); }, 3000);
-  }, [aberto?.id, limite, carregarMensagens]);
+    return sondar(() => { void carregarMensagens(aberto.id, limite); }, remoto ? 4000 : 3000);
+  }, [aberto?.id, limite, carregarMensagens, remoto]);
 
   // Rola SÓ a lista de mensagens (nunca a página): ao abrir, vai para o fim; com mensagem nova,
   // só desce se você já estava perto do fim, para não puxar quem está lendo o histórico.
@@ -210,7 +216,7 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
     setErro('');
     const conv = conversaDoRobo(aberto);
     try {
-      const m = await conectorLocal.enviar(aberto.id, texto.trim());
+      const m = await whats.enviar(aberto.id, texto.trim(), remoto, aberto.telefone);
       if (m === null) throw new Error('O Conector não respondeu. Veja se ele está aberto no computador.');
       setTexto('');
       setMensagens(prev => [...prev, m]);
@@ -238,6 +244,17 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
             <h3 className="font-bold text-slate-800 mb-1">Escaneie para conectar</h3>
             <img src={estado.qr} alt="QR code do WhatsApp" className="w-56 h-56 mx-auto my-3" />
             <p className="text-slate-500 text-sm">WhatsApp → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b>.</p>
+          </>
+        ) : estado?.fase === 'codigo' && estado.codigo ? (
+          <>
+            <h3 className="font-bold text-slate-800 mb-1">Digite este código no WhatsApp</h3>
+            <p className="text-3xl font-mono font-black tracking-widest text-emerald-700 my-3 select-all">{estado.codigo}</p>
+            <p className="text-slate-500 text-sm">WhatsApp → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b> → <b>Conectar com número de telefone</b>.</p>
+          </>
+        ) : estado?.fase === 'offline' ? (
+          <>
+            <h3 className="font-bold text-slate-800 mb-1">O computador do Conector está desligado</h3>
+            <p className="text-slate-500 text-sm max-w-md mx-auto">{estado.mensagem}</p>
           </>
         ) : estado?.fase === 'pronto' && erro ? (
           <>
@@ -311,6 +328,11 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
                 {ligando ? '…' : 'Ligar'}
               </button>
             </div>
+          )}
+          {remoto && (
+            <p className="text-[11px] text-sky-800 bg-sky-50 border border-sky-200 rounded-lg px-2.5 py-1.5">
+              Vendo pelo celular{idade > 15 ? ` · atualizado há ${idade}s` : ''}. O WhatsApp fica ligado no computador do Conector; a primeira atualização pode levar até 1 minuto.
+            </p>
           )}
           {notaHistorico && (
             <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">

@@ -386,6 +386,26 @@ export const api = {
     return await fetchWithToken('/robo/conector/fila');
   },
 
+  async whatsEstado(): Promise<{ conectado: boolean; online: boolean; fase?: string; qr?: string; codigo?: string; numero?: string }> {
+    return await fetchWithToken('/robo/whats/estado');
+  },
+
+  async whatsChats(): Promise<{ chats: any[]; idade_s: number | null; online: boolean; conectado: boolean }> {
+    return await fetchWithToken('/robo/whats/chats');
+  },
+
+  async whatsMensagens(id: string): Promise<{ mensagens: any[]; idade_s: number | null }> {
+    return await fetchWithToken(`/robo/whats/chats/${encodeURIComponent(id)}/mensagens`);
+  },
+
+  async whatsEnviar(id: string, texto: string, telefone = ''): Promise<{ ok: boolean; online: boolean }> {
+    return await fetchWithToken(`/robo/whats/chats/${encodeURIComponent(id)}/enviar`, { method: 'POST', body: JSON.stringify({ texto, telefone }) });
+  },
+
+  async conectorParear(numero: string): Promise<{ numero: string }> {
+    return await fetchWithToken('/robo/conector/parear', { method: 'POST', body: JSON.stringify({ numero }) });
+  },
+
   async filaEnviarAgora(id: string): Promise<EstadoFilaWhats> {
     return await fetchWithToken(`/robo/fila/${encodeURIComponent(id)}/enviar-agora`, { method: 'POST' });
   },

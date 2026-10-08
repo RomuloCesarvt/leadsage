@@ -1,5 +1,6 @@
 import time
 import re
+import hashlib
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -43,7 +44,7 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
-from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, abordagem_mestra, conector_whatsapp, caixa_de_entrada, ai_providers
+from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, abordagem_mestra, conector_whatsapp, caixa_de_entrada, ai_providers, espelho_whatsapp
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote as _quote
 from app.ai_robo import decidir as robo_decidir
@@ -1404,6 +1405,25 @@ class ConectorPing(BaseModel):
     numero: str = Field(default="", max_length=40)
     status: str = Field(default="", max_length=40)
     versao: str = Field(default="", max_length=20)
+    # o estado da conexao, para a tela do celular mostrar o QR code ou o codigo de pareamento
+    fase: str = Field(default="", max_length=20)
+    qr: str = Field(default="", max_length=30000)
+    codigo: str = Field(default="", max_length=20)
+
+
+class ConectorEspelho(BaseModel):
+    chats: Optional[List[Dict[str, Any]]] = None
+    chat_id: str = Field(default="", max_length=60)
+    mensagens: Optional[List[Dict[str, Any]]] = None
+
+
+class WhatsEnviar(BaseModel):
+    texto: str = Field(min_length=1, max_length=4000)
+    telefone: str = Field(default="", max_length=40)
+
+
+class WhatsParear(BaseModel):
+    numero: str = Field(min_length=8, max_length=24)
 
 
 class ConectorMensagem(BaseModel):
@@ -1412,6 +1432,8 @@ class ConectorMensagem(BaseModel):
     nome: str = Field(default="", max_length=120)
     texto: str = Field(min_length=1, max_length=4000)
     momento: int = 0
+    # so guarda: a resposta vem quando o lead parar de escrever (o Conector pede depois)
+    adiar: bool = False
 
 
 class ConectorResultado(BaseModel):
@@ -1558,7 +1580,92 @@ async def conector_ping(req: ConectorPing, request: Request):
         canal["cw_status"] = req.status
         canal["cw_versao"] = req.versao
         await _gravar_canal_do_conector(canal)
-    return {"ok": True, "limite_frio": conector_whatsapp.limite_frio_do_dia(canal), "robo_ativo": bool(canal.get("ativo"))}
+    # a conexao mudou (QR novo, codigo, pronto): a tela do celular precisa ver
+    marca = f"{req.fase}|{req.codigo}|{hashlib.md5(req.qr.encode()).hexdigest()[:8] if req.qr else ''}"
+    if req.fase and marca != canal.get("cw_marca_estado"):
+        canal["cw_marca_estado"] = marca
+        await espelho_whatsapp.salvar_estado(canal["uid"], req.fase, req.qr, req.codigo, req.numero)
+        await _gravar_canal_do_conector(canal)
+    pedidos = await espelho_whatsapp.pedidos_para_o_conector(canal["uid"])
+    return {"ok": True, "limite_frio": conector_whatsapp.limite_frio_do_dia(canal), "robo_ativo": bool(canal.get("ativo")), **pedidos}
+
+
+@app.post("/api/conector/espelho")
+async def conector_espelho(req: ConectorEspelho, request: Request):
+    """O Conector manda o que o celular pediu para ver: lista de conversas e/ou mensagens de uma conversa."""
+    canal = await _canal_do_conector(request)
+    uid = canal["uid"]
+    if req.chats is not None:
+        await espelho_whatsapp.salvar_chats(uid, req.chats)
+    if req.chat_id and req.mensagens is not None:
+        await espelho_whatsapp.salvar_mensagens(uid, req.chat_id, req.mensagens)
+    return {"ok": True}
+
+
+@app.get("/api/robo/whats/estado")
+async def whats_estado(user: dict = Depends(get_current_user)):
+    """A conexao do WhatsApp vista de qualquer aparelho: QR code, codigo de pareamento, online."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    uid = user.get("uid")
+    canal = await robo_store.canal_do_usuario(uid) or {}
+    estado = await espelho_whatsapp.ler_estado(uid)
+    return {"conectado": bool(canal.get("cw_hash")), "online": conector_whatsapp.online(canal), **estado}
+
+
+@app.post("/api/robo/conector/parear")
+async def conector_parear(req: WhatsParear, user: dict = Depends(get_current_user)):
+    """Conectar pelo numero do telefone: o codigo de 8 letras aparece na tela e se digita no WhatsApp."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    uid = user.get("uid")
+    canal = await robo_store.canal_do_usuario(uid) or {}
+    if not canal.get("cw_hash"):
+        raise HTTPException(status_code=409, detail="Gere a chave do Conector antes (Robô → Canais).")
+    try:
+        numero = await espelho_whatsapp.pedir_pareamento(uid, req.numero)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"numero": numero}
+
+
+@app.get("/api/robo/whats/chats")
+async def whats_chats(user: dict = Depends(get_current_user)):
+    """A lista de conversas do WhatsApp, lida do espelho (para quem nao esta no computador do Conector)."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    uid = user.get("uid")
+    await espelho_whatsapp.marcar_olhando(uid)
+    chats, idade = await espelho_whatsapp.ler_chats(uid)
+    canal = await robo_store.canal_do_usuario(uid) or {}
+    return {"chats": chats, "idade_s": idade, "online": conector_whatsapp.online(canal), "conectado": bool(canal.get("cw_hash"))}
+
+
+@app.get("/api/robo/whats/chats/{chat_id}/mensagens")
+async def whats_mensagens(chat_id: str, user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    if not espelho_whatsapp.chat_valido(chat_id):
+        raise HTTPException(status_code=400, detail="Conversa inválida.")
+    uid = user.get("uid")
+    await espelho_whatsapp.marcar_olhando(uid, abrir=chat_id)
+    mensagens, idade = await espelho_whatsapp.ler_mensagens(uid, chat_id)
+    return {"mensagens": mensagens, "idade_s": idade}
+
+
+@app.post("/api/robo/whats/chats/{chat_id}/enviar")
+async def whats_enviar(chat_id: str, req: WhatsEnviar, user: dict = Depends(get_current_user)):
+    """Responder pelo celular: a mensagem vai para a fila e o Conector (no computador) envia."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    if not espelho_whatsapp.chat_valido(chat_id):
+        raise HTTPException(status_code=400, detail="Conversa inválida.")
+    uid = user.get("uid")
+    canal = await robo_store.canal_do_usuario(uid) or {}
+    if not canal.get("cw_hash"):
+        raise HTTPException(status_code=409, detail="O WhatsApp pelo computador não está conectado.")
+    contato = req.telefone or chat_id.split("@")[0]
+    try:
+        await conector_whatsapp.enfileirar_resposta({**canal, "uid": uid}, contato, req.texto, chat_id=chat_id)
+    except meta_canais.EnvioFalhou as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    await espelho_whatsapp.marcar_olhando(uid, abrir=chat_id)
+    return {"ok": True, "online": conector_whatsapp.online(canal)}
 
 
 @app.get("/api/conector/tarefas")
@@ -1637,10 +1744,12 @@ async def conector_mensagem(req: ConectorMensagem, request: Request):
     msg = meta_canais.Recebida(canal="whatsapp", contato=contato, nome=req.nome.strip(),
                                texto=req.texto.strip(), meta_id=req.id, momento=req.momento)
     try:
-        conversa = await robo_service.processar(canal, msg)
+        conversa = await robo_service.processar(canal, msg, adiar=req.adiar)
     except Exception as exc:
         print(f"Robo: falha ao processar mensagem do conector {req.id}: {exc}")
         return {"ok": False}
+    if req.adiar:
+        return {"ok": True, "adiado": True, "respondeu": False}
     mensagens = conversa.get("mensagens") or []
     return {
         "ok": True,
