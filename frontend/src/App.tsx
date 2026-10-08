@@ -7,7 +7,6 @@ import { NovaBuscaScreen } from './components/screens/NovaBuscaScreen';
 import { ResultadosBusca } from './components/ResultadosBusca';
 import { SplitViewWorkspace } from './components/SplitViewWorkspace';
 import { MessageEditorModal } from './components/MessageEditorModal';
-import { CreditModal } from './components/CreditModal';
 import { ProfileModal } from './components/ProfileModal';
 import { IntegrationsModal } from './components/IntegrationsModal';
 import { ExportModal } from './components/ExportModal';
@@ -105,7 +104,6 @@ const MainApp: React.FC = () => {
       {/* Global Modals */}
       <LeadProfilePanel />
       <MessageEditorModal />
-      <CreditModal />
       <ProfileModal />
       <IntegrationsModal />
       <ExportModal />
