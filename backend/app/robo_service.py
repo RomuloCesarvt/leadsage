@@ -29,7 +29,7 @@ from app.profile_store import get_profile
 
 # A Meta espera resposta do webhook em ~20s e reenvia se nao vier. A IA
 # precisa caber nisso com folga para o envio.
-PRAZO_IA = 14.0
+PRAZO_IA = 22.0
 
 CUSTO_RESPOSTA = 1
 
@@ -39,10 +39,15 @@ Enviar = Callable[[str, str, str, Dict[str, Any]], Awaitable[str]]
 def _gerador_padrao() -> Callable[[str], Dict[str, Any]]:
     from app.ai_client import build_client, gerar_json
 
+    import time
+
     cliente = build_client(settings.GEMINI_API_KEY)
     # "mensagens" e conferida em ai_sdr.normalizar, que aceita tambem o
     # formato antigo ("resposta"); exigir aqui faria rejeitar o outro.
-    return lambda prompt: gerar_json(cliente, prompt)
+    # Resposta de vendedor no WhatsApp tem de sair em segundos: motores em paralelo, o mais rapido vence
+    # (antes era um depois do outro, e a IA estourava o prazo: "a IA demorou demais").
+    return lambda prompt: gerar_json(cliente, prompt, tentativas=2, prazo=time.monotonic() + PRAZO_IA - 1.5,
+                                     rapido=True, max_tokens=700)
 
 
 async def _lead_do_contato(uid: str, canal: str, contato: str) -> Optional[Dict[str, Any]]:

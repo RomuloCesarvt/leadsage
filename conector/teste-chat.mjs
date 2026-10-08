@@ -108,3 +108,64 @@ test('contato novo (@lid): telefone vem do titulo da conversa', async () => {
   assert.equal(c.telefone, '5511964623668');
   assert.equal(resumoDoChat({ id: { _serialized: '128625865191513@lid', user: '1' }, name: 'Gabriel' }).telefone, '');
 });
+
+test('"digitando…": comeca depois da pausa de leitura, renova e some ao parar', async () => {
+  const { criarDigitando } = await import('./leadsage-conector.mjs');
+  const eventos = [];
+  const d = criarDigitando(async (c, st) => { eventos.push(`${c}:${st}`); }, { leituraMs: 20, renovarMs: 30, tetoMs: 5000 });
+  d.iniciar('5511999990000');
+  assert.ok(d.ativo('5511999990000'));
+  assert.deepEqual(eventos, []);                       // ainda "lendo"
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal(eventos[0], '5511999990000:typing');
+  assert.ok(eventos.length >= 2);                      // renovou
+  await d.parar('5511999990000');
+  assert.equal(eventos.at(-1), '5511999990000:stop');
+  assert.ok(!d.ativo('5511999990000'));
+  const n = eventos.length;
+  await new Promise((r) => setTimeout(r, 80));
+  assert.equal(eventos.length, n);                     // nada mais depois de parar
+});
+
+test('parar antes da leitura nao mostra nem "digitando" nem "parou"', async () => {
+  const { criarDigitando } = await import('./leadsage-conector.mjs');
+  const eventos = [];
+  const d = criarDigitando(async (c, st) => { eventos.push(st); }, { leituraMs: 50, tetoMs: 5000 });
+  d.iniciar('1');
+  await d.parar('1');
+  await new Promise((r) => setTimeout(r, 120));
+  assert.deepEqual(eventos, []);
+});
+
+test('o tempo ja "digitando" e descontado da espera da resposta', async () => {
+  const { criarDigitando } = await import('./leadsage-conector.mjs');
+  let agora = 1000;
+  const d = criarDigitando(async () => {}, { leituraMs: 10000, tetoMs: 50000, agora: () => agora });
+  assert.equal(d.restante('x', 5000), 5000);           // sem indicador: espera normal
+  assert.equal(d.restante('x', 100), 800);             // minimo humano
+  d.iniciar('x');
+  agora += 3000;
+  assert.equal(d.restante('x', 5000), 2000);           // ja ficou 3 s
+  agora += 9000;
+  assert.equal(d.restante('x', 5000), 400);            // passou do tempo: so um instante
+  await d.parar('x');
+});
+
+test('nunca fica "digitando" para sempre (teto)', async () => {
+  const { criarDigitando } = await import('./leadsage-conector.mjs');
+  const eventos = [];
+  const d = criarDigitando(async (c, st) => { eventos.push(st); }, { leituraMs: 5, renovarMs: 1000, tetoMs: 60 });
+  d.iniciar('y');
+  await new Promise((r) => setTimeout(r, 150));
+  assert.ok(!d.ativo('y'));
+  assert.equal(eventos.at(-1), 'stop');
+});
+
+test('entregar mensagem avisa a resposta do LeadSage (respondeu ou nao)', async () => {
+  const { entregarMensagem } = await import('./leadsage-conector.mjs');
+  const respostas = [];
+  const ls = { mensagem: async () => ({ ok: true, status: 200, dados: { ok: true, respondeu: false, silencio: 'desligado' } }) };
+  const m = { id: 'z1', de: '5511999990000', texto: 'Oi', tipo: 'text', momento: 0 };
+  assert.equal(await entregarMensagem(ls, m, 0, new Set(), () => {}, (d) => respostas.push(d)), true);
+  assert.equal(respostas[0].respondeu, false);
+});

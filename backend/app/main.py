@@ -43,7 +43,7 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
-from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, abordagem_mestra, conector_whatsapp, caixa_de_entrada
+from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, abordagem_mestra, conector_whatsapp, caixa_de_entrada, ai_providers
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote as _quote
 from app.ai_robo import decidir as robo_decidir
@@ -148,6 +148,7 @@ def read_root():
         "status": "online",
         "service": "LeadSage AI Prospecting Engine",
         "version": "1.0.0",
+        "ia": [x["nome"] for x in ai_providers.ativos()] + (["gemini"] if settings.GEMINI_API_KEY else []),
         "armazenamento": "firestore" if firestore_db is not None else ("postgres" if EH_POSTGRES else ("sqlite" if settings.FIRESTORE_DESLIGADO else "indisponivel")),
         "timestamp": datetime.now().isoformat()
     }

@@ -102,22 +102,45 @@ def _tentar_modelo(client, model: str, prompt: str, limite_ms: int, max_tokens: 
     return texto
 
 
-def generate_hedged(client, prompt: str, prazo: float, atraso: float = 4.0, max_tokens: Optional[int] = None) -> str:
-    """Resposta mais rapida: se o primeiro modelo demora, o proximo ja comeca em paralelo.
+def _candidatos(client, prompt: str, max_tokens: Optional[int], json_mode: bool) -> list:
+    """Quem pode responder, do mais rapido para o mais lento: provedores gratuitos com chave
+    (respondem em ~1 s), depois os modelos do Gemini. Cada item e (rotulo, funcao(limite_s))."""
+    from app import ai_providers
 
-    O Gemini as vezes leva 5 s e as vezes 80 s no mesmo pedido. Esperar o primeiro terminar
+    itens = []
+    for prov in ai_providers.ativos():
+        itens.append((
+            f"{prov['nome']}",
+            lambda limite_s, prov=prov: ai_providers.chamar(prov, prompt, limite_s, max_tokens, json_mode),
+        ))
+    gemini = list(MODEL_CHAIN)
+    for modelo in gemini:
+        itens.append((
+            modelo,
+            lambda limite_s, modelo=modelo: _tentar_modelo(client, modelo, prompt, int(max(3.0, limite_s) * 1000), max_tokens),
+        ))
+    # o que respondeu da ultima vez vai na frente
+    for i, (rotulo, _) in enumerate(itens):
+        if rotulo == _working_model and i:
+            itens.insert(0, itens.pop(i))
+            break
+    return itens
+
+
+def generate_hedged(client, prompt: str, prazo: float, atraso: float = 3.0, max_tokens: Optional[int] = None,
+                    json_mode: bool = True) -> str:
+    """Resposta mais rapida: se o primeiro motor demora, o proximo ja comeca em paralelo.
+
+    O Gemini as vezes leva 3 s e as vezes 80 s no mesmo pedido. Esperar o primeiro terminar
     (ou estourar o tempo) para so entao tentar o segundo soma as esperas; aqui a primeira
-    resposta valida vence e as outras sao descartadas.
+    resposta valida vence e as outras sao descartadas. Os motores gratuitos extras (Groq,
+    Cerebras, OpenRouter) entram na frente quando ha chave deles no ambiente.
     """
     global _working_model
     from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
-    chain = list(MODEL_CHAIN)
-    if _working_model in chain:
-        chain.remove(_working_model)
-        chain.insert(0, _working_model)
-
-    executor = ThreadPoolExecutor(max_workers=len(chain))
+    candidatos = _candidatos(client, prompt, max_tokens, json_mode)
+    executor = ThreadPoolExecutor(max_workers=len(candidatos))
     em_andamento: Dict[Any, str] = {}
     proximo = 0
     ultimo: Optional[Exception] = None
@@ -125,38 +148,38 @@ def generate_hedged(client, prompt: str, prazo: float, atraso: float = 4.0, max_
 
     def lancar() -> None:
         nonlocal proximo
-        modelo = chain[proximo]
+        rotulo, fn = candidatos[proximo]
         proximo += 1
-        limite_ms = int(max(3.0, min(prazo - time.monotonic(), REQUEST_TIMEOUT_MS / 1000)) * 1000)
-        em_andamento[executor.submit(_tentar_modelo, client, modelo, prompt, limite_ms, max_tokens)] = modelo
+        limite_s = max(3.0, min(prazo - time.monotonic(), REQUEST_TIMEOUT_MS / 1000))
+        em_andamento[executor.submit(fn, limite_s)] = rotulo
 
     lancar()
     while True:
         restante = prazo - time.monotonic()
-        if restante <= 0.5 or (not em_andamento and proximo >= len(chain)):
+        if restante <= 0.5 or (not em_andamento and proximo >= len(candidatos)):
             break
         feitos, _ = wait(list(em_andamento), timeout=min(atraso, restante), return_when=FIRST_COMPLETED)
         for f in feitos:
-            modelo = em_andamento.pop(f)
+            rotulo = em_andamento.pop(f)
             try:
                 texto = f.result()
             except Exception as exc:
                 ultimo = exc
                 transitorio = transitorio or _e_transitorio(exc)
                 continue
-            _working_model = modelo
+            _working_model = rotulo
             executor.shutdown(wait=False, cancel_futures=True)
             return texto
         # demorou, ou todos falharam: chama o proximo sem esperar os outros
-        if proximo < len(chain) and (not feitos or not em_andamento):
+        if proximo < len(candidatos) and (not feitos or not em_andamento):
             lancar()
 
     executor.shutdown(wait=False, cancel_futures=True)
     if transitorio or ultimo is None:
         raise AIIndisponivel(
-            "O Gemini está com alta demanda no momento e demorou demais. Tente gerar de novo em alguns segundos."
+            "A IA está com alta demanda no momento e demorou demais. Tente gerar de novo em alguns segundos."
         )
-    raise AIIndisponivel(f"Nenhum modelo Gemini respondeu. Último erro: {ultimo}")
+    raise AIIndisponivel(f"Nenhum motor de IA respondeu. Último erro: {ultimo}")
 
 
 def generate_with_fallback(client, prompt: str, tentativas: int = 2, prazo: Optional[float] = None) -> str:

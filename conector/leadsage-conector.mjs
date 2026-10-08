@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '2.7.0';
+export const VERSAO = '2.8.0';
 const PORTA = 2790;
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -118,7 +118,8 @@ export async function enviarPendentes(ls, wa, aviso = log, dorme = dormir) {
   }
   let enviadas = 0;
   for (const tarefa of t.dados.tarefas || []) {
-    await dorme(1000 + Math.floor(Math.random() * 2000)); // respira antes de cada mensagem
+    // respira antes de cada mensagem; resposta a quem acabou de escrever sai logo (o indicador de digitação já deu o tempo)
+    await dorme(tarefa.tipo === 'resposta' ? 200 + Math.floor(Math.random() * 500) : 1000 + Math.floor(Math.random() * 2000));
     const r = await wa.enviar(tarefa.contato, tarefa.texto, atrasoHumano(tarefa.digitando_ms));
     if (r.ok) {
       enviadas++;
@@ -134,7 +135,7 @@ export async function enviarPendentes(ls, wa, aviso = log, dorme = dormir) {
 }
 
 /** Entrega ao LeadSage uma mensagem recebida. Devolve true se foi aceita. */
-export async function entregarMensagem(ls, m, inicioS, vistos, aviso = log) {
+export async function entregarMensagem(ls, m, inicioS, vistos, aviso = log, aoResposta = null) {
   if (vistos.has(String(m.id))) return false;
   const payload = paraLeadsage(m, inicioS);
   vistos.add(String(m.id));
@@ -142,6 +143,7 @@ export async function entregarMensagem(ls, m, inicioS, vistos, aviso = log) {
   if (!payload) return false;
   const e = await ls.mensagem(payload);
   if (e.ok && e.dados) {
+    if (aoResposta) aoResposta(e.dados);
     // o LeadSage diz se o robô respondeu; quando fica quieto, a janela mostra o motivo
     if (e.dados.respondeu) aviso(`Robô respondeu a ${m.de}.`);
     else if (e.dados.silencio) aviso(`Robô NÃO respondeu a ${m.de}: ${e.dados.silencio}`);
@@ -153,6 +155,50 @@ export async function entregarMensagem(ls, m, inicioS, vistos, aviso = log) {
     return false;
   }
   return true;
+}
+
+// ------------------------------------------------- "digitando…" enquanto a IA pensa
+
+/**
+ * O indicador "digitando…" do WhatsApp. Começa assim que o lead escreve (depois de uma pausa
+ * curta de "leitura"), é renovado a cada poucos segundos e some quando a resposta sai ou quando
+ * fica claro que ninguém vai responder. Ao enviar, o tempo que já ficou "digitando" conta como
+ * o tempo de digitação: a resposta não espera de novo o que o lead já esperou.
+ */
+export function criarDigitando(sinalizar, { leituraMs = 1200, renovarMs = 8000, tetoMs = 45000, agora = () => Date.now() } = {}) {
+  const ativos = new Map(); // contato -> { desde, renovar, leitura, teto }
+
+  const parar = async (contato) => {
+    const a = ativos.get(contato);
+    if (!a) return;
+    clearTimeout(a.leitura); clearInterval(a.renovar); clearTimeout(a.teto);
+    ativos.delete(contato);
+    if (a.mostrou) await Promise.resolve(sinalizar(contato, 'stop')).catch(() => {});
+  };
+
+  return {
+    iniciar(contato) {
+      if (!contato || ativos.has(contato)) return;
+      const a = { desde: agora(), mostrou: false };
+      a.leitura = setTimeout(async () => {
+        a.mostrou = true;
+        await Promise.resolve(sinalizar(contato, 'typing')).catch(() => {});
+        a.renovar = setInterval(() => Promise.resolve(sinalizar(contato, 'typing')).catch(() => {}), renovarMs);
+        a.renovar.unref?.();
+      }, leituraMs);
+      a.teto = setTimeout(() => parar(contato), tetoMs); // nunca fica "digitando" para sempre
+      a.leitura.unref?.(); a.teto.unref?.();
+      ativos.set(contato, a);
+    },
+    /** Quanto ainda falta de "digitação" para uma resposta de `digitandoMs` (o já gasto é descontado). */
+    restante(contato, digitandoMs) {
+      const a = ativos.get(contato);
+      if (!a) return Math.min(9000, Math.max(800, digitandoMs || 0));
+      return Math.max(400, (digitandoMs || 0) - (agora() - a.desde));
+    },
+    ativo: (contato) => ativos.has(contato),
+    parar,
+  };
 }
 
 // ------------------------------------------------- histórico próprio (reserva do chat)
@@ -352,6 +398,10 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
   const diag = { fonteChats: '', fonteMensagens: '', erros: {} };
   // telefone (ou id interno) -> id da conversa de verdade, para a resposta ir para o lugar certo
   const destinos = new Map();
+  const digitando = criarDigitando(async (contato, st) => {
+    const chat = destinos.get(contato);
+    if (chat) await client.pupPage.evaluate((i, e) => window.WWebJS.sendChatstate(e, i), chat, st);
+  });
   const navegador = acharNavegador();
   if (!navegador) throw new Error('Não achei o Microsoft Edge nem o Google Chrome neste computador. Instale um deles e abra de novo.');
   const { default: pkg } = await import('whatsapp-web.js');
@@ -423,9 +473,11 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
         // "digitando…" direto pela página: client.getChatById quebra nas versões atuais do WhatsApp Web
         // ("r"), e antes isso derrubava TODO envio do robô. O indicador é só um detalhe humano.
         const estado = (e) => client.pupPage.evaluate((i, st) => window.WWebJS.sendChatstate(st, i), id._serialized, e).catch(() => {});
-        await estado('typing');
-        await dormir(Math.min(9000, Math.max(800, digitandoMs || 0)));
+        // se já está "digitando" desde que o lead escreveu, só falta o resto do tempo
+        if (!digitando.ativo(telefone)) await estado('typing');
+        await dormir(digitando.restante(telefone, digitandoMs));
         await client.sendMessage(id._serialized, texto);
+        await digitando.parar(telefone);
         await estado('stop');
         return { ok: true };
       } catch (e) {
@@ -525,6 +577,7 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
       diag.fonteMensagens = 'historico';
       return historico.mensagens(chatId, limite);
     },
+    digitar: (contato, ligado) => (ligado ? digitando.iniciar(contato) : digitando.parar(contato)),
     diagnostico: () => ({ ...diag, historicoChats: historico.chats(1000).length }),
     async enviarNoChat(chatId, texto) {
       const enviada = await client.sendMessage(chatId, texto);
@@ -671,6 +724,8 @@ export async function executar() {
     let pronto = false;
     let proximaSaida = 0;
     let ultimoPing = 0;
+    let roboAtivo = true; // o ping diz; com o robô desligado não faz sentido mostrar "digitando…"
+    const lerRobo = (p) => { if (p?.dados && typeof p.dados.robo_ativo === 'boolean') roboAtivo = p.dados.robo_ativo; };
 
     try {
       estado.mensagem = 'Abrindo o WhatsApp Web…';
@@ -679,12 +734,19 @@ export async function executar() {
         aoPronto: async (numero) => {
           pronto = true; estado.fase = 'pronto'; estado.numero = numero; estado.qr = ''; estado.mensagem = 'Tudo certo. O robô está atendendo.';
           const p = await ls.ping(numero, 'ready');
+          lerRobo(p);
           if (p.status === 401) { estado.fase = 'erro'; estado.mensagem = 'A chave é inválida ou foi revogada. Gere outra no LeadSage.'; }
           ultimoPing = Date.now();
           log(`WhatsApp pronto${numero ? ` (${numero})` : ''}.`);
         },
         aoCair: (motivo) => { pronto = false; estado.fase = 'erro'; estado.mensagem = `WhatsApp desconectado (${motivo}). Feche e abra o Conector.`; log(estado.mensagem); },
-        aoReceber: async (m) => { if (pronto && await entregarMensagem(ls, m, inicioS, vistos)) proximaSaida = 0; },
+        aoReceber: async (m) => {
+          if (!pronto) return;
+          if (roboAtivo && !m.grupo) waAtual?.digitar(m.de, true);
+          const entregue = await entregarMensagem(ls, m, inicioS, vistos, log, (d) => { if (!d.respondeu) waAtual?.digitar(m.de, false); });
+          if (entregue) proximaSaida = 0;
+          else waAtual?.digitar(m.de, false);
+        },
       });
     } catch (e) {
       estado.fase = 'erro'; estado.mensagem = e.message; log('Erro:', e.message); ligado = false; return;
@@ -697,12 +759,12 @@ export async function executar() {
           const r = await enviarPendentes(ls, wa);
           proximaSaida = Date.now() + r.proximaEm * 1000;
         }
-        if (pronto && Date.now() - ultimoPing > 90000) { await ls.ping(estado.numero, 'ready'); ultimoPing = Date.now(); }
+        if (pronto && Date.now() - ultimoPing > 90000) { lerRobo(await ls.ping(estado.numero, 'ready')); ultimoPing = Date.now(); }
       } catch (e) {
         if (/revogada|errada/.test(String(e.message))) { estado.fase = 'erro'; estado.mensagem = e.message; log(e.message); await wa?.parar(); return; }
         log('Aviso:', e.message);
       }
-      await dormir(3000);
+      await dormir(1500);
     }
   };
   await iniciarTudo();
