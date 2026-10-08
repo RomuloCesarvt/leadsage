@@ -107,7 +107,7 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
   const contatar = (ids: string[]) => {
     if (!ids.length) return;
     setLeadsParaContato(ids);
-    setViewState('robo');
+    setViewState('fila');
   };
 
   const getScoreLabel = (score: number | undefined) => {

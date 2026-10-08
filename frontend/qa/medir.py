@@ -24,7 +24,7 @@ EDGE = r"C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
 
 TELAS = [
     ("dashboard", "Dashboard"), ("hero", "Nova Busca"), ("results", "Resultados"), ("workspace", "Meus Leads"), ("pipeline", "Pipeline de Vendas"),
-    ("history", "Histórico"), ("ai-outreach", "IA de Abordagem"), ("robo", "Robô de Atendimento"), ("proposals", "Propostas"),
+    ("history", "Histórico"), ("ai-outreach", "IA de Abordagem"), ("conversas", "Conversas"), ("fila", "Fila de envio"), ("robo", "Robô de Atendimento"), ("proposals", "Propostas"),
     ("contracts", "Contratos"), ("calculator", "Precificador"), ("create-site", "Criar Site"), ("my-sites", "Meus Sites"),
     ("tutorials", "Tutoriais"), ("notifications", "Avisos"), ("settings", "Configurações"), ("help", "Ajuda"),
     ("subscription", "Assinatura"),

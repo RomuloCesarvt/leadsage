@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '2.0.0';
+export const VERSAO = '2.1.0';
 const PORTA = 2790;
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -149,6 +149,76 @@ export async function entregarMensagem(ls, m, inicioS, vistos, aviso = log) {
   return true;
 }
 
+// ------------------------------------------------------- o chat (como o WhatsApp Web)
+
+/** Um chat da lista: nome, última mensagem, não lidas, número quando for pessoa. */
+export function resumoDoChat(chat) {
+  const id = chat.id?._serialized || '';
+  const grupo = Boolean(chat.isGroup) || id.endsWith('@g.us');
+  const ultima = chat.lastMessage || null;
+  const telefone = id.endsWith('@c.us') ? String(chat.id.user || '').replace(/\D/g, '') : '';
+  return {
+    id,
+    nome: chat.name || telefone || id.split('@')[0],
+    grupo,
+    telefone,
+    naoLidas: Number(chat.unreadCount) || 0,
+    quando: Number(chat.timestamp) || Number(ultima?.timestamp) || 0,
+    ultima: ultima
+      ? { texto: String(ultima.body || '').trim() || ROTULO_MIDIA[ultima.type] || '', minha: Boolean(ultima.fromMe) }
+      : null,
+  };
+}
+
+export function resumoDaMensagem(msg) {
+  const tipo = msg.type === 'chat' ? 'text' : msg.type;
+  return {
+    id: msg.id?._serialized || msg.id?.id || '',
+    texto: String(msg.body || '').trim() || ROTULO_MIDIA[tipo] || '',
+    minha: Boolean(msg.fromMe),
+    quando: Number(msg.timestamp) || 0,
+    tipo,
+    midia: Boolean(msg.hasMedia),
+    // 0 pendente, 1 enviada, 2 entregue, 3 lida
+    status: Number.isFinite(msg.ack) ? msg.ack : 0,
+  };
+}
+
+const CHAT_ID_RE = /^[0-9A-Za-z._-]{5,40}@(c\.us|g\.us|lid)$/;
+
+/**
+ * As rotas do chat. Devolve { status, json }; fica separada do servidor para ser testada
+ * sem rede: `wa` é o adaptador do WhatsApp (ou null enquanto não conectou).
+ */
+export async function tratarChat(wa, metodo, caminho, consulta, corpo) {
+  if (!wa) return { status: 503, json: { erro: 'O WhatsApp ainda não está conectado.' } };
+  const partes = caminho.split('/').filter(Boolean); // ['chats', id, 'mensagens']
+  try {
+    if (metodo === 'GET' && partes.length === 1) {
+      const limite = Math.min(100, Math.max(1, Number(consulta.get('limite')) || 40));
+      return { status: 200, json: { chats: await wa.chats(limite) } };
+    }
+    const id = decodeURIComponent(partes[1] || '');
+    if (!CHAT_ID_RE.test(id)) return { status: 400, json: { erro: 'Conversa inválida.' } };
+    if (metodo === 'GET' && partes[2] === 'mensagens') {
+      const limite = Math.min(150, Math.max(1, Number(consulta.get('limite')) || 60));
+      return { status: 200, json: { mensagens: await wa.mensagens(id, limite) } };
+    }
+    if (metodo === 'POST' && partes[2] === 'enviar') {
+      const texto = String(corpo?.texto || '').trim();
+      if (!texto) return { status: 400, json: { erro: 'Mensagem vazia.' } };
+      return { status: 200, json: { mensagem: await wa.enviarNoChat(id, texto.slice(0, 4096)) } };
+    }
+    if (metodo === 'POST' && partes[2] === 'lida') {
+      await wa.lida(id);
+      return { status: 200, json: { ok: true } };
+    }
+    return { status: 404, json: { erro: 'Rota desconhecida.' } };
+  } catch (e) {
+    return { status: 502, json: { erro: String(e.message || e).slice(0, 200) } };
+  }
+}
+
 // ------------------------------------------------------- WhatsApp (navegador)
 
 export function acharNavegador(existe = existsSync, plataforma = process.platform, env = process.env) {
@@ -213,6 +283,28 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber }) {
         return { ok: false, erro: String(e.message || e).slice(0, 160) };
       }
     },
+    // ---- o chat: o que o usuário vê no LeadSage, como no WhatsApp Web
+    async chats(limite = 40) {
+      const todos = await client.getChats();
+      return todos
+        .filter((c) => !(c.id?._serialized || '').includes('status@broadcast'))
+        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+        .slice(0, limite)
+        .map(resumoDoChat);
+    },
+    async mensagens(chatId, limite = 60) {
+      const chat = await client.getChatById(chatId);
+      const msgs = await chat.fetchMessages({ limit: limite });
+      return msgs.map(resumoDaMensagem);
+    },
+    async enviarNoChat(chatId, texto) {
+      const enviada = await client.sendMessage(chatId, texto);
+      return resumoDaMensagem(enviada);
+    },
+    async lida(chatId) {
+      const chat = await client.getChatById(chatId);
+      await chat.sendSeen();
+    },
     parar: () => client.destroy().catch(() => {}),
   };
 }
@@ -254,15 +346,33 @@ export function origensPermitidas(site) {
   return lista;
 }
 
-function servidorLocal(estado, aoReceberChave, permitidas) {
+/** O chat só atende o LeadSage: com Origin tem de ser uma permitida; sem Origin, só a própria página local. */
+export function chatPermitido(origem, host, permitidas) {
+  if (origem) return permitidas.has(origem);
+  return /^(127\.0\.0\.1|localhost):\d+$/.test(host || '');
+}
+
+function servidorLocal(estado, aoReceberChave, permitidas, obterWa) {
   return http.createServer(async (req, res) => {
     const origem = req.headers.origin || '';
     const cors = permitidas.has(origem)
       ? { 'access-control-allow-origin': origem, vary: 'Origin', 'access-control-allow-private-network': 'true',
-          'access-control-allow-methods': 'GET, OPTIONS', 'access-control-allow-headers': 'content-type' }
+          'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'content-type' }
       : {};
     const saida = (status, tipo, corpo) => { res.writeHead(status, { 'content-type': tipo, 'cache-control': 'no-store', ...cors }); res.end(corpo); };
     if (req.method === 'OPTIONS') return saida(204, 'text/plain', '');
+    const url = new URL(req.url, 'http://127.0.0.1');
+    if (url.pathname === '/chats' || url.pathname.startsWith('/chats/')) {
+      if (!chatPermitido(origem, req.headers.host, permitidas)) return saida(403, 'application/json', JSON.stringify({ erro: 'Acesso negado.' }));
+      let corpo = null;
+      if (req.method === 'POST') {
+        let bruto = '';
+        for await (const parte of req) bruto += parte;
+        try { corpo = bruto ? JSON.parse(bruto) : {}; } catch { return saida(400, 'application/json', JSON.stringify({ erro: 'Corpo inválido.' })); }
+      }
+      const r = await tratarChat(obterWa(), req.method, url.pathname, url.searchParams, corpo);
+      return saida(r.status, 'application/json', JSON.stringify(r.json));
+    }
     if (req.url === '/estado') return saida(200, 'application/json', JSON.stringify(estado));
     if (req.method === 'POST' && req.url === '/chave') {
       let corpo = '';
@@ -290,6 +400,7 @@ export async function executar() {
   const cfg = await lerConfig();
   const estado = { fase: chaveValida(cfg.chave) ? 'iniciando' : 'sem_chave', mensagem: 'Iniciando…', qr: '', numero: '' };
   let iniciarTudo = () => {};
+  let waAtual = null;
 
   const srv = servidorLocal(estado, async (k) => {
     cfg.chave = k;
@@ -297,7 +408,7 @@ export async function executar() {
     estado.fase = 'iniciando';
     estado.mensagem = 'Chave salva. Ligando o WhatsApp…';
     iniciarTudo();
-  }, origensPermitidas(cfg.site));
+  }, origensPermitidas(cfg.site), () => waAtual);
   srv.on('error', (e) => { console.error(e.code === 'EADDRINUSE' ? 'O Conector já está aberto em outra janela.' : e.message); process.exit(1); });
   await new Promise((r) => srv.listen(PORTA, '127.0.0.1', r));
   const url = `http://127.0.0.1:${PORTA}`;
@@ -338,6 +449,7 @@ export async function executar() {
     } catch (e) {
       estado.fase = 'erro'; estado.mensagem = e.message; log('Erro:', e.message); ligado = false; return;
     }
+    waAtual = wa;
 
     for (;;) {
       try {

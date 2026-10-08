@@ -1,5 +1,5 @@
 """QA da caixa de entrada: filtro por canal e situacao, busca, conversa do robo e abordagem aguardando (API simulada)."""
-import asyncio, json, os, sys
+import asyncio, json, os, re, sys
 from playwright.async_api import async_playwright
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
@@ -51,6 +51,8 @@ async def main():
             pag.on("pageerror", lambda e: erros.append(str(e)[:160]))
             await medir.ir_para(pag, "Conversas", w)
             await pag.wait_for_timeout(500)
+            await pag.get_by_role("tab", name="Todos os canais").click()
+            await pag.wait_for_timeout(500)
 
             async def itens():
                 return await pag.locator("button:has(p.truncate)").count()
@@ -58,11 +60,11 @@ async def main():
             n = await itens()
             if n != 6: problemas.append(f"{nome}: esperava 6 conversas, vieram {n}")
 
-            await pag.get_by_role("tab", name="WhatsApp").click(); await pag.wait_for_timeout(200)
+            await pag.get_by_role("tab", name=re.compile(r"^WhatsApp \d")).click(); await pag.wait_for_timeout(200)
             if await itens() != 3: problemas.append(f"{nome}: filtro WhatsApp deveria mostrar 3, mostrou {await itens()}")
-            await pag.get_by_role("tab", name="E-mail").click(); await pag.wait_for_timeout(200)
+            await pag.get_by_role("tab", name=re.compile(r"^E-mail \d")).click(); await pag.wait_for_timeout(200)
             if await itens() != 1: problemas.append(f"{nome}: filtro E-mail deveria mostrar 1")
-            await pag.get_by_role("tab", name="Todas").click()
+            await pag.get_by_role("tab", name=re.compile(r"^Todas \d")).click()
             await pag.get_by_label("Filtrar por situação").select_option("aguardando"); await pag.wait_for_timeout(200)
             if await itens() != 2: problemas.append(f"{nome}: 'aguardando resposta' deveria ter 2, tem {await itens()}")
             await pag.get_by_label("Filtrar por situação").select_option("precisa"); await pag.wait_for_timeout(200)

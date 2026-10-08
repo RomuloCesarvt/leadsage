@@ -141,8 +141,8 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
         <WhatsAppIcon className="w-7 h-7 text-emerald-500" />
         <div className="flex-1 min-w-[180px]">
           <p className="font-bold text-slate-800 text-sm flex items-center gap-2">
-            WhatsApp pelo computador
-            <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">não oficial</span>
+            WhatsApp
+            <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">pelo computador</span>
           </p>
           <p className="text-xs text-slate-500">
             {cfg.conector_criado

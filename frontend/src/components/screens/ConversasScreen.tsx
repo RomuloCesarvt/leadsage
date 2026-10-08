@@ -4,11 +4,13 @@
 import React, { useState } from 'react';
 import { Lock, MessagesSquare } from 'lucide-react';
 import { CaixaDeEntrada } from '../CaixaDeEntrada';
+import { ChatWhatsApp } from '../ChatWhatsApp';
 import { useApp } from '../../context/AppContext';
 
 export const ConversasScreen: React.FC = () => {
   const { setViewState } = useApp() as any;
   const [bloqueado, setBloqueado] = useState('');
+  const [aba, setAba] = useState<'whatsapp' | 'canais'>('whatsapp');
 
   if (bloqueado) {
     return (
@@ -29,15 +31,29 @@ export const ConversasScreen: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 max-w-6xl mx-auto w-full">
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
-          <MessagesSquare className="w-7 h-7 text-blue-600" /> Conversas
-        </h1>
-        <p className="text-slate-500 text-sm mt-1">
-          Tudo que você enviou e todas as respostas dos leads, em WhatsApp, Instagram, Messenger, Telegram e e-mail. Filtre por canal ou por quem precisa de você.
-        </p>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
+            <MessagesSquare className="w-7 h-7 text-blue-600" /> Conversas
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">
+            {aba === 'whatsapp'
+              ? 'Seu WhatsApp aqui dentro, como no WhatsApp Web. O robô atende os leads e você assume quando quiser.'
+              : 'Tudo que você enviou e as respostas dos leads em Instagram, Messenger, Telegram, e-mail e WhatsApp.'}
+          </p>
+        </div>
+        <div className="flex gap-1 bg-white border border-slate-200 rounded-2xl p-1" role="tablist">
+          {([['whatsapp', 'WhatsApp'], ['canais', 'Todos os canais']] as const).map(([id, rotulo]) => (
+            <button key={id} role="tab" aria-selected={aba === id} onClick={() => setAba(id)}
+              className={`px-4 py-2 rounded-xl text-sm font-bold ${aba === id ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-100'}`}>
+              {rotulo}
+            </button>
+          ))}
+        </div>
       </div>
-      <CaixaDeEntrada onBloqueio={setBloqueado} irConfigurar={() => setViewState('robo')} />
+      {aba === 'whatsapp'
+        ? <ChatWhatsApp irConectar={() => setViewState('robo')} />
+        : <CaixaDeEntrada onBloqueio={setBloqueado} irConfigurar={() => setViewState('robo')} />}
     </div>
   );
 };

@@ -93,7 +93,7 @@ const cadastrarWhatsApp = async (appId: string, configId: string) => {
   });
 };
 
-export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) => void }> = ({ cfg, aoMudar }) => {
+export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) => void; parte?: 'principais' | 'oficial' }> = ({ cfg, aoMudar, parte = 'principais' }) => {
   const [disp, setDisp] = useState<Disponivel | null>(null);
   const [ocupado, setOcupado] = useState<'' | 'facebook' | 'whatsapp' | 'pagina' | 'telegram'>('');
   const [tokenTg, setTokenTg] = useState('');
@@ -172,10 +172,39 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
   const fbConectado = cfg.meta_pronto && cfg.modo === 'app';
   const waConectado = cfg.whatsapp_pronto && cfg.modo === 'app';
 
+  if (parte === 'oficial') {
+    return (
+      <div className="space-y-3">
+        {/* WhatsApp oficial (API da Meta) */}
+        <div className="p-4 rounded-xl border border-slate-200 flex flex-wrap items-center gap-4">
+          <WhatsAppIcon className="w-7 h-7" />
+          <div className="flex-1 min-w-[160px]">
+            <p className="font-bold text-slate-800 text-sm">WhatsApp</p>
+            <p className="text-xs text-slate-500">
+              {waConectado ? <>Conectado · número {cfg.wa_phone_id}</> : 'Número de WhatsApp Business da sua empresa'}
+            </p>
+          </div>
+          {waConectado ? (
+            <button onClick={() => desconectar('whatsapp')} className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 flex items-center gap-1.5">
+              <Unplug className="w-3.5 h-3.5" /> Desconectar
+            </button>
+          ) : (
+            <button onClick={conectarWhatsApp} disabled={!disp.whatsapp || !!ocupado}
+              className="px-4 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#1EBE5A] disabled:opacity-40 text-white text-sm font-bold flex items-center gap-2">
+              {ocupado === 'whatsapp' ? <Loader2 className="w-4 h-4 animate-spin" /> : <WhatsAppIcon className="w-4 h-4" />}
+              Conectar WhatsApp
+            </button>
+          )}
+        </div>
+
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-      <h2 className="text-lg font-bold text-slate-800 mb-1">Conectar canais</h2>
-      <p className="text-sm text-slate-500 mb-5">Entre com a conta da sua empresa. Não precisa criar nada na Meta.</p>
+      <h2 className="text-lg font-bold text-slate-800 mb-1">Canais</h2>
+      <p className="text-sm text-slate-500 mb-5">Por onde o robô conversa. Comece pelo WhatsApp: é só escanear o QR code.</p>
 
       {!disp.facebook && (
         <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-100 text-sm text-amber-800 flex gap-2">
@@ -185,6 +214,9 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
       )}
 
       <div className="space-y-3">
+        {/* WhatsApp: o canal principal, pelo computador do usuário */}
+        <ConectorWhatsApp cfg={cfg} aoMudar={aoMudar} />
+
         {/* Facebook + Instagram */}
         <div className="p-4 rounded-xl border border-slate-200 flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-1.5"><FacebookIcon className="w-7 h-7" /><InstagramIcon className="w-7 h-7" /></div>
@@ -223,28 +255,6 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
             </div>
           </div>
         )}
-
-        {/* WhatsApp */}
-        <div className="p-4 rounded-xl border border-slate-200 flex flex-wrap items-center gap-4">
-          <WhatsAppIcon className="w-7 h-7" />
-          <div className="flex-1 min-w-[160px]">
-            <p className="font-bold text-slate-800 text-sm">WhatsApp</p>
-            <p className="text-xs text-slate-500">
-              {waConectado ? <>Conectado · número {cfg.wa_phone_id}</> : 'Número de WhatsApp Business da sua empresa'}
-            </p>
-          </div>
-          {waConectado ? (
-            <button onClick={() => desconectar('whatsapp')} className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 flex items-center gap-1.5">
-              <Unplug className="w-3.5 h-3.5" /> Desconectar
-            </button>
-          ) : (
-            <button onClick={conectarWhatsApp} disabled={!disp.whatsapp || !!ocupado}
-              className="px-4 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#1EBE5A] disabled:opacity-40 text-white text-sm font-bold flex items-center gap-2">
-              {ocupado === 'whatsapp' ? <Loader2 className="w-4 h-4 animate-spin" /> : <WhatsAppIcon className="w-4 h-4" />}
-              Conectar WhatsApp
-            </button>
-          )}
-        </div>
 
         {/* Telegram */}
         <div className="p-4 rounded-xl border border-slate-200 space-y-3">
@@ -288,14 +298,10 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
           )}
         </div>
 
-        <ConectorWhatsApp cfg={cfg} aoMudar={aoMudar} />
       </div>
 
       {erro && <p className="text-sm text-red-600 mt-3">{erro}</p>}
-      <p className="text-xs text-slate-400 mt-4">
-        Se o número já estiver no aplicativo WhatsApp Business do celular, o próprio cadastro da Meta
-        diz se ele pode continuar lá ao mesmo tempo. Na dúvida, use um número dedicado ao atendimento.
-      </p>
+
     </div>
   );
 };

@@ -319,7 +319,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Enquanto olha o pipeline ou o robo, traz o que o robo moveu sem precisar recarregar.
   useEffect(() => {
-    if (!user || (viewState !== 'pipeline' && viewState !== 'robo' && viewState !== 'conversas')) return;
+    if (!user || (viewState !== 'pipeline' && viewState !== 'robo' && viewState !== 'conversas' && viewState !== 'fila')) return;
     return sondar(() => { void atualizarPipeline(); }, 90000);
   }, [user, viewState, atualizarPipeline]);
 

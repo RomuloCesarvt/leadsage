@@ -29,11 +29,12 @@ async def main():
         for nome, w, h in [("desktop", 1440, 900), ("celular", 390, 844)]:
             ctx = await nav.new_context(viewport={"width": w, "height": h})
             await medir.preparar(ctx)
+            # a fila so oferece quem esta em Meus Leads: marca os leads simulados como salvos
+            await ctx.add_init_script("(()=>{try{const k='LEADSAGE_LEADS';const l=JSON.parse(localStorage.getItem(k)||'[]').map(x=>({...x,salvo:true}));localStorage.setItem(k,JSON.stringify(l))}catch(e){}})()")
             pag = await ctx.new_page()
             erros = []
             pag.on("pageerror", lambda e: erros.append(str(e)[:160]))
-            await medir.ir_para(pag, "Robô de Atendimento", w)
-            await pag.locator("button:has-text('Fila de envio')").first.dispatch_event("click")
+            await medir.ir_para(pag, "Fila de envio", w)
             await pag.wait_for_timeout(1200)
             lis = pag.locator("label input[type=checkbox]")
             for i in range(min(await lis.count(), 3)):

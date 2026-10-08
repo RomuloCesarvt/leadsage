@@ -1,29 +1,30 @@
 /**
- * Robô de atendimento — caixa de entrada, disparo, simulador e conexão com a Meta.
+ * Robô de atendimento: só a configuração do robô, em três abas.
  *
- * No WhatsApp o robô abre a conversa com um modelo aprovado (aba Disparo) e
- * depois conversa livremente. No Instagram e no Messenger ele só RESPONDE a
- * quem escreveu: a API da Meta não permite iniciar conversa com contato frio.
+ * - Canais: por onde ele conversa (WhatsApp pelo computador, Instagram e Messenger, Telegram);
+ * - Comportamento: o que ele vende e como fala;
+ * - Testar: simulador, sem enviar nada a ninguém.
+ *
+ * As conversas moram em "Conversas" e a Fila de envio tem tela própria: aqui só ficam
+ * as coisas que se configuram uma vez.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Bot, MessageCircle, Settings2, FlaskConical, Send, AlertTriangle,
-  Copy, Check, Lock, ExternalLink, ListChecks,
+  Bot, Settings2, FlaskConical, Send, AlertTriangle, Plug,
+  Copy, Check, Lock, ExternalLink,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { WhatsAppIcon, InstagramIcon, FacebookIcon } from '../BrandIcons';
 import { ConexaoMeta } from '../ConexaoMeta';
 import { DisparoWhatsApp } from '../DisparoWhatsApp';
-import { FilaDeEnvio } from '../FilaDeEnvio';
-import { CaixaDeEntrada } from '../CaixaDeEntrada';
 import { Balao } from '../conversaUi';
 import { OfertaDoRobo } from '../OfertaDoRobo';
 import type {
   RoboConfig, RoboConfigEntrada, RoboMensagem,
 } from '../../types';
 
-type Aba = 'conversas' | 'fila' | 'disparo' | 'simulador' | 'configurar';
+type Aba = 'canais' | 'comportamento' | 'testar';
 
 const campo =
   'w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 ' +
@@ -39,9 +40,7 @@ export const RoboScreen: React.FC = () => {
     const estado = q.get('meta');
     return estado ? { estado, msg: q.get('msg') || '' } : null;
   }, []);
-  const { leadsParaContato } = useApp() as any;
-  // vindo de Meus Leads com leads marcados: abre direto a Fila de envio
-  const [aba, setAba] = useState<Aba>(retornoMeta || new URLSearchParams(window.location.search).get('aba') === 'configurar' ? 'configurar' : (leadsParaContato?.length ? 'fila' : 'conversas'));
+  const [aba, setAba] = useState<Aba>('canais');
   const [bloqueado, setBloqueado] = useState('');
 
   useEffect(() => {
@@ -73,7 +72,7 @@ export const RoboScreen: React.FC = () => {
   const Tab = ({ id, icon: Icon, label }: { id: Aba; icon: any; label: string }) => (
     <button
       onClick={() => setAba(id)}
-      className={`px-2.5 sm:px-4 py-2 rounded-xl text-[13px] sm:text-sm font-bold flex items-center gap-2 transition-colors whitespace-nowrap shrink-0 ${
+      className={`px-3 sm:px-4 py-2 rounded-xl text-[13px] sm:text-sm font-bold flex items-center gap-2 transition-colors whitespace-nowrap shrink-0 ${
         aba === id ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-100'
       }`}
     >
@@ -82,46 +81,40 @@ export const RoboScreen: React.FC = () => {
   );
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 max-w-6xl mx-auto w-full">
+    <div className="flex-1 flex flex-col min-h-0 max-w-4xl mx-auto w-full">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
             <Bot className="w-7 h-7 text-blue-600" /> Robô de atendimento
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            A IA escreve a abordagem de cada lead: e-mail sai sozinho e WhatsApp, Instagram e LinkedIn vão para a fila, prontos para enviar. Quem responde é atendido como SDR, e o lead anda no pipeline.
+            Quem responde seus leads como um vendedor. As conversas ficam em{' '}
+            <button onClick={() => setViewState('conversas')} className="font-bold text-blue-600 hover:underline">Conversas</button>.
           </p>
         </div>
         <div className="flex gap-1 bg-white border border-slate-200 rounded-2xl p-1 max-w-full overflow-x-auto">
-          <Tab id="conversas" icon={MessageCircle} label="Conversas" />
-          <Tab id="fila" icon={ListChecks} label="Fila de envio" />
-          <Tab id="disparo" icon={Send} label="Disparo WhatsApp" />
-          <Tab id="simulador" icon={FlaskConical} label="Simulador" />
-          <Tab id="configurar" icon={Settings2} label="Configurar" />
+          <Tab id="canais" icon={Plug} label="Canais" />
+          <Tab id="comportamento" icon={Settings2} label="Comportamento" />
+          <Tab id="testar" icon={FlaskConical} label="Testar" />
         </div>
       </div>
 
-      {aba === 'conversas' && <CaixaDeEntrada onBloqueio={setBloqueado} irConfigurar={() => setAba('configurar')} />}
-      {aba === 'fila' && <FilaDeEnvio />}
-      {aba === 'disparo' && <DisparoWhatsApp irConfigurar={() => setAba('configurar')} />}
-      {aba === 'simulador' && <Simulador />}
-      {aba === 'configurar' && retornoMeta && (
+      {retornoMeta && aba === 'canais' && (
         <div className={`mb-4 p-3 rounded-xl text-sm border ${
           retornoMeta.estado === 'erro'
             ? 'bg-red-50 border-red-100 text-red-700'
             : 'bg-emerald-50 border-emerald-100 text-emerald-700'
         }`}>
-          {retornoMeta.estado === 'ok' && 'Página conectada. Ligue o robô e mande uma mensagem para ela para testar.'}
+          {retornoMeta.estado === 'ok' && 'Página conectada. Ligue o robô em Comportamento e mande uma mensagem para ela para testar.'}
           {retornoMeta.estado === 'escolher' && 'Login feito. Escolha abaixo qual página o robô vai atender.'}
           {retornoMeta.estado === 'erro' && (retornoMeta.msg || 'A conexão com o Facebook não foi concluída.')}
         </div>
       )}
-      {aba === 'configurar' && <Configurar onBloqueio={setBloqueado} />}
+
+      {aba === 'testar' ? <Simulador /> : <Configurar parte={aba} onBloqueio={setBloqueado} />}
     </div>
   );
 };
-
-
 
 // ================================================================ simulador
 
@@ -212,7 +205,7 @@ const Simulador: React.FC = () => {
 
 const VAZIO: Partial<RoboConfigEntrada> = {};
 
-const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio }) => {
+const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: string) => void }> = ({ parte, onBloqueio }) => {
   const [cfg, setCfg] = useState<RoboConfig | null>(null);
   const [form, setForm] = useState<Partial<RoboConfigEntrada>>(VAZIO);
   const [estado, setEstado] = useState<'idle' | 'salvando' | 'salvo' | 'erro'>('idle');
@@ -289,26 +282,43 @@ const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio 
     return <div className="text-slate-400 text-sm p-8 text-center">{erro || 'Carregando…'}</div>;
   }
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 pb-8">
-      <div className={`${avancado ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-5`}>
+  const barraSalvar = (
+    <div className="pt-2 flex justify-end items-center gap-4">
+      {estado === 'salvo' && <span className="text-sm font-semibold text-emerald-600 flex items-center gap-1.5"><Check className="w-4 h-4" /> Salvo</span>}
+      {estado === 'erro' && <span className="text-sm font-semibold text-red-600">{erro}</span>}
+      <button onClick={salvar} disabled={estado === 'salvando'}
+        className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl">
+        {estado === 'salvando' ? 'Salvando…' : 'Salvar'}
+      </button>
+    </div>
+  );
 
-        <ConexaoMeta cfg={cfg} aoMudar={setCfg} />
+  // ---------------------------------------------------------------- comportamento
+  if (parte === 'comportamento') {
+    return (
+      <div className="space-y-5 pb-8">
+        {/* a chave geral: tudo o mais so vale com o robo ligado */}
+        <div className={`rounded-2xl p-5 border flex items-center gap-4 ${form.ativo ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'}`}>
+          <div className="flex-1">
+            <p className="font-bold text-slate-800">{form.ativo ? 'O robô está atendendo' : 'O robô está desligado'}</p>
+            <p className="text-sm text-slate-500">
+              {form.ativo
+                ? 'Ele responde quem escrever nos canais conectados. Você pode pausá-lo numa conversa específica.'
+                : 'Nada é respondido sozinho. Ligue quando terminar de configurar e testar.'}
+            </p>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer shrink-0">
+            <span className="text-sm font-bold text-slate-600">{form.ativo ? 'Ligado' : 'Desligado'}</span>
+            <input type="checkbox" checked={!!form.ativo} onChange={e => mudar('ativo', e.target.checked)} className="w-10 h-5 accent-blue-600" aria-label="Ligar o robô" />
+          </label>
+        </div>
 
         <OfertaDoRobo valor={form.oferta} onChange={o => mudar('oferta', o)} />
 
-        {/* comportamento */}
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <Bot className="w-5 h-5 text-blue-600" /> Como o robô conversa
-            </h2>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <span className="text-sm font-bold text-slate-600">{form.ativo ? 'Ligado' : 'Desligado'}</span>
-              <input type="checkbox" checked={!!form.ativo} onChange={e => mudar('ativo', e.target.checked)}
-                className="w-10 h-5 accent-blue-600" />
-            </label>
-          </div>
+          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-5">
+            <Bot className="w-5 h-5 text-blue-600" /> Como ele conversa
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label className={rotulo}>Nome do assistente</label>
@@ -324,7 +334,7 @@ const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio 
                 <option value="vender">Fechar a venda pela conversa</option>
               </select>
             </div>
-            <div className="md:col-span-2">
+            <div>
               <label className={rotulo}>Link para agendar (opcional)</label>
               <input value={form.link_agenda || ''} onChange={e => mudar('link_agenda', e.target.value)}
                 placeholder="https://calendly.com/…" className={campo} />
@@ -336,45 +346,63 @@ const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio 
                 className={campo} />
               <p className="text-xs text-slate-500 mt-1.5">Só em troca de pagamento à vista ou de fechar na hora. 0 = nunca dá desconto.</p>
             </div>
-            <div className="md:col-span-2">
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-800 mb-1">Regras e respostas prontas</h2>
+          <p className="text-sm text-slate-500 mb-5">Preço e prazo ficam em "O que o robô vende". Aqui vai só o seu jeito de trabalhar.</p>
+          <div className="space-y-5">
+            <div>
               <label className={rotulo}>Perguntas frequentes (respostas oficiais)</label>
               <textarea rows={4} value={form.faq || ''} onChange={e => mudar('faq', e.target.value)}
                 placeholder={'Uma por linha. Ex.:\nVocês atendem fora de Botucatu? Sim, online, em todo o Brasil.\nPrecisa de contrato? Sim, enviado digitalmente.'}
                 className={`${campo} resize-none`} />
             </div>
-            <div className="md:col-span-2">
-              <label className={rotulo}>Instruções</label>
-              <textarea rows={5} value={form.instrucoes || ''} onChange={e => mudar('instrucoes', e.target.value)}
-                placeholder={'Outras regras. Ex.:\n- Atendo só a região de Botucatu.\n- Nunca prometo resultado de vendas.\n- Reunião só de terça a quinta.'}
+            <div>
+              <label className={rotulo}>Outras regras</label>
+              <textarea rows={4} value={form.instrucoes || ''} onChange={e => mudar('instrucoes', e.target.value)}
+                placeholder={'Ex.:\n- Atendo só a região de Botucatu.\n- Nunca prometo resultado de vendas.\n- Reunião só de terça a quinta.'}
                 className={`${campo} resize-none`} />
-              <p className="text-xs text-slate-500 mt-1.5">
-                Preço e prazo ficam em "Serviço que o robô vende". Aqui vão só as regras extras do seu jeito de trabalhar.
-              </p>
             </div>
           </div>
         </div>
 
-        {/* conexao manual: app proprio da Meta */}
-        <details open={avancado} onToggle={e => setAvancado((e.target as HTMLDetailsElement).open)}
-          className="bg-white border border-slate-200 rounded-2xl shadow-sm group">
-          <summary className="px-6 py-4 cursor-pointer text-sm font-bold text-slate-600 select-none">
-            Modo avançado: usar meu próprio app da Meta
-          </summary>
+        {barraSalvar}
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------- canais
+  return (
+    <div className="space-y-5 pb-8">
+      <ConexaoMeta cfg={cfg} aoMudar={setCfg} />
+
+      {/* tudo que só importa para quem usa a API oficial da Meta fica aqui, fechado */}
+      <details open={avancado} onToggle={e => setAvancado((e.target as HTMLDetailsElement).open)}
+        className="bg-white border border-slate-200 rounded-2xl shadow-sm">
+        <summary className="px-6 py-4 cursor-pointer text-sm font-bold text-slate-600 select-none">
+          Avançado: WhatsApp oficial da Meta e app próprio
+        </summary>
         <div className="px-6 pb-6 space-y-6">
+          <p className="text-xs text-slate-500">
+            Só use se você tem um número de WhatsApp Business na API oficial, ou um app da Meta seu. No dia a dia, o WhatsApp pelo computador (acima) basta.
+          </p>
+
+          <ConexaoMeta cfg={cfg} aoMudar={setCfg} parte="oficial" />
 
           <Segredo k="app_secret" tem={cfg.tem_app_secret} label="Chave secreta do app (App Secret)"
             dica="Meta for Developers → seu app → Configurações → Básico" />
 
           <div className="border-t border-slate-100 pt-5">
             <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-3">
-              <WhatsAppIcon className="w-5 h-5" /> WhatsApp
+              <WhatsAppIcon className="w-5 h-5" /> WhatsApp (API oficial)
               {prontos.wa && <span className="text-xs font-bold text-emerald-600">conectado</span>}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className={rotulo}>ID do número de telefone</label>
-                <input value={form.wa_phone_id || ''} onChange={e => mudar('wa_phone_id', e.target.value)}
-                  placeholder="Phone number ID" className={campo} />
+                <input value={form.wa_phone_id || ''} onChange={e => mudar('wa_phone_id', e.target.value)} placeholder="Phone number ID" className={campo} />
               </div>
               <Segredo k="wa_token" tem={cfg.tem_wa_token} label="Token de acesso" dica="Token permanente do usuário do sistema" />
             </div>
@@ -382,7 +410,7 @@ const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio 
 
           <div className="border-t border-slate-100 pt-5">
             <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-3">
-              <FacebookIcon className="w-5 h-5" /> <InstagramIcon className="w-5 h-5" /> Messenger e Instagram
+              <FacebookIcon className="w-5 h-5" /> <InstagramIcon className="w-5 h-5" /> Messenger e Instagram (app próprio)
               {prontos.meta && <span className="text-xs font-bold text-emerald-600">conectado</span>}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -392,8 +420,7 @@ const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio 
               </div>
               <div>
                 <label className={rotulo}>ID da conta do Instagram</label>
-                <input value={form.ig_id || ''} onChange={e => mudar('ig_id', e.target.value)}
-                  placeholder="Instagram profissional ligado à página" className={campo} />
+                <input value={form.ig_id || ''} onChange={e => mudar('ig_id', e.target.value)} placeholder="Instagram profissional ligado à página" className={campo} />
               </div>
               <div className="md:col-span-2">
                 <Segredo k="page_token" tem={cfg.tem_page_token} label="Token da página" dica="Token de acesso da página (serve para os dois)" />
@@ -401,31 +428,10 @@ const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio 
             </div>
           </div>
 
-        </div>
-        </details>
-
-        <div className="pt-2 flex justify-end items-center gap-4">
-            {estado === 'salvo' && <span className="text-sm font-semibold text-emerald-600 flex items-center gap-1.5"><Check className="w-4 h-4" /> Salvo</span>}
-            {estado === 'erro' && <span className="text-sm font-semibold text-red-600">{erro}</span>}
-            <button onClick={salvar} disabled={estado === 'salvando'}
-              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl">
-              {estado === 'salvando' ? 'Salvando…' : 'Salvar'}
-            </button>
-          </div>
-      </div>
-
-      {/* passo a passo do modo manual */}
-      <div className={`space-y-5 ${avancado ? '' : 'hidden'}`}>
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-          <h3 className="font-bold text-slate-800 mb-3">Cole isto na Meta</h3>
-          {!cfg.webhook_url ? (
-            <p className="text-sm text-slate-500">Salve a configuração uma vez para gerar seu endereço de webhook.</p>
-          ) : (
-            <div className="space-y-3">
-              {[
-                ['URL de callback', cfg.webhook_url],
-                ['Token de verificação', cfg.verify_token],
-              ].map(([nome, valor]) => (
+          {cfg.webhook_url && (
+            <div className="border-t border-slate-100 pt-5 space-y-3">
+              <h3 className="font-bold text-slate-800">Cole isto na Meta</h3>
+              {[['URL de callback', cfg.webhook_url], ['Token de verificação', cfg.verify_token]].map(([nome, valor]) => (
                 <div key={nome}>
                   <p className="text-xs font-bold text-slate-500 mb-1">{nome}</p>
                   <button onClick={() => copiar(nome, valor)}
@@ -436,32 +442,22 @@ const Configurar: React.FC<{ onBloqueio: (m: string) => void }> = ({ onBloqueio 
                 </div>
               ))}
               <p className="text-xs text-slate-500">
-                Assine os campos <b>messages</b> (WhatsApp) e <b>messages</b> + <b>messaging_postbacks</b> (página e Instagram).
+                Assine os campos <b>messages</b> (WhatsApp) e <b>messages</b> + <b>messaging_postbacks</b> (página e Instagram).{' '}
+                <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-blue-600 font-bold hover:underline">
+                  Abrir Meta for Developers <ExternalLink className="w-3 h-3" />
+                </a>
               </p>
             </div>
           )}
-        </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm text-sm text-slate-600">
-          <h3 className="font-bold text-slate-800 mb-3">Passo a passo</h3>
-          <ol className="list-decimal pl-4 space-y-2">
-            <li>Crie um app do tipo <b>Empresa</b> em developers.facebook.com.</li>
-            <li>Adicione os produtos <b>WhatsApp</b> e/ou <b>Messenger</b> e <b>Instagram</b>.</li>
-            <li>Copie a <b>App Secret</b>, os IDs e os tokens para esta tela e salve.</li>
-            <li>Em <b>Webhooks</b>, cole a URL e o token ao lado e assine as mensagens.</li>
-            <li>Ligue o robô e teste mandando uma mensagem do seu celular.</li>
-          </ol>
-          <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener"
-            className="mt-4 inline-flex items-center gap-1.5 text-blue-600 font-bold hover:underline">
-            Abrir Meta for Developers <ExternalLink className="w-3.5 h-3.5" />
-          </a>
-          <p className="text-xs text-slate-400 mt-4 pt-3 border-t border-slate-100">
-            O robô só responde a quem escreveu. O primeiro contato com o lead continua sendo seu,
-            pela IA de Abordagem — é regra da Meta para Instagram e Messenger, e no WhatsApp
-            mandar para quem não pediu leva ao bloqueio do número.
-          </p>
+          {barraSalvar}
+
+          <div className="border-t border-slate-100 pt-5">
+            <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-3"><Send className="w-4 h-4 text-blue-600" /> Disparo por modelo aprovado (API oficial)</h3>
+            {avancado && <DisparoWhatsApp irConfigurar={() => { /* já está em Canais */ }} />}
+          </div>
         </div>
-      </div>
+      </details>
     </div>
   );
 };
