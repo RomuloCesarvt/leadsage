@@ -127,8 +127,11 @@ async def pedir_pareamento(uid: str, numero: str) -> str:
     return digitos
 
 
-async def limpar_pareamento(uid: str) -> None:
+async def limpar_pareamento(uid: str, numero: str = "") -> None:
+    """Apaga o pedido de codigo. Com `numero`, so se for o numero pedido (outro numero ja ligado nao conta)."""
     c = await controle(uid)
+    if numero and re.sub(r"\D", "", numero) != c.get("parear"):
+        return
     if c.get("parear"):
         c.pop("parear", None)
         await _gravar(uid, "controle", c)

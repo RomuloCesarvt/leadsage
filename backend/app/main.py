@@ -1586,6 +1586,8 @@ async def conector_ping(req: ConectorPing, request: Request):
         canal["cw_marca_estado"] = marca
         await espelho_whatsapp.salvar_estado(canal["uid"], req.fase, req.qr, req.codigo, req.numero)
         await _gravar_canal_do_conector(canal)
+    if req.fase == "pronto":
+        await espelho_whatsapp.limpar_pareamento(canal["uid"], req.numero)  # o pedido de codigo ja foi atendido
     pedidos = await espelho_whatsapp.pedidos_para_o_conector(canal["uid"])
     return {"ok": True, "limite_frio": conector_whatsapp.limite_frio_do_dia(canal), "robo_ativo": bool(canal.get("ativo")), **pedidos}
 

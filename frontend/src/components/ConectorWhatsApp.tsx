@@ -129,15 +129,23 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
   const [numeroParear, setNumeroParear] = useState('');
   const [pedindo, setPedindo] = useState(false);
   const [pedido, setPedido] = useState(false);
+  const [demorou, setDemorou] = useState(false);
   const celular = noCelular();
   // o QR/código que aparece aqui vem do computador (local) ou, no celular, do servidor
   const qr = local?.fase === 'qr' && local.qr ? local.qr : remoto?.fase === 'qr' && remoto.qr ? remoto.qr : '';
   const codigo = remoto?.fase === 'codigo' ? remoto.codigo || '' : '';
 
+  // sem código depois de um tempo: o Conector do computador não está respondendo
+  useEffect(() => {
+    if (!pedido || codigo) { setDemorou(false); return; }
+    const t = setTimeout(() => setDemorou(true), 100000);
+    return () => clearTimeout(t);
+  }, [pedido, codigo]);
+
   const parear = async () => {
     setPedindo(true);
     setErro('');
-    try { await api.conectorParear(numeroParear); setPedido(true); }
+    try { await api.conectorParear(numeroParear); setPedido(true); setDemorou(false); }
     catch (e: any) { setErro(e?.message || 'Não foi possível pedir o código.'); }
     finally { setPedindo(false); }
   };
@@ -250,7 +258,13 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
                   {pedindo ? '…' : 'Pedir código'}
                 </button>
               </div>
-              {pedido && <p className="text-[11px] text-emerald-700">Pedido enviado. O código aparece aqui em instantes (com o Conector aberto no computador, pode levar até 1 minuto).</p>}
+              {pedido && demorou && !codigo && (
+                <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                  O código não veio. Quem responde ao pedido é o Conector no computador: confira se o computador está ligado (e não em repouso),
+                  se a janela do Conector está aberta e se o número tem WhatsApp. Depois peça de novo.
+                </p>
+              )}
+              {pedido && !demorou && <p className="text-[11px] text-emerald-700">Pedido enviado. O código aparece aqui em instantes (com o Conector aberto no computador, pode levar até 1 minuto).</p>}
             </div>
           )}
           {celular ? (

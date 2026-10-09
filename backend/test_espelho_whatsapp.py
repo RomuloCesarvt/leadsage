@@ -134,3 +134,12 @@ def test_olhando_grava_pouco(rodar, monkeypatch):
     for _ in range(6):
         rodar(esp.marcar_olhando, "alice", CHAT)
     assert gravacoes.count("controle") == 1
+
+
+def test_pedido_de_codigo_so_some_quando_aquele_numero_conecta(client, chave):
+    client.post("/api/robo/conector/parear", json={"numero": "14999019705"})
+    # outro numero ja ligado nao apaga o pedido
+    p = client.post("/api/conector/ping", headers=cabecalho(chave), json={"fase": "pronto", "numero": "5511911112222", "status": "ready"}).json()
+    assert p["parear"] == "5514999019705"
+    p = client.post("/api/conector/ping", headers=cabecalho(chave), json={"fase": "pronto", "numero": "5514999019705", "status": "ready"}).json()
+    assert p["parear"] == ""

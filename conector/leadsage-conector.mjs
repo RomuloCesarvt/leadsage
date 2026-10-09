@@ -15,14 +15,14 @@
  * restringir o número. Use um número secundário e não aumente o ritmo de envio.
  */
 import { readFile, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { exec } from 'node:child_process';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '3.0.0';
+export const VERSAO = '3.0.1';
 const PORTA = 2790;
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -649,6 +649,12 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoCodigo = (
       } catch (e) { diag.erros.lida = String(e.message || e).slice(0, 200); }
     },
     parar: () => client.destroy().catch(() => {}),
+    /** Sai do número atual e apaga a sessão, para conectar outro número (pelo código ou pelo QR). */
+    async sair() {
+      try { await client.logout(); } catch { /* já estava fora */ }
+      await client.destroy().catch(() => {});
+      rmSync(join(AQUI, 'sessao'), { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+    },
   };
 }
 
@@ -881,11 +887,15 @@ export async function executar() {
         // sem conexão ainda: mostra o QR no celular e fica de olho num pedido de pareamento
         if (!pronto && Date.now() - ultimoPing > 15000) await empurrarEstado();
         if (pronto && Date.now() - ultimoPing > 90000) await empurrarEstado();
-        if (!pronto && estado.fase === 'qr' && pedidos.parear && pedidos.parear !== pareando) {
-          pareando = pedidos.parear;
-          log(`Conectar pelo número ${pareando}: pedindo o código...`);
-          await wa?.parar();
-          await ligarWhatsApp(pareando);
+        // pedido de "conectar pelo número": vale em qualquer fase. Se já há outro número ligado, sai dele primeiro.
+        const quer = pedidos.parear;
+        if (quer && quer !== pareando && !(pronto && quer === String(estado.numero || '').replace(/\D/g, ''))) {
+          pareando = quer;
+          log(`Conectar pelo número ${quer}: pedindo o código ao WhatsApp...`);
+          estado.fase = 'iniciando'; estado.codigo = ''; estado.qr = '';
+          if (pronto) { pronto = false; await wa?.sair(); } else { await wa?.parar(); }
+          await ligarWhatsApp(quer);
+          empurrarEstado().catch(() => {});
         }
       } catch (e) {
         if (/revogada|errada/.test(String(e.message))) { estado.fase = 'erro'; estado.mensagem = e.message; log(e.message); await wa?.parar(); return; }
