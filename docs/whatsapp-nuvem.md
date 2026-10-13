@@ -28,6 +28,20 @@ mesmas rotas do Conector do computador, só que atende todos os usuários no mes
    8080 e monte um volume em `/dados`.
 4. Conferir: `https://SEU-APP.fly.dev/` deve responder `{"ok":true,"sessoes":0}` e, no log, "LeadSage Nuvem ligado".
 
+## Opção gratuita: uma VM sempre ligada
+
+Google Cloud (e2-micro, região `us-central1`, `us-east1` ou `us-west1`) e Oracle Cloud (Always Free)
+dão uma VM de graça para sempre; as duas pedem um cartão só para confirmar a conta (sem cobrança
+dentro do limite gratuito). Na VM (Ubuntu), um comando instala tudo e deixa ligado sozinho:
+
+```
+curl -fsSL https://raw.githubusercontent.com/RomuloCesarvt/leadsage/main/nuvem/instalar-vm.sh -o instalar.sh
+WORKER_SECRET="O_SEGREDO" bash instalar.sh
+```
+
+Para atualizar depois, rode o mesmo comando. Ver o que está acontecendo: `journalctl -u leadsage-nuvem -f`.
+As sessões ficam em `/var/lib/leadsage-nuvem`; faça backup dessa pasta se quiser que sobrevivam a uma VM perdida.
+
 ## Como o usuário usa
 
 Robô → Canais → WhatsApp → **Conectar pela nuvem**. Aparece o QR code (ou ele digita o número e recebe
