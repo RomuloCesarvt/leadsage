@@ -135,8 +135,8 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
       ...(version ? { version } : {}),
       auth: state,
       logger: pino({ level: 'silent' }),
-      browser: B.Browsers.macOS('Chrome'),
-      syncFullHistory: false,
+      browser: B.Browsers.macOS('Desktop'),
+      syncFullHistory: true, // ao conectar, o WhatsApp manda o histórico das conversas (só acontece no primeiro pareamento)
       markOnlineOnConnect: false,
     });
     sock = s;

@@ -163,7 +163,7 @@ export class Sessao {
     mkdirSync(this.dir, { recursive: true });
     // sem disco (hospedagem gratuita), as conversas ficam no banco do LeadSage, cifradas: sobrevivem a reinícios
     this.historico = this.authFabrica && this.segredo
-      ? criarHistorico('', { maxMensagens: 40, maxChats: 60, ...guardaRemota({ site: this.site, segredo: this.segredo, uid: this.uid, aviso: this.aviso }) })
+      ? criarHistorico('', { maxMensagens: 25, maxChats: 120, ...guardaRemota({ site: this.site, segredo: this.segredo, uid: this.uid, aviso: this.aviso }) })
       : criarHistorico(join(this.dir, 'historico.json'));
     await this.historico.carregar();
     this.inicioS = Math.floor(Date.now() / 1000);
