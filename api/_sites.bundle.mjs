@@ -486,7 +486,7 @@ var BANCO = [
     paleta: { primaria: "#8a4b1f", destaque: "#e9a23b" },
     cta: { principal: "Fazer meu pedido", secundario: "Ver como chegar" },
     etiqueta: "Feito todos os dias",
-    titulos: ["P\xE3o quente e doces feitos com carinho", "O sabor que {cidade} procura, todo dia", "Do forno para a sua mesa"],
+    titulos: ["P\xE3o quente e doces feitos com carinho", "O sabor que voc\xEA procura, todo dia", "Do forno para a sua mesa"],
     subtitulo: "P\xE3es, bolos e salgados frescos, para o caf\xE9 da manh\xE3, o lanche ou aquela encomenda especial.",
     sobre: "Uma padaria de bairro faz diferen\xE7a no dia: o cheiro de p\xE3o saindo do forno, o atendimento que lembra o seu nome e o produto fresquinho. Venha conhecer.",
     servicos: [
@@ -517,7 +517,7 @@ var BANCO = [
     paleta: { primaria: "#9b2c1a", destaque: "#f0a82b" },
     cta: { principal: "Pedir pelo WhatsApp", secundario: "Ver o card\xE1pio" },
     etiqueta: "Pe\xE7a sem complica\xE7\xE3o",
-    titulos: ["Comida boa, do jeito que voc\xEA gosta", "O prato que resolve o seu dia", "Venha comer bem em {cidade}"],
+    titulos: ["Comida boa, do jeito que voc\xEA gosta", "O prato que resolve o seu dia", "Comer bem nunca foi t\xE3o f\xE1cil"],
     subtitulo: "Veja o card\xE1pio, escolha o que quer e pe\xE7a pelo WhatsApp, para comer aqui ou receber em casa.",
     sobre: "Boa comida \xE9 feita com tempero, capricho e atendimento que faz voc\xEA querer voltar. Aqui o prato chega bonito, no ponto e sem demora.",
     servicos: [
@@ -542,7 +542,7 @@ var BANCO = [
     paleta: { primaria: "#0f7c8a", destaque: "#2f9e6f" },
     cta: { principal: "Agendar consulta", secundario: "Como chegar" },
     etiqueta: "Atendimento com hora marcada",
-    titulos: ["Cuidar da sua sa\xFAde come\xE7a aqui", "Aten\xE7\xE3o de verdade, com hora marcada", "Sua consulta sem complica\xE7\xE3o em {cidade}"],
+    titulos: ["Cuidar da sua sa\xFAde come\xE7a aqui", "Aten\xE7\xE3o de verdade, com hora marcada", "Sua consulta, sem fila e sem complica\xE7\xE3o"],
     subtitulo: "Atendimento atencioso, explica\xE7\xE3o clara em cada etapa e agendamento f\xE1cil pelo WhatsApp.",
     sobre: "Cuidar de pessoas come\xE7a por ouvir. Aqui a consulta tem tempo, a explica\xE7\xE3o \xE9 clara e o atendimento acolhe desde a recep\xE7\xE3o.",
     servicos: [
@@ -567,7 +567,7 @@ var BANCO = [
     paleta: { primaria: "#1e6fd9", destaque: "#18b8a4" },
     cta: { principal: "Agendar avalia\xE7\xE3o", secundario: "Como chegar" },
     etiqueta: "Sorrisos cuidados com aten\xE7\xE3o",
-    titulos: ["Cuide do seu sorriso sem medo", "Um sorriso saud\xE1vel come\xE7a com uma boa avalia\xE7\xE3o", "Odontologia com aten\xE7\xE3o em {cidade}"],
+    titulos: ["Cuide do seu sorriso sem medo", "Um sorriso saud\xE1vel come\xE7a com uma boa avalia\xE7\xE3o", "Odontologia que devolve a vontade de sorrir"],
     subtitulo: "Tratamentos explicados com calma, agendamento r\xE1pido pelo WhatsApp e um atendimento que respeita o seu tempo.",
     sobre: "Ir ao dentista pode ser tranquilo. Aqui voc\xEA entende cada etapa do tratamento, tira as d\xFAvidas e decide com seguran\xE7a.",
     servicos: [
@@ -592,7 +592,7 @@ var BANCO = [
     paleta: { primaria: "#5b7fa6", destaque: "#c58b6b" },
     cta: { principal: "Marcar uma conversa", secundario: "Saiba mais" },
     etiqueta: "Atendimento com sigilo e acolhimento",
-    titulos: ["Um espa\xE7o seguro para cuidar de voc\xEA", "Conversar pode ser o primeiro passo", "Acolhimento e escuta em {cidade}"],
+    titulos: ["Um espa\xE7o seguro para cuidar de voc\xEA", "Conversar pode ser o primeiro passo", "Voc\xEA merece ser ouvido, sem pressa e sem julgamento"],
     subtitulo: "Atendimento com sigilo, respeito ao seu tempo e agendamento discreto pelo WhatsApp.",
     sobre: "Procurar ajuda \xE9 um ato de cuidado. Aqui voc\xEA encontra escuta, respeito e um ambiente seguro para falar do que importa.",
     servicos: [
@@ -615,7 +615,7 @@ var BANCO = [
     paleta: { primaria: "#8a3f5d", destaque: "#d9a35b" },
     cta: { principal: "Agendar hor\xE1rio", secundario: "Ver servi\xE7os" },
     etiqueta: "Hor\xE1rio marcado, sem espera",
-    titulos: ["Realce o que voc\xEA tem de melhor", "Beleza e cuidado, no seu hor\xE1rio", "Seu momento de cuidado em {cidade}"],
+    titulos: ["Realce o que voc\xEA tem de melhor", "Beleza e cuidado, no seu hor\xE1rio", "Seu momento de cuidado, s\xF3 seu"],
     subtitulo: "Servi\xE7os feitos com aten\xE7\xE3o ao detalhe e agendamento f\xE1cil pelo WhatsApp.",
     sobre: "Sair daqui se sentindo bem \xE9 o que importa. Cuidamos de cada detalhe, do atendimento ao resultado.",
     servicos: [
@@ -640,7 +640,7 @@ var BANCO = [
     paleta: { primaria: "#e0451f", destaque: "#facc15" },
     cta: { principal: "Quero uma aula experimental", secundario: "Ver modalidades" },
     etiqueta: "Comece hoje",
-    titulos: ["Treine com orienta\xE7\xE3o e resultado", "O primeiro passo \xE9 o mais importante", "Sua melhor vers\xE3o come\xE7a em {cidade}"],
+    titulos: ["Treine com orienta\xE7\xE3o e resultado", "O primeiro passo \xE9 o mais importante", "Sua melhor vers\xE3o come\xE7a hoje"],
     subtitulo: "Treino com acompanhamento, ambiente motivador e hor\xE1rios que cabem na sua rotina.",
     sobre: "Treinar \xE9 mais f\xE1cil com orienta\xE7\xE3o e um ambiente que motiva. Aqui voc\xEA \xE9 acompanhado e evolui no seu ritmo.",
     servicos: [
@@ -665,7 +665,7 @@ var BANCO = [
     paleta: { primaria: "#1b2a4a", destaque: "#b08d57" },
     cta: { principal: "Falar com um advogado", secundario: "\xC1reas de atua\xE7\xE3o" },
     etiqueta: "Atendimento sigiloso",
-    titulos: ["Orienta\xE7\xE3o jur\xEDdica clara, com respeito ao seu caso", "Seus direitos explicados sem complica\xE7\xE3o", "Advocacia atenta em {cidade}"],
+    titulos: ["Orienta\xE7\xE3o jur\xEDdica clara, com respeito ao seu caso", "Seus direitos explicados sem complica\xE7\xE3o", "Advocacia atenta ao que importa no seu caso"],
     subtitulo: "Atendimento individual, linguagem simples e um primeiro contato para entender o seu caso.",
     sobre: "Cada caso tem a sua hist\xF3ria. Aqui o atendimento \xE9 pr\xF3ximo, a explica\xE7\xE3o \xE9 clara e a atua\xE7\xE3o segue a \xE9tica da profiss\xE3o.",
     servicos: [
@@ -690,7 +690,7 @@ var BANCO = [
     paleta: { primaria: "#0f4c5c", destaque: "#e08e45" },
     cta: { principal: "Pedir um or\xE7amento", secundario: "Nossos servi\xE7os" },
     etiqueta: "Contabilidade sem dor de cabe\xE7a",
-    titulos: ["Contabilidade que cuida do seu neg\xF3cio", "Menos burocracia, mais tempo para vender", "Seu contador de confian\xE7a em {cidade}"],
+    titulos: ["Contabilidade que cuida do seu neg\xF3cio", "Menos burocracia, mais tempo para vender", "O contador que o seu neg\xF3cio merece"],
     subtitulo: "Abertura de empresa, impostos e obriga\xE7\xF5es em dia, com atendimento que explica em linguagem simples.",
     sobre: "Quem empreende precisa de tranquilidade com os n\xFAmeros. Cuidamos da parte fiscal para voc\xEA cuidar do neg\xF3cio.",
     servicos: [
@@ -715,7 +715,7 @@ var BANCO = [
     paleta: { primaria: "#13405b", destaque: "#d6a03c" },
     cta: { principal: "Falar com um corretor", secundario: "Ver im\xF3veis" },
     etiqueta: "Atendimento personalizado",
-    titulos: ["Encontre o im\xF3vel certo em {cidade}", "Comprar, vender ou alugar com seguran\xE7a", "Seu pr\xF3ximo endere\xE7o come\xE7a aqui"],
+    titulos: ["O im\xF3vel certo, sem dor de cabe\xE7a", "Comprar, vender ou alugar com seguran\xE7a", "Seu pr\xF3ximo endere\xE7o come\xE7a aqui"],
     subtitulo: "Atendimento pr\xF3ximo, orienta\xE7\xE3o em cada etapa e agilidade para voc\xEA decidir com seguran\xE7a.",
     sobre: "Negociar um im\xF3vel \xE9 uma decis\xE3o importante. Aqui voc\xEA tem acompanhamento do in\xEDcio \xE0 entrega das chaves.",
     servicos: [
@@ -740,7 +740,7 @@ var BANCO = [
     paleta: { primaria: "#c2410c", destaque: "#facc15" },
     cta: { principal: "Pedir or\xE7amento", secundario: "Como chegar" },
     etiqueta: "Or\xE7amento sem compromisso",
-    titulos: ["Seu carro em boas m\xE3os, sem susto na conta", "Conserto honesto, or\xE7amento claro", "A oficina de confian\xE7a em {cidade}"],
+    titulos: ["Seu carro em boas m\xE3os, sem susto na conta", "Conserto honesto, or\xE7amento claro", "A oficina em que voc\xEA confia de olhos fechados"],
     subtitulo: "Diagn\xF3stico explicado, or\xE7amento antes do servi\xE7o e acompanhamento pelo WhatsApp.",
     sobre: "Confian\xE7a \xE9 tudo em uma oficina. Aqui voc\xEA sabe o que o carro tem, o que ser\xE1 feito e quanto vai custar antes de come\xE7ar.",
     servicos: [
@@ -765,7 +765,7 @@ var BANCO = [
     paleta: { primaria: "#2a7de1", destaque: "#f5a524" },
     cta: { principal: "Agendar banho ou consulta", secundario: "Ver servi\xE7os" },
     etiqueta: "Cuidado de quem ama pets",
-    titulos: ["Quem ama pet cuida com a gente", "Banho, sa\xFAde e carinho para o seu melhor amigo", "O cantinho do seu pet em {cidade}"],
+    titulos: ["Quem ama pet cuida com a gente", "Banho, sa\xFAde e carinho para o seu melhor amigo", "O cantinho preferido do seu pet"],
     subtitulo: "Banho e tosa, consultas e tudo para o seu pet, com agendamento f\xE1cil pelo WhatsApp.",
     sobre: "Pet \xE9 da fam\xEDlia. Cuidamos dele com paci\xEAncia, higiene e aten\xE7\xE3o, para voc\xEA deixar com tranquilidade.",
     servicos: [
@@ -790,7 +790,7 @@ var BANCO = [
     paleta: { primaria: "#1f1f1f", destaque: "#c9a227" },
     cta: { principal: "Ver novidades no WhatsApp", secundario: "Como chegar" },
     etiqueta: "Novidades toda semana",
-    titulos: ["Estilo que combina com voc\xEA", "Pe\xE7as escolhidas com cuidado", "A sua loja de moda em {cidade}"],
+    titulos: ["Estilo que combina com voc\xEA", "Pe\xE7as escolhidas com cuidado", "Moda que combina com a sua hist\xF3ria"],
     subtitulo: "Veja as novidades, tire d\xFAvidas de tamanho e pe\xE7a pelo WhatsApp, para retirar ou receber.",
     sobre: "Vestir bem \xE9 se sentir bem. Selecionamos pe\xE7as com qualidade e atendemos com aten\xE7\xE3o, sem pressa.",
     servicos: [
@@ -815,7 +815,7 @@ var BANCO = [
     paleta: { primaria: "#374151", destaque: "#f59e0b" },
     cta: { principal: "Pedir or\xE7amento", secundario: "Ver servi\xE7os" },
     etiqueta: "Projeto e obra com acompanhamento",
-    titulos: ["Sua obra entregue com capricho e transpar\xEAncia", "Do projeto \xE0 \xFAltima pincelada", "Reformas e projetos em {cidade}"],
+    titulos: ["Sua obra entregue com capricho e transpar\xEAncia", "Do projeto \xE0 \xFAltima pincelada", "Reformas e projetos feitos para durar"],
     subtitulo: "Or\xE7amento claro, cronograma combinado e acompanhamento do in\xEDcio ao fim.",
     sobre: "Obra boa tem planejamento, comunica\xE7\xE3o e acabamento cuidadoso. Voc\xEA sabe o que ser\xE1 feito e acompanha cada etapa.",
     servicos: [
@@ -840,7 +840,7 @@ var BANCO = [
     paleta: { primaria: "#1d4ed8", destaque: "#f97316" },
     cta: { principal: "Chamar agora", secundario: "Ver servi\xE7os" },
     etiqueta: "Atendimento r\xE1pido",
-    titulos: ["Problema em casa? Resolvemos r\xE1pido", "Servi\xE7o bem feito, com hora combinada", "Atendimento \xE1gil em {cidade}"],
+    titulos: ["Problema em casa? Resolvemos r\xE1pido", "Servi\xE7o bem feito, com hora combinada", "Chamou, resolveu: atendimento \xE1gil"],
     subtitulo: "Chame pelo WhatsApp, combine o hor\xE1rio e receba o atendimento com or\xE7amento antes do servi\xE7o.",
     sobre: "Quando surge um problema, voc\xEA precisa de algu\xE9m que responda e resolva. Aqui o atendimento \xE9 direto e o combinado \xE9 cumprido.",
     servicos: [
@@ -865,7 +865,7 @@ var BANCO = [
     paleta: { primaria: "#6d28d9", destaque: "#f59e0b" },
     cta: { principal: "Quero saber mais", secundario: "Conhecer a escola" },
     etiqueta: "Matr\xEDculas abertas? Confirme pelo WhatsApp",
-    titulos: ["Aprender aqui faz diferen\xE7a", "Educa\xE7\xE3o com acompanhamento pr\xF3ximo", "O lugar certo para aprender em {cidade}"],
+    titulos: ["Aprender aqui faz diferen\xE7a", "Educa\xE7\xE3o com acompanhamento pr\xF3ximo", "O lugar certo para aprender de verdade"],
     subtitulo: "Turmas acompanhadas de perto, professores atenciosos e informa\xE7\xF5es f\xE1ceis pelo WhatsApp.",
     sobre: "Aprender \xE9 mais f\xE1cil com acompanhamento e um ambiente acolhedor. Conhe\xE7a o nosso jeito de ensinar.",
     servicos: [
@@ -890,7 +890,7 @@ var BANCO = [
     paleta: { primaria: "#7a2e5c", destaque: "#d4a24c" },
     cta: { principal: "Pedir or\xE7amento", secundario: "Ver trabalhos" },
     etiqueta: "Seu evento, do seu jeito",
-    titulos: ["Seu grande dia merece cuidado em cada detalhe", "Eventos que ficam na mem\xF3ria", "Festas e celebra\xE7\xF5es em {cidade}"],
+    titulos: ["Seu grande dia merece cuidado em cada detalhe", "Eventos que ficam na mem\xF3ria", "Festas e celebra\xE7\xF5es que ningu\xE9m esquece"],
     subtitulo: "Conte a data e o tipo de evento, e receba um or\xE7amento pensado para voc\xEA.",
     sobre: "Cada celebra\xE7\xE3o \xE9 \xFAnica. Planejamos junto com voc\xEA, cuidamos dos detalhes e entregamos tranquilidade.",
     servicos: [
@@ -915,7 +915,7 @@ var BANCO = [
     paleta: { primaria: "#0b6e6e", destaque: "#e7a33e" },
     cta: { principal: "Reservar pelo WhatsApp", secundario: "Ver acomoda\xE7\xF5es" },
     etiqueta: "Reserve direto, sem intermedi\xE1rio",
-    titulos: ["Descanse do jeito que voc\xEA merece", "Sua estadia come\xE7a com um bom acolhimento", "Hospedagem confort\xE1vel em {cidade}"],
+    titulos: ["Descanse do jeito que voc\xEA merece", "Sua estadia come\xE7a com um bom acolhimento", "Hospedagem para descansar de verdade"],
     subtitulo: "Veja as acomoda\xE7\xF5es, tire d\xFAvidas e reserve direto pelo WhatsApp.",
     sobre: "Hospedar bem \xE9 receber com carinho. Cuidamos do conforto, da limpeza e do atendimento para a sua estadia ser tranquila.",
     servicos: [
@@ -940,7 +940,7 @@ var BANCO = [
     paleta: { primaria: "#2f6b3a", destaque: "#d97706" },
     cta: { principal: "Pedir cota\xE7\xE3o", secundario: "Como chegar" },
     etiqueta: "Atendimento de quem entende do campo",
-    titulos: ["Tudo para o campo, com atendimento de confian\xE7a", "Cota\xE7\xE3o r\xE1pida, entrega combinada", "Seu parceiro do campo em {cidade}"],
+    titulos: ["Tudo para o campo, com atendimento de confian\xE7a", "Cota\xE7\xE3o r\xE1pida, entrega combinada", "O parceiro certo para o seu campo"],
     subtitulo: "Insumos, produtos e orienta\xE7\xE3o para o seu dia a dia, com cota\xE7\xE3o pelo WhatsApp.",
     sobre: "No campo, tempo e confian\xE7a valem muito. Atendemos com agilidade e conhecimento do que o produtor precisa.",
     servicos: [
@@ -965,7 +965,7 @@ var BANCO = [
     paleta: { primaria: "#0f5132", destaque: "#f2a900" },
     cta: { principal: "Falar no WhatsApp", secundario: "Como chegar" },
     etiqueta: "Atendimento na loja e pelo WhatsApp",
-    titulos: ["Tudo o que voc\xEA precisa, com atendimento de verdade", "Boas escolhas, bom pre\xE7o e aten\xE7\xE3o", "Sua loja de confian\xE7a em {cidade}"],
+    titulos: ["Tudo o que voc\xEA precisa, com atendimento de verdade", "Boas escolhas, bom pre\xE7o e aten\xE7\xE3o", "A loja em que voc\xEA volta sempre"],
     subtitulo: "Veja o que temos, tire d\xFAvidas e pe\xE7a pelo WhatsApp, para retirar na loja ou combinar a entrega.",
     sobre: "Com\xE9rcio de bairro \xE9 feito de confian\xE7a. Aqui voc\xEA encontra o que precisa e \xE9 atendido por quem conhece o produto.",
     servicos: [
@@ -990,7 +990,7 @@ var BANCO = [
     paleta: { primaria: "#2d3a8c", destaque: "#00b8a9" },
     cta: { principal: "Pedir uma proposta", secundario: "Ver servi\xE7os" },
     etiqueta: "Resultado combinado antes de come\xE7ar",
-    titulos: ["Solu\xE7\xF5es que resolvem o problema de verdade", "Do briefing \xE0 entrega, com acompanhamento", "Parceiro de neg\xF3cios em {cidade}"],
+    titulos: ["Solu\xE7\xF5es que resolvem o problema de verdade", "Do briefing \xE0 entrega, com acompanhamento", "O parceiro que o seu neg\xF3cio precisa"],
     subtitulo: "Conte o seu desafio e receba uma proposta clara, com escopo, prazo e valor.",
     sobre: "Bons projetos nascem de entender o problema. Ouvimos, propomos e acompanhamos a entrega com transpar\xEAncia.",
     servicos: [
@@ -1015,7 +1015,7 @@ var BANCO = [
     paleta: { primaria: "#b4121b", destaque: "#cbd5e1" },
     cta: { principal: "Falar com um vendedor", secundario: "Ver como chegar" },
     etiqueta: "Atendimento direto pelo WhatsApp",
-    titulos: ["Seu pr\xF3ximo carro come\xE7a aqui", "Encontre o ve\xEDculo certo em {cidade}", "Compre com atendimento de verdade"],
+    titulos: ["Seu pr\xF3ximo carro come\xE7a aqui", "O ve\xEDculo certo est\xE1 esperando por voc\xEA", "Compre com atendimento de verdade"],
     subtitulo: "Ve\xEDculos novos e seminovos, avalia\xE7\xE3o do seu usado e atendimento direto pelo WhatsApp.",
     sobre: "Comprar um ve\xEDculo \xE9 uma decis\xE3o grande e merece uma conversa clara. Aqui voc\xEA tira d\xFAvidas, conhece as op\xE7\xF5es e negocia com transpar\xEAncia.",
     servicos: [
@@ -1046,7 +1046,7 @@ var BANCO = [
     paleta: { primaria: "#0a6b52", destaque: "#f2b705" },
     cta: { principal: "Simular pelo WhatsApp", secundario: "Como funciona" },
     etiqueta: "Atendimento direto pelo WhatsApp",
-    titulos: ["Cr\xE9dito com condi\xE7\xF5es explicadas antes de contratar", "Entenda cada etapa e simule pelo WhatsApp", "Cr\xE9dito com atendimento claro em {cidade}"],
+    titulos: ["Cr\xE9dito com condi\xE7\xF5es explicadas antes de contratar", "Entenda cada etapa e simule pelo WhatsApp", "Cr\xE9dito claro, do come\xE7o ao fim"],
     subtitulo: "Tire d\xFAvidas, veja os documentos necess\xE1rios e fa\xE7a a sua simula\xE7\xE3o pelo WhatsApp. Cr\xE9dito sujeito \xE0 an\xE1lise e aprova\xE7\xE3o.",
     sobre: "Contratar cr\xE9dito exige clareza. Aqui voc\xEA entende as condi\xE7\xF5es, os prazos e os documentos antes de decidir.",
     servicos: [
@@ -1078,7 +1078,7 @@ var GENERICO = {
   paleta: { primaria: "#1f4fd8", destaque: "#f59e0b" },
   cta: { principal: "Falar no WhatsApp", secundario: "Como chegar" },
   etiqueta: "Atendimento direto pelo WhatsApp",
-  titulos: ["Atendimento de confian\xE7a em {cidade}", "Fale com a gente e resolva sem complica\xE7\xE3o", "Qualidade e aten\xE7\xE3o no que fazemos"],
+  titulos: ["Atendimento de confian\xE7a, do jeito que deveria ser", "Fale com a gente e resolva sem complica\xE7\xE3o", "Qualidade e aten\xE7\xE3o no que fazemos"],
   subtitulo: "Conhe\xE7a o que fazemos, tire suas d\xFAvidas e fale direto com a gente pelo WhatsApp.",
   sobre: "Trabalhamos para entregar um bom atendimento, com clareza e aten\xE7\xE3o ao que voc\xEA precisa.",
   servicos: [
@@ -4530,7 +4530,7 @@ var noir = {
     const capa = fotoDe(d, 0), foto2 = fotoDe(d, 1) || capa;
     const nums = numerosReais(d);
     const fotosGal = imagens(d).slice(1);
-    const h1 = titulo(d, `${d.categoria || "Excel\xEAncia"}${d.cidade ? ` em ${d.cidade}` : ""}, do jeito que deveria ser`);
+    const h1 = titulo(d, `${d.categoria || "Excel\xEAncia"}, do jeito que deveria ser`);
     return documentoCinema(d, PARES.instrument, `
 ${cssBaseEscura(d, "#06070b")}
 ${cssNavVidro("nv")}

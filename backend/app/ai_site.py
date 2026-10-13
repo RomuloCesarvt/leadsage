@@ -280,7 +280,7 @@ PROJETO VISUAL JÁ DEFINIDO (não mude, só escreva dentro dele)
 RETORNO
 JSON puro, sem markdown, com estas chaves:
 - "categoria": como o negócio se apresenta, 2 a 4 palavras (ex.: "Padaria e confeitaria")
-- "slogan": frase de capa, no máximo 10 palavras, concreta e específica
+- "slogan": frase de capa, no máximo 10 palavras, impactante e específica do ramo; NUNCA cite a cidade nem o nome da região nela (a cidade só vai no título da aba)
 - "sobre": 2 frases sobre o negócio, sem autoelogio genérico
 - "servicos": 4 objetos com "titulo" (até 4 palavras) e "descricao" (uma frase do que o cliente leva)
 - "diferenciais": 3 frases curtas de até 8 palavras, cada uma um motivo real de escolher esse lugar

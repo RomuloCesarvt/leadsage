@@ -83,4 +83,19 @@ for (const ramo of ['Psicologia', 'Dentistas', 'Padarias', 'Advocacia', 'Hotéis
   }
 }
 
+// a cidade nunca entra no título da capa (fica na etiqueta pequena e no rodapé)
+for (const ramo of ['Psicologia', 'Dentistas', 'Pizzarias', 'Advocacia', 'Imobiliárias', 'Concessionárias', 'Hotéis', 'Qualquer coisa']) {
+  for (const emp of ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']) {
+    const d = dadosDoLead({ id: emp, company: `Empresa ${emp}`, niche: ramo, city: 'Botucatu' });
+    assert.ok(!/botucatu/i.test(d.slogan), `${ramo}/${emp}: ${d.slogan}`);
+    assert.ok(!/\{cidade\}/.test(d.slogan));
+  }
+}
+const nenhumaCidade = SITE_TEMPLATES.every(t => {
+  const html = t.render({ ...dadosDoLead({ id: 'z', company: 'Casa Teste', niche: 'Padarias', city: 'Botucatu' }), slogan: '' });
+  const h1 = /<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html);
+  return !h1 || !/botucatu/i.test(h1[1]);
+});
+assert.ok(nenhumaCidade, 'nenhum h1 de modelo leva a cidade');
+
 console.log('direcao.test: ok');

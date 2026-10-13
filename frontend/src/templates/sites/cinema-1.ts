@@ -29,7 +29,7 @@ const noir: SiteTemplate = {
     const capa = fotoDe(d, 0), foto2 = fotoDe(d, 1) || capa;
     const nums = numerosReais(d);
     const fotosGal = imagens(d).slice(1);
-    const h1 = titulo(d, `${d.categoria || 'Excelência'}${d.cidade ? ` em ${d.cidade}` : ''}, do jeito que deveria ser`);
+    const h1 = titulo(d, `${d.categoria || 'Excelência'}, do jeito que deveria ser`);
     return documentoCinema(d, PARES.instrument, `
 ${cssBaseEscura(d, '#06070b')}
 ${cssNavVidro('nv')}
