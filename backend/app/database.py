@@ -9,52 +9,21 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.pool import NullPool
 
 
+from app import bancos
+from app.bancos import _criar_engine  # noqa: F401  (mantido: scripts e testes importam daqui)
+
+
 def url_do_banco(env=None) -> str:
-    """O banco do sistema.
-
-    `DATABASE_URL` (Postgres, por exemplo o Supabase) e o banco de verdade. Sem ela, SQLite:
-    em arquivo no computador de quem desenvolve e em /tmp na Vercel, onde some a cada
-    reinicio, o que so serve de reserva.
-    """
-    env = os.environ if env is None else env
-    url = (env.get("DATABASE_URL") or "").strip()
-    if url:
-        if url.startswith("postgres://"):
-            url = "postgresql://" + url[len("postgres://"):]
-        if url.startswith("postgresql://"):
-            url = "postgresql+asyncpg://" + url[len("postgresql://"):]
-        return url
-    if env.get("VERCEL") == "1":
-        return "sqlite+aiosqlite:////tmp/leadsage.db"
-    return "sqlite+aiosqlite:///./leadsage.db"
-
-
-def _criar_engine(url: str):
-    if not url.startswith("postgresql"):
-        return create_async_engine(url, echo=False)
-    u = make_url(url)
-    # asyncpg nao aceita ?sslmode=...; o SSL vai por connect_args
-    u = u.set(query={k: v for k, v in u.query.items() if k not in ("sslmode", "pgbouncer", "supa")})
-    local = (u.host or "") in ("localhost", "127.0.0.1", "::1")
-    return create_async_engine(
-        u,
-        echo=False,
-        # funcao serverless: uma conexao por chamada, sem pool guardado entre invocacoes
-        poolclass=NullPool,
-        connect_args={
-            **({} if local else {"ssl": "require"}),
-            # o pooler do Supabase (pgbouncer, modo transacao) nao guarda comandos preparados
-            "statement_cache_size": 0,
-            "prepared_statement_cache_size": 0,
-            "prepared_statement_name_func": lambda: f"__asyncpg_{uuid.uuid4().hex}__",
-        },
-    )
+    """O banco principal. `DATABASE_URL` (Postgres, por exemplo Supabase); com reservas em `DATABASE_URL_2`, `_3`... (ver app/bancos.py).
+    Sem nenhuma, SQLite: em arquivo no computador de quem desenvolve e em /tmp na Vercel, onde some a cada reinicio."""
+    return bancos.urls_dos_bancos(env)[0]
 
 
 DATABASE_URL = url_do_banco()
-EH_POSTGRES = DATABASE_URL.startswith("postgresql")
-engine = _criar_engine(DATABASE_URL)
-AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+EH_POSTGRES = any(f.tipo == "postgres" for f in bancos.CONJUNTO.fontes)
+engine = bancos.CONJUNTO.principal.engine
+# cada operacao usa o primeiro banco que responde; se um cai, o proximo assume
+AsyncSessionLocal = bancos.criar_fabrica_de_sessoes()
 
 Base = declarative_base()
 
@@ -318,10 +287,18 @@ class DBCreditoHistorico(Base):
     timestamp = Column(String, index=True)
 
 
-async def init_db():
-    async with engine.begin() as conn:
+async def _preparar_banco(eng) -> None:
+    async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_migrate)
+
+
+async def init_db():
+    """Cria as tabelas em todos os bancos que respondem; um banco fora do ar nao impede o sistema de subir."""
+    if engine is not bancos.CONJUNTO.principal.engine:
+        await _preparar_banco(engine)  # engine trocado de fora (testes, scripts): so ele
+        return
+    await bancos.CONJUNTO.preparar(_preparar_banco)
 
 async def get_db():
     async with AsyncSessionLocal() as session:

@@ -17,6 +17,7 @@ from sqlalchemy.future import select
 import json
 
 from app.config import settings
+from app import bancos
 from app.database import init_db, get_db, DBLead, DBSearchHistory, EH_POSTGRES, chave_do_lead, chaves_do_lead
 
 from app.models import (
@@ -152,6 +153,8 @@ def read_root():
         "version": "1.0.0",
         "ia": [x["nome"] for x in ai_providers.ativos()] + (["gemini"] if settings.GEMINI_API_KEY else []),
         "armazenamento": "firestore" if firestore_db is not None else ("postgres" if EH_POSTGRES else ("sqlite" if settings.FIRESTORE_DESLIGADO else "indisponivel")),
+        # os bancos SQL de reserva: qual esta no ar e qual esta de lado (sem expor conexao nem segredo)
+        "bancos": bancos.CONJUNTO.estado(),
         "timestamp": datetime.now().isoformat()
     }
 
@@ -1571,13 +1574,18 @@ async def _gravar_canal_do_conector(canal: Dict[str, Any]) -> None:
 
 MSG_BANCO_SEM_COTA = (
     "O banco de dados do LeadSage está sem cota agora (limite do plano gratuito do Firebase), "
-    "e uma chave gerada neste estado não funcionaria. Tente de novo depois das 4h da manhã (horário de Brasília), "
-    "quando a cota volta, ou assim que o faturamento do Firebase for ativado."
+    "e não há banco de reserva ligado. Tente de novo depois das 4h da manhã (horário de Brasília), quando a cota volta, "
+    "ou ligue um banco gratuito de reserva (Supabase ou Neon) no painel da Vercel."
 )
 
 
+def _sem_banco_duravel() -> bool:
+    """Firestore sem cota E nenhum Postgres de reserva no ar: so assim uma gravacao nao teria onde ficar."""
+    return robo_store.firestore_falhou_agora() and not bancos.CONJUNTO.tem_postgres()
+
+
 def _exigir_banco_disponivel() -> None:
-    if robo_store.firestore_falhou_agora():
+    if _sem_banco_duravel():
         raise HTTPException(status_code=503, detail=MSG_BANCO_SEM_COTA)
 
 
@@ -1595,7 +1603,7 @@ async def conector_gerar(user: dict = Depends(get_current_user)):
     chave = await conector_whatsapp.criar_chave(canal)
     await robo_store.registrar_ativo("conector", canal["cw_hash"], uid, canal["gancho"])
     canal = await robo_store.substituir_canal(uid, canal)
-    if robo_store.firestore_falhou_agora():
+    if _sem_banco_duravel():
         # a gravação caiu no banco temporário: a chave não valeria na próxima chamada
         raise HTTPException(status_code=503, detail=MSG_BANCO_SEM_COTA)
     if antigo:
@@ -1618,7 +1626,7 @@ async def nuvem_ligar(user: dict = Depends(get_current_user)):
         await robo_store.registrar_ativo("conector", canal["cw_hash"], uid, canal["gancho"])
         canal["nuvem_chave"] = chave
         canal = await robo_store.substituir_canal(uid, canal)
-        if robo_store.firestore_falhou_agora():
+        if _sem_banco_duravel():
             raise HTTPException(status_code=503, detail=MSG_BANCO_SEM_COTA)
         await robo_store.registrar_nuvem(uid, canal["gancho"])
         await robo_store.limpar_nuvem_sair(uid)
