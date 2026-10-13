@@ -263,6 +263,15 @@ e inventar justificativa (custo, margem, agenda cheia) — para negar um descont
 - Use o nome da pessoa quando souber. Espelhe o nível de formalidade dela.
 - NUNCA invente preço, prazo, garantia ou fato sobre o negócio. Se não souber, diga que confirma com o responsável.
 - Se perguntarem se você é robô: diga que é o assistente virtual de {quem}.
+- VALORES (preço, renovação, domínio, custos): NUNCA cite por iniciativa sua. Só fale de dinheiro quando o cliente perguntar.
+- QUANDO PERGUNTAREM O PREÇO: nunca responda só com o número. Faça nesta ordem, em 2 ou 3 frases curtas:
+  1) o benefício e o porquê faz sentido PARA O NEGÓCIO DELE (use o que ele disse e o dossiê: o cliente que procura no Google e não
+     acha, o WhatsApp direto, a prévia já pronta, o primeiro ano sem custo de hospedagem e endereço, 2 manutenções, ele só aprova);
+  2) só então o valor, amarrado ao que vem junto ("tudo isso por R$ X", "e o investimento é R$ X, já com …");
+  3) UM próximo passo (ver a prévia, ou uma conversa curta).
+  Se ele só escreveu "preço" ou "quanto?", tudo bem: responda o valor, mas sempre com o valor entregue (o que ele recebe) antes do número.
+- Só afirme o que está nos fatos do dono acima. Não diga que "inclui domínio" se o que está escrito é endereço do site e hospedagem:
+  domínio próprio da empresa é opcional e tem custo à parte, e só se fala disso se perguntarem.
 
 == QUANDO PASSAR PARA O HUMANO ==
 Horário de reunião confirmado; aceitou a proposta; quer negociar além do autorizado; pergunta técnica ou jurídica
@@ -435,8 +444,29 @@ def _repete(novo: str, antigo: str) -> bool:
     return len(a & b) / len(a) >= 0.85
 
 
+# O cliente perguntou de dinheiro? So nesse caso o robo pode citar valor (preco, renovacao, dominio).
+_PERGUNTOU_DE_VALOR = _re.compile(
+    r"\b(quanto|pre[cç]o|valor(es)?|custa|custo|custos|investimento|mensalidade|anuidade|renova[cç][aã]o|pagar|pagamento|"
+    r"parcel\w*|desconto|caro|barato|or[cç]amento|cobra\w*|gr[aá]tis|gratuito|dom[ií]nio|hospedagem|taxa|reais|mil|faz por|fecha por|por quanto)\b|r\$|\d{3,}",
+    _re.I,
+)
+
+
+def cliente_perguntou_de_valor(mensagens: List[Dict[str, Any]]) -> bool:
+    """A ultima fala do cliente toca em preco, custo ou pagamento?"""
+    for m in reversed(mensagens):
+        if m.get("de") == "contato":
+            return bool(_PERGUNTOU_DE_VALOR.search(m.get("texto", "")))
+    return False
+
+
 def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: List[Dict[str, Any]]) -> List[str]:
     erros: List[str] = []
+    if any(m.get("de") == "contato" for m in mensagens) and not cliente_perguntou_de_valor(mensagens):
+        for t in textos:
+            if _VALOR.search(t):
+                erros.append("você citou valor sem o cliente ter perguntado de preço ou custo: só fale de valores se ele perguntar")
+                break
     previas = [m.get("texto", "") for m in mensagens if m.get("de") in ("robo", "voce")]
     ja_se_apresentou = any(_APRESENTACAO.search(_simples(p)) for p in previas)
     for t in textos:
@@ -459,3 +489,22 @@ def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: Lis
         if m:
             erros.append(f'você usou "{m.group(0)}", que é justificativa ou urgência inventada')
     return erros
+
+
+def forma_do_preco(textos: List[str], mensagens: List[Dict[str, Any]]) -> List[str]:
+    """O primeiro preco da conversa vem depois do beneficio, nunca como a primeira coisa que o cliente le.
+
+    "Tudo isso por R$ X" vende; "R$ X" sozinho vira comparacao de preco. Vale so na primeira vez que o valor aparece;
+    depois (negociacao, reajuste) a pessoa ja viu o valor da oferta.
+    """
+    juntos = " ".join(textos)
+    achou = _VALOR.search(juntos)
+    if not achou:
+        return []
+    if any(_VALOR.search(m.get("texto", "")) for m in mensagens if m.get("de") == "robo"):
+        return []
+    antes = [p for p in juntos[: achou.start()].split() if len(p) > 1]
+    if len(antes) >= 12:
+        return []
+    return ["você citou o valor antes de mostrar o benefício: primeiro diga o que ele recebe e por que faz sentido para o negócio dele, "
+            "e só então o valor, amarrado a isso (\"tudo isso por R$ X\")"]

@@ -185,7 +185,7 @@ def respostas_seguidas_do_robo(mensagens: List[Dict[str, Any]]) -> int:
 
 
 from app import ai_oferta  # noqa: E402
-from app.ai_sdr import montar_prompt, normalizar, problemas_da_resposta  # noqa: E402
+from app.ai_sdr import forma_do_preco, montar_prompt, normalizar, problemas_da_resposta  # noqa: E402
 
 
 def decidir(
@@ -245,7 +245,7 @@ def decidir(
 
     # Conferencia em codigo: preco fora do catalogo e motivo inventado nao
     # saem. Uma chance de corrigir; errou de novo, o humano assume.
-    erros = problemas_da_resposta(n["mensagens"], cfg, mensagens)
+    erros = problemas_da_resposta(n["mensagens"], cfg, mensagens) + forma_do_preco(n["mensagens"], mensagens)
     if erros:
         correcao = (prompt + "\n\n== SUA RESPOSTA ANTERIOR FOI RECUSADA ==\n"
                     + "\n".join(f"- {e}" for e in erros)
