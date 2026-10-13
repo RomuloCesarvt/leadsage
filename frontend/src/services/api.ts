@@ -440,6 +440,10 @@ export const api = {
     return await fetchWithToken('/robo/whats/estado');
   },
 
+  async whatsAcesso(): Promise<{ nuvem: boolean; url?: string; token?: string }> {
+    return await fetchWithToken('/robo/whats/acesso');
+  },
+
   async whatsChats(): Promise<{ chats: any[]; idade_s: number | null; online: boolean; conectado: boolean }> {
     return await fetchWithToken('/robo/whats/chats');
   },

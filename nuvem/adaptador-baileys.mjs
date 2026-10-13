@@ -220,6 +220,15 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
         return { ok: false, erro: String(e.message || e).slice(0, 200) };
       }
     },
+    /** Resposta feita pelo dono direto no chat do LeadSage. */
+    async enviarNoChat(chatId, texto) {
+      if (!sock || !pronto) throw new Error('O WhatsApp não está conectado agora.');
+      const enviada = await sock.sendMessage(paraJid(chatId), { text: texto });
+      const msg = { ...(enviada || {}), key: { ...(enviada?.key || {}), remoteJid: paraJid(chatId), fromMe: true }, message: { conversation: texto }, status: 2 };
+      if (!msg.key.id) msg.key.id = `local_${Date.now()}`;
+      guardar(msg);
+      return resumoBaileys(msg);
+    },
     async chats(limite = 40) { return historico.chats(limite); },
     async mensagens(chatId, limite = 60) { return historico.mensagens(chatId, limite); },
     async lida(chatId) { historico.lida(chatId); },

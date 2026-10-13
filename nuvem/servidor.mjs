@@ -9,17 +9,58 @@
  * Variáveis: LEADSAGE_URL (https://...), WORKER_SECRET, DADOS_DIR (pasta que persiste; padrão ./dados).
  */
 import { mkdirSync } from 'node:fs';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import http from 'node:http';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  clienteLeadsage, criarAgrupador, criarHistorico, enviarPendentes, entregarMensagem, tentarDeNovo,
+  clienteLeadsage, criarAgrupador, criarHistorico, enviarPendentes, entregarMensagem, tentarDeNovo, tratarChat,
 } from '../conector/leadsage-conector.mjs';
 import { iniciarBaileys } from './adaptador-baileys.mjs';
 import { authRemoto, guardaRemota } from './auth-remoto.mjs';
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const agora = () => new Date().toISOString().slice(11, 19);
+
+
+const ORIGENS = (process.env.CHAT_ORIGENS || 'https://leadsageofc.vercel.app,http://localhost:5173,http://127.0.0.1:5173').split(',');
+
+/** Token do chat: uid.exp.assinatura (HMAC com o segredo do serviço). Devolve o uid ou '' se inválido/vencido. */
+export function uidDoToken(token, segredo, agoraS = Math.floor(Date.now() / 1000)) {
+  const [uid, exp, sig] = String(token || '').split('.');
+  if (!uid || !exp || !sig || Number(exp) < agoraS) return '';
+  const esperado = createHmac('sha256', segredo).update(`${uid}.${exp}`).digest('hex');
+  const a = Buffer.from(sig), b = Buffer.from(esperado);
+  return a.length === b.length && timingSafeEqual(a, b) ? uid : '';
+}
+
+/** API de chat servida pelo próprio worker: o navegador lê as conversas direto daqui, sem passar pelo banco. */
+export function criarApiChat({ gerente, segredo }) {
+  return async (req, res) => {
+    const origem = req.headers.origin || '';
+    const cors = {
+      'access-control-allow-origin': ORIGENS.includes(origem) ? origem : ORIGENS[0],
+      'access-control-allow-headers': 'authorization, content-type',
+      'access-control-allow-methods': 'GET, POST, OPTIONS',
+      vary: 'origin',
+    };
+    const responder = (status, json) => { res.writeHead(status, { 'content-type': 'application/json', ...cors }); res.end(JSON.stringify(json)); };
+    if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
+    const url = new URL(req.url, 'http://x');
+    if (!url.pathname.startsWith('/chat')) return responder(200, { ok: true, sessoes: gerente.total() });
+    const uid = uidDoToken((req.headers.authorization || '').replace(/^Bearer\s+/i, ''), segredo);
+    if (!uid) return responder(401, { erro: 'Acesso negado.' });
+    let corpo = {};
+    if (req.method === 'POST') {
+      const partes = [];
+      for await (const c of req) { partes.push(c); if (partes.reduce((n, x) => n + x.length, 0) > 100000) return responder(413, { erro: 'Grande demais.' }); }
+      try { corpo = JSON.parse(Buffer.concat(partes).toString() || '{}'); } catch { return responder(400, { erro: 'JSON inválido.' }); }
+    }
+    const wa = gerente.ativas.get(uid)?.sessao?.wa || null;
+    const r = await tratarChat(wa && wa.pronto ? wa : null, req.method, url.pathname.replace(/^\/chat/, '/chats'), url.searchParams, corpo);
+    responder(r.status, r.json);
+  };
+}
 
 export class Sessao {
   constructor({ uid, chave, site, dados, aviso, fabrica = iniciarBaileys, authFabrica = null, segredo = '' }) {
@@ -279,7 +320,7 @@ async function principal() {
   const gerente = criarGerente({ site, segredo, dados, aviso, sessaoNoBanco, desconectar });
 
   // a plataforma (Fly, Railway...) confere se o processo está vivo por aqui
-  http.createServer((req, res) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true, sessoes: gerente.total() })); })
+  http.createServer(criarApiChat({ gerente, segredo }))
     .listen(Number(process.env.PORT) || 8080, '0.0.0.0');
 
   aviso(`LeadSage Nuvem ligado. Site: ${site}`);

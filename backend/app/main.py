@@ -1861,6 +1861,24 @@ async def whats_estado(user: dict = Depends(get_current_user)):
     return {"conectado": bool(canal.get("cw_hash")), "online": conector_whatsapp.online(canal), **estado}
 
 
+def token_do_chat_nuvem(uid: str, segredo: str, validade_s: int = 12 * 3600, agora_s: Optional[int] = None) -> str:
+    """Token curto que o navegador usa para falar direto com o worker da nuvem (uid.exp.assinatura)."""
+    exp = int((agora_s if agora_s is not None else time.time()) + validade_s)
+    sig = hmac.new(segredo.encode(), f"{uid}.{exp}".encode(), hashlib.sha256).hexdigest()
+    return f"{uid}.{exp}.{sig}"
+
+
+@app.get("/api/robo/whats/acesso")
+async def whats_acesso(user: dict = Depends(get_current_user)):
+    """Endereco e token para ler as conversas direto do worker da nuvem (nao depende do banco). Vazio fora do modo nuvem."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    uid = user.get("uid")
+    canal = await robo_store.canal_do_usuario(uid) or {}
+    if not settings.WORKER_SECRET or not canal.get("nuvem_chave"):
+        return {"nuvem": False}
+    return {"nuvem": True, "url": settings.NUVEM_URL.rstrip("/"), "token": token_do_chat_nuvem(uid, settings.WORKER_SECRET)}
+
+
 @app.post("/api/robo/conector/parear")
 async def conector_parear(req: WhatsParear, user: dict = Depends(get_current_user)):
     """Conectar pelo numero do telefone: o codigo de 8 letras aparece na tela e se digita no WhatsApp."""

@@ -42,6 +42,7 @@ class Settings(BaseModel):
     HIDE_SUBSCRIPTION_EMAILS: str = os.getenv("HIDE_SUBSCRIPTION_EMAILS", "")
     # Segredo do servico "LeadSage Nuvem" (o WhatsApp de cada usuario ligado num servidor). Vazio = recurso desligado.
     WORKER_SECRET: str = os.getenv("WORKER_SECRET", "")
+    NUVEM_URL: str = os.getenv("NUVEM_URL", "https://leadsage-nuvem.onrender.com")
 
     # Pagamentos. Enquanto PAYMENT_PROVIDER estiver vazio, a compra fica
     # indisponivel — o que e melhor do que conceder credito sem cobrar.

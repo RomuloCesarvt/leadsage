@@ -119,3 +119,13 @@ def test_historico_das_conversas_vai_e_volta_e_some_com_a_sessao(nuvem):
     nuvem.put("/api/worker/auth/alice", headers=h, json={"blob": "c2Vzc2Fv"})
     assert nuvem.delete("/api/worker/auth/alice", headers=h).status_code == 200
     assert nuvem.get("/api/worker/historico/alice", headers=h).json() == {"blob": ""}
+
+
+def test_token_do_chat_da_nuvem_confere_com_o_worker():
+    import hashlib, hmac
+    from app.main import token_do_chat_nuvem
+    t = token_do_chat_nuvem("u1", "segredo-de-teste-1234567890", agora_s=1000)
+    uid, exp, sig = t.split(".")
+    assert uid == "u1" and int(exp) == 1000 + 12 * 3600
+    esperado = hmac.new(b"segredo-de-teste-1234567890", f"u1.{exp}".encode(), hashlib.sha256).hexdigest()
+    assert sig == esperado

@@ -4,7 +4,9 @@ import assert from 'node:assert/strict';
 import {
   paraChatId, paraJid, lerConteudo, resumoBaileys, telefoneDoRemetente, desembrulhar,
 } from './adaptador-baileys.mjs';
-import { criarGerente } from './servidor.mjs';
+import { createHmac } from 'node:crypto';
+import http from 'node:http';
+import { criarGerente, criarApiChat, uidDoToken } from './servidor.mjs';
 
 test('ids: o formato do Baileys vira o do Conector e volta', () => {
   assert.equal(paraChatId('5511999990000@s.whatsapp.net'), '5511999990000@c.us');
@@ -253,4 +255,46 @@ test('historico: grava no banco (cifrado) e volta igual depois de um reinício',
   await h2.carregar();
   assert.equal(h2.chats()[0].nome, 'Gabriel');
   assert.equal(h2.mensagens('5511999990000@c.us')[0].texto, 'boa tarde');
+});
+
+const segredoTeste = 'segredo-de-teste-1234567890';
+const tokenDe = (uid, exp) => `${uid}.${exp}.${createHmac('sha256', segredoTeste).update(`${uid}.${exp}`).digest('hex')}`;
+
+test('token do chat: vale só com a assinatura certa e dentro do prazo', () => {
+  const agora = 1000;
+  assert.equal(uidDoToken(tokenDe('u1', 2000), segredoTeste, agora), 'u1');
+  assert.equal(uidDoToken(tokenDe('u1', 500), segredoTeste, agora), '');            // vencido
+  assert.equal(uidDoToken(tokenDe('u1', 2000).replace('u1', 'u2'), segredoTeste, agora), ''); // outro dono
+  assert.equal(uidDoToken('lixo', segredoTeste, agora), '');
+});
+
+test('API do chat: lê e envia direto da sessão do dono, e ninguém vê a do outro', async () => {
+  const enviadas = [];
+  const wa = {
+    pronto: true,
+    chats: async () => [{ id: '5511999990000@c.us', nome: 'Gabriel' }],
+    mensagens: async () => [{ id: 'm1', texto: 'oi' }],
+    enviarNoChat: async (id, texto) => { enviadas.push([id, texto]); return { id: 'm2', texto, minha: true }; },
+    lida: async () => {},
+  };
+  const gerente = { total: () => 1, ativas: new Map([['u1', { sessao: { wa } }]]) };
+  const servidor = http.createServer(criarApiChat({ gerente, segredo: segredoTeste }));
+  await new Promise((r) => servidor.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${servidor.address().port}`;
+  const exp = Math.floor(Date.now() / 1000) + 600;
+  const auth = (uid) => ({ authorization: `Bearer ${tokenDe(uid, exp)}` });
+  try {
+    assert.equal((await fetch(`${base}/chat`)).status, 401);
+    const lista = await (await fetch(`${base}/chat?limite=10`, { headers: auth('u1') })).json();
+    assert.equal(lista.chats[0].nome, 'Gabriel');
+    const msgs = await (await fetch(`${base}/chat/5511999990000%40c.us/mensagens`, { headers: auth('u1') })).json();
+    assert.equal(msgs.mensagens[0].texto, 'oi');
+    const env = await (await fetch(`${base}/chat/5511999990000%40c.us/enviar`, { method: 'POST', headers: { ...auth('u1'), 'content-type': 'application/json' }, body: JSON.stringify({ texto: 'olá' }) })).json();
+    assert.equal(env.mensagem.texto, 'olá');
+    assert.deepEqual(enviadas, [['5511999990000@c.us', 'olá']]);
+    assert.equal((await fetch(`${base}/chat`, { headers: auth('u2') })).status, 503); // u2 não tem sessão: nunca vê a de u1
+    const pre = await fetch(`${base}/chat`, { method: 'OPTIONS', headers: { origin: 'https://leadsageofc.vercel.app' } });
+    assert.equal(pre.status, 204);
+    assert.equal(pre.headers.get('access-control-allow-origin'), 'https://leadsageofc.vercel.app');
+  } finally { servidor.close(); }
 });

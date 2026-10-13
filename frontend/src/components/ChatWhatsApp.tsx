@@ -89,13 +89,19 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
   const [limite, setLimite] = useState(60);
   const [carregandoMais, setCarregandoMais] = useState(false);
   const alturaAntes = useRef(0);
+  const chatsVistos = useRef(0);
 
   const carregarChats = useCallback(async () => {
     try {
       const l = await whats.chats(80);
-      if (l === null) { setOffline(true); setEstado(await whats.estado().catch(() => null)); return; }
+      if (l === null) {
+        // falha passageira: se já havia conversas na tela, elas ficam (não some para voltar depois)
+        if (chatsVistos.current === 0) { setOffline(true); setEstado(await whats.estado().catch(() => null)); }
+        return;
+      }
       setOffline(false);
-      setChats(l.chats);
+      // lista vazia depois de ter conversas é leitura ruim, não "apagou tudo": mantém a que já estava
+      if (l.chats.length > 0 || chatsVistos.current === 0) { chatsVistos.current = l.chats.length; setChats(l.chats); }
       setFonte(l.fonte);
       setRemoto(l.remoto);
       setIdade(l.idade_s ?? 0);
