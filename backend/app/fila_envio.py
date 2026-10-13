@@ -30,7 +30,9 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
 
 LIMITE_EMAIL_DIA = 40
 LOTE_MAXIMO = 8
-STATUS = ("pendente", "enviado", "pulado", "aguardando_limite", "falhou")
+STATUS = ("rascunho", "pendente", "enviado", "pulado", "aguardando_limite", "falhou")
+# mensagens que ainda podem ser corrigidas antes de sair
+EDITAVEIS = ("rascunho", "pendente", "aguardando_limite", "falhou")
 
 RODAPE_SAIR = "\n\n—\nSe preferir não receber mais mensagens, é só responder SAIR."
 
@@ -162,6 +164,7 @@ def emails_enviados_hoje(itens: List[Dict[str, Any]]) -> int:
 def resumo(itens: List[Dict[str, Any]]) -> Dict[str, Any]:
     enviados_hoje = emails_enviados_hoje(itens)
     return {
+        "rascunhos": sum(1 for i in itens if i.get("status") == "rascunho"),
         "pendentes": sum(1 for i in itens if i.get("status") == "pendente"),
         "aguardando_limite": sum(1 for i in itens if i.get("status") == "aguardando_limite"),
         "enviados": sum(1 for i in itens if i.get("status") == "enviado"),
@@ -182,7 +185,7 @@ Cobrar = Callable[[], Awaitable[None]]
 async def _ja_contatado(uid: str, lead_id: str, existentes: List[Dict[str, Any]]) -> str:
     """Motivo para não preparar de novo, ou vazio."""
     for i in existentes:
-        if i.get("lead_id") == lead_id and i.get("status") in ("pendente", "enviado", "aguardando_limite"):
+        if i.get("lead_id") == lead_id and i.get("status") in ("rascunho", "pendente", "enviado", "aguardando_limite"):
             return "já está na fila" if i["status"] != "enviado" else "já recebeu a abordagem"
     item = await pipeline_store.obter(uid, lead_id)
     if item and (pipeline_store.etapa_valida(item.get("etapa", "")) or "Novo Lead") != "Novo Lead":
@@ -198,8 +201,9 @@ async def preparar_lote(
     pode_enviar: PodeEnviar,
     cobrar_email: Cobrar,
     pausa: float = 0.8,
+    revisar: bool = False,
 ) -> Dict[str, Any]:
-    """Prepara até LOTE_MAXIMO leads. Devolve o que aconteceu com cada um.
+    """Prepara até LOTE_MAXIMO leads. Com `revisar`, nada sai: as mensagens ficam como rascunho para a pessoa conferir. Devolve o que aconteceu com cada um.
 
     `gerar`, `enviar_email` e `cobrar_email` entram de fora: assim o fluxo
     inteiro testa sem rede, sem SMTP e sem IA.
@@ -276,6 +280,12 @@ async def preparar_lote(
             await pipeline_store.registrar(uid, {**lead, "id": lid})
         except Exception as exc:
             print(f"Fila: não registrou no pipeline: {exc}")
+
+        if revisar:
+            item["status"] = "rascunho"
+            await _gravar(uid, item)
+            saida.append({"lead_id": lid, "nome": nome, "canal": canal, "resultado": "para revisar", "motivo": ""})
+            continue
 
         if canal == "email":
             if restante <= 0:
@@ -365,3 +375,86 @@ async def enviar_aguardando(uid: str, enviar_email: EnviarEmail, pode_enviar: Po
         enviados += 1
         await asyncio.sleep(pausa)
     return {"enviados": enviados, "resumo": resumo(await listar(uid))}
+
+
+# ------------------------------------------------------------- revisar antes de enviar
+
+async def editar(uid: str, item_id: str, texto: Optional[str] = None, assunto: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Corrige a mensagem (ou o assunto) de um item que ainda nao saiu. None se nao existe ou ja saiu."""
+    item = await obter(uid, item_id)
+    if not item or item.get("status") not in EDITAVEIS:
+        return None
+    if texto is not None:
+        novo = texto.strip()
+        if not novo:
+            raise ValueError("A mensagem não pode ficar vazia.")
+        if item.get("canal") == "email":
+            novo = com_rodape_de_saida(novo)
+        novo = novo[:4000]
+        contato = item.get("contato") or {}
+        lead = {"phone": contato.get("phone", ""), "instagram": contato.get("instagram", ""),
+                "socials": {"instagram": contato.get("instagram", ""), "linkedin": contato.get("linkedin", "")}}
+        item["texto"] = novo
+        item["link"] = link_do_canal(item.get("canal", ""), lead, novo)  # o link do WhatsApp leva o texto
+    if assunto is not None:
+        item["assunto"] = assunto.strip()[:200]
+    item["editado"] = True
+    await _gravar(uid, item)
+    return item
+
+
+async def descartar(uid: str, ids: List[str]) -> int:
+    """Tira da fila (sem enviar) as mensagens escolhidas. Devolve quantas."""
+    n = 0
+    for iid in ids[:100]:
+        item = await obter(uid, iid)
+        if item and item.get("status") in EDITAVEIS:
+            item["status"] = "pulado"
+            item["motivo"] = "descartada na revisão"
+            await _gravar(uid, item)
+            n += 1
+    return n
+
+
+async def aprovar(uid: str, ids: List[str], enviar_email: EnviarEmail, pode_enviar: PodeEnviar,
+                  cobrar_email: Cobrar, pausa: float = 0.8) -> Dict[str, Any]:
+    """Libera para sair as mensagens revisadas.
+
+    WhatsApp vai para a fila de saida (o Conector envia com intervalo e limite do dia); e-mail sai agora, dentro
+    do limite diario e dos creditos; Instagram e LinkedIn ficam prontos para a pessoa abrir.
+    """
+    todos = await listar(uid)
+    por_id = {i["id"]: i for i in todos}
+    restante = max(0, LIMITE_EMAIL_DIA - emails_enviados_hoje(todos))
+    saida: List[Dict[str, Any]] = []
+    for iid in ids[:60]:
+        item = por_id.get(iid)
+        if not item or item.get("status") != "rascunho":
+            continue
+        nome, lid = item.get("nome", ""), item.get("lead_id", "")
+        if item.get("canal") != "email":
+            item["status"] = "pendente"
+            item["motivo"] = ""
+            await _gravar(uid, item)
+            saida.append({"lead_id": lid, "nome": nome, "canal": item["canal"], "resultado": "na fila", "motivo": ""})
+            continue
+        if restante <= 0:
+            item["status"], item["motivo"] = "aguardando_limite", f"limite de {LIMITE_EMAIL_DIA} e-mails por dia atingido; envie amanhã"
+        elif not await pode_enviar():
+            item["status"], item["motivo"] = "aguardando_limite", "créditos insuficientes para enviar o e-mail"
+        else:
+            lead = {"id": lid, "name": nome, "email": (item.get("contato") or {}).get("email", "")}
+            try:
+                await enviar_email(lead, item.get("assunto") or "Contato", item["texto"])
+                await cobrar_email()
+                item.update({"status": "enviado", "enviado_em": agora(), "enviado_por": "robô", "motivo": ""})
+                restante -= 1
+                await pipeline_store.mover(uid, lid, "Contato Enviado", motivo="e-mail enviado pelo robô", por="robô")
+                await asyncio.sleep(pausa)
+            except Exception as exc:
+                item["status"], item["motivo"] = "falhou", str(exc)[:200]
+        await _gravar(uid, item)
+        saida.append({"lead_id": lid, "nome": nome, "canal": "email",
+                      "resultado": {"enviado": "enviado", "aguardando_limite": "aguardando", "falhou": "falhou"}[item["status"]],
+                      "motivo": item.get("motivo", "")})
+    return {"resultados": saida, "resumo": resumo(await listar(uid))}

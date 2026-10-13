@@ -1057,6 +1057,17 @@ async def pipeline_mover(lead_id: str, req: PipelineMoverRequest, user: dict = D
 class FilaPrepararRequest(BaseModel):
     leads: List[Dict[str, Any]] = Field(default_factory=list, max_length=fila_envio.LOTE_MAXIMO)
     tom: str = "Consultivo"
+    # a pessoa confere cada mensagem antes de qualquer envio
+    revisar: bool = False
+
+
+class FilaEditarRequest(BaseModel):
+    texto: Optional[str] = Field(default=None, max_length=4000)
+    assunto: Optional[str] = Field(default=None, max_length=200)
+
+
+class FilaIdsRequest(BaseModel):
+    ids: List[str] = Field(default_factory=list, max_length=100)
 
 
 def _lead_para_pitch(lead: Dict[str, Any]) -> LeadItem:
@@ -1119,7 +1130,7 @@ async def fila_preparar(req: FilaPrepararRequest, user: dict = Depends(get_curre
     try:
         return await asyncio.wait_for(
             fila_envio.preparar_lote(user.get("uid"), req.leads,
-                                     lambda l, c: gerar(l, c, req.tom), enviar, pode_enviar, cobrar),
+                                     lambda l, c: gerar(l, c, req.tom), enviar, pode_enviar, cobrar, revisar=req.revisar),
             timeout=55,
         )
     except asyncio.TimeoutError:
@@ -1138,6 +1149,34 @@ async def fila_enviar_aguardando(user: dict = Depends(get_current_user)):
     await exigir_recurso(user, "ia_abordagem", "O disparo")
     _, enviar, pode_enviar, cobrar = await _funcoes_da_fila(user)
     return await fila_envio.enviar_aguardando(user.get("uid"), enviar, pode_enviar, cobrar)
+
+
+@app.patch("/api/robo/fila/{item_id}")
+async def fila_editar(item_id: str, req: FilaEditarRequest, user: dict = Depends(get_current_user)):
+    """Corrige a mensagem ou o assunto de um item que ainda não saiu."""
+    await exigir_recurso(user, "ia_abordagem", "O disparo")
+    try:
+        item = await fila_envio.editar(user.get("uid"), item_id, req.texto, req.assunto)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    if item is None:
+        raise HTTPException(status_code=404, detail="Esse item não existe ou já saiu.")
+    return item
+
+
+@app.post("/api/robo/fila/aprovar")
+async def fila_aprovar(req: FilaIdsRequest, user: dict = Depends(get_current_user)):
+    """Libera para sair as mensagens que a pessoa revisou e deixou marcadas."""
+    await exigir_recurso(user, "ia_abordagem", "O disparo")
+    _, enviar, pode_enviar, cobrar = await _funcoes_da_fila(user)
+    return await fila_envio.aprovar(user.get("uid"), req.ids, enviar, pode_enviar, cobrar)
+
+
+@app.post("/api/robo/fila/descartar")
+async def fila_descartar(req: FilaIdsRequest, user: dict = Depends(get_current_user)):
+    await exigir_recurso(user, "ia_abordagem", "O disparo")
+    n = await fila_envio.descartar(user.get("uid"), req.ids)
+    return {"descartadas": n, "resumo": fila_envio.resumo(await fila_envio.listar(user.get("uid")))}
 
 
 @app.post("/api/robo/fila/{item_id}/enviado")

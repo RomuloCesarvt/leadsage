@@ -191,3 +191,68 @@ def test_filas_de_contas_diferentes_nao_se_misturam(com_robo, rodar):
     preparar(rodar, [lead("W", phone="14998003784")], p, uid="alice")
     assert len(rodar(fila_envio.listar, "alice")) == 1
     assert rodar(fila_envio.listar, "bob") == []
+
+
+# ------------------------------------------------------------------ revisar antes de enviar
+
+def revisar(rodar, leads, p, uid=UID):
+    return rodar(fila_envio.preparar_lote, uid, leads, p.gerar, p.enviar, p.pode, p.cobrar, 0, True)
+
+
+def test_revisar_nao_envia_nada_e_deixa_tudo_como_rascunho(rodar, com_robo):
+    p = Pontas()
+    r = revisar(rodar, [lead("A", email="a@b.com"), lead("B", phone="14998003784")], p)
+    assert [x["resultado"] for x in r["resultados"]] == ["para revisar", "para revisar"]
+    assert p.enviados == [] and p.cobrancas == 0
+    itens = rodar(fila_envio.listar, UID)
+    assert {i["status"] for i in itens} == {"rascunho"} and r["resumo"]["rascunhos"] == 2
+
+
+def test_rascunho_nao_vai_para_a_fila_do_conector(rodar, com_robo):
+    from app import conector_whatsapp as cw
+    revisar(rodar, [lead("B", phone="14998003784")], Pontas())
+    assert rodar(cw._fila_whatsapp, UID) == []
+
+
+def test_editar_muda_o_texto_o_link_do_whatsapp_e_o_rodape_do_email(rodar, com_robo):
+    revisar(rodar, [lead("A", email="a@b.com"), lead("B", phone="14998003784")], Pontas())
+    zap = rodar(fila_envio.editar, UID, "f_B", "Oi, tudo bem? Posso mostrar uma ideia?")
+    assert zap["texto"] == "Oi, tudo bem? Posso mostrar uma ideia?" and "Oi%2C%20tudo%20bem" in zap["link"] and zap["editado"]
+    mail = rodar(fila_envio.editar, UID, "f_A", "Texto novo sem rodapé", "Assunto novo")
+    assert mail["assunto"] == "Assunto novo" and "responder SAIR" in mail["texto"]
+    with pytest.raises(ValueError):
+        rodar(fila_envio.editar, UID, "f_B", "   ")
+    assert rodar(fila_envio.editar, UID, "f_nao_existe", "x") is None
+
+
+def test_aprovar_libera_so_os_marcados_whatsapp_vai_para_a_fila_e_email_sai(rodar, com_robo):
+    p = Pontas()
+    revisar(rodar, [lead("A", email="a@b.com"), lead("B", phone="14998003784"), lead("C", phone="14998003785")], p)
+    r = rodar(fila_envio.aprovar, UID, ["f_A", "f_B"], p.enviar, p.pode, p.cobrar, 0)
+    assert {x["lead_id"]: x["resultado"] for x in r["resultados"]} == {"A": "enviado", "B": "na fila"}
+    assert [e[0] for e in p.enviados] == ["A"] and p.cobrancas == 1
+    status = {i["id"]: i["status"] for i in rodar(fila_envio.listar, UID)}
+    assert status == {"f_A": "enviado", "f_B": "pendente", "f_C": "rascunho"}   # C continua esperando a decisao
+
+
+def test_aprovar_email_sem_credito_espera_e_nao_envia_de_graca(rodar, com_robo):
+    p = Pontas(creditos=0)
+    revisar(rodar, [lead("A", email="a@b.com")], p)
+    r = rodar(fila_envio.aprovar, UID, ["f_A"], p.enviar, p.pode, p.cobrar, 0)
+    assert r["resultados"][0]["resultado"] == "aguardando" and p.enviados == []
+
+
+def test_descartar_tira_da_fila_sem_enviar_e_nao_mexe_no_que_ja_saiu(rodar, com_robo):
+    p = Pontas()
+    revisar(rodar, [lead("A", email="a@b.com"), lead("B", phone="14998003784")], p)
+    rodar(fila_envio.aprovar, UID, ["f_A"], p.enviar, p.pode, p.cobrar, 0)
+    assert rodar(fila_envio.descartar, UID, ["f_A", "f_B"]) == 1          # A ja saiu: fica
+    status = {i["id"]: i["status"] for i in rodar(fila_envio.listar, UID)}
+    assert status == {"f_A": "enviado", "f_B": "pulado"}
+
+
+def test_rotas_de_revisao(client, com_robo):
+    from app.main import app  # noqa: F401
+    r = client.post("/api/robo/fila/aprovar", json={"ids": []})
+    assert r.status_code in (200, 402, 403)
+    assert client.patch("/api/robo/fila/f_x", json={"texto": "oi"}).status_code in (404, 402, 403)

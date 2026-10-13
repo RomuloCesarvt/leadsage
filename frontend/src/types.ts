@@ -551,21 +551,23 @@ export interface ItemFila {
   link: string;
   gancho?: string;
   seguimentos?: { quando: string; objetivo?: string; texto: string }[];
-  status: 'pendente' | 'enviando' | 'enviado' | 'pulado' | 'aguardando_limite' | 'falhou';
+  status: 'rascunho' | 'pendente' | 'enviando' | 'enviado' | 'pulado' | 'aguardando_limite' | 'falhou';
   motivo?: string;
+  /** a pessoa mudou o texto gerado pelo robô */
+  editado?: boolean;
   criado: string;
   enviado_em?: string;
   enviado_por?: string;
 }
 
 export interface ResumoFila {
-  pendentes: number; aguardando_limite: number; enviados: number;
+  rascunhos?: number; pendentes: number; aguardando_limite: number; enviados: number;
   email_hoje: number; limite_email_dia: number; email_restante: number;
 }
 
 export interface ResultadoPreparo {
   lead_id: string; nome: string; canal?: CanalFila;
-  resultado: 'enviado' | 'na fila' | 'aguardando' | 'falhou' | 'ignorado'; motivo?: string;
+  resultado: 'enviado' | 'na fila' | 'aguardando' | 'falhou' | 'ignorado' | 'para revisar'; motivo?: string;
 }
 
 export interface UsuarioAdmin {

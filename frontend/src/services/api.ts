@@ -384,8 +384,20 @@ export const api = {
     return await fetchWithToken('/robo/fila');
   },
 
-  async filaPreparar(leads: Record<string, unknown>[], tom = 'Consultivo'): Promise<{ resultados: ResultadoPreparo[]; resumo: ResumoFila }> {
-    return await fetchWithToken('/robo/fila/preparar', { method: 'POST', body: JSON.stringify({ leads, tom }) });
+  async filaPreparar(leads: Record<string, unknown>[], tom = 'Consultivo', revisar = false): Promise<{ resultados: ResultadoPreparo[]; resumo: ResumoFila }> {
+    return await fetchWithToken('/robo/fila/preparar', { method: 'POST', body: JSON.stringify({ leads, tom, revisar }) });
+  },
+
+  async filaEditar(id: string, dados: { texto?: string; assunto?: string }): Promise<ItemFila> {
+    return await fetchWithToken(`/robo/fila/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(dados) });
+  },
+
+  async filaAprovar(ids: string[]): Promise<{ resultados: ResultadoPreparo[]; resumo: ResumoFila }> {
+    return await fetchWithToken('/robo/fila/aprovar', { method: 'POST', body: JSON.stringify({ ids }) });
+  },
+
+  async filaDescartar(ids: string[]): Promise<{ descartadas: number; resumo: ResumoFila }> {
+    return await fetchWithToken('/robo/fila/descartar', { method: 'POST', body: JSON.stringify({ ids }) });
   },
 
   async filaEnviarAguardando(): Promise<{ enviados: number; resumo: ResumoFila }> {
