@@ -1695,6 +1695,28 @@ async def worker_auth_apagar(uid: str, request: Request):
     if not nuvem_auth.uid_valido(uid):
         raise HTTPException(status_code=400, detail="Usuário inválido.")
     await nuvem_auth.apagar(uid)
+    await nuvem_auth.apagar(uid, "historico")  # quem desconecta leva as conversas junto
+    return {"ok": True}
+
+
+@app.get("/api/worker/historico/{uid}")
+async def worker_historico_ler(uid: str, request: Request):
+    """As conversas recentes do WhatsApp deste usuário (texto cifrado pelo serviço da nuvem): sobrevivem a reinícios."""
+    _exigir_worker(request)
+    if not nuvem_auth.uid_valido(uid):
+        raise HTTPException(status_code=400, detail="Usuário inválido.")
+    blob = await nuvem_auth.ler(uid, "historico")
+    if blob is None:
+        raise HTTPException(status_code=503, detail="Banco indisponível agora.")
+    return {"blob": blob}
+
+
+@app.put("/api/worker/historico/{uid}")
+async def worker_historico_gravar(uid: str, req: SessaoGuardada, request: Request):
+    _exigir_worker(request)
+    if not nuvem_auth.uid_valido(uid):
+        raise HTTPException(status_code=400, detail="Usuário inválido.")
+    await nuvem_auth.gravar(uid, req.blob, "historico")
     return {"ok": True}
 
 

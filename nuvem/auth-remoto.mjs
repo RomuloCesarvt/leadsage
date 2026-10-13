@@ -28,6 +28,26 @@ export function decifrar(blob, segredo) {
   return Buffer.concat([d.update(b.subarray(28)), d.final()]).toString('utf8');
 }
 
+/** Ler e gravar um texto cifrado no LeadSage (usado pelo histórico das conversas). */
+export function guardaRemota({ site, segredo, uid, tipo = 'historico', buscar = fetch, aviso = () => {} }) {
+  const url = `${site}/api/worker/${tipo}/${encodeURIComponent(uid)}`;
+  const cab = { 'x-worker-secret': segredo, 'content-type': 'application/json' };
+  return {
+    async ler() {
+      const r = await buscar(url, { headers: cab, signal: AbortSignal.timeout(20000) });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const { blob } = await r.json();
+      return blob ? decifrar(blob, segredo) : '{"chats":{}}';
+    },
+    async gravar(texto) {
+      const cifrado = cifrar(texto, segredo);
+      if (cifrado.length > MAX_BLOB) { aviso('O histórico ficou grande demais para guardar; guardando só o mais recente.'); return; }
+      const r = await buscar(url, { method: 'PUT', headers: cab, body: JSON.stringify({ blob: cifrado }), signal: AbortSignal.timeout(20000) });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    },
+  };
+}
+
 export async function authRemoto({ site, segredo, uid, aviso = () => {}, esperaMs = 4000, buscar = fetch }) {
   const url = `${site}/api/worker/auth/${encodeURIComponent(uid)}`;
   const cab = { 'x-worker-secret': segredo, 'content-type': 'application/json' };

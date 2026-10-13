@@ -369,7 +369,7 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-          {!filtrados.length && <p className="text-sm text-slate-400 text-center py-10 px-4">Nenhuma conversa aqui.</p>}
+          {!filtrados.length && <p className="text-sm text-slate-400 text-center py-10 px-4">{remoto && !(chats || []).length ? 'Ainda não há conversas guardadas. Elas aparecem aqui conforme as mensagens chegam; a nuvem passa a guardar o histórico e ele não some mais ao reiniciar.' : 'Nenhuma conversa aqui.'}</p>}
           {filtrados.map(c => {
             const r = conversaDoRobo(c);
             return (

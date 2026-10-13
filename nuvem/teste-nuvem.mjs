@@ -229,3 +229,28 @@ test('sessão guardada: depois de apagar, nada ressuscita a sessão', async () =
   await new Promise((r) => setTimeout(r, 50));
   assert.equal(b.deletes, 1); assert.equal(b.puts, 0); assert.equal(b.blob, '');
 });
+
+// ------------------------------------------------------------------ o historico das conversas sobrevive a reinicios
+
+import { criarHistorico } from '../conector/leadsage-conector.mjs';
+import { guardaRemota } from './auth-remoto.mjs';
+
+test('historico: grava no banco (cifrado) e volta igual depois de um reinício', async () => {
+  const b = bancoFalso('');
+  const seg = 'segredo-1234567890123456';
+  const guarda = guardaRemota({ site: 'https://x.test', segredo: seg, uid: 'u1', buscar: async (url, init = {}) => {
+    if (init.method === 'PUT') { b.blob = JSON.parse(init.body).blob; b.puts++; return { ok: true, status: 200, json: async () => ({}) }; }
+    return { ok: true, status: 200, json: async () => ({ blob: b.blob }) };
+  } });
+  const h1 = criarHistorico('', { maxMensagens: 40, maxChats: 60, ...guarda });
+  await h1.carregar();
+  assert.deepEqual(h1.chats(), []);                                   // primeira vez: nada
+  h1.registrar({ chatId: '5511999990000@c.us', nome: 'Gabriel', mensagem: { id: 'a1', texto: 'boa tarde', minha: false, quando: 100, tipo: 'text', midia: false, status: 0 } });
+  await new Promise((r) => setTimeout(r, 6300));                      // a gravação é adiada em alguns segundos
+  assert.equal(b.puts, 1);
+  assert.ok(!b.blob.includes('Gabriel'));                             // o banco só vê texto cifrado
+  const h2 = criarHistorico('', { ...guarda });                       // o serviço reiniciou
+  await h2.carregar();
+  assert.equal(h2.chats()[0].nome, 'Gabriel');
+  assert.equal(h2.mensagens('5511999990000@c.us')[0].texto, 'boa tarde');
+});

@@ -20,43 +20,47 @@ def uid_valido(uid: str) -> bool:
     return bool(_UID_RE.match(uid or ""))
 
 
-def _chave(uid: str) -> str:
-    return f"nuvem_auth:{uid}"
+def _chave(uid: str, tipo: str = "auth") -> str:
+    return f"nuvem_{tipo}:{uid}"
 
 
-async def ler(uid: str) -> Optional[str]:
+def _colecao(tipo: str) -> str:
+    return "nuvem_auth" if tipo == "auth" else f"nuvem_{tipo}"
+
+
+async def ler(uid: str, tipo: str = "auth") -> Optional[str]:
     """O texto guardado, '' se nao ha nada, ou None se o banco nao respondeu."""
     if firestore_db is not None:
         try:
-            doc = firestore_db.collection("nuvem_auth").document(uid).get()
+            doc = firestore_db.collection(_colecao(tipo)).document(uid).get()
             return (doc.to_dict() or {}).get("blob", "") if doc.exists else ""
         except Exception as exc:
             robo_store._FALHA[0] = time.monotonic()
             print(f"Nuvem: falha ao ler a sessao: {exc}")
             return None
-    dados = await robo_store._sql_get(_chave(uid))
+    dados = await robo_store._sql_get(_chave(uid, tipo))
     return (dados or {}).get("blob", "")
 
 
-async def gravar(uid: str, blob: str) -> None:
+async def gravar(uid: str, blob: str, tipo: str = "auth") -> None:
     if firestore_db is not None:
         try:
-            firestore_db.collection("nuvem_auth").document(uid).set({"blob": blob, "em": robo_store.agora()})
+            firestore_db.collection(_colecao(tipo)).document(uid).set({"blob": blob, "em": robo_store.agora()})
             return
         except Exception as exc:
             robo_store._FALHA[0] = time.monotonic()
             print(f"Nuvem: falha ao gravar a sessao: {exc}")
-    await robo_store._sql_put(_chave(uid), uid, "nuvem_auth", {"blob": blob})
+    await robo_store._sql_put(_chave(uid, tipo), uid, "nuvem_auth", {"blob": blob})
 
 
-async def apagar(uid: str) -> None:
+async def apagar(uid: str, tipo: str = "auth") -> None:
     if firestore_db is not None:
         try:
-            firestore_db.collection("nuvem_auth").document(uid).delete()
+            firestore_db.collection(_colecao(tipo)).document(uid).delete()
         except Exception as exc:
-            print(f"Nuvem: falha ao apagar a sessao: {exc}")
+            print(f"Nuvem: falha ao apagar ({tipo}): {exc}")
     async with AsyncSessionLocal() as s:
-        linha = (await s.execute(select(DBRobo).where(DBRobo.chave == _chave(uid)))).scalar_one_or_none()
+        linha = (await s.execute(select(DBRobo).where(DBRobo.chave == _chave(uid, tipo)))).scalar_one_or_none()
         if linha:
             await s.delete(linha)
             await s.commit()

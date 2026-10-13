@@ -105,3 +105,17 @@ def test_perguntar_por_tarefas_tambem_prova_que_o_conector_esta_vivo(nuvem):
     assert nuvem.get("/api/robo/whats/estado").json()["online"] is False
     nuvem.get("/api/conector/tarefas", headers={"x-conector-key": chave})
     assert nuvem.get("/api/robo/whats/estado").json()["online"] is True
+
+
+def test_historico_das_conversas_vai_e_volta_e_some_com_a_sessao(nuvem):
+    h = {"x-worker-secret": SEGREDO}
+    assert nuvem.get("/api/worker/historico/alice", headers=h).json() == {"blob": ""}
+    assert nuvem.put("/api/worker/historico/alice", headers=h, json={"blob": "Y29udmVyc2Fz"}).status_code == 200
+    assert nuvem.get("/api/worker/historico/alice", headers=h).json() == {"blob": "Y29udmVyc2Fz"}
+    # a sessao e o historico sao guardados separados
+    assert nuvem.get("/api/worker/auth/alice", headers=h).json() == {"blob": ""}
+    assert nuvem.get("/api/worker/historico/alice").status_code == 401
+    # quem desconecta leva as conversas junto
+    nuvem.put("/api/worker/auth/alice", headers=h, json={"blob": "c2Vzc2Fv"})
+    assert nuvem.delete("/api/worker/auth/alice", headers=h).status_code == 200
+    assert nuvem.get("/api/worker/historico/alice", headers=h).json() == {"blob": ""}

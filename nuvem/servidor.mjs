@@ -16,13 +16,14 @@ import {
   clienteLeadsage, criarAgrupador, criarHistorico, enviarPendentes, entregarMensagem, tentarDeNovo,
 } from '../conector/leadsage-conector.mjs';
 import { iniciarBaileys } from './adaptador-baileys.mjs';
-import { authRemoto } from './auth-remoto.mjs';
+import { authRemoto, guardaRemota } from './auth-remoto.mjs';
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const agora = () => new Date().toISOString().slice(11, 19);
 
 export class Sessao {
-  constructor({ uid, chave, site, dados, aviso, fabrica = iniciarBaileys, authFabrica = null }) {
+  constructor({ uid, chave, site, dados, aviso, fabrica = iniciarBaileys, authFabrica = null, segredo = '' }) {
+    this.segredo = segredo;
     this.authFabrica = authFabrica; // sessão no banco (servidor sem disco); sem ele, usa a pasta
     this.uid = uid;
     this.chave = chave;
@@ -119,7 +120,10 @@ export class Sessao {
   /** Roda até `parar()`. Cada volta é curta; erros de rede só viram aviso. */
   async rodar() {
     mkdirSync(this.dir, { recursive: true });
-    this.historico = criarHistorico(join(this.dir, 'historico.json'));
+    // sem disco (hospedagem gratuita), as conversas ficam no banco do LeadSage, cifradas: sobrevivem a reinícios
+    this.historico = this.authFabrica && this.segredo
+      ? criarHistorico('', { maxMensagens: 40, maxChats: 60, ...guardaRemota({ site: this.site, segredo: this.segredo, uid: this.uid, aviso: this.aviso }) })
+      : criarHistorico(join(this.dir, 'historico.json'));
     await this.historico.carregar();
     this.inicioS = Math.floor(Date.now() / 1000);
     this.vistos = new Set();
@@ -181,7 +185,7 @@ export class Sessao {
 
 export function criarGerente({ site, segredo, dados, aviso = console.log, sessaoNoBanco = false, fabricaSessao = null, desconectar = async () => {} }) {
   const authFabrica = sessaoNoBanco ? (uid) => authRemoto({ site, segredo, uid, aviso }) : null;
-  fabricaSessao = fabricaSessao || ((o) => new Sessao({ ...o, authFabrica }));
+  fabricaSessao = fabricaSessao || ((o) => new Sessao({ ...o, authFabrica, segredo }));
   const ativas = new Map(); // uid -> { sessao, chave }
 
   async function lista() {
