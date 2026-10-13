@@ -63,6 +63,11 @@ async def criar(uid: str, email: str, lead: Dict[str, Any]) -> Tuple[str, str]:
     if not lead_id:
         return "", "o lead não tem identificador"
     try:
+        # a pagina generica das primeiras versoes sai de cena (e devolve a vaga): ela nao era o site da empresa
+        from app.sites_store import delete_site, list_sites
+        for antigo in await list_sites(uid):
+            if antigo.get("lead_id") == lead_id and antigo.get("template") == "Prévia rápida":
+                await delete_site(uid, antigo["id"])
         if not is_admin(email):
             cota = (await get_profile(uid)).sites_quota or 0
             if await contar_sites(uid) >= cota:

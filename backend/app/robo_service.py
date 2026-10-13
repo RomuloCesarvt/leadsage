@@ -155,7 +155,8 @@ async def _site_do_lead(uid: str, lead_id: str) -> str:
 
     try:
         for site in await list_sites(uid):
-            if site.get("lead_id") == lead_id and site.get("slug"):
+            # a pagina generica das primeiras versoes ("Previa rapida") nao vale: a previa e o site da empresa
+            if site.get("lead_id") == lead_id and site.get("slug") and site.get("template") != "Prévia rápida":
                 return f"{settings.APP_URL}/s/{site['slug']}"
     except Exception:
         pass

@@ -393,3 +393,14 @@ def test_previa_por_telefone_funciona_de_qualquer_tela(rodar, com_robo):
 def test_rota_de_previa_por_telefone(client, com_robo):
     r = client.post("/api/robo/previa", json={"telefone": "5511900000000"})
     assert r.status_code in (404, 402, 403)
+
+
+def test_a_previa_generica_antiga_e_trocada_pelo_site_da_empresa(rodar, com_robo):
+    from app import previa_site
+    from app.sites_store import create_site, list_sites
+    rodar(create_site, "alice", "Clínica Alluve", "<html><body>generica</body></html>", "Prévia rápida", "L77")
+    assert rodar(robo_service._site_do_lead, "alice", "L77") == ""          # a generica nao conta como previa
+    url, falha = rodar(previa_site.criar, "alice", "alice@example.com", LEAD_CLINICA)
+    assert falha == "" and url
+    sites = [s for s in rodar(list_sites, "alice") if s.get("lead_id") == "L77"]
+    assert [s["template"] for s in sites] == ["Modelo de teste"]            # a antiga saiu, ficou so o site de verdade
