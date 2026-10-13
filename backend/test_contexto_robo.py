@@ -159,3 +159,75 @@ def test_preco_seco_na_segunda_tentativa_ainda_sai_sem_chamar_o_humano():
     hist = [{"de": "robo", "texto": ABORDAGEM}, {"de": "contato", "texto": "Preço"}]
     d = decidir(hist, "whatsapp", {}, {"ativo": True, "catalogo": "Site: R$ 600"}, None, lambda p: {"mensagens": ["R$ 600."]})
     assert d.mensagens == ["R$ 600."] and not d.passar_para_humano
+
+
+# ------------------------------------------------------------------ o caso real: [LINK_DA_PREVIA], "preparei" sem previa e resposta em quadruplicata
+
+def test_marcador_de_modelo_nunca_chega_ao_cliente():
+    from app.ai_sdr import resolver_marcadores
+    erros = problemas_da_resposta(["Que ótimo! Segue o link da prévia: [LINK_DA_PREVIA]."], {}, HISTORICO, {"site_publicado": "https://x.test/s/a"})
+    assert any("marcador" in e for e in erros)
+    # com a previa criada, o marcador vira o link de verdade
+    assert resolver_marcadores(["Segue: [LINK_DA_PREVIA]."], {"site_publicado": "https://x.test/s/a"}) == ["Segue: https://x.test/s/a."]
+    # sem previa, nao ha o que colocar no lugar
+    assert resolver_marcadores(["Segue: [LINK_DA_PREVIA]."], {}) == ["Segue: [LINK_DA_PREVIA]."]
+
+
+@pytest.mark.parametrize("texto", [
+    "Que ótimo! Preparei esse esboço focado em converter quem pesquisa por dentista.",
+    "Vou te enviar o link da prévia agora.",
+    "Segue o link da prévia para você analisar.",
+    "Montei uma prévia do site de vocês.",
+])
+def test_sem_previa_criada_o_robo_nao_diz_que_preparou_nem_manda_link(texto):
+    erros = problemas_da_resposta([texto], {}, HISTORICO, {})
+    assert any("NENHUMA prévia" in e for e in erros)
+
+
+def test_com_previa_criada_pode_falar_dela_mas_o_link_precisa_estar_la():
+    lead = {"site_publicado": "https://x.test/s/clinica"}
+    assert problemas_da_resposta(["Montei uma prévia do site de vocês."], {}, HISTORICO, lead) == []
+    assert any("sem colocar o link" in e for e in problemas_da_resposta(["Segue o link da prévia, é só abrir."], {}, HISTORICO, lead))
+    assert problemas_da_resposta(["Segue o link da prévia: https://x.test/s/clinica"], {}, HISTORICO, lead) == []
+
+
+def test_decidir_sem_previa_nao_deixa_o_modelo_alucinar_e_passa_ao_dono():
+    hist = [{"de": "robo", "texto": ABORDAGEM}, {"de": "contato", "texto": "Ok"}]
+    d = decidir(hist, "whatsapp", {}, {"ativo": True}, {"id": "L1", "name": "Clínica"},
+                lambda p: {"mensagens": ["Que ótimo! Segue o link da prévia: [LINK_DA_PREVIA]."]})
+    assert d.passar_para_humano and not d.mensagens and "conferência" in d.motivo
+
+
+def test_prompt_diz_se_a_previa_existe():
+    from app.ai_sdr import montar_prompt
+    sem = montar_prompt(HISTORICO, "whatsapp", {}, {"ativo": True}, {"name": "Clínica"})
+    com = montar_prompt(HISTORICO, "whatsapp", {}, {"ativo": True}, {"name": "Clínica", "site_publicado": "https://x.test/s/c"})
+    assert "NÃO existe nenhuma prévia criada" in sem and "https://x.test/s/c" in com and "NÃO existe nenhuma prévia" not in com
+
+
+@pytest.mark.parametrize("auto", [
+    "Agradecemos pela sua mensagem.\n\nClínica Alluve ✨",
+    "Olá! No momento não estamos disponíveis. Responderemos em breve.",
+])
+def test_resposta_automatica_de_clinica_nao_e_respondida(auto):
+    from app.ai_robo import parece_automatica
+    assert parece_automatica(auto)
+
+
+def test_a_mesma_mensagem_do_lead_so_e_respondida_uma_vez_mesmo_com_chamadas_simultaneas(rodar, com_robo):
+    import asyncio
+    envio = Envio()
+    chamadas = []
+
+    def gerar(p):
+        chamadas.append(1)
+        return {"mensagens": ["Perfeito! Amanhã às 15h ou sexta às 10h, qual fica melhor?"], "etapa": "agendamento"}
+
+    async def varias():
+        m = msg("Pode me explicar melhor como funciona?", 1, contato="5511955556666")
+        await robo_service.processar(cfg(), m, gerar=gerar, enviar=envio, adiar=True)       # guarda a mensagem
+        # o agrupador, a nova tentativa e a varredura chamam ao mesmo tempo
+        return await asyncio.gather(*[robo_service.processar(cfg(), m, gerar=gerar, enviar=envio, reprocessar=True) for _ in range(4)])
+
+    rodar(varias)
+    assert len(envio.enviados) == 1 and len(chamadas) == 1

@@ -137,6 +137,9 @@ SINAIS_DE_ROBO = (
     (2, "escolha uma das opcoes"), (2, "selecione uma opcao"), (2, "para continuar o atendimento"),
     (2, "sobre qual deles"), (2, "agradece seu contato"), (2, "agradecemos o seu contato"),
     (2, "agradecemos seu contato"), (2, "agradeco o seu contato"), (2, "agradeco o contato"),
+    (2, "agradecemos pela sua mensagem"), (2, "agradecemos a sua mensagem"), (2, "agradecemos a mensagem"),
+    (2, "agradecemos pelo seu contato"), (2, "obrigado pela sua mensagem"), (2, "obrigada pela sua mensagem"),
+    (2, "nao estamos disponiveis"), (2, "no momento nao estamos"), (2, "retornaremos assim que"), (2, "responderemos em breve"),
     (2, "sua parcela"), (2, "sua fatura"), (2, "seu boleto"),
     (1, "obrigado por entrar em contato"), (1, "obrigada por entrar em contato"), (1, "em caso de duvidas"),
     (1, "retornaremos"), (1, "responderemos assim que"), (1, "em breve"), (1, "nosso horario"),
@@ -185,7 +188,7 @@ def respostas_seguidas_do_robo(mensagens: List[Dict[str, Any]]) -> int:
 
 
 from app import ai_oferta  # noqa: E402
-from app.ai_sdr import forma_do_preco, montar_prompt, normalizar, problemas_da_resposta  # noqa: E402
+from app.ai_sdr import forma_do_preco, montar_prompt, normalizar, problemas_da_resposta, resolver_marcadores  # noqa: E402
 
 
 def decidir(
@@ -245,15 +248,18 @@ def decidir(
 
     # Conferencia em codigo: preco fora do catalogo e motivo inventado nao
     # saem. Uma chance de corrigir; errou de novo, o humano assume.
-    erros = problemas_da_resposta(n["mensagens"], cfg, mensagens) + forma_do_preco(n["mensagens"], mensagens)
+    n["mensagens"] = resolver_marcadores(n["mensagens"], lead)
+    erros = problemas_da_resposta(n["mensagens"], cfg, mensagens, lead or {}) + forma_do_preco(n["mensagens"], mensagens)
     if erros:
         correcao = (prompt + "\n\n== SUA RESPOSTA ANTERIOR FOI RECUSADA ==\n"
                     + "\n".join(f"- {e}" for e in erros)
                     + "\nReescreva sem isso. Para negar algo, basta dizer que não é possível.")
         n = normalizar(gerar_json(correcao), sdr)
-        if problemas_da_resposta(n["mensagens"], cfg, mensagens):
+        n["mensagens"] = resolver_marcadores(n["mensagens"], lead)
+        restantes = problemas_da_resposta(n["mensagens"], cfg, mensagens, lead or {})
+        if restantes:
             return Decisao(passar_para_humano=True, usou_ia=True, sdr=n["sdr"],
-                           motivo="a IA insistiu em citar preço ou motivo que não existe — responda você")
+                           motivo="a resposta do robô não passou na conferência (" + restantes[0][:110] + ") — responda você")
     humano = n["passar_para_humano"]
 
     if not n["mensagens"] and not humano:

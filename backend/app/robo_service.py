@@ -220,7 +220,26 @@ async def _incluir_abordagem(uid: str, conversa: Dict[str, Any], lead: Optional[
         conversa["mensagens"] = previas + conversa["mensagens"]
 
 
+# Uma conversa por vez: o Conector chama o robo de varios lugares ao mesmo tempo (agrupador, nova tentativa, varredura).
+# Sem isto, cada chamada lia a mesma mensagem sem resposta e todas respondiam: o lead recebia a resposta quatro vezes.
+_TRAVAS: Dict[str, asyncio.Lock] = {}
+
+
 async def processar(
+    cfg: Dict[str, Any],
+    msg: meta_canais.Recebida,
+    gerar: Optional[Callable[[str], Dict[str, Any]]] = None,
+    enviar: Optional[Enviar] = None,
+    reprocessar: bool = False,
+    adiar: bool = False,
+) -> Dict[str, Any]:
+    chave = f"{cfg['uid']}:{robo_store.id_da_conversa(msg.canal, msg.contato)}"
+    trava = _TRAVAS.setdefault(chave, asyncio.Lock())
+    async with trava:
+        return await _processar(cfg, msg, gerar, enviar, reprocessar, adiar)
+
+
+async def _processar(
     cfg: Dict[str, Any],
     msg: meta_canais.Recebida,
     gerar: Optional[Callable[[str], Dict[str, Any]]] = None,
@@ -271,6 +290,7 @@ async def processar(
     await _incluir_abordagem(uid, conversa, lead, msg)
 
     async def salvar() -> Dict[str, Any]:
+        conversa.pop("respondendo", None)
         await robo_store.salvar_conversa(uid, conversa)
         return conversa
 
@@ -279,6 +299,10 @@ async def processar(
 
     # 2. quem pediu para sair nao recebe mais nada do robo
     if conversa.get("optout"):
+        return await salvar()
+
+    # A ultima fala ja e do robo (ou do dono): essa mensagem do lead ja foi respondida. Outra chamada chegou na frente.
+    if conversa["mensagens"] and conversa["mensagens"][-1].get("de") != "contato":
         return await salvar()
 
     # a IA falhou antes por um motivo passageiro: nao prende a conversa, tenta de novo agora
@@ -313,6 +337,20 @@ async def processar(
             raio = await raio_x.ler_cache(uid, lead["id"])
         except Exception:
             raio = None
+
+    # Entre instancias do servidor a trava acima nao vale: marca na propria conversa que alguem esta respondendo.
+    import time as _t
+    import uuid as _uuid
+    reserva = conversa.get("respondendo") or {}
+    if reserva.get("em") and _t.time() - float(reserva["em"]) < 90:
+        return conversa  # outra chamada ja esta respondendo a esta mensagem
+    token = _uuid.uuid4().hex
+    conversa["respondendo"] = {"token": token, "em": _t.time()}
+    await robo_store.salvar_conversa(uid, conversa)
+    await asyncio.sleep(0.35)
+    fresca = await robo_store.obter_conversa(uid, cid)
+    if fresca and (fresca.get("respondendo") or {}).get("token") != token:
+        return fresca  # a outra chamada ganhou
 
     # 5 e 6. regras fixas, depois IA
     gerador = gerar or _gerador_padrao()

@@ -115,6 +115,18 @@ def _formatar_dossie(lead: Optional[Dict[str, Any]], raio: Optional[Dict[str, An
     return "\n".join(linhas)
 
 
+def _bloco_da_previa(lead: Optional[Dict[str, Any]]) -> str:
+    url = ((lead or {}).get("site_publicado") or "").strip()
+    if url:
+        return (f"EXISTE uma prévia pronta: {url}\n"
+                "- Quando o cliente aceitar ver (\"pode mandar\", \"ok\", \"sim\"), envie ESTE link, escrito por inteiro na mensagem, com uma frase do que ele vai ver. "
+                "Nunca escreva marcadores entre colchetes como [LINK]: só o endereço de verdade.")
+    return ("NÃO existe nenhuma prévia criada para este negócio (não há link).\n"
+            "- NUNCA diga que preparou, montou ou criou a prévia, que está pronta, nem que vai mandar o link agora, e NUNCA escreva marcadores como [LINK].\n"
+            "- Se o cliente aceitou ver ou receber a prévia: diga em UMA frase que está finalizando e envia por aqui em breve, e marque "
+            "passar_para_humano=true com o motivo \"aceitou a prévia, mas ela ainda não existe: crie o site e envie o link\". Não faça mais perguntas.")
+
+
 def _formatar_estado(sdr: Dict[str, Any]) -> str:
     if not sdr:
         return "Início da conversa: nada descoberto ainda."
@@ -219,6 +231,9 @@ Instruções do dono: {cfg.get('instrucoes') or '(nenhuma)'}
 
 == ENTENDENDO O RAMO ==
 {ramo}
+
+== A PRÉVIA DO SITE DESTE NEGÓCIO ==
+{_bloco_da_previa(lead)}
 
 == ONDE A CONVERSA ESTÁ ==
 {_formatar_estado(sdr or {})}
@@ -460,8 +475,45 @@ def cliente_perguntou_de_valor(mensagens: List[Dict[str, Any]]) -> bool:
     return False
 
 
-def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: List[Dict[str, Any]]) -> List[str]:
+_MARCADOR = _re.compile(r"\[[A-Z0-9_ ]{3,40}\]|\{\{[^}]{1,40}\}\}|\{[a-z_]{3,30}\}|<[A-Z_]{3,30}>")
+_ALEGA_PREVIA = _re.compile(
+    r"\b(montei|preparei|criei|fiz|deixei|elaborei|desenvolvi)\b[^.?!]{0,60}\b(pr[eé]via|esbo[cç]o|site|layout)\b|"
+    r"\b(segue|aqui est[aá]|abaixo|vou (te )?(enviar|mandar)|te (envio|mando)|enviei|mandei)\b[^.?!]{0,30}\b(o )?(link|endere[cç]o)\b|"
+    r"\blink d[aoe] (pr[eé]via|site|esbo[cç]o)\b",
+    _re.I,
+)
+
+
+def resolver_marcadores(textos: List[str], lead: Optional[Dict[str, Any]]) -> List[str]:
+    """Troca marcadores como [LINK_DA_PREVIA] pelo link de verdade, quando ele existe."""
+    url = (lead or {}).get("site_publicado") or ""
+    if not url:
+        return textos
+    return [_re.sub(r"\[LINK[A-Z0-9_ ]{0,30}\]|\{\{\s*link[^}]{0,30}\}\}|\{link[a-z_]{0,20}\}|<LINK[A-Z_]{0,20}>", url, t, flags=_re.I) for t in textos]
+
+
+def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: List[Dict[str, Any]], lead: Optional[Dict[str, Any]] = None) -> List[str]:
     erros: List[str] = []
+    # 1) marcador de modelo nunca vai para o cliente
+    for t in textos:
+        m = _MARCADOR.search(t)
+        if m:
+            erros.append(f'você deixou o marcador "{m.group(0)}" na mensagem: escreva só o texto final, com o link de verdade ou sem ele')
+            break
+    # 2) sem previa criada, nada de dizer que preparou nem de prometer link agora
+    if lead is not None and not (lead.get("site_publicado") or "").strip():
+        for t in textos:
+            if _ALEGA_PREVIA.search(t):
+                erros.append('você disse que preparou a prévia ou que vai mandar o link, mas NENHUMA prévia foi criada para este negócio: '
+                             'diga que está finalizando e envia por aqui em breve, sem link e sem afirmar que já está pronta')
+                break
+    # 3) com previa criada, "segue o link" precisa trazer o link de verdade
+    elif lead is not None and (lead.get("site_publicado") or "").strip():
+        url = lead["site_publicado"]
+        for t in textos:
+            if _re.search(r"\b(segue|aqui est[aá])\b[^.?!]{0,25}\blink\b", t, _re.I) and url not in t and "http" not in t.lower():
+                erros.append(f'você disse "segue o link" sem colocar o link: cole a URL completa {url}')
+                break
     if any(m.get("de") == "contato" for m in mensagens) and not cliente_perguntou_de_valor(mensagens):
         for t in textos:
             if _VALOR.search(t):
