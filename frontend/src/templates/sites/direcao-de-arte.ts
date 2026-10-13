@@ -80,10 +80,31 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Nude', primaria: '#a1695a', destaque: '#d9b99b' },
       { nome: 'Sálvia', primaria: '#5f7a6a', destaque: '#e6c79c' },
     ],
-    modelos: ['ritual', 'fragrancia', 'noir'], fonte: 'luxo', fonteSerifa: 'luxo', fonteSans: 'moderna',
+    modelos: ['ritual', 'fragrancia', 'natural', 'noir'], fonte: 'luxo', fonteSerifa: 'luxo', fonteSans: 'moderna',
   },
   {
-    id: 'saude', nome: 'Saúde e clínicas', palavras: ['odonto', 'dentist', 'clinic', 'medic', 'saude', 'fisio', 'nutri', 'psicolog', 'laborat', 'farmac', 'oftalm', 'ortoped', 'pediatr', 'terapia', 'quiropr'],
+    id: 'odonto', nome: 'Odontologia', palavras: ['odonto', 'dentist', 'ortodont', 'implante', 'sorriso'],
+    humor: 'Azul limpo com verde-água: higiene, confiança e sorriso novo.',
+    paletas: [
+      { nome: 'Azul clínico', primaria: '#1e6fd9', destaque: '#18b8a4' },
+      { nome: 'Petróleo', primaria: '#0f7c8a', destaque: '#2f9e6f' },
+      { nome: 'Céu', primaria: '#2563eb', destaque: '#06b6d4' },
+    ],
+    modelos: ['sorriso', 'clinica', 'noir'], fonte: 'moderna', fonteSerifa: 'sobria', fonteSans: 'moderna',
+  },
+  {
+    id: 'mente', nome: 'Psicologia e terapias', palavras: ['psicolog', 'psiquiat', 'psicanal', 'terapia', 'terapeut', 'neuropsic', 'constelac', 'saude mental', 'mindful', 'logoped', 'fonoaud'],
+    humor: 'Tons suaves de sálvia, azul-sereno e terracota: acolhimento, calma e espaço para respirar. Nada de painel ou tecnologia: aqui o que vende é confiança e cuidado.',
+    paletas: [
+      { nome: 'Sálvia', primaria: '#4f7a6a', destaque: '#d9a96b' },
+      { nome: 'Azul sereno', primaria: '#3f6f94', destaque: '#e0b084' },
+      { nome: 'Lavanda', primaria: '#6b5b95', destaque: '#e6c79c' },
+      { nome: 'Terracota suave', primaria: '#a1695a', destaque: '#8fb8a8' },
+    ],
+    modelos: ['natural', 'escritorio', 'clinica', 'classico'], fonte: 'elegante', fonteSerifa: 'elegante', fonteSans: 'moderna',
+  },
+  {
+    id: 'saude', nome: 'Saúde e clínicas', palavras: ['clinic', 'medic', 'saude', 'fisio', 'nutri', 'laborat', 'farmac', 'oftalm', 'ortoped', 'pediatr', 'quiropr', 'dermat', 'cardio', 'exame', 'hospital'],
     humor: 'Azul, verde-água e branco: limpeza, calma e confiança, as cores que a pessoa espera de quem cuida da saúde.',
     paletas: [
       { nome: 'Petróleo', primaria: '#0f7c8a', destaque: '#2f9e6f' },
@@ -91,7 +112,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Menta', primaria: '#0f766e', destaque: '#84cc16' },
       { nome: 'Céu', primaria: '#2563eb', destaque: '#06b6d4' },
     ],
-    modelos: ['sorriso', 'clinica', 'natural', 'bento'], fonte: 'moderna', fonteSerifa: 'sobria', fonteSans: 'moderna',
+    modelos: ['clinica', 'sorriso', 'natural', 'noir'], fonte: 'moderna', fonteSerifa: 'sobria', fonteSans: 'moderna',
   },
   {
     id: 'juridico', nome: 'Advocacia, contabilidade e consultoria', palavras: ['advoga', 'advoca', 'juridic', 'contab', 'contador', 'seguro', 'consult', 'despachante', 'cartorio', 'notari'],
@@ -105,14 +126,24 @@ const SEGMENTOS: Segmento[] = [
     modelos: ['classico', 'escritorio', 'premio'], fonte: 'sobria', fonteSerifa: 'sobria', fonteSans: 'moderna',
   },
   {
-    id: 'imoveis', nome: 'Imobiliária, arquitetura e interiores', palavras: ['imobili', 'corretor', 'arquitet', 'decoracao', 'interior', 'paisag', 'construtora', 'incorpor', 'marcenar', 'movel', 'moveis', 'planejad'],
+    id: 'imoveis', nome: 'Imobiliária e corretagem', palavras: ['imobili', 'corretor', 'incorpor', 'locacao', 'condominio'],
+    humor: 'Azul profundo, grafite e dourado: solidez, patrimônio e negócio fechado com segurança.',
+    paletas: [
+      { nome: 'Azul profundo', primaria: '#13405b', destaque: '#d6a03c' },
+      { nome: 'Grafite e areia', primaria: '#3b3a36', destaque: '#c8a97e' },
+      { nome: 'Musgo', primaria: '#3f4d3a', destaque: '#d2b48c' },
+    ],
+    modelos: ['arquitetura', 'escritorio', 'classico', 'fintech'], fonte: 'editorial', fonteSerifa: 'editorial', fonteSans: 'moderna',
+  },
+  {
+    id: 'arquitetura', nome: 'Arquitetura, interiores e obras', palavras: ['arquitet', 'decoracao', 'interior', 'paisag', 'construtora', 'marcenar', 'movel', 'moveis', 'planejad', 'engenhar'],
     humor: 'Grafite, areia e verde-musgo: materiais de verdade, calma e bom gosto.',
     paletas: [
       { nome: 'Grafite e areia', primaria: '#3b3a36', destaque: '#c8a97e' },
       { nome: 'Azul profundo', primaria: '#13405b', destaque: '#d6a03c' },
       { nome: 'Musgo', primaria: '#3f4d3a', destaque: '#d2b48c' },
     ],
-    modelos: ['arquitetura', 'escritorio', 'planta'], fonte: 'editorial', fonteSerifa: 'editorial', fonteSans: 'moderna',
+    modelos: ['arquitetura', 'planta', 'noir', 'escritorio'], fonte: 'editorial', fonteSerifa: 'editorial', fonteSans: 'moderna',
   },
   {
     id: 'oficina', nome: 'Mecânica, obras e indústria', palavras: ['mecan', 'oficina', 'auto pecas', 'autopecas', 'funilar', 'eletric', 'encanad', 'pintor', 'serralher', 'vidrac', 'material de constru', 'constru', 'reforma', 'industri', 'logist', 'transport', 'guincho', 'borrachar', 'ar condicionado', 'refrigera'],
@@ -145,7 +176,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Verde aprender', primaria: '#059669', destaque: '#f97316' },
       { nome: 'Coral', primaria: '#e11d48', destaque: '#38bdf8' },
     ],
-    modelos: ['vibrante', 'campus', 'bento'], fonte: 'amigavel', fonteSerifa: 'artesanal', fonteSans: 'amigavel',
+    modelos: ['vibrante', 'campus'], fonte: 'amigavel', fonteSerifa: 'artesanal', fonteSans: 'amigavel',
   },
   {
     id: 'moda', nome: 'Joalheria, moda e presentes', palavras: ['joalher', 'perfum', 'boutique', 'moda', 'roupa', 'brinqued', 'presente', 'calcado', 'bolsa', 'oculos', 'relojo', 'loja de'],
@@ -166,7 +197,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Oliva', primaria: '#55612a', destaque: '#e3b04b' },
       { nome: 'Mata', primaria: '#166534', destaque: '#a3e635' },
     ],
-    modelos: ['agro', 'natural', 'aurora'], fonte: 'artesanal', fonteSerifa: 'artesanal', fonteSans: 'moderna',
+    modelos: ['agro', 'natural', 'fragrancia'], fonte: 'artesanal', fonteSerifa: 'artesanal', fonteSans: 'moderna',
   },
   {
     id: 'tecnologia', nome: 'Tecnologia, software e marketing', palavras: ['tecnolog', 'software', 'sistema', 'aplicativo', 'marketing', 'agencia', 'startup', 'informatica', 'ti ', 'desenvolvimento', 'design', 'coworking', 'telecom', 'internet'],
@@ -186,7 +217,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Profundo', primaria: '#0c4a6e', destaque: '#fcd34d' },
       { nome: 'Ilha', primaria: '#0e7490', destaque: '#fb923c' },
     ],
-    modelos: ['aurora', 'natural', 'editorial'], fonte: 'elegante', fonteSerifa: 'elegante', fonteSans: 'moderna',
+    modelos: ['editorial', 'natural', 'noir'], fonte: 'elegante', fonteSerifa: 'elegante', fonteSans: 'moderna',
   },
   {
     id: 'eventos', nome: 'Eventos, festas e fotografia', palavras: ['evento', 'festa', 'buffet', 'fotograf', 'cerimonial', 'casamento', 'decoracao de festa', 'dj', 'noturna', 'balada', 'espaco de eventos', 'game'],
@@ -224,7 +255,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Azul fresco', primaria: '#0284c7', destaque: '#34d399' },
       { nome: 'Verde limpo', primaria: '#0f766e', destaque: '#fde047' },
     ],
-    modelos: ['clinica', 'bento', 'oficina'], fonte: 'amigavel', fonteSerifa: 'sobria', fonteSans: 'moderna',
+    modelos: ['bento', 'oficina', 'vibrante'], fonte: 'amigavel', fonteSerifa: 'sobria', fonteSans: 'moderna',
   },
   {
     id: 'mercado', nome: 'Mercado, açougue e hortifruti', palavras: ['mercado', 'mercearia', 'hortifruti', 'acougue', 'supermerc', 'emporio', 'quitanda', 'adega', 'distribuidora', 'atacado', 'conveniencia'],
@@ -233,7 +264,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Feira', primaria: '#0f5132', destaque: '#f2a900' },
       { nome: 'Promoção', primaria: '#b91c1c', destaque: '#facc15' },
     ],
-    modelos: ['forno', 'agro', 'aurora'], fonte: 'amigavel', fonteSerifa: 'artesanal', fonteSans: 'forte',
+    modelos: ['agro', 'vibrante', 'forno'], fonte: 'amigavel', fonteSerifa: 'artesanal', fonteSans: 'forte',
   },
 ];
 
@@ -246,7 +277,19 @@ const GENERICO: Segmento = {
     { nome: 'Grafite', primaria: '#334155', destaque: '#38bdf8' },
     { nome: 'Vinho', primaria: '#9f1239', destaque: '#fbbf24' },
   ],
-  modelos: ['noir', 'fintech', 'premio', 'editorial'], fonte: 'moderna', fonteSerifa: 'editorial', fonteSans: 'moderna',
+  modelos: ['noir', 'premio', 'escritorio', 'natural'], fonte: 'moderna', fonteSerifa: 'editorial', fonteSans: 'moderna',
+};
+
+/**
+ * Modelos com cara de painel, tecnologia ou prancha técnica. Só entram em segmentos onde isso faz sentido:
+ * ninguém espera um "dashboard" no site de uma psicóloga ou de uma padaria.
+ */
+export const MODELOS_DE_PAINEL: Record<string, string[]> = {
+  bento: ['tecnologia', 'limpeza'],
+  fintech: ['tecnologia', 'financeiro', 'imoveis'],
+  b2b: ['tecnologia', 'oficina'],
+  campus: ['tecnologia', 'educacao'],
+  planta: ['arquitetura'],
 };
 
 /** Modelos feitos em itálico serifado: pedem fonte com serifa. */

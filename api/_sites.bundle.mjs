@@ -1216,15 +1216,46 @@ var SEGMENTOS = [
       { nome: "Nude", primaria: "#a1695a", destaque: "#d9b99b" },
       { nome: "S\xE1lvia", primaria: "#5f7a6a", destaque: "#e6c79c" }
     ],
-    modelos: ["ritual", "fragrancia", "noir"],
+    modelos: ["ritual", "fragrancia", "natural", "noir"],
     fonte: "luxo",
     fonteSerifa: "luxo",
     fonteSans: "moderna"
   },
   {
+    id: "odonto",
+    nome: "Odontologia",
+    palavras: ["odonto", "dentist", "ortodont", "implante", "sorriso"],
+    humor: "Azul limpo com verde-\xE1gua: higiene, confian\xE7a e sorriso novo.",
+    paletas: [
+      { nome: "Azul cl\xEDnico", primaria: "#1e6fd9", destaque: "#18b8a4" },
+      { nome: "Petr\xF3leo", primaria: "#0f7c8a", destaque: "#2f9e6f" },
+      { nome: "C\xE9u", primaria: "#2563eb", destaque: "#06b6d4" }
+    ],
+    modelos: ["sorriso", "clinica", "noir"],
+    fonte: "moderna",
+    fonteSerifa: "sobria",
+    fonteSans: "moderna"
+  },
+  {
+    id: "mente",
+    nome: "Psicologia e terapias",
+    palavras: ["psicolog", "psiquiat", "psicanal", "terapia", "terapeut", "neuropsic", "constelac", "saude mental", "mindful", "logoped", "fonoaud"],
+    humor: "Tons suaves de s\xE1lvia, azul-sereno e terracota: acolhimento, calma e espa\xE7o para respirar. Nada de painel ou tecnologia: aqui o que vende \xE9 confian\xE7a e cuidado.",
+    paletas: [
+      { nome: "S\xE1lvia", primaria: "#4f7a6a", destaque: "#d9a96b" },
+      { nome: "Azul sereno", primaria: "#3f6f94", destaque: "#e0b084" },
+      { nome: "Lavanda", primaria: "#6b5b95", destaque: "#e6c79c" },
+      { nome: "Terracota suave", primaria: "#a1695a", destaque: "#8fb8a8" }
+    ],
+    modelos: ["natural", "escritorio", "clinica", "classico"],
+    fonte: "elegante",
+    fonteSerifa: "elegante",
+    fonteSans: "moderna"
+  },
+  {
     id: "saude",
     nome: "Sa\xFAde e cl\xEDnicas",
-    palavras: ["odonto", "dentist", "clinic", "medic", "saude", "fisio", "nutri", "psicolog", "laborat", "farmac", "oftalm", "ortoped", "pediatr", "terapia", "quiropr"],
+    palavras: ["clinic", "medic", "saude", "fisio", "nutri", "laborat", "farmac", "oftalm", "ortoped", "pediatr", "quiropr", "dermat", "cardio", "exame", "hospital"],
     humor: "Azul, verde-\xE1gua e branco: limpeza, calma e confian\xE7a, as cores que a pessoa espera de quem cuida da sa\xFAde.",
     paletas: [
       { nome: "Petr\xF3leo", primaria: "#0f7c8a", destaque: "#2f9e6f" },
@@ -1232,7 +1263,7 @@ var SEGMENTOS = [
       { nome: "Menta", primaria: "#0f766e", destaque: "#84cc16" },
       { nome: "C\xE9u", primaria: "#2563eb", destaque: "#06b6d4" }
     ],
-    modelos: ["sorriso", "clinica", "natural", "bento"],
+    modelos: ["clinica", "sorriso", "natural", "noir"],
     fonte: "moderna",
     fonteSerifa: "sobria",
     fonteSans: "moderna"
@@ -1255,15 +1286,30 @@ var SEGMENTOS = [
   },
   {
     id: "imoveis",
-    nome: "Imobili\xE1ria, arquitetura e interiores",
-    palavras: ["imobili", "corretor", "arquitet", "decoracao", "interior", "paisag", "construtora", "incorpor", "marcenar", "movel", "moveis", "planejad"],
+    nome: "Imobili\xE1ria e corretagem",
+    palavras: ["imobili", "corretor", "incorpor", "locacao", "condominio"],
+    humor: "Azul profundo, grafite e dourado: solidez, patrim\xF4nio e neg\xF3cio fechado com seguran\xE7a.",
+    paletas: [
+      { nome: "Azul profundo", primaria: "#13405b", destaque: "#d6a03c" },
+      { nome: "Grafite e areia", primaria: "#3b3a36", destaque: "#c8a97e" },
+      { nome: "Musgo", primaria: "#3f4d3a", destaque: "#d2b48c" }
+    ],
+    modelos: ["arquitetura", "escritorio", "classico", "fintech"],
+    fonte: "editorial",
+    fonteSerifa: "editorial",
+    fonteSans: "moderna"
+  },
+  {
+    id: "arquitetura",
+    nome: "Arquitetura, interiores e obras",
+    palavras: ["arquitet", "decoracao", "interior", "paisag", "construtora", "marcenar", "movel", "moveis", "planejad", "engenhar"],
     humor: "Grafite, areia e verde-musgo: materiais de verdade, calma e bom gosto.",
     paletas: [
       { nome: "Grafite e areia", primaria: "#3b3a36", destaque: "#c8a97e" },
       { nome: "Azul profundo", primaria: "#13405b", destaque: "#d6a03c" },
       { nome: "Musgo", primaria: "#3f4d3a", destaque: "#d2b48c" }
     ],
-    modelos: ["arquitetura", "escritorio", "planta"],
+    modelos: ["arquitetura", "planta", "noir", "escritorio"],
     fonte: "editorial",
     fonteSerifa: "editorial",
     fonteSans: "moderna"
@@ -1311,7 +1357,7 @@ var SEGMENTOS = [
       { nome: "Verde aprender", primaria: "#059669", destaque: "#f97316" },
       { nome: "Coral", primaria: "#e11d48", destaque: "#38bdf8" }
     ],
-    modelos: ["vibrante", "campus", "bento"],
+    modelos: ["vibrante", "campus"],
     fonte: "amigavel",
     fonteSerifa: "artesanal",
     fonteSans: "amigavel"
@@ -1342,7 +1388,7 @@ var SEGMENTOS = [
       { nome: "Oliva", primaria: "#55612a", destaque: "#e3b04b" },
       { nome: "Mata", primaria: "#166534", destaque: "#a3e635" }
     ],
-    modelos: ["agro", "natural", "aurora"],
+    modelos: ["agro", "natural", "fragrancia"],
     fonte: "artesanal",
     fonteSerifa: "artesanal",
     fonteSans: "moderna"
@@ -1372,7 +1418,7 @@ var SEGMENTOS = [
       { nome: "Profundo", primaria: "#0c4a6e", destaque: "#fcd34d" },
       { nome: "Ilha", primaria: "#0e7490", destaque: "#fb923c" }
     ],
-    modelos: ["aurora", "natural", "editorial"],
+    modelos: ["editorial", "natural", "noir"],
     fonte: "elegante",
     fonteSerifa: "elegante",
     fonteSans: "moderna"
@@ -1430,7 +1476,7 @@ var SEGMENTOS = [
       { nome: "Azul fresco", primaria: "#0284c7", destaque: "#34d399" },
       { nome: "Verde limpo", primaria: "#0f766e", destaque: "#fde047" }
     ],
-    modelos: ["clinica", "bento", "oficina"],
+    modelos: ["bento", "oficina", "vibrante"],
     fonte: "amigavel",
     fonteSerifa: "sobria",
     fonteSans: "moderna"
@@ -1444,7 +1490,7 @@ var SEGMENTOS = [
       { nome: "Feira", primaria: "#0f5132", destaque: "#f2a900" },
       { nome: "Promo\xE7\xE3o", primaria: "#b91c1c", destaque: "#facc15" }
     ],
-    modelos: ["forno", "agro", "aurora"],
+    modelos: ["agro", "vibrante", "forno"],
     fonte: "amigavel",
     fonteSerifa: "artesanal",
     fonteSans: "forte"
@@ -1461,7 +1507,7 @@ var GENERICO2 = {
     { nome: "Grafite", primaria: "#334155", destaque: "#38bdf8" },
     { nome: "Vinho", primaria: "#9f1239", destaque: "#fbbf24" }
   ],
-  modelos: ["noir", "fintech", "premio", "editorial"],
+  modelos: ["noir", "premio", "escritorio", "natural"],
   fonte: "moderna",
   fonteSerifa: "editorial",
   fonteSans: "moderna"

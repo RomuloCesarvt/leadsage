@@ -1,12 +1,12 @@
 // Direção de arte: cada segmento tem identidade própria e o site usa as cores e fontes dele.
 import assert from 'node:assert/strict';
-import { direcaoDeArte, fonteDoModelo, segmentoDoRamo, todosOsSegmentos } from './direcao-de-arte';
+import { MODELOS_DE_PAINEL, direcaoDeArte, fonteDoModelo, segmentoDoRamo, todosOsSegmentos } from './direcao-de-arte';
 import { dadosDoLead, escolherTemplate, montarPrevia } from './previa';
 import { SITE_TEMPLATES } from './layouts';
 
 // o ramo certo cai no segmento certo
 const casos: [string, string][] = [
-  ['Pizzarias', 'comida'], ['Padarias', 'doces'], ['Dentistas', 'saude'], ['Clínicas Odontológicas', 'saude'],
+  ['Pizzarias', 'comida'], ['Padarias', 'doces'], ['Dentistas', 'odonto'], ['Clínicas Odontológicas', 'odonto'], ['Psicologia', 'mente'], ['Nutricionistas', 'saude'],
   ['Barbearias', 'barbearia'], ['Clínicas de estética', 'estetica'], ['Escritórios de advocacia', 'juridico'],
   ['Pet shops', 'pet'], ['Clínica veterinária', 'pet'], ['Academias', 'fitness'], ['Oficinas mecânicas', 'oficina'],
   ['Imobiliárias', 'imoveis'], ['Joalherias', 'moda'], ['Escolas de idiomas', 'educacao'], ['Hotéis', 'turismo'],
@@ -56,5 +56,31 @@ assert.notEqual(dent.html.slice(0, 4000), site.html.slice(0, 4000));
 // fonte escolhida pelo usuário vence a do segmento
 const usuario = SITE_TEMPLATES.find(t => t.id === 'clinica')!.render({ ...dados, fonte: 'luxo' });
 assert.ok(usuario.includes('Cormorant'), 'fonte do usuário vence');
+
+// psicologia não recebe modelo de painel nem o de dentista
+for (const r of ['Psicologia', 'Psicólogos', 'Clínica de psicologia', 'Terapia', 'Psicanálise', 'Fonoaudiologia']) {
+  const sg = segmentoDoRamo(r);
+  assert.equal(sg.id, 'mente', r);
+  for (const m of ['bento', 'fintech', 'b2b', 'campus', 'planta', 'sorriso', 'neon', 'impacto']) assert.ok(!sg.modelos.includes(m), `${r} não leva ${m}`);
+}
+assert.equal(segmentoDoRamo('Clínicas Odontológicas').id, 'odonto');
+assert.ok(segmentoDoRamo('Dentistas').modelos.includes('sorriso'));
+assert.ok(!segmentoDoRamo('Nutricionistas').modelos.includes('bento'));
+
+// modelos de painel só aparecem nos segmentos que os justificam
+for (const s of todosOsSegmentos()) {
+  for (const m of s.modelos) {
+    const permitidos = MODELOS_DE_PAINEL[m];
+    if (permitidos) assert.ok(permitidos.includes(s.id), `${m} não combina com ${s.id}`);
+  }
+}
+
+// para qualquer empresa de qualquer ramo, o modelo escolhido sempre vem da lista do segmento
+for (const ramo of ['Psicologia', 'Dentistas', 'Padarias', 'Advocacia', 'Hotéis', 'Imobiliárias', 'Floriculturas', 'Qualquer coisa']) {
+  for (const emp of ['A', 'B', 'C', 'D', 'E', 'F']) {
+    const t = escolherTemplate(ramo, `Empresa ${emp}`);
+    assert.ok(segmentoDoRamo(ramo).modelos.includes(t.id), `${ramo}/${emp}: ${t.id}`);
+  }
+}
 
 console.log('direcao.test: ok');
