@@ -1637,6 +1637,14 @@ async def conector_fila(user: dict = Depends(get_current_user)):
     return await conector_whatsapp.estado_da_fila({**canal, "uid": user.get("uid")})
 
 
+@app.get("/api/robo/conector/saude")
+async def conector_saude(user: dict = Depends(get_current_user)):
+    """Termometro de risco de banimento do numero conectado."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    canal = await robo_store.canal_do_usuario(user.get("uid")) or {}
+    return await conector_whatsapp.saude({**canal, "uid": user.get("uid")})
+
+
 @app.post("/api/robo/fila/{item_id}/enviar-agora")
 async def fila_enviar_agora(item_id: str, user: dict = Depends(get_current_user)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")

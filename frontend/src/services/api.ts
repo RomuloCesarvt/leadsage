@@ -16,6 +16,7 @@ import type {
   CreditPackage,
   PlanoAtual,
   UsuarioAdmin,
+  SaudeDoNumero,
   SiteCopyResponse,
   DocumentAIRequest,
   DocumentAIResponse,
@@ -319,6 +320,10 @@ export const api = {
 
   async conectorGerar(): Promise<RoboConfig & { chave: string }> {
     return await fetchWithToken('/robo/conector/gerar', { method: 'POST' });
+  },
+
+  async conectorSaude(): Promise<SaudeDoNumero> {
+    return await fetchWithToken('/robo/conector/saude');
   },
 
   async nuvemLigar(): Promise<RoboConfig> {

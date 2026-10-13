@@ -39,9 +39,9 @@ PREFIXO = "lsc_"
 CHAVE_RE = re.compile(r"^lsc_[A-Za-z0-9_-]{30,60}$")
 ONLINE_SEGUNDOS = 200
 INTERVALO_FRIO_S = 90          # entre uma abordagem fria e a seguinte
-FRIO_INICIAL = 5               # por dia, no primeiro dia da conexão
-FRIO_POR_DIA = 3               # quanto o limite cresce a cada dia
-FRIO_MAXIMO = 30
+FRIO_INICIAL = 10              # por dia, no primeiro dia da conexão
+FRIO_POR_DIA = 5               # quanto o limite cresce a cada dia
+FRIO_MAXIMO = 60               # teto diário: acima disso o risco de banimento sobe muito
 MAX_TAREFAS = 3
 CAMPOS_CONECTOR = ("cw_hash", "cw_prefixo", "cw_criado", "cw_visto", "cw_primeiro", "cw_numero",
                    "cw_status", "cw_ultimo_frio", "cw_versao", "cw_frio_dia", "cw_frio_n", "cw_atividade")
@@ -381,3 +381,109 @@ async def registrar_resultado(canal: Dict[str, Any], tarefa_id: str, ok: bool, e
         s["erro"] = (erro or "")[:200]
     await _gravar(uid, s)
     return True
+
+
+# ------------------------------------------------------------------ saude do numero
+
+_SAUDE: Dict[str, Any] = {}
+_SAUDE_TTL_S = 120
+
+
+def _nivel(pontos: int) -> str:
+    return "boa" if pontos >= 80 else ("atencao" if pontos >= 55 else "risco")
+
+
+async def saude(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Dict[str, Any]:
+    """Quanto o numero esta exposto a restricao ou banimento, a partir do que o proprio LeadSage ve.
+
+    Nao e uma nota do WhatsApp (ele nao a publica): e um termometro dos sinais que mais derrubam numeros —
+    conexao nova, volume alto, numeros que nao existem, gente pedindo para sair e quase ninguem respondendo.
+    """
+    agora = agora or _agora_dt()
+    if not canal.get("cw_hash"):
+        return {"disponivel": False}
+    uid = canal["uid"]
+    guardado = _SAUDE.get(uid)
+    import time as _t
+    if guardado and _t.monotonic() - guardado[0] < _SAUDE_TTL_S:
+        return guardado[1]
+
+    pontos = 100
+    sinais: List[Dict[str, str]] = []
+
+    def marcar(tipo: str, texto: str, tira: int = 0) -> None:
+        nonlocal pontos
+        pontos -= tira
+        sinais.append({"tipo": tipo, "texto": texto})
+
+    # 1. tempo de conexao: numero novo e o que mais leva ban
+    primeiro = _ler_data(canal.get("cw_primeiro"))
+    dias = max(0, (agora - primeiro).days) if primeiro else 0
+    if dias < 1:
+        marcar("aviso", "Número conectado hoje: ainda em aquecimento. Comece devagar.", 25)
+    elif dias < 3:
+        marcar("aviso", f"Conectado há {dias} dias: o número ainda está ganhando confiança.", 15)
+    elif dias < 7:
+        marcar("aviso", f"Conectado há {dias} dias.", 5)
+    else:
+        marcar("ok", f"Conectado há {dias} dias.")
+
+    # 2. volume de hoje contra o limite
+    hoje = agora.strftime("%Y-%m-%d")
+    usados = int(canal.get("cw_frio_n") or 0) if canal.get("cw_frio_dia") == hoje else 0
+    limite = limite_frio_do_dia(canal, agora)
+    if usados >= limite:
+        marcar("aviso", f"Limite de hoje atingido ({usados} de {limite}). O robô para até amanhã.", 10)
+    elif usados >= 0.8 * limite:
+        marcar("aviso", f"Perto do limite de hoje ({usados} de {limite}).", 5)
+    else:
+        marcar("ok", f"Hoje: {usados} de {limite} abordagens.")
+
+    # 3. numeros que nao existem no WhatsApp pesam contra a conta
+    itens = [i for i in await fila_envio.listar(uid) if i.get("canal") == "whatsapp" and i.get("status") in ("enviado", "falhou")]
+    itens.sort(key=lambda i: i.get("enviado_em") or i.get("atualizado") or "", reverse=True)
+    recentes = itens[:40]
+    invalidos = sum(1 for i in recentes if i.get("status") == "falhou" and "whatsapp" in (i.get("motivo") or "").lower())
+    if len(recentes) >= 10:
+        taxa = invalidos / len(recentes)
+        if taxa >= 0.2:
+            marcar("risco", f"{invalidos} de {len(recentes)} números recentes não existem no WhatsApp. Confira a lista de leads.", 25)
+        elif taxa >= 0.1:
+            marcar("aviso", f"{invalidos} de {len(recentes)} números recentes não existem no WhatsApp.", 12)
+        else:
+            marcar("ok", "Quase todos os números abordados existem no WhatsApp.")
+
+    # 4. pedidos para sair e respostas: quem recebe e denuncia derruba o numero
+    try:
+        conversas = [c for c in await robo_store.listar_conversas(uid) if c.get("canal") == "whatsapp" and c.get("origem") == "envio"]
+    except Exception:
+        conversas = []
+    if len(conversas) >= 10:
+        saidas = sum(1 for c in conversas if c.get("optout"))
+        respondidas = sum(1 for c in conversas if (c.get("total") or 0) >= 2 or (c.get("ultima") or {}).get("de") == "contato")
+        if saidas / len(conversas) >= 0.10:
+            marcar("risco", f"{saidas} de {len(conversas)} pessoas pediram para sair. Revise a mensagem de abordagem.", 25)
+        elif saidas / len(conversas) >= 0.05:
+            marcar("aviso", f"{saidas} de {len(conversas)} pessoas pediram para sair.", 12)
+        if len(conversas) >= 20 and respondidas / len(conversas) < 0.05:
+            marcar("aviso", "Quase ninguém responde às abordagens: mensagem pouco personalizada aumenta o risco de denúncia.", 15)
+        elif respondidas:
+            marcar("ok", f"{respondidas} de {len(conversas)} pessoas responderam.")
+
+    pontos = max(0, min(100, pontos))
+    nivel = _nivel(pontos)
+    dicas = [
+        "Use um número secundário, nunca o seu principal.",
+        "Mantenha o limite diário: ele sobe sozinho conforme o número ganha confiança (máximo " + str(FRIO_MAXIMO) + " por dia).",
+        "Personalize a primeira mensagem e só abordem quem tem WhatsApp.",
+        "Se alguém pedir para sair, o robô respeita na hora. Não insista.",
+    ]
+    if nivel != "boa":
+        dicas.insert(0, "Reduza o ritmo hoje: pause as abordagens frias e deixe o robô só responder.")
+    resposta = {
+        "disponivel": True, "pontos": pontos, "nivel": nivel,
+        "rotulo": {"boa": "Boa", "atencao": "Atenção", "risco": "Em risco"}[nivel],
+        "sinais": sinais, "dicas": dicas, "dias_conectado": dias, "usadas_hoje": usados, "limite_hoje": limite,
+    }
+    _SAUDE[uid] = (_t.monotonic(), resposta)
+    return resposta

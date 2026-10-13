@@ -577,3 +577,15 @@ export interface UsuarioAdmin {
   admin: boolean;
   ilimitado: boolean;
 }
+
+export interface SaudeDoNumero {
+  disponivel: boolean;
+  pontos?: number;
+  nivel?: 'boa' | 'atencao' | 'risco';
+  rotulo?: string;
+  sinais?: { tipo: 'ok' | 'aviso' | 'risco'; texto: string }[];
+  dicas?: string[];
+  dias_conectado?: number;
+  usadas_hoje?: number;
+  limite_hoje?: number;
+}

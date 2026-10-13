@@ -9,11 +9,11 @@
  * única vez; depois só o prefixo e o estado (online/offline).
  */
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, Download, Loader2, Smartphone, Unplug, Wifi, WifiOff } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, Loader2, ShieldCheck, Smartphone, Unplug, Wifi, WifiOff } from 'lucide-react';
 import { api } from '../services/api';
 import { WhatsAppIcon } from './BrandIcons';
 import { sondar } from '../lib/sondagem';
-import type { RoboConfig } from '../types';
+import type { RoboConfig, SaudeDoNumero } from '../types';
 
 /** O arquivo que o usuário baixa: leva a chave, instala o que falta e abre o Conector. */
 export function arquivoDoConector(chave: string, site: string): string {
@@ -116,6 +116,63 @@ function useEstadoRemoto(ativo: boolean): EstadoRemoto | null {
   }, [ativo]);
   return estado;
 }
+
+const COR_NIVEL = {
+  boa: { faixa: 'bg-emerald-500', texto: 'text-emerald-700', fundo: 'bg-emerald-50 border-emerald-200' },
+  atencao: { faixa: 'bg-amber-500', texto: 'text-amber-700', fundo: 'bg-amber-50 border-amber-200' },
+  risco: { faixa: 'bg-red-500', texto: 'text-red-700', fundo: 'bg-red-50 border-red-200' },
+} as const;
+
+/** Dispositivo conectado + termômetro de risco de banimento do número. */
+const SaudeDoNumeroPainel: React.FC<{ numero: string; ativo: boolean }> = ({ numero, ativo }) => {
+  const [s, setS] = useState<SaudeDoNumero | null>(null);
+  const [aberto, setAberto] = useState(false);
+  useEffect(() => {
+    if (!ativo) return;
+    let vivo = true;
+    const ler = async () => { try { const r = await api.conectorSaude(); if (vivo) setS(r); } catch { /* sem plano ou sem rede */ } };
+    void ler();
+    const parar = sondar(ler, 60000);
+    return () => { vivo = false; parar(); };
+  }, [ativo]);
+  const cor = COR_NIVEL[s?.nivel || 'boa'];
+  return (
+    <div className="space-y-2">
+      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-800 flex items-center gap-2">
+        <CheckCircle2 className="w-5 h-5 shrink-0" />
+        <span><b>Dispositivo conectado</b>{numero ? ` · ${numero}` : ''}. O robô está atendendo.</span>
+      </div>
+      {s?.disponivel && (
+        <div className={`p-3 rounded-xl border ${cor.fundo}`}>
+          <button onClick={() => setAberto(!aberto)} className="w-full flex items-center gap-2 text-left">
+            <ShieldCheck className={`w-5 h-5 shrink-0 ${cor.texto}`} />
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm font-bold text-slate-800">Saúde do número: <span className={cor.texto}>{s.rotulo}</span> <span className="text-slate-400 font-semibold">({s.pontos}/100)</span></span>
+              <span className="block h-1.5 mt-1.5 rounded-full bg-white/70 overflow-hidden"><span className={`block h-full ${cor.faixa}`} style={{ width: `${s.pontos}%` }} /></span>
+            </span>
+            <span className="text-[11px] font-bold text-slate-500 shrink-0">{aberto ? 'Fechar' : 'Detalhes'}</span>
+          </button>
+          {aberto && (
+            <div className="mt-3 space-y-3">
+              <ul className="space-y-1">
+                {(s.sinais || []).map((x, i) => (
+                  <li key={i} className={`text-xs flex gap-1.5 ${x.tipo === 'risco' ? 'text-red-700' : x.tipo === 'aviso' ? 'text-amber-800' : 'text-slate-600'}`}>
+                    <span aria-hidden>{x.tipo === 'ok' ? '✓' : '!'}</span><span>{x.texto}</span>
+                  </li>
+                ))}
+              </ul>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Como não tomar banimento</p>
+                <ul className="list-disc pl-4 space-y-0.5 text-xs text-slate-600">{(s.dicas || []).map((d, i) => <li key={i}>{d}</li>)}</ul>
+              </div>
+              <p className="text-[11px] text-slate-400">É um termômetro feito pelo LeadSage com os sinais que mais derrubam números. O WhatsApp não publica uma nota oficial.</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const noCelular = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
@@ -258,6 +315,7 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
 
       {ativo && (
         <div className="space-y-3">
+          {conectado && <SaudeDoNumeroPainel numero={remoto?.numero || cfg.conector_numero || ''} ativo={ativo} />}
           {nuvem ? (
             <ol className="text-sm text-slate-700 list-decimal pl-5 space-y-1">
               <li>Escaneie o <b>QR code</b> que aparece aqui: no celular, WhatsApp → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b>.</li>

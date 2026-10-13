@@ -315,3 +315,56 @@ def test_editor_envia_pelo_conector(client, chave, rodar):
 def test_editor_sem_conector_conectado_diz_o_que_fazer(client, com_robo):
     r = client.post("/api/robo/conector/enviar", json={"lead_id": "L9", "telefone": "14998003786", "texto": "oi"})
     assert r.status_code == 409 and "Conecte" in r.json()["detail"]
+
+
+# ------------------------------------------------------------------ limites e saude do numero
+
+def test_limite_de_abordagens_comeca_em_10_sobe_de_5_em_5_e_para_em_60():
+    from datetime import datetime, timedelta, timezone
+    assert (cw.FRIO_INICIAL, cw.FRIO_POR_DIA, cw.FRIO_MAXIMO) == (10, 5, 60)
+    agora = datetime(2026, 10, 14, 12, 0, tzinfo=timezone.utc)
+    for dias, esperado in [(0, 10), (1, 15), (2, 20), (5, 35), (10, 60), (30, 60)]:
+        primeiro = (agora - timedelta(days=dias)).isoformat()
+        assert cw.limite_frio_do_dia({"cw_primeiro": primeiro}, agora) == esperado
+
+
+def test_saude_sem_conexao_nao_existe(rodar):
+    assert rodar(cw.saude, {"uid": "s1"}) == {"disponivel": False}
+
+
+def test_saude_numero_novo_pede_cuidado(rodar):
+    from datetime import datetime, timezone
+    agora = datetime.now(timezone.utc)
+    cw._SAUDE.clear()
+    r = rodar(cw.saude, {"uid": "s2", "cw_hash": "h", "cw_primeiro": agora.isoformat()}, agora)
+    assert r["disponivel"] and r["nivel"] == "atencao" and r["pontos"] == 75
+    assert any("aquecimento" in s["texto"] for s in r["sinais"]) and r["dicas"][0].startswith("Reduza")
+
+
+def test_saude_numero_antigo_e_tranquilo_e_limite_batido_pesa(rodar):
+    from datetime import datetime, timedelta, timezone
+    agora = datetime.now(timezone.utc)
+    cw._SAUDE.clear()
+    base = {"uid": "s3", "cw_hash": "h", "cw_primeiro": (agora - timedelta(days=20)).isoformat()}
+    assert rodar(cw.saude, base, agora)["nivel"] == "boa"
+    cw._SAUDE.clear()
+    cheio = {**base, "cw_frio_dia": agora.strftime("%Y-%m-%d"), "cw_frio_n": 60}
+    r = rodar(cw.saude, cheio, agora)
+    assert r["pontos"] == 90 and any("Limite de hoje" in s["texto"] for s in r["sinais"])
+
+
+def test_saude_numeros_inexistentes_e_pedidos_de_sair_derrubam_a_nota(rodar):
+    from datetime import datetime, timedelta, timezone
+    from app import fila_envio
+    agora = datetime.now(timezone.utc)
+    cw._SAUDE.clear()
+    for n in range(12):
+        rodar(fila_envio._gravar, "s4", {"id": f"f{n}", "lead_id": f"l{n}", "canal": "whatsapp", "status": "falhou" if n < 5 else "enviado",
+                                          "motivo": "Esse número não está no WhatsApp.", "enviado_em": agora.isoformat()})
+    r = rodar(cw.saude, {"uid": "s4", "cw_hash": "h", "cw_primeiro": (agora - timedelta(days=20)).isoformat()}, agora)
+    assert r["nivel"] != "boa" and any(s["tipo"] == "risco" and "não existem" in s["texto"] for s in r["sinais"])
+
+
+def test_rota_de_saude_exige_plano_e_responde(client, com_robo):
+    r = client.get("/api/robo/conector/saude")
+    assert r.status_code == 200 and r.json() == {"disponivel": False}
