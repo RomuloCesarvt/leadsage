@@ -13,7 +13,8 @@ import { BancoImagens, buscarFotos } from './BancoImagens';
 import { comEditor, editarCampo, listarTextos, restaurarTexto } from '../templates/sites/textos-editaveis';
 import { FONTES } from '../templates/sites/premium-base';
 import { LAYOUTS_ANTIGOS } from '../templates/sites/layouts';
-import { semearConteudo, layoutDoRamo } from '../templates/sites/semear';
+import { semearConteudo } from '../templates/sites/semear';
+import { dadosDoLead, escolherTemplate, montarPrevia } from '../templates/sites/previa';
 import { resumirSemana } from '../templates/sites/profissional';
 import { ConteudoDoSite } from './ConteudoDoSite';
 import type { DestinoFoto, FotoBanco } from './BancoImagens';
@@ -32,49 +33,51 @@ import type { DestinoFoto, FotoBanco } from './BancoImagens';
 const TETO_LOGO = 120 * 1024;
 const TETO_FOTO = 260 * 1024;
 
-const dadosIniciais = (lead: any): SiteData => {
-  const base: SiteData = {
-    empresa: lead?.company || lead?.name || 'Minha Empresa',
-    // o ramo da busca ("Dentistas") casa melhor com o banco do que o cargo do contato
-    categoria: lead?.niche || lead?.role || '',
-    cidade: lead?.city || '',
-    slogan: '',
-    sobre: '',
-    servicos: [
-      { titulo: '', descricao: '' },
-      { titulo: '', descricao: '' },
-      { titulo: '', descricao: '' },
-    ],
-    galeria: [],
-    depoimentos: [{ texto: '', autor: '' }],
-    telefone: lead?.phone ? `+${lead.phone}` : '',
-    whatsapp: lead?.whatsapp && lead?.phone ? lead.phone : '',
-    email: lead?.email || '',
-    endereco: lead?.address || lead?.location || '',
-    // a semana inteira resumida ("Seg a Sex 08:00–18:00 · Sáb ..."), nao so os 3 primeiros dias
-    horario: lead?.opening_hours_week?.length ? resumirSemana(lead.opening_hours_week) : lead?.opening_hours || '',
-    instagram: lead?.socials?.instagram || '',
-    corPrimaria: '#2563eb',
-    corDestaque: '#f59e0b',
-    // a nota do Google vira o selo de prova social no site
-    nota: lead?.rating ?? null,
-    avaliacoes: lead?.rating_count ?? null,
-  };
-  // com um negocio de verdade, o repertorio do ramo ja vem escrito (e editavel)
-  return lead ? semearConteudo(base, { cores: true }) : base;
-};
+const dadosIniciais = dadosDoLead;
 
 /**
  * A prévia de um lead, pronta para publicar: os dados reais dele, o layout do ramo e o conteúdo semeado do ramo.
  * Sem chamar IA: é o mesmo caminho do construtor, só que em lote (o disparo cria uma por lead).
  */
-export const montarPreviaDoLead = (lead: any) => {
-  const dados = dadosIniciais(lead);
-  const ramo = lead?.niche || lead?.role || '';
-  const template = SITE_TEMPLATES.find(t => t.id === layoutDoRamo(ramo)) || sugerirTemplate(ramo);
-  const html = template.render({ ...dados, selo: true });
-  return { company: dados.empresa, html, template: template.nome, lead_id: String(lead?.id || ''), builder_data: JSON.stringify(dados) };
+/** O modelo renderizado com os dados do negócio, reduzido para caber no cartão. Só carrega quando entra na tela. */
+const PreviaViva: React.FC<{ html: string }> = ({ html }) => {
+  const caixa = useRef<HTMLDivElement>(null);
+  const [visivel, setVisivel] = useState(false);
+  const [escala, setEscala] = useState(0.25);
+  useEffect(() => {
+    const el = caixa.current;
+    if (!el) return;
+    const medir = () => setEscala(el.clientWidth / 1280);
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVisivel(true); io.disconnect(); } }, { rootMargin: '300px' });
+    io.observe(el);
+    return () => { ro.disconnect(); io.disconnect(); };
+  }, []);
+  return (
+    <div ref={caixa} className="relative aspect-[16/10] overflow-hidden bg-slate-900">
+      {visivel && (
+        <iframe title="Prévia do modelo" srcDoc={html} sandbox="" tabIndex={-1} aria-hidden="true"
+          className="absolute top-0 left-0 border-0 pointer-events-none origin-top-left"
+          style={{ width: 1280, height: 800, transform: `scale(${escala})` }} />
+      )}
+    </div>
+  );
 };
+
+/** As fotos do banco entram só onde o negócio ainda não tem foto. */
+const comFotosDoBanco = (d: SiteData, fotos: string[]): SiteData => {
+  if (!fotos.length) return d;
+  return {
+    ...d,
+    capa: d.capa || fotos[0],
+    fotoSobre: d.fotoSobre || fotos[1] || fotos[0],
+    galeria: (d.galeria || []).length ? d.galeria : fotos.slice(2, 6),
+  };
+};
+
+export const montarPreviaDoLead = (lead: any, fotos: string[] = []) => montarPrevia(lead, fotos);
 
 const PALETAS = [
   { nome: 'Azul', primaria: '#2563eb', destaque: '#f59e0b' },
@@ -105,6 +108,7 @@ export const SiteBuilder: React.FC = () => {
   // Quando o usuário escolhe um layout na galeria, a sugestão automática
   // para de mexer nele.
   const [escolheuLayout, setEscolheuLayout] = useState(false);
+  const [fotosBanco, setFotosBanco] = useState<string[]>([]);
   const inputLogo = useRef<HTMLInputElement>(null);
   // A logo original fica guardada para "manter o fundo" sem pedir o arquivo de novo.
   const arquivoLogo = useRef<File | null>(null);
@@ -231,12 +235,13 @@ export const SiteBuilder: React.FC = () => {
   const escolherLead = (id: string) => {
     const encontrado = (leads || []).find((l: any) => l.id === id) || null;
     setLead(encontrado);
+    setFotosBanco([]);
+    if (encontrado) buscarFotos(encontrado.niche || encontrado.role || '').then(r => setFotosBanco(r.imagens.map(f => f.url).filter(u => u.startsWith('https://')))).catch(() => {});
     setDados(dadosIniciais(encontrado));
     if (encontrado) {
       const ramo = encontrado.niche || encontrado.role || '';
       // o banco do ramo recomenda o layout; sem ele, a sugestao por palavras-chave
-      const doBanco = SITE_TEMPLATES.find(t => t.id === layoutDoRamo(ramo));
-      setTemplate(doBanco || sugerirTemplate(ramo));
+      setTemplate(escolherTemplate(ramo, encontrado.company || encontrado.name || ''));
     }
   };
 
@@ -412,7 +417,7 @@ export const SiteBuilder: React.FC = () => {
               ))}
             </select>
             <p className="text-xs text-slate-400 mt-2">
-              Nome, telefone, endereço e horário do lead entram preenchidos, e sugerimos o layout do nicho.
+              Escolha um lead e cada modelo aparece com o nome, as cores, os serviços, o endereço e as fotos do ramo dele.
             </p>
           </div>
         )}
@@ -422,15 +427,20 @@ export const SiteBuilder: React.FC = () => {
           {SITE_TEMPLATES.filter(t => !LAYOUTS_ANTIGOS.has(t.id)).map(t => (
             <button
               key={t.id}
-              onClick={() => { setTemplate(t); setEscolheuLayout(true); }}
+              onClick={() => { setDados(d => comFotosDoBanco(d, fotosBanco)); setTemplate(t); setEscolheuLayout(true); }}
               className="group text-left bg-white border border-slate-200 rounded-2xl overflow-hidden hover:border-blue-400 hover:shadow-lg transition-all flex flex-col justify-start items-stretch"
             >
-              <div
-                className="bg-slate-100 border-b border-slate-200 aspect-[160/110] overflow-hidden [&>svg]:block [&>svg]:w-full [&>svg]:h-auto"
-                dangerouslySetInnerHTML={{
-                  __html: t.miniatura({ corPrimaria: dados.corPrimaria, corDestaque: dados.corDestaque }),
-                }}
-              />
+              {lead ? (
+                // com um lead escolhido, cada modelo aparece JÁ com o nome, as cores, os serviços e as fotos dele
+                <div className="border-b border-slate-200"><PreviaViva html={t.render({ ...comFotosDoBanco(dados, fotosBanco), selo: false })} /></div>
+              ) : (
+                <div
+                  className="bg-slate-100 border-b border-slate-200 aspect-[160/110] overflow-hidden [&>svg]:block [&>svg]:w-full [&>svg]:h-auto"
+                  dangerouslySetInnerHTML={{
+                    __html: t.miniatura({ corPrimaria: dados.corPrimaria, corDestaque: dados.corDestaque }),
+                  }}
+                />
+              )}
               <div className="p-4">
                 <h3 className="font-bold text-slate-800 mb-1">{t.nome}</h3>
                 <p className="text-xs text-slate-500 leading-relaxed mb-3">{t.descricao}</p>

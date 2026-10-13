@@ -239,12 +239,68 @@ LEAD_CLINICA = {"id": "L77", "name": "Clínica Alluve", "company": "Clínica All
                 "phone": "5514998005560", "rating": 4.8, "rating_count": 115, "address": "Rua Amando de Barros, 480"}
 
 
-def test_previa_rapida_e_uma_pagina_completa_e_segura():
+@pytest.fixture(autouse=True)
+def motor_de_sites_falso(monkeypatch):
+    """O motor de sites (funcao Node) e o banco de imagens saem do ar nos testes: aqui so se confere o que o robo faz com eles."""
     from app import previa_site
-    html = previa_site.renderizar({**LEAD_CLINICA, "company": "<script>alert(1)</script> Alluve"})
-    assert html.startswith("<!DOCTYPE html>") and "<script>alert(1)</script>" not in html
-    assert "115 avaliações" in html and "4,8" in html and "wa.me/5514998005560" in html and "viewport" in html
-    assert "Esboço inicial" in html and "undefined" not in html
+    chamadas = []
+
+    async def renderizar(lead, fotos):
+        chamadas.append((lead, fotos))
+        nome = lead.get("company") or lead.get("name") or "Empresa"
+        return {"html": f"<!DOCTYPE html><html><body><h1>{nome}</h1><p>{lead.get('niche', '')}</p></body></html>",
+                "template": "Modelo de teste", "company": nome, "builder_data": "{}"}
+
+    async def fotos(nicho, quantidade=8):
+        return ["https://exemplo.test/f1.jpg", "https://exemplo.test/f2.jpg"]
+
+    monkeypatch.setattr(previa_site, "renderizar", renderizar)
+    monkeypatch.setattr(previa_site, "fotos_do_ramo", fotos)
+    return chamadas
+
+
+def test_a_previa_e_o_site_da_empresa_com_os_dados_dela_e_fotos_do_ramo(rodar, com_robo, motor_de_sites_falso):
+    from app import previa_site
+    from app.sites_store import list_sites
+    url, falha = rodar(previa_site.criar, "alice", "alice@example.com", LEAD_CLINICA)
+    assert falha == "" and "/s/clinica-alluve-" in url
+    lead, fotos = motor_de_sites_falso[0]
+    assert lead["company"] == "Clínica Alluve" and lead["niche"] == "Estética" and lead["rating"] == 4.8 and lead["phone"] == "5514998005560"
+    assert fotos == ["https://exemplo.test/f1.jpg", "https://exemplo.test/f2.jpg"]
+    assert [s["template"] for s in rodar(list_sites, "alice") if s.get("lead_id") == "L77"] == ["Modelo de teste"]
+
+
+def test_motor_fora_do_ar_nao_publica_pagina_nenhuma(rodar, com_robo, monkeypatch):
+    from app import previa_site
+    from app.sites_store import list_sites
+
+    async def cai(lead, fotos):
+        raise RuntimeError("o motor de sites respondeu 502")
+    monkeypatch.setattr(previa_site, "renderizar", cai)
+    url, falha = rodar(previa_site.criar, "alice", "alice@example.com", LEAD_CLINICA)
+    assert url == "" and "502" in falha
+    assert [s for s in rodar(list_sites, "alice") if s.get("lead_id") == "L77"] == []   # nada de pagina generica no lugar
+
+
+def test_o_servidor_chama_o_motor_com_o_segredo(rodar, monkeypatch):
+    import httpx
+    from app import previa_site
+    from app.config import settings
+    monkeypatch.undo()  # volta ao renderizar de verdade; so a rede e simulada
+    visto = {}
+
+    def tratar(req: httpx.Request) -> httpx.Response:
+        import json
+        visto["url"], visto["segredo"], visto["corpo"] = str(req.url), req.headers.get("x-render-secret"), json.loads(req.content)
+        return httpx.Response(200, json={"html": "<html></html>", "template": "Noir Vidro", "company": "X", "builder_data": "{}"})
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(tratar), **kw))
+    monkeypatch.setattr(settings, "WORKER_SECRET", "segredo-do-motor-1234567890")
+    saida = rodar(previa_site.renderizar, {**LEAD_CLINICA, "campo_estranho": "x"}, ["https://exemplo.test/f1.jpg"])
+    assert saida["template"] == "Noir Vidro" and visto["url"].endswith("/api/render-site") and visto["segredo"] == "segredo-do-motor-1234567890"
+    assert visto["corpo"]["lead"]["company"] == "Clínica Alluve" and "campo_estranho" not in visto["corpo"]["lead"]
+    assert visto["corpo"]["fotos"] == ["https://exemplo.test/f1.jpg"]
 
 
 def test_criar_previa_publica_o_site_do_lead_e_devolve_o_link(rodar, com_robo):

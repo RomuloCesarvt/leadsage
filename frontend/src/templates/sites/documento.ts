@@ -14,7 +14,21 @@ import { cssExtras, secoesExtras } from './secoes-extras';
 export type OpcoesDocumento = {
   /** layout de fundo escuro: as seções extras acompanham */
   escuro?: boolean;
+  /** os modelos que já trazem a própria animação (família Cinema) desligam a revelação padrão */
+  semRevelacao?: boolean;
 };
+
+/**
+ * Fluidez para todos os layouts: cada seção, depois da primeira tela, entra suavemente ao rolar.
+ * Só onde o navegador sabe (animation-timeline: view()); nos demais o conteúdo aparece como sempre, sem animação.
+ */
+const REVELACAO = `
+@supports (animation-timeline:view()){
+  @keyframes rv-padrao{from{opacity:0;transform:translateY(34px)}to{opacity:1;transform:none}}
+  main>section:not(:first-of-type) .wrap>*,body>section:not(:first-of-type) .wrap>*{animation:rv-padrao linear both;animation-timeline:view();animation-range:entry 3% entry 46%}
+}
+@media(prefers-reduced-motion:reduce){main>section .wrap>*,body>section .wrap>*{animation:none!important}}
+`;
 
 /** Onde as seções extras entram: antes do bloco de contato; sem ele, antes do rodapé. */
 const pontoDeInsercao = (corpo: string): number => {
@@ -72,7 +86,7 @@ export const documentoPremium = (
 <meta name="viewport" content="width=device-width,initial-scale=1">
 ${cabecaSEO(d, d.schema || 'LocalBusiness')}
 ${linkFontes(f)}
-<style>${cssRaiz(d, f)}${cssProfissional()}${extras ? cssExtras(opcoes.escuro ?? fundoEscuro(css)) : ''}${css}</style>
+<style>${cssRaiz(d, f)}${cssProfissional()}${extras ? cssExtras(opcoes.escuro ?? fundoEscuro(css)) : ''}${css}${opcoes.semRevelacao ? '' : REVELACAO}</style>
 </head>
 <body>
 ${temMain ? '<a class="pular" href="#conteudo">Pular para o conteúdo</a>' : ''}

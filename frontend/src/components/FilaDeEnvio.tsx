@@ -18,6 +18,7 @@ import { WhatsAppIcon, InstagramIcon, LinkedInIcon } from './BrandIcons';
 import { ehSalvo } from '../lib/leadsSalvos';
 import { sondar } from '../lib/sondagem';
 import { montarPreviaDoLead } from './SiteBuilder';
+import { buscarFotos } from './BancoImagens';
 import type { CanalFila, EstadoFilaWhats, ItemFila, LeadItem, ResultadoPreparo, ResumoFila } from '../types';
 
 const SEM_CONTATO_AINDA = new Set(['', 'Novo Lead', 'Novos', 'Novo']);
@@ -170,10 +171,21 @@ export const FilaDeEnvio: React.FC = () => {
         const criar = faltam.slice(0, vagas);
         setPrevias({ feitas: 0, total: criar.length });
         let feitas = 0; let falhas = 0; let proximo = 0;
+        // as fotos do ramo (banco de imagens), uma busca por ramo: o site sai com imagens de verdade, não com gradiente
+        const fotosPorRamo = new Map<string, string[]>();
+        for (const ramo of new Set(criar.map(l => (l.niche || l.role || '').trim()))) {
+          const r = await buscarFotos(ramo);
+          fotosPorRamo.set(ramo, r.imagens.map(f => f.url));
+        }
         const trabalhador = async () => {
           while (proximo < criar.length) {
             const lead = criar[proximo++];
-            try { await api.publishSite(montarPreviaDoLead(lead)); } catch { falhas++; }
+            try {
+              const fotos = (fotosPorRamo.get((lead.niche || lead.role || '').trim()) || []);
+              // cada lead começa em um ponto diferente da lista: dois negócios do mesmo ramo não ficam com as mesmas fotos
+              const giro = fotos.length ? (proximo * 2) % fotos.length : 0;
+              await api.publishSite(montarPreviaDoLead(lead, [...fotos.slice(giro), ...fotos.slice(0, giro)]));
+            } catch { falhas++; }
             feitas++; setPrevias({ feitas, total: criar.length });
           }
         };

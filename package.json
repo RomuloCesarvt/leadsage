@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "bundle:sites": "cd frontend && npx esbuild src/templates/sites/render-entry.ts --bundle --platform=node --format=esm --outfile=../api/_sites.bundle.mjs",
     "build": "cd frontend && npm install && npm run build && cd .. && mkdir -p frontend/dist/conector && cp conector/leadsage-conector.mjs conector/package.json conector/LEIA-ME.md frontend/dist/conector/ && rm -rf dist && mv frontend/dist dist"
   }
 }

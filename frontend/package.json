@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test:templates": "npx esbuild src/templates/sites/layouts.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/layouts.test.mjs && node node_modules/.cache/layouts.test.mjs",
+    "test:templates": "npx esbuild src/templates/sites/layouts.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/layouts.test.mjs && node node_modules/.cache/layouts.test.mjs && npx esbuild src/templates/sites/previa.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/previa.test.mjs && node node_modules/.cache/previa.test.mjs",
     "test:docs": "npx esbuild src/templates/docs/docs.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/docs.test.mjs && node node_modules/.cache/docs.test.mjs",
     "test:front": "npm run test:templates && npm run test:textos && npm run test:docs && npm run test:geo && npm run test:imagem && npm run test:nichos && npm run test:salvos && npm run test:site",
     "geo": "node scripts/gerar-geo.mjs",

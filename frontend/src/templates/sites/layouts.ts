@@ -2,6 +2,11 @@ import { prepararDados } from './profissional';
 import { LAYOUTS_PREMIUM } from './premium';
 import { LAYOUTS_PREMIUM_2 } from './premium2';
 import { CENAS } from './cenas';
+import { LAYOUTS_CINEMA_1 } from './cinema-1';
+import { LAYOUTS_CINEMA_2 } from './cinema-2';
+import { LAYOUTS_CINEMA_3 } from './cinema-3';
+import { LAYOUTS_CINEMA_4 } from './cinema-4';
+import { LAYOUTS_CINEMA_5 } from './cinema-5';
 import { aplicarTextos } from './textos-editaveis';
 /**
  * Os layouts propriamente ditos.
@@ -645,7 +650,7 @@ ${rodape(d)}`
  * publicados com eles — reabrir para editar precisa encontrar o layout.
  */
 export const SITE_TEMPLATES: SiteTemplate[] = [
-  ...CENAS, ...LAYOUTS_PREMIUM, ...LAYOUTS_PREMIUM_2, vitrine, profissional, servicoLocal, essencial,
+  ...LAYOUTS_CINEMA_1, ...LAYOUTS_CINEMA_2, ...LAYOUTS_CINEMA_3, ...LAYOUTS_CINEMA_4, ...LAYOUTS_CINEMA_5, ...CENAS, ...LAYOUTS_PREMIUM, ...LAYOUTS_PREMIUM_2, vitrine, profissional, servicoLocal, essencial,
 ].map(t => ({
   ...t,
   // Todo texto marcado e com as edições do usuário aplicadas — na prévia

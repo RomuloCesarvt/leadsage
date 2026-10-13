@@ -10,6 +10,13 @@
       }
     },
     {
+      "src": "api/render-site.mjs",
+      "use": "@vercel/node",
+      "config": {
+        "maxDuration": 30
+      }
+    },
+    {
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
@@ -18,6 +25,10 @@
     }
   ],
   "routes": [
+    {
+      "src": "/api/render-site",
+      "dest": "/api/render-site.mjs"
+    },
     {
       "src": "/api/(.*)",
       "dest": "/api/index.py"
