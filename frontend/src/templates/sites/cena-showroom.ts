@@ -51,7 +51,6 @@ export const showroom: SiteTemplate = {
     const dados: string[] = [];
     if (nota) dados.push(`<div><b>${nota.nota} ★</b><small>${nota.avaliacoes ? `${nota.avaliacoes} avaliações no Google` : 'avaliação no Google'}</small></div>`);
     if (horario) dados.push(`<div><b>${esc(horario)}</b><small>Horário de atendimento</small></div>`);
-    if (d.cidade) dados.push(`<div><b>${esc(d.cidade)}</b><small>Venha conhecer</small></div>`);
     if (d.telefone || d.whatsapp) dados.push(`<div><b>WhatsApp</b><small>Fale com um vendedor</small></div>`);
 
     return documentoPremium(d, FONTES_SHOWROOM, `
@@ -128,7 +127,7 @@ ${cssRodape('rp', '#07080b', '#a4a9b6')}
 </div></header>
 <section class="capa"><div class="gigante" aria-hidden="true">${marca}</div>
   <div class="wrap capa-in">
-    <div><span class="etq">${esc(d.categoria || 'Veículos novos e seminovos')}${d.cidade ? ` · ${esc(d.cidade)}` : ''}</span>
+    <div><span class="etq">${esc(d.categoria || 'Veículos novos e seminovos')}</span>
       <h1>${d.slogan && d.slogan.trim() ? esc(d.slogan.trim()) : 'Seu próximo carro <em>começa aqui</em>'}</h1>
       <p class="lead">${capaTxt}</p>
       <div class="btns">${ctaPrincipal(d, 'Falar com vendedor')}<a class="btn btn-2" href="#categorias">Ver opções</a></div></div>

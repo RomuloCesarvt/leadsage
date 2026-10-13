@@ -134,7 +134,7 @@ ${cssRodape('rp', '#0c2340', '#a9bbd0')}
   ${ctaPrincipal(d, 'Agendar')}
 </div></header>
 <section class="capa"><div class="wrap capa-in">
-  <div><span class="eyebrow">${esc(d.categoria || 'Atendimento com hora marcada')}${d.cidade ? ` · ${esc(d.cidade)}` : ''}</span>
+  <div><span class="eyebrow">${esc(d.categoria || 'Atendimento com hora marcada')}</span>
     <h1>${titulo}</h1><p class="lead">${capaTxt}</p>
     <div class="btns">${ctaPrincipal(d, 'Agendar avaliação')}<a class="btn btn-2" href="#tratamentos">Ver tratamentos</a></div></div>
   <div class="foto-wrap"><div class="img" role="img" aria-label="${esc(d.empresa)}"></div>

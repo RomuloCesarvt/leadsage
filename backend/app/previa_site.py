@@ -8,6 +8,7 @@ daqui com o segredo do serviço; assim o robô e o disparo geram exatamente o me
 
 Se o motor não responder, NÃO se publica uma página qualquer: o robô avisa que está finalizando e o dono assume.
 """
+import json
 from typing import Any, Dict, List, Tuple
 
 import httpx
@@ -15,6 +16,10 @@ import httpx
 from app import banco_imagens
 from app.config import settings
 from app.credit_system import is_admin
+
+# Versao do motor de sites. Ao mudar o visual (cores, modelos, titulos), troque o valor: as previas ja criadas e
+# nunca editadas sao refeitas, com o mesmo link, na proxima vez que forem enviadas.
+MOTOR_VERSAO = "2026-10-13-direcao-de-arte-2"
 
 # o que o motor de sites sabe usar de um lead
 CAMPOS_DO_LEAD = (
@@ -36,14 +41,14 @@ async def fotos_do_ramo(nicho: str, quantidade: int = 8) -> List[str]:
         return []
 
 
-async def renderizar(lead: Dict[str, Any], fotos: List[str]) -> Dict[str, Any]:
+async def renderizar(lead: Dict[str, Any], fotos: List[str], modelo: str = "") -> Dict[str, Any]:
     """O site do lead (html, modelo, empresa) montado pelo motor de sites."""
     if not settings.WORKER_SECRET:
         raise RuntimeError("o motor de sites não está configurado")
     async with httpx.AsyncClient(timeout=25) as cliente:
         r = await cliente.post(
             f"{settings.APP_URL.rstrip('/')}/api/render-site",
-            json={"lead": lead_para_o_motor(lead), "fotos": fotos},
+            json={"lead": lead_para_o_motor(lead), "fotos": fotos, "modelo": modelo},
             headers={"x-render-secret": settings.WORKER_SECRET},
         )
     if r.status_code != 200:
@@ -52,6 +57,54 @@ async def renderizar(lead: Dict[str, Any], fotos: List[str]) -> Dict[str, Any]:
     if not str(dados.get("html") or "").strip():
         raise RuntimeError("o motor de sites devolveu uma página vazia")
     return dados
+
+
+def _com_carimbo(builder_data: str) -> str:
+    """O mesmo builder_data, marcado com a versao do motor que gerou o site."""
+    try:
+        dados = json.loads(builder_data or "{}")
+        if isinstance(dados, dict):
+            dados["motor"] = MOTOR_VERSAO
+            return json.dumps(dados, ensure_ascii=False)
+    except Exception:
+        pass
+    return builder_data
+
+
+def _carimbo(builder_data: str) -> str:
+    try:
+        return str((json.loads(builder_data or "{}") or {}).get("motor") or "")
+    except Exception:
+        return ""
+
+
+async def atualizar_se_antigo(uid: str, email: str, lead: Dict[str, Any]) -> bool:
+    """Refaz, com o motor atual, a previa deste lead se ela foi feita por uma versao antiga e ninguem a editou.
+
+    O link nao muda (quem ja recebeu ve o site novo). Site que o dono editou nunca e sobrescrito.
+    """
+    from app.sites_store import list_sites, update_site
+
+    lead_id = str(lead.get("id") or "")
+    if not lead_id:
+        return False
+    try:
+        for s in await list_sites(uid):
+            if s.get("lead_id") != lead_id or not s.get("slug") or s.get("template") == "Prévia rápida":
+                continue
+            if s.get("updated_at"):
+                return False  # o dono mexeu neste site: fica como ele deixou
+            if _carimbo(s.get("builder_data") or "") == MOTOR_VERSAO:
+                return False
+            fotos = await fotos_do_ramo(str(lead.get("niche") or lead.get("role") or ""))
+            site = await renderizar(lead, fotos, str(s.get("template") or ""))
+            await update_site(uid, s["id"], str(site.get("company") or s.get("company") or ""), site["html"],
+                              str(site.get("template") or ""), _com_carimbo(str(site.get("builder_data") or "")),
+                              marcar_edicao=False)
+            return True
+    except Exception as exc:  # atualizar e um extra: nunca derruba o envio do link
+        print(f"Falha ao atualizar a previa antiga: {type(exc).__name__}: {str(exc)[:80]}")
+    return False
 
 
 async def criar(uid: str, email: str, lead: Dict[str, Any]) -> Tuple[str, str]:
@@ -76,7 +129,7 @@ async def criar(uid: str, email: str, lead: Dict[str, Any]) -> Tuple[str, str]:
         site = await renderizar(lead, fotos)
         criado = await create_site(
             uid, str(site.get("company") or lead.get("company") or lead.get("name") or "Prévia"), site["html"],
-            str(site.get("template") or ""), lead_id, str(site.get("builder_data") or ""),
+            str(site.get("template") or ""), lead_id, _com_carimbo(str(site.get("builder_data") or "")),
         )
         return f"{settings.APP_URL.rstrip('/')}/s/{criado['slug']}", ""
     except Exception as exc:  # o robô cai para "finalizando" e chama o dono; não derruba a conversa

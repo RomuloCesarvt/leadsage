@@ -119,7 +119,7 @@ ${nav(d, [['#trabalhos', 'Serviços'], ['#explore', 'Galeria'], ['#contato', 'Co
       <div class="pf-btns entra" style="--d:4">${ctaPrincipal(d, 'Falar no WhatsApp', 'bt-cheio')}<a class="vidro-bt" href="#trabalhos">Ver serviços${ICONES.seta}</a></div>
     </div>
   </div>
-  ${faixa([d.categoria || d.empresa, ...servicos.map(s => s.titulo), d.cidade || ''], 'marq pf-faixa')}
+  ${faixa([d.categoria || d.empresa, ...servicos.map(s => s.titulo)], 'marq pf-faixa')}
 </div></section>
 ${servicos.length ? `<section class="sec" id="trabalhos"><div class="wrap">
   <div class="pf-cab rev"><h2>O que a gente faz</h2><p>${capaTxt}</p></div>
@@ -159,7 +159,7 @@ const editorial: SiteTemplate = {
     const destaque = fotoDe(d, 1), terceira = fotoDe(d, 2);
     const nums = numerosReais(d);
     const fil = frases(d.sobre);
-    const manifesto = (fil.length >= 3 ? fil.slice(1) : [`${d.categoria || 'Nosso trabalho'} feito com verdade.`, 'Atendimento de perto, sem pressa e sem improviso.', `${d.empresa}${d.cidade ? `, em ${d.cidade}` : ''}.`]).slice(0, 3);
+    const manifesto = (fil.length >= 3 ? fil.slice(1) : [`${d.categoria || 'Nosso trabalho'} feito com verdade.`, 'Atendimento de perto, sem pressa e sem improviso.', `${d.empresa}.`]).slice(0, 3);
     const depo = (d.depoimentos || []).find(x => x.texto?.trim());
     const h1 = titulo(d, d.empresa);
     return documentoCinema(d, PARES.instrument, `

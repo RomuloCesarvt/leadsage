@@ -143,7 +143,7 @@ ${cssRodape('rp', '#0a0706', '#a99b88')}
   ${ctaPrincipal(d, 'Pedir agora')}
 </div></header>
 <section class="capa"><div class="wrap capa-in">
-  <div><p class="eyebrow">${esc(d.categoria || 'Cardápio e pedidos')}${d.cidade ? ` · ${esc(d.cidade)}` : ''}</p>
+  <div><p class="eyebrow">${esc(d.categoria || 'Cardápio e pedidos')}</p>
     <h1>${titulo}</h1><p class="lead">${capaTxt}</p>
     <div class="btns">${ctaPrincipal(d, 'Pedir pelo WhatsApp')}<a class="btn btn-2" href="#cardapio">Ver o cardápio</a></div></div>
   ${horario || nota ? `<aside class="hoje" aria-label="Informações">

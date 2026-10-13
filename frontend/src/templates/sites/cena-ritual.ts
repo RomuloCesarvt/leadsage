@@ -152,7 +152,7 @@ ${cssRodape('rp', '#2a1f23', '#d8c6bc')}
   <div class="topo-d">${ctaPrincipal(d, 'Agendar')}</div>
 </div></header>
 <section class="capa"><div class="wrap capa-in">
-  <div><p class="eyebrow">${esc(d.categoria || 'Beleza e bem-estar')}${d.cidade ? ` · ${esc(d.cidade)}` : ''}</p>
+  <div><p class="eyebrow">${esc(d.categoria || 'Beleza e bem-estar')}</p>
     <h1>${titulo}</h1><p class="lead">${capaTxt}</p>
     <div class="btns">${ctaPrincipal(d, 'Agendar horário')}<a class="btn btn-2" href="#servicos">Ver tratamentos</a></div></div>
   <div class="colagem">

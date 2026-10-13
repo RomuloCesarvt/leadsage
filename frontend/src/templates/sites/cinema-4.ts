@@ -85,7 +85,7 @@ ${nav(d, [['#sobre', 'Sobre'], ['#servicos', 'Serviços'], ['#contato', 'Contato
   <div class="ag-foto rev-r"><div class="${classeImagem(foto2 || capa, 'par')}" style="${fundoImagem(foto2 || capa, 1)}"></div></div>
 </div></section>
 ${nums.length >= 2 ? `<section class="ag-sec ag-esc"><div class="wrap"><p class="ag-rot rev">Em números</p><div class="ag-num rev">${nums.map(n => n.valor !== undefined ? contador(n.valor, n.rotulo, 'ag-ct') : `<div class="ag-ct"><b>${n.texto}</b><span>${esc(n.rotulo)}</span></div>`).join('')}</div></div></section>` : ''}
-<div style="overflow:hidden">${faixa([d.categoria || d.empresa, ...servicos.map(s => s.titulo), d.cidade || ''], 'marq ag-faixa')}</div>
+<div style="overflow:hidden">${faixa([d.categoria || d.empresa, ...servicos.map(s => s.titulo)], 'marq ag-faixa')}</div>
 ${servicos.length ? `<section class="ag-sec" id="servicos"><div class="wrap"><p class="ag-rot rev">O que fazemos</p><h2 class="ag-t rev">Soluções para o seu dia a dia</h2>
   <div class="ag-cards">${servicos.map((s, i) => { const f = fotoDe(d, i + 2); return `<article class="ag-card rev"><div class="${classeImagem(f, 'fundo')}" style="${fundoImagem(f, i % 3)}"></div><span class="n">${pad2(i + 1)}</span><h3>${esc(s.titulo)}</h3>${s.descricao ? `<p>${esc(s.descricao)}</p>` : ''}</article>`; }).join('')}</div></div></section>` : ''}
 <div class="ag-esc">${vozes(d, 'nr-vozes')}</div>

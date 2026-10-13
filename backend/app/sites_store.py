@@ -207,7 +207,7 @@ async def create_site(
 
 async def update_site(
     uid: str, site_id: str, company: str, html: str, template: str = "",
-    builder_data: str = "",
+    builder_data: str = "", marcar_edicao: bool = True,
 ) -> Optional[Dict[str, Any]]:
     """Regrava um site que ja existe.
 
@@ -228,7 +228,7 @@ async def update_site(
         "template": template or atual.get("template") or "",
         "html": html,
         "builder_data": builder_data,
-        "updated_at": _now(),
+        "updated_at": _now() if marcar_edicao else (atual.get("updated_at") or ""),
     }
 
     if firestore_db is not None:

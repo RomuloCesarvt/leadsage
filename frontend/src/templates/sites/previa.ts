@@ -67,7 +67,7 @@ const urlHttps = (u: unknown): string => (/^https:\/\/[^\s"'<>()\\]+$/.test(Stri
  * O site do lead, pronto para publicar.
  * `fotos`: endereços https do banco de imagens do ramo; só entram onde o lead ainda não tem foto.
  */
-export const montarPrevia = (lead: any, fotos: string[] = []) => {
+export const montarPrevia = (lead: any, fotos: string[] = [], preferido = '') => {
   const dados = dadosDoLead(lead);
   const urls = [...new Set((fotos || []).map(urlHttps).filter(Boolean))];
   if (urls.length) {
@@ -76,7 +76,9 @@ export const montarPrevia = (lead: any, fotos: string[] = []) => {
     if (!(dados.galeria || []).length) dados.galeria = urls.slice(2, 6);
   }
   const ramo = lead?.niche || lead?.role || '';
-  const template = escolherTemplate(ramo, dados.empresa);
+  // ao atualizar um site que já existe, mantém o modelo dele, desde que ainda combine com o ramo
+  const atual = preferido ? SITE_TEMPLATES.find(t => t.nome === preferido || t.id === preferido) : undefined;
+  const template = atual && direcaoDeArte(ramo, dados.empresa).modelos.includes(atual.id) ? atual : escolherTemplate(ramo, dados.empresa);
   const html = template.render({ ...dados, selo: true });
   return { company: dados.empresa, html, template: template.nome, lead_id: String(lead?.id || ''), builder_data: JSON.stringify(dados) };
 };

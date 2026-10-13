@@ -141,7 +141,7 @@ ${cssRodape('rp', '#0d1014', '#9aa4b0')}
 @media(max-width:900px){.info .wrap{justify-content:center}.topo nav{display:none}.capa-in,.sobre .wrap,.dif .wrap,.contato .wrap{grid-template-columns:1fr}.celulas{grid-template-columns:1fr 1fr}.etapas{grid-template-columns:1fr 1fr;gap:28px 0}.etapas::before{display:none}.fig figure,.f4 figure:nth-child(4),.f5 figure:nth-child(n+4),.f2 figure{grid-column:span 6!important;grid-row:auto!important}.fig img{aspect-ratio:4/3!important}}
 @media(max-width:560px){.celulas{grid-template-columns:1fr}.etapas{grid-template-columns:1fr}}
 `, `
-<div class="info mono"><div class="wrap"><span>${d.cidade ? `Atendemos ${esc(d.cidade)} e região` : 'Orçamento pelo WhatsApp'}</span><span>${tel ? `<a href="${tel}">${esc(d.telefone)}</a>` : ''}${horario ? ` · ${esc(horario)}` : ''}</span></div></div>
+<div class="info mono"><div class="wrap"><span>Orçamento pelo WhatsApp</span><span>${tel ? `<a href="${tel}">${esc(d.telefone)}</a>` : ''}${horario ? ` · ${esc(horario)}` : ''}</span></div></div>
 <header class="topo"><div class="wrap">
   <a class="marca" href="#">${logo(d)}<span>${esc(d.empresa)}</span></a>
   <nav aria-label="Seções"><a href="#servicos">Serviços</a><a href="#processo">Processo</a><a href="#sobre">Quem somos</a><a href="#contato">Contato</a></nav>

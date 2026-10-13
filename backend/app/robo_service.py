@@ -150,6 +150,15 @@ async def _lead_por_id(uid: str, lead_id: str) -> Optional[Dict[str, Any]]:
     return lead
 
 
+async def _atualizar_previa_antiga(uid: str, email: str, lead: Dict[str, Any]) -> None:
+    """Previa feita por uma versao antiga do motor (e nunca editada) e refeita antes de o link seguir para o lead."""
+    try:
+        from app import previa_site
+        await previa_site.atualizar_se_antigo(uid, email, lead)
+    except Exception:
+        pass
+
+
 async def _site_do_lead(uid: str, lead_id: str) -> str:
     from app.sites_store import list_sites
 
@@ -283,6 +292,7 @@ async def _processar(
     if lead:
         conversa["lead_id"] = lead["id"]
         conversa["nome"] = conversa["nome"] or lead.get("company") or lead.get("name") or ""
+        await _atualizar_previa_antiga(uid, email, lead)
         lead["site_publicado"] = await _site_do_lead(uid, lead["id"])
         # primeira resposta do lead: sai de "Contato Enviado" mesmo que o
         # robo nao possa responder (desligado, sem plano, sem creditos)
@@ -486,6 +496,7 @@ async def enviar_previa(uid: str, email: str, cid: str, enviar: Optional[Enviar]
     lead = _lead_do_item(item) if item else {"id": conversa.get("lead_id") or cid, "name": conversa.get("nome") or "", "phone": conversa.get("contato", "")}
     nome = lead.get("company") or lead.get("name") or conversa.get("nome") or ""
 
+    await _atualizar_previa_antiga(uid, email, lead)
     url = await _site_do_lead(uid, lead["id"])
     if not url:
         url, falha = await previa_site.criar(uid, email, lead)
@@ -522,6 +533,7 @@ async def enviar_previa_por_telefone(uid: str, email: str, telefone: str, chat_i
     cfg = await robo_store.canal_do_usuario(uid) or {}
     cfg = {**cfg, "uid": uid, "email": email}
 
+    await _atualizar_previa_antiga(uid, email, lead)
     url = await _site_do_lead(uid, lead["id"])
     if not url:
         url, falha = await previa_site.criar(uid, email, lead)

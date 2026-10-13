@@ -101,7 +101,7 @@ ${nav(d, [['#sobre', 'Sobre'], ['#servicos', 'Serviços'], ['#contato', 'Contato
     <div class="nx-btns entra" style="--d:6">${ctaPrincipal(d, 'Quero participar', 'nx-btn')}<a class="vidro-bt" href="#servicos">Ver o que rola${ICONES.seta}</a></div>
   </div>
 </section>
-<div style="overflow:hidden;padding:18px 0">${faixa([d.categoria || d.empresa, ...servicos.map(s => s.titulo), d.cidade || ''], 'marq nx-faixa')}</div>
+<div style="overflow:hidden;padding:18px 0">${faixa([d.categoria || d.empresa, ...servicos.map(s => s.titulo)], 'marq nx-faixa')}</div>
 <section class="sec nx-sobre" id="sobre"><div class="wrap">
   <div class="rev-l"><h2 class="nx-t">Quem é <em>${esc(d.empresa)}</em></h2><p>${sobreTxt}</p>${seloGoogle(d, 'nr-nota vidro')}</div>
   <div class="nx-moldura rev-r"><div class="${classeImagem(foto2 || capa, 'par')}" style="${fundoImagem(foto2 || capa, 1)}"></div></div>
@@ -200,7 +200,7 @@ ${nav(d, [['#empresa', 'A empresa'], ['#solucoes', 'Soluções'], ['#contato', '
   </div>
 </div></section>
 <section class="sec" id="empresa"><div class="wrap"><p class="rot">A empresa</p><p class="b2-leit">${apresentacao}</p>${seloGoogle(d, 'nr-nota vidro')}</div></section>
-${faixa([d.categoria || d.empresa, ...servicos.map(s => s.titulo), d.cidade || ''], 'marq b2-faixa')}
+${faixa([d.categoria || d.empresa, ...servicos.map(s => s.titulo)], 'marq b2-faixa')}
 ${servicos.length ? `<section class="sec" id="solucoes"><div class="wrap"><p class="rot rev">Soluções</p><h2 class="b2-tit rev">O que entregamos para o seu negócio</h2>
   <div class="b2-grade">${servicos.map((s, i) => `<article class="b2-card rev"><span class="ic">${iconeDoServico(i)}</span><h3>${esc(s.titulo)}</h3>${s.descricao ? `<p>${esc(s.descricao)}</p>` : ''}</article>`).join('')}</div></div></section>` : ''}
 ${fotosGal.length >= 3 ? `<section class="sec"><div class="wrap"><h2 class="b2-tit rev">Na prática</h2><div class="b2-mosaico">${fotosGal.slice(0, 6).map((src, i) => `<figure class="rev"><img src="${src}" alt="${esc(d.empresa)} — foto ${i + 1}" loading="lazy"></figure>`).join('')}</div></div></section>` : ''}

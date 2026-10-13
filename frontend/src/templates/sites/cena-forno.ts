@@ -114,7 +114,7 @@ ${cssRodape('rp', '#2a170d', '#d8c7b3')}
   ${ctaPrincipal(d, 'Encomendar')}
 </div></header>
 <section class="capa"><div class="wrap capa-in">
-  <div><span class="etq">${esc(d.categoria || 'Feito todo dia')}${d.cidade ? ` · ${esc(d.cidade)}` : ''}</span>
+  <div><span class="etq">${esc(d.categoria || 'Feito todo dia')}</span>
     <h1>${d.slogan && d.slogan.trim() ? esc(d.slogan.trim()) : 'Cheirinho de pão <em>saindo do forno</em>'}</h1>
     <p class="lead">${capaTxt}</p>
     <div class="btns">${ctaPrincipal(d, 'Fazer encomenda')}<a class="btn btn-2" href="#cardapio">Ver cardápio</a></div>

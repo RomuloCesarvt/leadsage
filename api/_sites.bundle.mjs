@@ -3143,7 +3143,7 @@ ${cssRodape("rp", "#2a1f23", "#d8c6bc")}
   <div class="topo-d">${ctaPrincipal(d, "Agendar")}</div>
 </div></header>
 <section class="capa"><div class="wrap capa-in">
-  <div><p class="eyebrow">${esc(d.categoria || "Beleza e bem-estar")}${d.cidade ? ` \xB7 ${esc(d.cidade)}` : ""}</p>
+  <div><p class="eyebrow">${esc(d.categoria || "Beleza e bem-estar")}</p>
     <h1>${titulo2}</h1><p class="lead">${capaTxt}</p>
     <div class="btns">${ctaPrincipal(d, "Agendar hor\xE1rio")}<a class="btn btn-2" href="#servicos">Ver tratamentos</a></div></div>
   <div class="colagem">
@@ -3299,7 +3299,7 @@ ${cssRodape("rp", "#0a0706", "#a99b88")}
   ${ctaPrincipal(d, "Pedir agora")}
 </div></header>
 <section class="capa"><div class="wrap capa-in">
-  <div><p class="eyebrow">${esc(d.categoria || "Card\xE1pio e pedidos")}${d.cidade ? ` \xB7 ${esc(d.cidade)}` : ""}</p>
+  <div><p class="eyebrow">${esc(d.categoria || "Card\xE1pio e pedidos")}</p>
     <h1>${titulo2}</h1><p class="lead">${capaTxt}</p>
     <div class="btns">${ctaPrincipal(d, "Pedir pelo WhatsApp")}<a class="btn btn-2" href="#cardapio">Ver o card\xE1pio</a></div></div>
   ${horario || nota ? `<aside class="hoje" aria-label="Informa\xE7\xF5es">
@@ -3446,7 +3446,7 @@ ${cssRodape("rp", "#0d1014", "#9aa4b0")}
 @media(max-width:900px){.info .wrap{justify-content:center}.topo nav{display:none}.capa-in,.sobre .wrap,.dif .wrap,.contato .wrap{grid-template-columns:1fr}.celulas{grid-template-columns:1fr 1fr}.etapas{grid-template-columns:1fr 1fr;gap:28px 0}.etapas::before{display:none}.fig figure,.f4 figure:nth-child(4),.f5 figure:nth-child(n+4),.f2 figure{grid-column:span 6!important;grid-row:auto!important}.fig img{aspect-ratio:4/3!important}}
 @media(max-width:560px){.celulas{grid-template-columns:1fr}.etapas{grid-template-columns:1fr}}
 `, `
-<div class="info mono"><div class="wrap"><span>${d.cidade ? `Atendemos ${esc(d.cidade)} e regi\xE3o` : "Or\xE7amento pelo WhatsApp"}</span><span>${tel ? `<a href="${tel}">${esc(d.telefone)}</a>` : ""}${horario ? ` \xB7 ${esc(horario)}` : ""}</span></div></div>
+<div class="info mono"><div class="wrap"><span>Or\xE7amento pelo WhatsApp</span><span>${tel ? `<a href="${tel}">${esc(d.telefone)}</a>` : ""}${horario ? ` \xB7 ${esc(horario)}` : ""}</span></div></div>
 <header class="topo"><div class="wrap">
   <a class="marca" href="#">${logo(d)}<span>${esc(d.empresa)}</span></a>
   <nav aria-label="Se\xE7\xF5es"><a href="#servicos">Servi\xE7os</a><a href="#processo">Processo</a><a href="#sobre">Quem somos</a><a href="#contato">Contato</a></nav>
@@ -3594,7 +3594,7 @@ ${cssRodape("rp", "#0c2340", "#a9bbd0")}
   ${ctaPrincipal(d, "Agendar")}
 </div></header>
 <section class="capa"><div class="wrap capa-in">
-  <div><span class="eyebrow">${esc(d.categoria || "Atendimento com hora marcada")}${d.cidade ? ` \xB7 ${esc(d.cidade)}` : ""}</span>
+  <div><span class="eyebrow">${esc(d.categoria || "Atendimento com hora marcada")}</span>
     <h1>${titulo2}</h1><p class="lead">${capaTxt}</p>
     <div class="btns">${ctaPrincipal(d, "Agendar avalia\xE7\xE3o")}<a class="btn btn-2" href="#tratamentos">Ver tratamentos</a></div></div>
   <div class="foto-wrap"><div class="img" role="img" aria-label="${esc(d.empresa)}"></div>
@@ -3739,7 +3739,7 @@ ${cssRodape("rp", "#1d2340", "#c6cce0")}
 </div></header>
 <section class="capa"><div class="pata" style="left:2%;top:46%;width:90px;transform:rotate(-20deg)">${PATA}</div><div class="pata" style="left:44%;top:6%;width:64px;transform:rotate(18deg)">${PATA}</div>
   <div class="wrap capa-in">
-  <div><span class="eyebrow">${esc(d.categoria || "Cuidado de quem ama pets")}${d.cidade ? ` \xB7 ${esc(d.cidade)}` : ""}</span>
+  <div><span class="eyebrow">${esc(d.categoria || "Cuidado de quem ama pets")}</span>
     <h1>${titulo2}</h1><p class="lead">${capaTxt}</p>
     <div class="btns">${ctaPrincipal(d, "Agendar pelo WhatsApp")}<a class="btn btn-2" href="#servicos">Ver servi\xE7os</a></div></div>
   <div class="blob-wrap"><div class="blob" role="img" aria-label="${esc(d.empresa)}"></div>
@@ -3800,7 +3800,6 @@ var showroom = {
     const dados = [];
     if (nota) dados.push(`<div><b>${nota.nota} \u2605</b><small>${nota.avaliacoes ? `${nota.avaliacoes} avalia\xE7\xF5es no Google` : "avalia\xE7\xE3o no Google"}</small></div>`);
     if (horario) dados.push(`<div><b>${esc(horario)}</b><small>Hor\xE1rio de atendimento</small></div>`);
-    if (d.cidade) dados.push(`<div><b>${esc(d.cidade)}</b><small>Venha conhecer</small></div>`);
     if (d.telefone || d.whatsapp) dados.push(`<div><b>WhatsApp</b><small>Fale com um vendedor</small></div>`);
     return documentoPremium(d, FONTES_SHOWROOM, `
 :root{--v-fundo:#0b0c10;--v-card:#14161d;--v-borda:#262932;--v-tinta:#f4f5f7;--v-suave:#a4a9b6}
@@ -3876,7 +3875,7 @@ ${cssRodape("rp", "#07080b", "#a4a9b6")}
 </div></header>
 <section class="capa"><div class="gigante" aria-hidden="true">${marca2}</div>
   <div class="wrap capa-in">
-    <div><span class="etq">${esc(d.categoria || "Ve\xEDculos novos e seminovos")}${d.cidade ? ` \xB7 ${esc(d.cidade)}` : ""}</span>
+    <div><span class="etq">${esc(d.categoria || "Ve\xEDculos novos e seminovos")}</span>
       <h1>${d.slogan && d.slogan.trim() ? esc(d.slogan.trim()) : "Seu pr\xF3ximo carro <em>come\xE7a aqui</em>"}</h1>
       <p class="lead">${capaTxt}</p>
       <div class="btns">${ctaPrincipal(d, "Falar com vendedor")}<a class="btn btn-2" href="#categorias">Ver op\xE7\xF5es</a></div></div>
@@ -4015,7 +4014,7 @@ ${cssRodape("rp", "#0d2b22", "#a8c2b8")}
   ${ctaPrincipal(d, "Simular")}
 </div></header>
 <section class="capa"><div class="wrap capa-in">
-  <div><span class="etq">${esc(d.categoria || "Cr\xE9dito com atendimento claro")}${d.cidade ? ` \xB7 ${esc(d.cidade)}` : ""}</span>
+  <div><span class="etq">${esc(d.categoria || "Cr\xE9dito com atendimento claro")}</span>
     <h1>${d.slogan && d.slogan.trim() ? esc(d.slogan.trim()) : "Cr\xE9dito explicado <em>antes de contratar</em>"}</h1>
     <p class="lead">${capaTxt}</p>
     <div class="btns">${ctaPrincipal(d, "Simular pelo WhatsApp")}<a class="btn btn-2" href="#como">Como funciona</a></div>
@@ -4143,7 +4142,7 @@ ${cssRodape("rp", "#2a170d", "#d8c7b3")}
   ${ctaPrincipal(d, "Encomendar")}
 </div></header>
 <section class="capa"><div class="wrap capa-in">
-  <div><span class="etq">${esc(d.categoria || "Feito todo dia")}${d.cidade ? ` \xB7 ${esc(d.cidade)}` : ""}</span>
+  <div><span class="etq">${esc(d.categoria || "Feito todo dia")}</span>
     <h1>${d.slogan && d.slogan.trim() ? esc(d.slogan.trim()) : "Cheirinho de p\xE3o <em>saindo do forno</em>"}</h1>
     <p class="lead">${capaTxt}</p>
     <div class="btns">${ctaPrincipal(d, "Fazer encomenda")}<a class="btn btn-2" href="#cardapio">Ver card\xE1pio</a></div>
@@ -4218,7 +4217,7 @@ var letras = (texto, inicio = 0) => esc(texto).split(" ").map((palavra, w, todas
   return `<span class="pal-g">${[...palavra].map((c, i) => `<span class="let" style="--i:${inicio + base + i}">${c}</span>`).join("")}</span>`;
 }).join(" ");
 var titulo = (d, padrao) => (d.slogan || "").trim() || padrao;
-var eyebrow = (d) => [d.categoria, d.cidade].map((x) => (x || "").trim()).filter(Boolean).join(" \xB7 ");
+var eyebrow = (d) => (d.categoria || "").trim();
 var frases = (texto) => (texto || "").match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g)?.map((s) => s.trim()).filter(Boolean) || [];
 var imagens = (d) => {
   const todas = [urlImagem(d.capa), urlImagem(d.fotoSobre), ...fotos(d)].filter(Boolean);
@@ -4734,7 +4733,7 @@ ${nav(d, [["#trabalhos", "Servi\xE7os"], ["#explore", "Galeria"], ["#contato", "
       <div class="pf-btns entra" style="--d:4">${ctaPrincipal(d, "Falar no WhatsApp", "bt-cheio")}<a class="vidro-bt" href="#trabalhos">Ver servi\xE7os${ICONES.seta}</a></div>
     </div>
   </div>
-  ${faixa([d.categoria || d.empresa, ...servicos.map((s) => s.titulo), d.cidade || ""], "marq pf-faixa")}
+  ${faixa([d.categoria || d.empresa, ...servicos.map((s) => s.titulo)], "marq pf-faixa")}
 </div></section>
 ${servicos.length ? `<section class="sec" id="trabalhos"><div class="wrap">
   <div class="pf-cab rev"><h2>O que a gente faz</h2><p>${capaTxt}</p></div>
@@ -4772,7 +4771,7 @@ var editorial = {
     const destaque = fotoDe(d, 1), terceira = fotoDe(d, 2);
     const nums = numerosReais(d);
     const fil = frases(d.sobre);
-    const manifesto = (fil.length >= 3 ? fil.slice(1) : [`${d.categoria || "Nosso trabalho"} feito com verdade.`, "Atendimento de perto, sem pressa e sem improviso.", `${d.empresa}${d.cidade ? `, em ${d.cidade}` : ""}.`]).slice(0, 3);
+    const manifesto = (fil.length >= 3 ? fil.slice(1) : [`${d.categoria || "Nosso trabalho"} feito com verdade.`, "Atendimento de perto, sem pressa e sem improviso.", `${d.empresa}.`]).slice(0, 3);
     const depo = (d.depoimentos || []).find((x) => x.texto?.trim());
     const h1 = titulo(d, d.empresa);
     return documentoCinema(d, PARES.instrument, `
@@ -4953,7 +4952,7 @@ ${nav(d, [["#sobre", "Sobre"], ["#servicos", "Servi\xE7os"], ["#contato", "Conta
     <div class="nx-btns entra" style="--d:6">${ctaPrincipal(d, "Quero participar", "nx-btn")}<a class="vidro-bt" href="#servicos">Ver o que rola${ICONES.seta}</a></div>
   </div>
 </section>
-<div style="overflow:hidden;padding:18px 0">${faixa([d.categoria || d.empresa, ...servicos.map((s) => s.titulo), d.cidade || ""], "marq nx-faixa")}</div>
+<div style="overflow:hidden;padding:18px 0">${faixa([d.categoria || d.empresa, ...servicos.map((s) => s.titulo)], "marq nx-faixa")}</div>
 <section class="sec nx-sobre" id="sobre"><div class="wrap">
   <div class="rev-l"><h2 class="nx-t">Quem \xE9 <em>${esc(d.empresa)}</em></h2><p>${sobreTxt}</p>${seloGoogle(d, "nr-nota vidro")}</div>
   <div class="nx-moldura rev-r"><div class="${classeImagem(foto2 || capa, "par")}" style="${fundoImagem(foto2 || capa, 1)}"></div></div>
@@ -5048,7 +5047,7 @@ ${nav(d, [["#empresa", "A empresa"], ["#solucoes", "Solu\xE7\xF5es"], ["#contato
   </div>
 </div></section>
 <section class="sec" id="empresa"><div class="wrap"><p class="rot">A empresa</p><p class="b2-leit">${apresentacao}</p>${seloGoogle(d, "nr-nota vidro")}</div></section>
-${faixa([d.categoria || d.empresa, ...servicos.map((s) => s.titulo), d.cidade || ""], "marq b2-faixa")}
+${faixa([d.categoria || d.empresa, ...servicos.map((s) => s.titulo)], "marq b2-faixa")}
 ${servicos.length ? `<section class="sec" id="solucoes"><div class="wrap"><p class="rot rev">Solu\xE7\xF5es</p><h2 class="b2-tit rev">O que entregamos para o seu neg\xF3cio</h2>
   <div class="b2-grade">${servicos.map((s, i) => `<article class="b2-card rev"><span class="ic">${iconeDoServico(i)}</span><h3>${esc(s.titulo)}</h3>${s.descricao ? `<p>${esc(s.descricao)}</p>` : ""}</article>`).join("")}</div></div></section>` : ""}
 ${fotosGal.length >= 3 ? `<section class="sec"><div class="wrap"><h2 class="b2-tit rev">Na pr\xE1tica</h2><div class="b2-mosaico">${fotosGal.slice(0, 6).map((src, i) => `<figure class="rev"><img src="${src}" alt="${esc(d.empresa)} \u2014 foto ${i + 1}" loading="lazy"></figure>`).join("")}</div></div></section>` : ""}
@@ -5210,7 +5209,7 @@ ${nav(d, [["#sobre", "Sobre"], ["#servicos", "Servi\xE7os"], ["#contato", "Conta
   <div class="ag-foto rev-r"><div class="${classeImagem(foto2 || capa, "par")}" style="${fundoImagem(foto2 || capa, 1)}"></div></div>
 </div></section>
 ${nums.length >= 2 ? `<section class="ag-sec ag-esc"><div class="wrap"><p class="ag-rot rev">Em n\xFAmeros</p><div class="ag-num rev">${nums.map((n) => n.valor !== void 0 ? contador(n.valor, n.rotulo, "ag-ct") : `<div class="ag-ct"><b>${n.texto}</b><span>${esc(n.rotulo)}</span></div>`).join("")}</div></div></section>` : ""}
-<div style="overflow:hidden">${faixa([d.categoria || d.empresa, ...servicos.map((s) => s.titulo), d.cidade || ""], "marq ag-faixa")}</div>
+<div style="overflow:hidden">${faixa([d.categoria || d.empresa, ...servicos.map((s) => s.titulo)], "marq ag-faixa")}</div>
 ${servicos.length ? `<section class="ag-sec" id="servicos"><div class="wrap"><p class="ag-rot rev">O que fazemos</p><h2 class="ag-t rev">Solu\xE7\xF5es para o seu dia a dia</h2>
   <div class="ag-cards">${servicos.map((s, i) => {
       const f = fotoDe(d, i + 2);
@@ -6310,7 +6309,7 @@ var escolherTemplate = (nicho, empresa) => {
   return validos.length ? validos[indiceEstavel2(empresa, validos.length)] : sugerirTemplate(nicho);
 };
 var urlHttps = (u) => /^https:\/\/[^\s"'<>()\\]+$/.test(String(u || "")) ? String(u) : "";
-var montarPrevia = (lead, fotos2 = []) => {
+var montarPrevia = (lead, fotos2 = [], preferido = "") => {
   const dados = dadosDoLead(lead);
   const urls = [...new Set((fotos2 || []).map(urlHttps).filter(Boolean))];
   if (urls.length) {
@@ -6319,13 +6318,14 @@ var montarPrevia = (lead, fotos2 = []) => {
     if (!(dados.galeria || []).length) dados.galeria = urls.slice(2, 6);
   }
   const ramo = lead?.niche || lead?.role || "";
-  const template = escolherTemplate(ramo, dados.empresa);
+  const atual = preferido ? SITE_TEMPLATES.find((t) => t.nome === preferido || t.id === preferido) : void 0;
+  const template = atual && direcaoDeArte(ramo, dados.empresa).modelos.includes(atual.id) ? atual : escolherTemplate(ramo, dados.empresa);
   const html = template.render({ ...dados, selo: true });
   return { company: dados.empresa, html, template: template.nome, lead_id: String(lead?.id || ""), builder_data: JSON.stringify(dados) };
 };
 
 // src/templates/sites/render-entry.ts
-var renderizarPrevia = (lead, fotos2 = []) => montarPrevia(lead, fotos2);
+var renderizarPrevia = (lead, fotos2 = [], preferido = "") => montarPrevia(lead, fotos2, preferido);
 export {
   renderizarPrevia
 };

@@ -73,7 +73,7 @@ export const titulo = (d: SiteData, padrao: string): string =>
   (d.slogan || '').trim() || padrao;
 
 export const eyebrow = (d: SiteData): string =>
-  [d.categoria, d.cidade].map(x => (x || '').trim()).filter(Boolean).join(' · ');
+  (d.categoria || '').trim();
 
 /** Quebra o "sobre" em frases. */
 export const frases = (texto: string): string[] =>

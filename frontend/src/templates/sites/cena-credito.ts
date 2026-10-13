@@ -129,7 +129,7 @@ ${cssRodape('rp', '#0d2b22', '#a8c2b8')}
   ${ctaPrincipal(d, 'Simular')}
 </div></header>
 <section class="capa"><div class="wrap capa-in">
-  <div><span class="etq">${esc(d.categoria || 'Crédito com atendimento claro')}${d.cidade ? ` · ${esc(d.cidade)}` : ''}</span>
+  <div><span class="etq">${esc(d.categoria || 'Crédito com atendimento claro')}</span>
     <h1>${d.slogan && d.slogan.trim() ? esc(d.slogan.trim()) : 'Crédito explicado <em>antes de contratar</em>'}</h1>
     <p class="lead">${capaTxt}</p>
     <div class="btns">${ctaPrincipal(d, 'Simular pelo WhatsApp')}<a class="btn btn-2" href="#como">Como funciona</a></div>

@@ -138,7 +138,7 @@ ${cssRodape('rp', '#1d2340', '#c6cce0')}
 </div></header>
 <section class="capa"><div class="pata" style="left:2%;top:46%;width:90px;transform:rotate(-20deg)">${PATA}</div><div class="pata" style="left:44%;top:6%;width:64px;transform:rotate(18deg)">${PATA}</div>
   <div class="wrap capa-in">
-  <div><span class="eyebrow">${esc(d.categoria || 'Cuidado de quem ama pets')}${d.cidade ? ` · ${esc(d.cidade)}` : ''}</span>
+  <div><span class="eyebrow">${esc(d.categoria || 'Cuidado de quem ama pets')}</span>
     <h1>${titulo}</h1><p class="lead">${capaTxt}</p>
     <div class="btns">${ctaPrincipal(d, 'Agendar pelo WhatsApp')}<a class="btn btn-2" href="#servicos">Ver serviços</a></div></div>
   <div class="blob-wrap"><div class="blob" role="img" aria-label="${esc(d.empresa)}"></div>

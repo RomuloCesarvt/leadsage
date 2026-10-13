@@ -14,7 +14,7 @@ export default function handler(req, res) {
   try {
     const corpo = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
     if (!corpo.lead || typeof corpo.lead !== 'object') { res.status(400).json({ erro: 'Faltou o lead.' }); return; }
-    const saida = renderizarPrevia(corpo.lead, Array.isArray(corpo.fotos) ? corpo.fotos.slice(0, 8) : []);
+    const saida = renderizarPrevia(corpo.lead, Array.isArray(corpo.fotos) ? corpo.fotos.slice(0, 8) : [], String(corpo.modelo || '').slice(0, 60));
     res.status(200).json(saida);
   } catch (e) {
     res.status(500).json({ erro: String(e && e.message || e).slice(0, 200) });
