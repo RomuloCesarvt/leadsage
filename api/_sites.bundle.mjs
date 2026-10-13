@@ -5239,8 +5239,13 @@ var fintech = {
     const aval = Number(d.avaliacoes) || 0;
     const depo = depoimentosValidos(d);
     const anel = nota >= 3.5 ? Math.round(nota / 5 * 100) : 0;
+    const painel = ["tecnologia", "financeiro"].includes(d.segmento || segmentoDoRamo(d.categoria).id);
+    const horarioEmLinhas = (d.horario || "").split(/\s*·\s*/).map((x) => x.trim()).filter(Boolean).slice(0, 7);
     return documentoCinema(d, PARES.sora, `
 ${cssBaseEscura(d, "#050912")}
+.ft-horas{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:5px;font-size:14.5px;font-weight:500;line-height:1.3}
+.ft-horas li::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--c2);margin-right:10px;vertical-align:middle}
+.ft-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.ft-chips span{padding:7px 13px;border-radius:999px;border:1px solid var(--linha);background:rgba(255,255,255,.08);font-size:14px;font-weight:500}
 ${cssNavVidro("nv")}
 ${cssRodapeEscuro("rd")}
 ${cssVozesEscuras("Sora")}
@@ -5295,10 +5300,14 @@ ${nav(d, [["#sobre", "Sobre"], ["#solucoes", "Solu\xE7\xF5es"], ["#contato", "Co
       <div class="ft-btns entra" style="--d:6">${ctaPrincipal(d, "Falar com a equipe", "bt-cheio")}<a class="vidro-bt" href="#solucoes">Ver solu\xE7\xF5es${ICONES.seta}</a></div></div>
     <div class="ft-flut" aria-hidden="false">
       ${anel ? `<div class="ft-c ft-c1 vidro entra" style="--d:3"><div class="ft-linha"><div style="position:relative;width:96px;height:96px;flex:none"><div class="ft-anel"></div><div class="ft-anel-n">${nota.toFixed(1).replace(".", ",")}</div></div><div><small>Nota no Google</small><b>${aval ? `${aval.toLocaleString("pt-BR")} avalia\xE7\xF5es` : "de clientes"}</b></div></div></div>` : ""}
-      <div class="ft-c ft-c2 vidro entra" style="--d:4"><small style="color:var(--mudo)">Atendimento</small><div style="font-size:20px;font-weight:600;margin-top:2px">${esc(d.horario || "Fale agora pelo WhatsApp")}</div>
+      ${painel ? `<div class="ft-c ft-c2 vidro entra" style="--d:4"><small style="color:var(--mudo)">Atendimento</small><div style="font-size:20px;font-weight:600;margin-top:2px">${esc(d.horario || "Fale agora pelo WhatsApp")}</div>
         <svg class="ft-spark" viewBox="0 0 200 60" preserveAspectRatio="none"><path d="M0 48 C 25 44, 35 20, 60 26 S 95 52, 120 30 S 160 6, 200 12"/></svg></div>
       <div class="ft-c ft-c3 vidro entra" style="--d:5"><small style="color:var(--mudo)">Servi\xE7os</small><div style="font-size:20px;font-weight:600;margin-top:2px">${servicos.length ? `${servicos.length} ${servicos.length === 1 ? "servi\xE7o" : "servi\xE7os"} para voc\xEA` : esc(d.categoria || d.empresa)}</div>
-        <div class="ft-barras"><i style="--h:38%"></i><i style="--h:60%;animation-delay:.1s"></i><i style="--h:46%;animation-delay:.2s"></i><i style="--h:82%;animation-delay:.3s"></i><i style="--h:68%;animation-delay:.4s"></i><i style="--h:100%;animation-delay:.5s"></i></div></div>
+        <div class="ft-barras"><i style="--h:38%"></i><i style="--h:60%;animation-delay:.1s"></i><i style="--h:46%;animation-delay:.2s"></i><i style="--h:82%;animation-delay:.3s"></i><i style="--h:68%;animation-delay:.4s"></i><i style="--h:100%;animation-delay:.5s"></i></div></div>` : `
+      <div class="ft-c ft-c2 vidro entra" style="--d:4"><small style="color:var(--mudo)">Hor\xE1rio de atendimento</small>
+        <ul class="ft-horas">${(horarioEmLinhas.length ? horarioEmLinhas : ["Combine pelo WhatsApp"]).map((l) => `<li>${esc(l)}</li>`).join("")}</ul></div>
+      ${servicos.length ? `<div class="ft-c ft-c3 vidro entra" style="--d:5"><small style="color:var(--mudo)">Como podemos ajudar</small>
+        <div class="ft-chips">${servicos.slice(0, 4).map((s) => `<span>${esc(s.titulo)}</span>`).join("")}</div></div>` : ""}`}
     </div>
   </div>
 </section>
