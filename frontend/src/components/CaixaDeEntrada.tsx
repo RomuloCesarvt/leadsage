@@ -112,6 +112,21 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
     } catch (e: any) { setErro(e.message); }
   };
 
+  const mandarPrevia = async () => {
+    if (!aberta) return;
+    if (!window.confirm(`Criar a prévia do site de ${aberta.nome || 'este lead'} (se ainda não existe) e enviar o link agora na conversa?`)) return;
+    setEnviando(true);
+    setErro('');
+    try {
+      setAberta(await api.roboEnviarPrevia(aberta.id));
+      carregar();
+    } catch (e: any) {
+      setErro(e.message);
+    } finally {
+      setEnviando(false);
+    }
+  };
+
   const responder = async () => {
     if (!aberta || !texto.trim()) return;
     setEnviando(true);
@@ -313,6 +328,12 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
             ) : (
               <div className="p-3 border-t border-slate-100">
                 {erro && <p className="text-xs text-red-600 mb-2">{erro}</p>}
+                {aberta.canal === 'whatsapp' && !aberta.optout && (
+                  <button onClick={mandarPrevia} disabled={enviando}
+                    className="mb-2 px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold disabled:opacity-60">
+                    Enviar a prévia do site agora
+                  </button>
+                )}
                 <div className="flex gap-2">
                   <textarea
                     value={texto}

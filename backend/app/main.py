@@ -1339,6 +1339,20 @@ async def robo_responder(cid: str, req: RoboTextoRequest, user: dict = Depends(g
         raise HTTPException(status_code=502, detail=str(exc))
 
 
+@app.post("/api/robo/conversas/{cid}/previa")
+async def robo_enviar_previa(cid: str, user: dict = Depends(get_current_user)):
+    """Cria a prévia do site deste lead (se ainda não existe) e manda o link na conversa."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    if cid.startswith(caixa_de_entrada.PREFIXO_ENVIO):
+        raise HTTPException(status_code=409, detail="Esta pessoa ainda não respondeu: a prévia vai quando ela responder ou pelo disparo.")
+    try:
+        return await robo_service.enviar_previa(user.get("uid"), user.get("email", ""), cid)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except meta_canais.EnvioFalhou as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
 @app.post("/api/robo/testar")
 async def robo_testar(req: RoboTesteRequest, user: dict = Depends(get_current_user)):
     """Simulador: o robo responde sem Meta, sem envio e sem gravar.

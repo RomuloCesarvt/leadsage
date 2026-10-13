@@ -285,6 +285,10 @@ export const api = {
     });
   },
 
+  async roboEnviarPrevia(id: string): Promise<RoboConversa> {
+    return await fetchWithToken(`/robo/conversas/${encodeURIComponent(id)}/previa`, { method: 'POST' });
+  },
+
   async roboTestar(mensagens: RoboMensagem[], canal = 'whatsapp'): Promise<RoboTeste> {
     return await fetchWithToken('/robo/testar', {
       method: 'POST',

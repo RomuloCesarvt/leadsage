@@ -465,6 +465,44 @@ async def responder_como_humano(
     return conversa
 
 
+async def enviar_previa(uid: str, email: str, cid: str, enviar: Optional[Enviar] = None) -> Dict[str, Any]:
+    """Cria (se ainda nao existe) a previa do site deste lead e MANDA o link na conversa, agora.
+
+    Para quando o lead aceitou ver o site e o link nao chegou: o dono resolve com um clique, sem escrever nada.
+    O robo continua ligado; so a conversa deixa de estar marcada como "precisa de voce".
+    """
+    from app import previa_site
+
+    conversa = await robo_store.obter_conversa(uid, cid)
+    if not conversa:
+        raise LookupError("Conversa não encontrada.")
+    cfg = await robo_store.canal_do_usuario(uid) or {}
+    item = None
+    if conversa.get("lead_id"):
+        item = await pipeline_store.obter(uid, conversa["lead_id"])
+    if item is None and conversa.get("canal") == "whatsapp":
+        item = await pipeline_store.achar_por_telefone(uid, conversa.get("contato", ""))
+    lead = _lead_do_item(item) if item else {"id": conversa.get("lead_id") or cid, "name": conversa.get("nome") or "", "phone": conversa.get("contato", "")}
+    nome = lead.get("company") or lead.get("name") or conversa.get("nome") or ""
+
+    url = await _site_do_lead(uid, lead["id"])
+    if not url:
+        url, falha = await previa_site.criar(uid, email, lead)
+        if not url:
+            raise meta_canais.EnvioFalhou(f"Não consegui criar a prévia agora: {falha}")
+
+    texto = f"Aqui está a prévia do site{f' da {nome}' if nome else ''}: {url}\nDá uma olhada e me conta o que achou."
+    enviar = enviar or meta_canais.enviar
+    meta_id = await enviar(conversa["canal"], conversa["contato"], texto, {**cfg, "uid": uid})
+    conversa["mensagens"].append({"de": "robo", "texto": texto, "em": robo_store.agora(), "meta_id": meta_id})
+    conversa["precisa_humano"] = False
+    conversa["motivo"] = ""
+    conversa.setdefault("sdr", {})["previa_enviada"] = url
+    conversa["atualizado"] = robo_store.agora()
+    await robo_store.salvar_conversa(uid, conversa)
+    return conversa
+
+
 async def responder_sem_guardar(
     cfg: Dict[str, Any],
     mensagens: list,

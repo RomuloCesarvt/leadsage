@@ -301,3 +301,24 @@ def test_se_nao_da_para_criar_a_previa_sai_so_o_aviso_e_o_dono_assume(rodar, com
     c = rodar(robo_service.processar, cfg(), m, gerar=lambda p: {"mensagens": ["Aqui está: [LINK_DA_PREVIA]"], "enviar_previa": True}, enviar=envio)
     assert envio.enviados == ["Perfeito! Estou finalizando a prévia e já te envio o link por aqui."]
     assert c["precisa_humano"] and "crie e envie o link" in c["motivo"]
+
+
+# ------------------------------------------------------------------ o dono manda a previa com um clique
+
+def test_botao_enviar_previa_cria_o_site_e_manda_o_link_na_conversa(rodar, com_robo):
+    from app import pipeline_store
+    from app.sites_store import list_sites
+    envio = Envio()
+    rodar(pipeline_store.registrar, "alice", {**LEAD_CLINICA})
+    m = meta_canais.Recebida(canal="whatsapp", contato="5514998005560", nome="Clínica", texto="Ok", meta_id="mBTN", momento=1)
+    c = rodar(robo_service.processar, cfg(), m, adiar=True)           # a mensagem do lead ficou na conversa
+    c["precisa_humano"], c["motivo"] = True, "o robô se perdeu"
+    rodar(robo_service.robo_store.salvar_conversa, "alice", c)
+    r = rodar(robo_service.enviar_previa, "alice", "alice@example.com", c["id"], envio)
+    assert len(envio.enviados) == 1 and "/s/clinica-alluve-" in envio.enviados[0] and "[LINK" not in envio.enviados[0]
+    assert not r["precisa_humano"] and r["sdr"]["previa_enviada"].startswith("http")
+    assert len([s for s in rodar(list_sites, "alice") if s.get("lead_id") == "L77"]) == 1
+    # clicar de novo manda o MESMO link, sem criar outro site
+    rodar(robo_service.enviar_previa, "alice", "alice@example.com", c["id"], envio)
+    assert envio.enviados[0].split(": ")[1].split("\n")[0] == envio.enviados[1].split(": ")[1].split("\n")[0]
+    assert len([s for s in rodar(list_sites, "alice") if s.get("lead_id") == "L77"]) == 1
