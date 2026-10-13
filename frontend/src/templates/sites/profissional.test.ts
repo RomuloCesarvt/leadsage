@@ -2,6 +2,7 @@
  * Camada profissional: contraste, SEO, acessibilidade, seções e conteúdo.
  * Rodar: cd frontend && npx tsx src/templates/sites/profissional.test.ts
  */
+import { direcaoDeArte } from './direcao-de-arte';
 import { LAYOUTS_PREMIUM as LAYOUTS_BASE } from './premium';
 import { LAYOUTS_PREMIUM_2 } from './premium2';
 import { CENAS } from './cenas';
@@ -176,7 +177,7 @@ ok('não sobrescreve o que já existe', semearConteudo(base).slogan === 'Cuide d
 ok('sobrescrever=true substitui', semearConteudo(base, { sobrescrever: true }).servicos.length === 6);
 ok('o título é estável para a mesma empresa', semearConteudo(vazioDados).slogan === semearConteudo(vazioDados).slogan);
 ok('empresas diferentes podem ter títulos diferentes', new Set(['A', 'Bb', 'Ccc', 'Dddd', 'Eeeee'].map(e => semearConteudo({ ...vazioDados, empresa: e }).slogan)).size > 1);
-ok('cores só mudam se pedido', semearConteudo(base).corPrimaria === base.corPrimaria && semearConteudo(base, { cores: true }).corPrimaria === achar('Dentista').paleta.primaria);
+ok('cores só mudam se pedido', semearConteudo(base).corPrimaria === base.corPrimaria && semearConteudo(base, { cores: true }).corPrimaria === direcaoDeArte('Dentista', base.empresa).paleta.primaria);
 
 console.log(falhas === 0 ? '\n=========== TUDO PASSOU ===========' : `\n=========== ${falhas} FALHA(S) ===========`);
 process.exit(falhas ? 1 : 0);

@@ -10,6 +10,7 @@
  */
 import type { SiteData } from './base';
 import { SOBRE_COMPLEMENTO, achar, preencher } from './conteudo-nichos';
+import { direcaoDeArte } from './direcao-de-arte';
 
 const vazio = (v?: string) => !(v || '').trim();
 const listaVazia = <T>(l?: T[], campo?: (x: T) => string) =>
@@ -46,8 +47,11 @@ export function semearConteudo(d: SiteData, opcoes: { sobrescrever?: boolean; co
     saida.faq = c.faq.map(x => ({ pergunta: sub(x.pergunta), resposta: sub(x.resposta) }));
   }
   if (opcoes.cores) {
-    saida.corPrimaria = c.paleta.primaria;
-    saida.corDestaque = c.paleta.destaque;
+    // cor e fonte vêm da direção de arte do segmento (comida pede cores quentes, clínica pede claras...)
+    const dir = direcaoDeArte(d.categoria, d.empresa);
+    saida.corPrimaria = dir.paleta.primaria;
+    saida.corDestaque = dir.paleta.destaque;
+    saida.segmento = dir.segmento.id;
   }
   return saida;
 }

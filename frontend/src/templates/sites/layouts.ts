@@ -1,4 +1,5 @@
 import { prepararDados } from './profissional';
+import { fonteDoModelo } from './direcao-de-arte';
 import { LAYOUTS_PREMIUM } from './premium';
 import { LAYOUTS_PREMIUM_2 } from './premium2';
 import { CENAS } from './cenas';
@@ -655,7 +656,11 @@ export const SITE_TEMPLATES: SiteTemplate[] = [
   ...t,
   // Todo texto marcado e com as edições do usuário aplicadas — na prévia
   // e no site publicado.
-  render: (d: SiteData) => { const p = prepararDados(d); return aplicarTextos(t.render(p), p); },
+  render: (d: SiteData) => {
+    // sem fonte escolhida pelo usuário, o modelo veste a fonte que combina com o segmento do negócio
+    const p = prepararDados(!d.fonte && d.segmento ? { ...d, fonte: fonteDoModelo(d.segmento, t.id) } : d);
+    return aplicarTextos(t.render(p), p);
+  },
 }));
 
 export const LAYOUTS_ANTIGOS = new Set(['vitrine', 'profissional', 'servico-local', 'essencial']);

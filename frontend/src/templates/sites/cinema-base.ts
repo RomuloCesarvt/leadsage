@@ -173,7 +173,7 @@ export const cssBaseEscura = (d: SiteData, fundo = '#07080c'): string => `
   --bg:${fundo};--fg:#f4f5f7;--mudo:rgba(244,245,247,.64);--linha:rgba(255,255,255,.13);
   --c1c:color-mix(in srgb,var(--c1) 58%,#fff);--c2c:color-mix(in srgb,var(--c2) 72%,#fff);
   --raio:26px;--ease:cubic-bezier(.2,.7,.2,1)}
-@supports (background:color-mix(in srgb,red,blue)){:root{--bg:color-mix(in srgb,var(--c1) 8%,${fundo})}}
+@supports (background:color-mix(in srgb,red,blue)){:root{--bg:color-mix(in srgb,var(--c1) 15%,${fundo})}}
 body{background:${fundo};background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 ::selection{background:var(--c2);color:#111}
 .wrap{width:min(1200px,90vw);margin:0 auto}

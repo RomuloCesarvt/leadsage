@@ -47,6 +47,8 @@ export type SiteData = {
   textos?: Record<string, string>;
   /** par tipografico escolhido (FONTES em premium-base); vazio = o do layout */
   fonte?: string;
+  /** segmento da direção de arte (direcao-de-arte.ts): com ele, cada modelo usa a fonte que combina com o ramo */
+  segmento?: string;
   /** nota e número de avaliações no Google, quando o site nasce de um lead */
   nota?: number | null;
   avaliacoes?: number | null;
