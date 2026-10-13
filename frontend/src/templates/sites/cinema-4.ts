@@ -9,7 +9,7 @@ import type { SiteTemplate } from './base';
 import { iconeDoServico, partirSobre } from './premium-base';
 import {
   PARES, ICONES, classeImagem, contador, contatoLinhas, cssBaseClara, cssBaseEscura, cssNavVidro, cssRodapeEscuro, cssVozesEscuras, ctaPrincipal,
-  documentoCinema, esc, eyebrow, faixa, fotoDe, fundoImagem, imagens, linkMapa, miniaturaCinema,
+  documentoCinema, esc, eyebrow, faixa, fotoDe, fundoImagem, linkMapa, miniaturaCinema,
   nav, numerosReais, palavras, rodape, seloGoogle, servicosValidos, titulo, vozes,
 } from './cinema-base';
 import { depoimentosValidos } from './premium-base';

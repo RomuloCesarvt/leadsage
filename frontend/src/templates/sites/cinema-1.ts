@@ -5,11 +5,11 @@
  * - **Portfólio Bento**: contador de carregamento, grade bento alternada, galeria com parallax e rodapé em faixa.
  * - **Editorial Cruzado**: capa com fotos em crossfade, About / Destaque / Filosofia / Serviços.
  */
-import type { SiteData, SiteTemplate } from './base';
-import { partirSobre, iconeDoServico } from './premium-base';
+import type { SiteTemplate } from './base';
+import { partirSobre } from './premium-base';
 import {
   PARES, ICONES, classeImagem, contador, contatoLinhas, cssBaseEscura, cssNavVidro, cssRodapeEscuro, ctaPrincipal,
-  documentoCinema, esc, eyebrow, faixa, fotoDe, frases, fundoImagem, imagens, letras, linkMapa, logo, miniaturaCinema,
+  documentoCinema, esc, eyebrow, faixa, fotoDe, fundoImagem, imagens, linkMapa, miniaturaCinema,
   nav, numerosReais, palavras, rodape, seloGoogle, servicosValidos, titulo, vozes,
 } from './cinema-base';
 

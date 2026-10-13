@@ -379,13 +379,13 @@ var jsonLd = (d, tipo = "LocalBusiness") => {
   const tel = digitos(d.telefone || d.whatsapp);
   const horarios = lerHorario(d.horario);
   const ig = d.instagram ? d.instagram.startsWith("http") ? d.instagram : `https://instagram.com/${d.instagram.replace(/^@/, "")}` : "";
-  const imagens3 = imagemPublica(d);
+  const imagens2 = imagemPublica(d);
   const dados = {
     "@context": "https://schema.org",
     "@type": tipo,
     name: d.empresa,
     ...d.slogan || d.sobre ? { description: (d.slogan || d.sobre).slice(0, 300) } : {},
-    ...imagens3.length ? { image: imagens3 } : {},
+    ...imagens2.length ? { image: imagens2 } : {},
     ...tel.length >= 10 ? { telephone: `+${tel.startsWith("55") ? tel : "55" + tel}` } : {},
     ...d.email ? { email: d.email } : {},
     ...d.endereco ? { address: { "@type": "PostalAddress", streetAddress: d.endereco, ...d.cidade ? { addressLocality: d.cidade } : {}, addressCountry: "BR" } } : {},
@@ -1253,9 +1253,9 @@ var urlImagem = (valor) => {
 var partirSobre = (d, capaPadrao, sobrePadrao) => {
   const texto = (d.sobre || "").trim();
   if (!texto) return [esc(capaPadrao), esc(sobrePadrao)];
-  const frases3 = texto.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) || [texto];
-  if (frases3.length >= 2) {
-    return [esc(frases3[0].trim()), esc(frases3.slice(1).join(" ").replace(/\s+/g, " ").trim())];
+  const frases2 = texto.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) || [texto];
+  if (frases2.length >= 2) {
+    return [esc(frases2[0].trim()), esc(frases2.slice(1).join(" ").replace(/\s+/g, " ").trim())];
   }
   return [esc(capaPadrao), esc(texto)];
 };
@@ -2605,8 +2605,8 @@ var notaReal = (d) => {
 };
 var num = (i) => String(i + 1).padStart(2, "0");
 var partirDestaque = (texto) => {
-  const frases3 = texto.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) || [texto];
-  return { destaque: (frases3[0] || texto).trim(), resto: frases3.slice(1).join(" ").trim() };
+  const frases2 = texto.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) || [texto];
+  return { destaque: (frases2[0] || texto).trim(), resto: frases2.slice(1).join(" ").trim() };
 };
 var galeriaCena = (fotosLista, empresa, titulo2) => {
   const f = fotosLista.slice(0, 6);

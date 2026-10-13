@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
-import { SITE_TEMPLATES, sugerirTemplate } from '../templates/sites/layouts';
+import { SITE_TEMPLATES } from '../templates/sites/layouts';
 import type { SiteData, SiteTemplate } from '../templates/sites/base';
 import type { SiteIdentity } from '../types';
 import { prepararImagem, prepararLogo, formatarBytes, TETO_SITE_BYTES } from '../lib/imagem';
@@ -15,7 +15,6 @@ import { FONTES } from '../templates/sites/premium-base';
 import { LAYOUTS_ANTIGOS } from '../templates/sites/layouts';
 import { semearConteudo } from '../templates/sites/semear';
 import { dadosDoLead, escolherTemplate, montarPrevia } from '../templates/sites/previa';
-import { resumirSemana } from '../templates/sites/profissional';
 import { ConteudoDoSite } from './ConteudoDoSite';
 import type { DestinoFoto, FotoBanco } from './BancoImagens';
 
