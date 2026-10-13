@@ -268,14 +268,32 @@ e inventar justificativa (custo, margem, agenda cheia) — para negar um descont
 Horário de reunião confirmado; aceitou a proposta; quer negociar além do autorizado; pergunta técnica ou jurídica
 que você não sabe; reclamação; pedido explícito para falar com uma pessoa.
 
+== O QUE JÁ FOI DITO (leia antes de escrever) ==
+- Na CONVERSA abaixo, "VOCÊ" são as mensagens que você (ou o dono) JÁ enviou. A primeira costuma ser a abordagem
+  inicial: nela você já cumprimentou, já se apresentou e já deu o motivo do contato.
+- NUNCA se apresente de novo (nome, empresa, "vi seu perfil no Google") nem repita elogio, número ou argumento que já
+  esteja numa mensagem sua. Continue a partir da resposta do cliente.
+- Entenda o que o cliente trouxe ANTES de responder: uma pergunta? interesse? objeção? um agradecimento? indicou outra
+  pessoa ("quem cuida disso é o fulano, o número é...")? é mensagem automática ou propaganda do negócio que não
+  responde ao que você disse?
+- Indicou outro responsável: agradeça em uma frase, diga que vai falar com ele(a), guarde o nome em "decisor" e o
+  telefone em "contato_decisor". Não faça pitch para quem não decide.
+- Mensagem automática, de boas-vindas ou propaganda do negócio: NÃO responda ("automatica": true, "mensagens": []).
+- Responda o que ele disse, em uma frase, antes de qualquer pergunta. Nunca ignore uma pergunta dele.
+- Se responder em duas mensagens, a ordem é a de leitura: a primeira acolhe ou responde, a segunda conduz.
+  Saudação e apresentação nunca vão na segunda.
+
 == CONVERSA ==
 {historico}
 
 == RESPONDA SÓ COM ESTE JSON ==
-{{"mensagens": ["primeira mensagem", "segunda (opcional)"],
+{{"entendi": "uma frase: o que o cliente disse ou quer",
+ "tipo": "pergunta|interesse|objecao|agradecimento|indicou_contato|automatica|outro",
+ "automatica": false,
+ "mensagens": ["primeira mensagem", "segunda (opcional)"],
  "etapa": "{'|'.join(ETAPAS)}",
  "temperatura": "frio|morno|quente",
- "dados": {{"nome": "", "decisor": "", "dor": "", "canal_atual": "", "orcamento": "", "prazo": ""}},
+ "dados": {{"nome": "", "decisor": "", "contato_decisor": "", "dor": "", "canal_atual": "", "orcamento": "", "prazo": ""}},
  "objecao": "tipo da objeção desta mensagem, ou vazio",
  "proximo_passo": "o que você está buscando na próxima resposta",
  "passar_para_humano": false,
@@ -311,7 +329,7 @@ def normalizar(dados: Dict[str, Any], anterior: Optional[Dict[str, Any]] = None)
 
     descobertos = dict(anterior.get("dados") or {})
     for k, v in (dados.get("dados") or {}).items():
-        if k in ("nome", "decisor", "dor", "canal_atual", "orcamento", "prazo") and _texto(v):
+        if k in ("nome", "decisor", "contato_decisor", "dor", "canal_atual", "orcamento", "prazo") and _texto(v):
             descobertos[k] = _texto(v)
 
     objecoes = list(anterior.get("objecoes") or [])
@@ -329,7 +347,9 @@ def normalizar(dados: Dict[str, Any], anterior: Optional[Dict[str, Any]] = None)
             "objecoes": objecoes[-8:],
             "proximo_passo": _texto(dados.get("proximo_passo")) or anterior.get("proximo_passo", ""),
             "reuniao": _texto(dados.get("reuniao"), 80) or anterior.get("reuniao", ""),
+            "entendi": _texto(dados.get("entendi"), 200),
         },
+        "automatica": bool(dados.get("automatica")) or dados.get("tipo") == "automatica",
         "passar_para_humano": bool(dados.get("passar_para_humano")),
         "motivo": _texto(dados.get("motivo")),
     }
@@ -398,8 +418,34 @@ def valores_permitidos(cfg: Dict[str, Any], mensagens: List[Dict[str, Any]]) -> 
     return [v for v in permitidos if v > 0]
 
 
+_APRESENTACAO = _re.compile(r"\b(me chamo|meu nome e|sou (o|a) [a-z]+ (da|do|de)\b|aqui e (o|a) [a-z]+ (da|do|de)\b)")
+
+
+def _simples(texto: str) -> str:
+    import unicodedata
+    t = unicodedata.normalize("NFKD", texto or "").encode("ascii", "ignore").decode().lower()
+    return _re.sub(r"\s+", " ", _re.sub(r"[^a-z0-9 ]+", " ", t)).strip()
+
+
+def _repete(novo: str, antigo: str) -> bool:
+    """Quase tudo o que a resposta diz ja estava numa mensagem anterior (mesmo conteudo, outras palavras na ponta)."""
+    a, b = set(_simples(novo).split()), set(_simples(antigo).split())
+    if len(a) < 8:
+        return False  # frase curta ("posso te mostrar amanha?") reaproveita palavras sem repetir o assunto
+    return len(a & b) / len(a) >= 0.85
+
+
 def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: List[Dict[str, Any]]) -> List[str]:
     erros: List[str] = []
+    previas = [m.get("texto", "") for m in mensagens if m.get("de") in ("robo", "voce")]
+    ja_se_apresentou = any(_APRESENTACAO.search(_simples(p)) for p in previas)
+    for t in textos:
+        if ja_se_apresentou and _APRESENTACAO.search(_simples(t)):
+            erros.append("você já se apresentou nesta conversa: não se apresente de novo, continue a partir da resposta do cliente")
+        for p in previas:
+            if _repete(t, p):
+                erros.append(f'você repetiu o que já disse ("{p[:60]}…"): fale algo novo, a partir do que o cliente trouxe')
+                break
     permitidos = valores_permitidos(cfg, mensagens)
     for t in textos:
         for v in _VALOR.findall(t):

@@ -53,6 +53,9 @@ const mesclarPipeline = (atuais: LeadItem[], itens: PipelineItem[]): LeadItem[] 
   });
   for (const i of itens) {
     if (vistos.has(i.id)) continue;
+    // sobra de busca no servidor ("Novo Lead" que ninguém escolheu) não é lead e não é resultado desta busca:
+    // trazer isso de volta misturava pesquisas antigas nos resultados de uma pesquisa nova
+    if (!salvoPeloServidor(i.origem, i.etapa)) continue;
     const ultimo = (i.historico || [])[(i.historico || []).length - 1];
     saida.push({
       ...leadDeItem(i), pipeline_stage: i.etapa, pipeline_por: ultimo?.por, pipeline_motivo: ultimo?.motivo, pipeline_em: ultimo?.em,

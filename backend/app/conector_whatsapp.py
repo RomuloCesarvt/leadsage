@@ -23,6 +23,7 @@ reduzem o risco, não o eliminam, e a tela diz isso antes de conectar.
 import hashlib
 import re
 import secrets
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -228,6 +229,8 @@ async def enfileirar_resposta(cfg: Dict[str, Any], contato: str, texto: str, cha
     await _gravar(cfg["uid"], {
         "id": sid, "tipo": "resposta", "contato": telefone_whatsapp(contato), "texto": texto[:4096],
         "status": "pendente", "criado": robo_store.agora(), "tentativas": 0, "chat_id": chat_id or "",
+        # duas respostas criadas no mesmo segundo precisam sair na ordem em que foram escritas
+        "seq": time.time_ns(),
     })
     return sid
 
@@ -256,7 +259,7 @@ async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Di
     uid = canal["uid"]
     saida: List[Dict[str, Any]] = []
 
-    for s in sorted(await _listar_saida(uid), key=lambda i: i.get("criado") or ""):
+    for s in sorted(await _listar_saida(uid), key=lambda i: (i.get("criado") or "", int(i.get("seq") or 0))):
         if _disponivel(s, agora) and len(saida) < MAX_TAREFAS:
             s["status"], s["enviando_em"] = "enviando", agora.isoformat()
             await _gravar(uid, s)

@@ -150,15 +150,15 @@ export class Sessao {
         if (this.pronto && this.pedidos.remoto) await this.espelhar();
         if (this.pronto && Date.now() - this.ultimaVarredura > 15 * 60 * 1000) { this.ultimaVarredura = Date.now(); this.ls.reprocessar('').catch(() => {}); }
         if (!this.pronto && Date.now() - this.ultimoPing > 15000) await this.empurrar();
-        if (this.pronto && Date.now() - this.ultimoPing > 90000) await this.empurrar();
+        if (this.pronto && Date.now() - this.ultimoPing > 60000) await this.empurrar();
         // pedido de "conectar pelo número": vale em qualquer fase; se há outro número ligado, sai dele antes
+        // Um número já conectado NUNCA é derrubado por um pedido de código: só o botão Desligar desconecta.
         const quer = this.pedidos.parear;
-        if (quer && quer !== this.pareando && !(this.pronto && quer === this.estado.numero)) {
+        if (quer && quer !== this.pareando && !this.pronto) {
           this.pareando = quer;
           this.aviso(`Conectar pelo número ${quer}...`);
           this.estado = { ...this.estado, fase: 'iniciando', codigo: '', qr: '' };
-          if (this.pronto) { this.pronto = false; await this.wa?.sair(); } else { await this.wa?.parar(); }
-          this.parou = false;
+          await this.wa?.parar();
           await this.ligar(quer);
           this.empurrar().catch(() => {});
         }
@@ -179,7 +179,7 @@ export class Sessao {
 
 // ------------------------------------------------------------------ o gerente de sessões
 
-export function criarGerente({ site, segredo, dados, aviso = console.log, sessaoNoBanco = false, fabricaSessao = null }) {
+export function criarGerente({ site, segredo, dados, aviso = console.log, sessaoNoBanco = false, fabricaSessao = null, desconectar = async () => {} }) {
   const authFabrica = sessaoNoBanco ? (uid) => authRemoto({ site, segredo, uid, aviso }) : null;
   fabricaSessao = fabricaSessao || ((o) => new Sessao({ ...o, authFabrica }));
   const ativas = new Map(); // uid -> { sessao, chave }
@@ -188,18 +188,37 @@ export function criarGerente({ site, segredo, dados, aviso = console.log, sessao
     try {
       const r = await fetch(`${site}/api/worker/sessoes`, { headers: { 'x-worker-secret': segredo }, signal: AbortSignal.timeout(20000) });
       if (!r.ok) { aviso(`LeadSage respondeu ${r.status} ao pedir as sessões.`); return null; }
-      return (await r.json()).sessoes || [];
+      const j = await r.json();
+      return { sessoes: j.sessoes || [], desligar: j.desligar || [] };
     } catch (e) {
       aviso('Sem resposta do LeadSage:', e.message);
-      return null; // sem lista: não desliga ninguém
+      return null; // sem lista: não mexe em ninguém
     }
   }
+
+  const avisarDesligada = (uid) => fetch(`${site}/api/worker/desligadas/${encodeURIComponent(uid)}`, {
+    method: 'POST', headers: { 'x-worker-secret': segredo }, signal: AbortSignal.timeout(20000),
+  }).catch(() => {});
 
   async function sincronizar() {
     const alvo = await lista();
     if (alvo === null) return;
-    const uids = new Set(alvo.map((s) => s.uid));
-    for (const { uid, chave } of alvo) {
+    // 1) quem clicou em Desligar: este é o ÚNICO caso em que o WhatsApp é desconectado
+    for (const uid of alvo.desligar) {
+      const atual = ativas.get(uid);
+      aviso(`Desconectando ${uid.slice(0, 6)} (o usuário pediu).`);
+      ativas.delete(uid);
+      try {
+        if (atual) await atual.sessao.parar({ sair: true });
+        else await desconectar(uid);
+        await avisarDesligada(uid);
+      } catch (e) { aviso('Não consegui desconectar agora; tento de novo:', e.message); }
+    }
+    const pediramSair = new Set(alvo.desligar);
+    // 2) quem está na lista fica ligado
+    const uids = new Set(alvo.sessoes.map((s) => s.uid));
+    for (const { uid, chave } of alvo.sessoes) {
+      if (pediramSair.has(uid)) continue;
       const atual = ativas.get(uid);
       if (atual && atual.chave === chave) continue;
       if (atual) await atual.sessao.parar(); // a chave mudou: recomeça com a nova (a sessão do WhatsApp continua)
@@ -210,11 +229,13 @@ export function criarGerente({ site, segredo, dados, aviso = console.log, sessao
         if (ativas.get(uid)?.sessao === sessao) ativas.delete(uid); // volta na próxima rodada
       });
     }
+    // 3) sumiu da lista sem pedir para desligar (falha momentânea, banco): só para de atender aqui.
+    //    A sessão do WhatsApp continua guardada e conectada; nada é desconectado.
     for (const [uid, { sessao }] of ativas) {
-      if (!uids.has(uid)) {
-        aviso(`Sessão removida (o usuário desligou): ${uid.slice(0, 6)}`);
+      if (!uids.has(uid) && !pediramSair.has(uid)) {
+        aviso(`Fora da lista, sem pedido de desligar: mantendo o WhatsApp conectado (${uid.slice(0, 6)}).`);
         ativas.delete(uid);
-        await sessao.parar({ sair: true });
+        await sessao.parar();
       }
     }
   }
@@ -237,7 +258,21 @@ async function principal() {
   // padrão: a sessão do WhatsApp fica no banco do LeadSage (criptografada), então o serviço roda em
   // hospedagem sem disco. AUTH=disco guarda em arquivos (VM com disco próprio).
   const sessaoNoBanco = (process.env.AUTH || 'banco') !== 'disco';
-  const gerente = criarGerente({ site, segredo, dados, aviso, sessaoNoBanco });
+  const desconectar = async (uid) => {
+    // abre a sessão guardada só para sair dela direito (some da lista de aparelhos do celular) e apaga o que foi guardado
+    const auth = await authRemoto({ site, segredo, uid, aviso });
+    if (!auth.state.creds.account) { await auth.apagar(); return; } // nada conectado: só limpa
+    await new Promise((resolve, reject) => {
+      const limite = setTimeout(() => reject(new Error('o WhatsApp não abriu a tempo')), 90000);
+      iniciarBaileys({
+        dir: join(dados, 'saindo'), auth, historico: criarHistorico(''), aviso,
+        aoQr() {}, aoCodigo() {}, aoCair() {}, aoReceber() {},
+        aoPronto: async () => { clearTimeout(limite); try { await wa.sair(); resolve(); } catch (e) { reject(e); } },
+      }).then((x) => { wa = x; }).catch(reject);
+      let wa;
+    });
+  };
+  const gerente = criarGerente({ site, segredo, dados, aviso, sessaoNoBanco, desconectar });
 
   // a plataforma (Fly, Railway...) confere se o processo está vivo por aqui
   http.createServer((req, res) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true, sessoes: gerente.total() })); })

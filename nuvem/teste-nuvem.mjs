@@ -74,13 +74,35 @@ test('gerente: sem resposta do LeadSage, ninguém é desligado', async () => {
   t.restaurar();
 });
 
-test('gerente: usuário que desligou sai da lista e o WhatsApp dele é desconectado', async () => {
+test('gerente: sumir da lista (falha do banco) NÃO desconecta o WhatsApp, só para de atender aqui', async () => {
   const t = gerenteFalso([{ corpo: { sessoes: [{ uid: 'u1', chave: 'k1' }, { uid: 'u2', chave: 'k2' }] } }, { corpo: { sessoes: [{ uid: 'u2', chave: 'k2' }] } }]);
+  await t.g.sincronizar(); await t.g.sincronizar();
+  assert.equal(t.g.total(), 1);
+  assert.deepEqual(t.sessoes[0].paradas, [{}]);      // parou de atender, sem sair do WhatsApp
+  assert.deepEqual(t.sessoes[1].paradas, []);
+  t.restaurar();
+});
+
+test('gerente: só quem pediu para desligar é desconectado, e o LeadSage é avisado', async () => {
+  const t = gerenteFalso([{ corpo: { sessoes: [{ uid: 'u1', chave: 'k1' }, { uid: 'u2', chave: 'k2' }] } },
+    { corpo: { sessoes: [{ uid: 'u2', chave: 'k2' }], desligar: ['u1'] } }, { corpo: { ok: true } }]);
   await t.g.sincronizar(); await t.g.sincronizar();
   assert.equal(t.g.total(), 1);
   assert.deepEqual(t.sessoes[0].paradas, [{ sair: true }]);
   assert.deepEqual(t.sessoes[1].paradas, []);
   t.restaurar();
+});
+
+test('gerente: quem pediu para desligar sem sessão ativa (reinício) é desconectado pela sessão guardada', async () => {
+  const antes = globalThis.fetch;
+  const chamadas = [];
+  globalThis.fetch = async (url) => { chamadas.push(String(url)); return { ok: true, status: 200, json: async () => ({ sessoes: [], desligar: ['u9'] }) }; };
+  const desconectados = [];
+  const g = criarGerente({ site: 'https://x.test', segredo: 's'.repeat(20), dados: '/tmp/x', aviso: () => {}, desconectar: async (u) => desconectados.push(u), fabricaSessao: () => ({}) });
+  await g.sincronizar();
+  globalThis.fetch = antes;
+  assert.deepEqual(desconectados, ['u9']);
+  assert.ok(chamadas.some((c) => c.endsWith('/api/worker/desligadas/u9')));
 });
 
 test('gerente: chave nova recomeça a sessão sem desconectar o WhatsApp', async () => {
@@ -135,9 +157,9 @@ test('sessão: conecta, avisa o LeadSage, envia a tarefa e atende pedido de cód
   assert.deepEqual(enviados[0], ['5511911112222', 'Oi!', '5511911112222@c.us']);
   assert.ok(chamadas.some(([rota, b]) => rota === '/ping' && b.fase === 'pronto' && b.numero === '5511900000000'));
   assert.ok(chamadas.some(([rota]) => rota === '/tarefas/t1/resultado'));
-  // pediram o código para outro número: sai do atual e reconecta pelo código
-  assert.equal(ciclos.sairam, true);
-  assert.equal(ciclos.at(-1).parear, '5514999019705');
+  // pediram o código para outro número com um já conectado: NUNCA derruba o que está conectado
+  assert.equal(ciclos.sairam, undefined);
+  assert.equal(ciclos.length, 1);
 });
 
 // ------------------------------------------------------------------ sessão guardada no banco

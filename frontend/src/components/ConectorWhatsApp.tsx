@@ -192,7 +192,9 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
   const [pedido, setPedido] = useState(false);
   const [demorou, setDemorou] = useState(false);
   const celular = noCelular();
-  const conectado = cfg.conector_online && (!remoto?.fase || remoto.fase === 'pronto');
+  // na nuvem, o número fica conectado mesmo que a tela perca o contato por um momento: vale o que o serviço guardou
+  const conectado = nuvem ? remoto?.fase === 'pronto' : cfg.conector_online && (!remoto?.fase || remoto.fase === 'pronto');
+  const nuvemSemResposta = nuvem && conectado && !cfg.conector_online;
   // o QR/código que aparece aqui vem do computador (local) ou, no celular, do servidor
   const qr = local?.fase === 'qr' && local.qr ? local.qr : remoto?.fase === 'qr' && remoto.qr ? remoto.qr : '';
   const codigo = remoto?.fase === 'codigo' ? remoto.codigo || '' : '';
@@ -315,6 +317,11 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
 
       {ativo && (
         <div className="space-y-3">
+          {nuvemSemResposta && (
+            <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
+              O serviço da nuvem está sem responder à tela há alguns minutos. O número continua conectado e volta a atualizar sozinho. Nada precisa ser feito.
+            </p>
+          )}
           {conectado && <SaudeDoNumeroPainel numero={remoto?.numero || cfg.conector_numero || ''} ativo={ativo} />}
           {nuvem ? (
             <ol className="text-sm text-slate-700 list-decimal pl-5 space-y-1">

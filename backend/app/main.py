@@ -1563,6 +1563,7 @@ async def nuvem_ligar(user: dict = Depends(get_current_user)):
         if robo_store.firestore_falhou_agora():
             raise HTTPException(status_code=503, detail=MSG_BANCO_SEM_COTA)
         await robo_store.registrar_nuvem(uid, canal["gancho"])
+        await robo_store.limpar_nuvem_sair(uid)
         _SESSOES_NUVEM.clear()
         if antigo:
             _CACHE_CONECTOR.pop(antigo, None)
@@ -1580,6 +1581,8 @@ async def nuvem_desligar(user: dict = Depends(get_current_user)):
     canal = await conector_whatsapp.revogar(canal)
     canal = await robo_store.substituir_canal(uid, canal)
     await robo_store.esquecer_nuvem(uid)
+    # so quem clica em Desligar perde o WhatsApp: o servico da nuvem le esta marca e desconecta o numero
+    await robo_store.marcar_nuvem_sair(uid)
     _SESSOES_NUVEM.clear()
     if antigo:
         _CACHE_CONECTOR.pop(antigo, None)
@@ -1598,6 +1601,17 @@ def _exigir_worker(request: Request) -> None:
 
 class SessaoGuardada(BaseModel):
     blob: str = Field(max_length=950_000)
+
+
+@app.post("/api/worker/desligadas/{uid}")
+async def worker_desligada(uid: str, request: Request):
+    """O servico da nuvem confirma que desconectou o numero de quem pediu para desligar."""
+    _exigir_worker(request)
+    if not nuvem_auth.uid_valido(uid):
+        raise HTTPException(status_code=400, detail="Usuário inválido.")
+    await robo_store.limpar_nuvem_sair(uid)
+    _SESSOES_NUVEM.clear()
+    return {"ok": True}
 
 
 @app.get("/api/worker/auth/{uid}")
@@ -1636,7 +1650,7 @@ async def worker_sessoes(request: Request):
     _exigir_worker(request)
     guardado = _SESSOES_NUVEM.get("lista")
     if guardado and time.monotonic() - guardado[0] < 40:
-        return {"sessoes": guardado[1]}
+        return guardado[1]
     sessoes = []
     for uid, gancho in (await robo_store.listar_nuvem()).items():
         canal = await robo_store.canal_por_gancho(gancho)
@@ -1644,8 +1658,11 @@ async def worker_sessoes(request: Request):
             sessoes.append({"uid": uid, "chave": canal["nuvem_chave"]})
     if robo_store.firestore_falhou_agora():
         raise HTTPException(status_code=503, detail="Banco indisponível agora.")  # o serviço não desliga ninguém
-    _SESSOES_NUVEM["lista"] = (time.monotonic(), sessoes)
-    return {"sessoes": sessoes}
+    resposta = {"sessoes": sessoes, "desligar": await robo_store.listar_nuvem_sair()}
+    if robo_store.firestore_falhou_agora():
+        raise HTTPException(status_code=503, detail="Banco indisponível agora.")
+    _SESSOES_NUVEM["lista"] = (time.monotonic(), resposta)
+    return resposta
 
 
 @app.post("/api/robo/conector/revogar")
@@ -1831,7 +1848,12 @@ async def conector_tarefas(request: Request):
         canal["cw_primeiro"] = datetime.now(timezone.utc).isoformat()
     antes = (canal.get("cw_ultimo_frio"), canal.get("cw_frio_n"), canal.get("cw_primeiro"))
     resposta = await conector_whatsapp.tarefas(canal)
-    if antes != (canal.get("cw_ultimo_frio"), canal.get("cw_frio_n"), canal.get("cw_primeiro")):
+    agora_dt = datetime.now(timezone.utc)
+    visto = conector_whatsapp._ler_data(canal.get("cw_visto"))
+    renovou = not visto or (agora_dt - visto).total_seconds() > 80
+    if renovou:
+        canal["cw_visto"] = agora_dt.isoformat()  # perguntar por tarefas tambem prova que esta vivo
+    if renovou or antes != (canal.get("cw_ultimo_frio"), canal.get("cw_frio_n"), canal.get("cw_primeiro")):
         await _gravar_canal_do_conector(canal)
     return resposta
 

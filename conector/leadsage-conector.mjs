@@ -889,11 +889,12 @@ export async function executar() {
         if (pronto && Date.now() - ultimoPing > 90000) await empurrarEstado();
         // pedido de "conectar pelo número": vale em qualquer fase. Se já há outro número ligado, sai dele primeiro.
         const quer = pedidos.parear;
-        if (quer && quer !== pareando && !(pronto && quer === String(estado.numero || '').replace(/\D/g, ''))) {
+        // um número já conectado nunca é derrubado por um pedido de código: só o botão Desligar desconecta
+        if (quer && quer !== pareando && !pronto) {
           pareando = quer;
           log(`Conectar pelo número ${quer}: pedindo o código ao WhatsApp...`);
           estado.fase = 'iniciando'; estado.codigo = ''; estado.qr = '';
-          if (pronto) { pronto = false; await wa?.sair(); } else { await wa?.parar(); }
+          await wa?.parar();
           await ligarWhatsApp(quer);
           empurrarEstado().catch(() => {});
         }

@@ -83,3 +83,25 @@ def test_sessao_guardada_exige_o_segredo_e_uid_valido(nuvem):
     assert nuvem.get("/api/worker/auth/alice").status_code == 401
     assert nuvem.put("/api/worker/auth/alice", headers={"x-worker-secret": "errado"}, json={"blob": "x"}).status_code == 401
     assert nuvem.get("/api/worker/auth/a%20b", headers={"x-worker-secret": SEGREDO}).status_code in (400, 404)
+
+
+def test_so_quem_clica_em_desligar_entra_na_lista_de_desconectar(nuvem):
+    h = {"x-worker-secret": SEGREDO}
+    nuvem.post("/api/robo/nuvem/ligar")
+    assert nuvem.get("/api/worker/sessoes", headers=h).json()["desligar"] == []   # ligar nao desconecta ninguem
+    nuvem.post("/api/robo/nuvem/desligar")
+    from app import main
+    main._SESSOES_NUVEM.clear()
+    j = nuvem.get("/api/worker/sessoes", headers=h).json()
+    assert j["sessoes"] == [] and j["desligar"] == ["alice"]
+    assert nuvem.post("/api/worker/desligadas/alice", headers=h).status_code == 200   # o servico confirmou
+    assert nuvem.get("/api/worker/sessoes", headers=h).json()["desligar"] == []
+    assert nuvem.post("/api/worker/desligadas/alice").status_code == 401
+
+
+def test_perguntar_por_tarefas_tambem_prova_que_o_conector_esta_vivo(nuvem):
+    nuvem.post("/api/robo/nuvem/ligar")
+    chave = nuvem.get("/api/worker/sessoes", headers={"x-worker-secret": SEGREDO}).json()["sessoes"][0]["chave"]
+    assert nuvem.get("/api/robo/whats/estado").json()["online"] is False
+    nuvem.get("/api/conector/tarefas", headers={"x-conector-key": chave})
+    assert nuvem.get("/api/robo/whats/estado").json()["online"] is True

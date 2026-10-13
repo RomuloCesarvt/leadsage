@@ -364,6 +364,45 @@ async def listar_nuvem() -> Dict[str, str]:
     return await _sql_get("sistema:nuvem") or {}
 
 
+# Quem clicou em "Desligar": so esses perdem o WhatsApp. Fica marcado ate o servico da nuvem confirmar.
+async def marcar_nuvem_sair(uid: str) -> None:
+    if firestore_db is not None:
+        try:
+            firestore_db.collection("sistema").document("nuvem_sair").set({uid: agora()}, merge=True)
+            return
+        except Exception as exc:
+            _FALHA[0] = time.monotonic()
+            print(f"Falha ao marcar a saida da nuvem: {exc}")
+    lista = await _sql_get("sistema:nuvem_sair") or {}
+    lista[uid] = agora()
+    await _sql_put("sistema:nuvem_sair", "sistema", "sistema", lista)
+
+
+async def limpar_nuvem_sair(uid: str) -> None:
+    if firestore_db is not None:
+        try:
+            from firebase_admin import firestore as _fs
+            firestore_db.collection("sistema").document("nuvem_sair").update({uid: _fs.DELETE_FIELD})
+            return
+        except Exception as exc:
+            print(f"Falha ao limpar a saida da nuvem: {exc}")
+    lista = await _sql_get("sistema:nuvem_sair") or {}
+    if uid in lista:
+        lista.pop(uid)
+        await _sql_put("sistema:nuvem_sair", "sistema", "sistema", lista)
+
+
+async def listar_nuvem_sair() -> List[str]:
+    if firestore_db is not None:
+        try:
+            doc = firestore_db.collection("sistema").document("nuvem_sair").get()
+            return list((doc.to_dict() or {}).keys()) if doc.exists else []
+        except Exception as exc:
+            _FALHA[0] = time.monotonic()
+            print(f"Falha ao listar saidas da nuvem: {exc}")
+    return list((await _sql_get("sistema:nuvem_sair") or {}).keys())
+
+
 async def canal_por_ativo(tipo: str, ativo_id: str) -> Optional[Dict[str, Any]]:
     """A configuracao do cliente dono daquela pagina, conta ou numero."""
     if not ativo_id:

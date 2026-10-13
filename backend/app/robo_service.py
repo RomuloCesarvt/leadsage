@@ -19,7 +19,7 @@ from typing import Any, Awaitable, Callable, Dict, Optional
 
 from sqlalchemy import select
 
-from app import meta_canais, pipeline_store, robo_store
+from app import fila_envio, meta_canais, pipeline_store, robo_store
 from app.ai_robo import Decisao, decidir
 from app.config import settings
 from app.credit_system import BancoDeCreditosIndisponivel, check_and_deduct_credits, is_admin
@@ -185,6 +185,41 @@ def _marcar(conversa: Dict[str, Any], motivo: str) -> None:
     conversa["motivo"] = motivo
 
 
+
+async def _incluir_abordagem(uid: str, conversa: Dict[str, Any], lead: Optional[Dict[str, Any]], msg: Any) -> None:
+    """Põe no começo da conversa a abordagem que o LeadSage já mandou a este lead.
+
+    Sem isso o robô acha que está abrindo a conversa: cumprimenta, se apresenta e repete o pitch por cima do que
+    já foi dito. Feito uma vez por conversa (a primeira mensagem do lead); se não houver abordagem (quem escreveu
+    primeiro foi o lead), nada muda.
+    """
+    if conversa.get("abordagem_incluida"):
+        return
+    conversa["abordagem_incluida"] = True
+    if any(m.get("de") in ("robo", "voce") for m in conversa["mensagens"]):
+        return
+    try:
+        itens = await fila_envio.listar(uid)
+    except Exception as exc:
+        print(f"Robo: nao leu a abordagem enviada: {exc}")
+        return
+    lead_id = (lead or {}).get("id") or conversa.get("lead_id") or ""
+    enviadas = [
+        i for i in itens
+        if i.get("status") == "enviado" and i.get("canal") == msg.canal and i.get("texto") and (
+            (lead_id and i.get("lead_id") == lead_id)
+            or pipeline_store.mesmo_telefone((i.get("contato") or {}).get("phone", ""), msg.contato)
+        )
+    ]
+    enviadas.sort(key=lambda i: i.get("enviado_em") or "")
+    previas = [
+        {"de": "robo", "texto": i["texto"], "em": i.get("enviado_em") or robo_store.agora(), "origem": "abordagem"}
+        for i in enviadas[-2:]
+    ]
+    if previas:
+        conversa["mensagens"] = previas + conversa["mensagens"]
+
+
 async def processar(
     cfg: Dict[str, Any],
     msg: meta_canais.Recebida,
@@ -232,6 +267,8 @@ async def processar(
         # primeira resposta do lead: sai de "Contato Enviado" mesmo que o
         # robo nao possa responder (desligado, sem plano, sem creditos)
         await _atualizar_pipeline(uid, conversa, {"etapa": "abertura"})
+
+    await _incluir_abordagem(uid, conversa, lead, msg)
 
     async def salvar() -> Dict[str, Any]:
         await robo_store.salvar_conversa(uid, conversa)

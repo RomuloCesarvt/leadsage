@@ -239,6 +239,9 @@ def decidir(
 
     prompt = montar_prompt(mensagens, canal, perfil, cfg, lead, raio=raio, sdr=sdr)
     n = normalizar(gerar_json(prompt), sdr)
+    # o modelo percebeu que o outro lado e um atendimento automatico ou propaganda: nao se responde
+    if n.get("automatica") and not n["mensagens"]:
+        return Decisao(automatica=True, usou_ia=True, sdr=n["sdr"], motivo="parece uma resposta automática (outro robô)")
 
     # Conferencia em codigo: preco fora do catalogo e motivo inventado nao
     # saem. Uma chance de corrigir; errou de novo, o humano assume.
@@ -255,6 +258,13 @@ def decidir(
 
     if not n["mensagens"] and not humano:
         return Decisao(passar_para_humano=True, motivo="a IA não produziu resposta", usou_ia=True, sdr=n["sdr"])
+
+    # Indicou outra pessoa para falar: o robo agradece e o humano assume (o pitch vai para quem decide, nao para quem atendeu).
+    novo = (n["sdr"].get("dados") or {}).get("contato_decisor")
+    if novo and novo != ((sdr or {}).get("dados") or {}).get("contato_decisor"):
+        humano = True
+        quem = (n["sdr"].get("dados") or {}).get("decisor") or "o responsável"
+        n["motivo"] = n["motivo"] or f"indicou outro contato: {quem} — {novo}"
 
     # Reuniao combinada e o fim do trabalho do robo: o humano assume.
     if n["sdr"].get("reuniao") and not (sdr or {}).get("reuniao"):
