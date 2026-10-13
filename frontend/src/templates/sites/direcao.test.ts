@@ -91,11 +91,25 @@ for (const ramo of ['Psicologia', 'Dentistas', 'Pizzarias', 'Advocacia', 'Imobil
     assert.ok(!/\{cidade\}/.test(d.slogan));
   }
 }
-const nenhumaCidade = SITE_TEMPLATES.every(t => {
-  const html = t.render({ ...dadosDoLead({ id: 'z', company: 'Casa Teste', niche: 'Padarias', city: 'Botucatu' }), slogan: '' });
-  const h1 = /<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html);
-  return !h1 || !/botucatu/i.test(h1[1]);
-});
-assert.ok(nenhumaCidade, 'nenhum h1 de modelo leva a cidade');
+// varredura: todo modelo x vários ramos. Nada de cidade no título, nas faixas gigantes em movimento e na etiqueta de capa;
+// nada de gráfico de painel fora de tecnologia e finanças
+const texto = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+const RAMOS = ['Psicologia', 'Dentistas', 'Pizzarias', 'Advocacia', 'Imobiliárias', 'Academias', 'Pet shops', 'Barbearias', 'Oficinas mecânicas', 'Hotéis', 'Padarias', 'Concessionárias'];
+for (const ramo of RAMOS) {
+  for (const t of SITE_TEMPLATES) {
+    const d = dadosDoLead({ id: 'z', company: 'Casa Teste', niche: ramo, city: 'Botucatu', address: 'Rua X, 10 - Botucatu', phone: '5514999990000', rating: 4.9, rating_count: 50 });
+    const html = t.render(d);
+    const corpo = html.slice(html.indexOf('<body')).replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, '');
+    const h1 = (/<h1[^>]*>([\s\S]*?)<\/h1>/.exec(corpo) || [, ''])[1];
+    assert.ok(!/botucatu/i.test(texto(h1)), `${ramo}/${t.id}: cidade no título`);
+    const blocos = [
+      ...corpo.matchAll(/class="marq[^"]*"[^>]*>([\s\S]*?)<\/div><\/div>/g),
+      ...corpo.matchAll(/class="[^"]*(?:gigante|eyebrow|etq|rot|ed-pre)[^"]*"[^>]*>([\s\S]*?)<\/(?:span|p|div)>/g),
+    ];
+    assert.ok(blocos.length > 0 || t.id === 'planta' || t.id === 'clinica' || t.id.length > 0);
+    for (const m of blocos) assert.ok(!/botucatu/i.test(texto(m[1])), `${ramo}/${t.id}: cidade em faixa/etiqueta de capa`);
+    if (/ft-barras"|ft-spark"/.test(html)) assert.ok(['tecnologia', 'financeiro'].includes(d.segmento || ''), `${ramo}/${t.id}: gráfico de painel`);
+  }
+}
 
 console.log('direcao.test: ok');

@@ -67,8 +67,20 @@ const urlHttps = (u: unknown): string => (/^https:\/\/[^\s"'<>()\\]+$/.test(Stri
  * O site do lead, pronto para publicar.
  * `fotos`: endereços https do banco de imagens do ramo; só entram onde o lead ainda não tem foto.
  */
-export const montarPrevia = (lead: any, fotos: string[] = [], preferido = '') => {
+/** O que um site já existente sabia do negócio e o lead que chega agora pode não trazer (contato, horário, nota, fotos). */
+const CAMPOS_DO_SITE_ANTERIOR = ['telefone', 'whatsapp', 'email', 'endereco', 'horario', 'instagram', 'nota', 'avaliacoes', 'logo', 'capa', 'fotoSobre'] as const;
+
+export const montarPrevia = (lead: any, fotos: string[] = [], preferido = '', anterior: Partial<SiteData> | null = null) => {
   const dados = dadosDoLead(lead);
+  if (anterior && typeof anterior === 'object') {
+    const d = dados as unknown as Record<string, unknown>;
+    for (const k of CAMPOS_DO_SITE_ANTERIOR) {
+      const novo = d[k]; const velho = (anterior as Record<string, unknown>)[k];
+      if ((novo === undefined || novo === null || novo === '') && velho !== undefined && velho !== null && velho !== '') d[k] = velho;
+    }
+    if (!(dados.galeria || []).length && Array.isArray(anterior.galeria)) dados.galeria = anterior.galeria.filter(x => typeof x === 'string').slice(0, 4);
+    if (!dados.depoimentos?.some(x => x.texto?.trim()) && Array.isArray(anterior.depoimentos)) dados.depoimentos = anterior.depoimentos;
+  }
   const urls = [...new Set((fotos || []).map(urlHttps).filter(Boolean))];
   if (urls.length) {
     dados.capa = dados.capa || urls[0];

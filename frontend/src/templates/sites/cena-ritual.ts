@@ -164,7 +164,7 @@ ${cssRodape('rp', '#2a1f23', '#d8c6bc')}
 ${nota || horario || d.endereco ? `<section class="fatos"><div class="wrap">
   ${nota ? `<div class="fato"><small>Avaliação no Google</small><b>${nota.nota}${nota.avaliacoes ? ` · ${nota.avaliacoes} avaliações` : ''}</b></div>` : ''}
   ${horario ? `<div class="fato"><small>Horário</small><b>${esc(horario)}</b></div>` : ''}
-  ${d.endereco ? `<div class="fato"><small>Visite</small><b>${esc(d.cidade || d.endereco.split(',').slice(-1)[0].trim())}</b></div>` : ''}
+  ${d.endereco ? `<div class="fato"><small>Visite</small><b>${esc(d.endereco.split(/[,-]/)[0].trim())}</b></div>` : ''}
 </div></section>` : ''}
 ${servicos.length ? `<section class="sec menu" id="servicos"><div class="wrap">
   <div class="menu-cab"><h2>Nossos <em>tratamentos</em></h2><p>Escolha um cuidado e chame direto: a mensagem já vai pronta.</p></div>

@@ -41,14 +41,14 @@ async def fotos_do_ramo(nicho: str, quantidade: int = 8) -> List[str]:
         return []
 
 
-async def renderizar(lead: Dict[str, Any], fotos: List[str], modelo: str = "") -> Dict[str, Any]:
+async def renderizar(lead: Dict[str, Any], fotos: List[str], modelo: str = "", anterior: Dict[str, Any] = None) -> Dict[str, Any]:
     """O site do lead (html, modelo, empresa) montado pelo motor de sites."""
     if not settings.WORKER_SECRET:
         raise RuntimeError("o motor de sites não está configurado")
     async with httpx.AsyncClient(timeout=25) as cliente:
         r = await cliente.post(
             f"{settings.APP_URL.rstrip('/')}/api/render-site",
-            json={"lead": lead_para_o_motor(lead), "fotos": fotos, "modelo": modelo},
+            json={"lead": lead_para_o_motor(lead), "fotos": fotos, "modelo": modelo, "anterior": anterior or None},
             headers={"x-render-secret": settings.WORKER_SECRET},
         )
     if r.status_code != 200:
@@ -78,12 +78,32 @@ def _carimbo(builder_data: str) -> str:
         return ""
 
 
+def _do_site_anterior(builder_data: str) -> Dict[str, Any]:
+    """Os dados de contato e as fotos do site antigo, para a versao nova nao perder o que o lead de agora nao traz."""
+    try:
+        d = json.loads(builder_data or "{}")
+    except Exception:
+        return {}
+    if not isinstance(d, dict):
+        return {}
+    chaves = ("telefone", "whatsapp", "email", "endereco", "horario", "instagram", "nota", "avaliacoes", "logo", "capa", "fotoSobre")
+    saida = {k: d[k] for k in chaves if d.get(k) not in (None, "")}
+    saida["galeria"] = [x for x in (d.get("galeria") or []) if isinstance(x, str)][:4]
+    saida["depoimentos"] = [x for x in (d.get("depoimentos") or []) if isinstance(x, dict)][:3]
+    # fotos enviadas pelo dono (data:) pesam demais para a viagem: so entram enderecos https
+    for k in ("logo", "capa", "fotoSobre"):
+        if str(saida.get(k, "")).startswith("data:"):
+            saida.pop(k)
+    saida["galeria"] = [x for x in saida["galeria"] if not x.startswith("data:")]
+    return saida
+
+
 async def atualizar_se_antigo(uid: str, email: str, lead: Dict[str, Any]) -> bool:
     """Refaz, com o motor atual, a previa deste lead se ela foi feita por uma versao antiga e ninguem a editou.
 
     O link nao muda (quem ja recebeu ve o site novo). Site que o dono editou nunca e sobrescrito.
     """
-    from app.sites_store import list_sites, update_site
+    from app.sites_store import get_site, list_sites, update_site
 
     lead_id = str(lead.get("id") or "")
     if not lead_id:
@@ -94,10 +114,13 @@ async def atualizar_se_antigo(uid: str, email: str, lead: Dict[str, Any]) -> boo
                 continue
             if s.get("updated_at"):
                 return False  # o dono mexeu neste site: fica como ele deixou
-            if _carimbo(s.get("builder_data") or "") == MOTOR_VERSAO:
+            dados = s.get("builder_data")
+            if dados is None:  # a listagem do banco SQL nao traz o builder_data: le o site para achar o carimbo
+                dados = (await get_site(uid, s["id"]) or {}).get("builder_data") or ""
+            if _carimbo(dados) == MOTOR_VERSAO:
                 return False
             fotos = await fotos_do_ramo(str(lead.get("niche") or lead.get("role") or ""))
-            site = await renderizar(lead, fotos, str(s.get("template") or ""))
+            site = await renderizar(lead, fotos, str(s.get("template") or ""), _do_site_anterior(dados))
             await update_site(uid, s["id"], str(site.get("company") or s.get("company") or ""), site["html"],
                               str(site.get("template") or ""), _com_carimbo(str(site.get("builder_data") or "")),
                               marcar_edicao=False)

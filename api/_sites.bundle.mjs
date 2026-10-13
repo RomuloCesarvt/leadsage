@@ -3155,7 +3155,7 @@ ${cssRodape("rp", "#2a1f23", "#d8c6bc")}
 ${nota || horario || d.endereco ? `<section class="fatos"><div class="wrap">
   ${nota ? `<div class="fato"><small>Avalia\xE7\xE3o no Google</small><b>${nota.nota}${nota.avaliacoes ? ` \xB7 ${nota.avaliacoes} avalia\xE7\xF5es` : ""}</b></div>` : ""}
   ${horario ? `<div class="fato"><small>Hor\xE1rio</small><b>${esc(horario)}</b></div>` : ""}
-  ${d.endereco ? `<div class="fato"><small>Visite</small><b>${esc(d.cidade || d.endereco.split(",").slice(-1)[0].trim())}</b></div>` : ""}
+  ${d.endereco ? `<div class="fato"><small>Visite</small><b>${esc(d.endereco.split(/[,-]/)[0].trim())}</b></div>` : ""}
 </div></section>` : ""}
 ${servicos.length ? `<section class="sec menu" id="servicos"><div class="wrap">
   <div class="menu-cab"><h2>Nossos <em>tratamentos</em></h2><p>Escolha um cuidado e chame direto: a mensagem j\xE1 vai pronta.</p></div>
@@ -6309,8 +6309,19 @@ var escolherTemplate = (nicho, empresa) => {
   return validos.length ? validos[indiceEstavel2(empresa, validos.length)] : sugerirTemplate(nicho);
 };
 var urlHttps = (u) => /^https:\/\/[^\s"'<>()\\]+$/.test(String(u || "")) ? String(u) : "";
-var montarPrevia = (lead, fotos2 = [], preferido = "") => {
+var CAMPOS_DO_SITE_ANTERIOR = ["telefone", "whatsapp", "email", "endereco", "horario", "instagram", "nota", "avaliacoes", "logo", "capa", "fotoSobre"];
+var montarPrevia = (lead, fotos2 = [], preferido = "", anterior = null) => {
   const dados = dadosDoLead(lead);
+  if (anterior && typeof anterior === "object") {
+    const d = dados;
+    for (const k of CAMPOS_DO_SITE_ANTERIOR) {
+      const novo = d[k];
+      const velho = anterior[k];
+      if ((novo === void 0 || novo === null || novo === "") && velho !== void 0 && velho !== null && velho !== "") d[k] = velho;
+    }
+    if (!(dados.galeria || []).length && Array.isArray(anterior.galeria)) dados.galeria = anterior.galeria.filter((x) => typeof x === "string").slice(0, 4);
+    if (!dados.depoimentos?.some((x) => x.texto?.trim()) && Array.isArray(anterior.depoimentos)) dados.depoimentos = anterior.depoimentos;
+  }
   const urls = [...new Set((fotos2 || []).map(urlHttps).filter(Boolean))];
   if (urls.length) {
     dados.capa = dados.capa || urls[0];
@@ -6325,7 +6336,7 @@ var montarPrevia = (lead, fotos2 = [], preferido = "") => {
 };
 
 // src/templates/sites/render-entry.ts
-var renderizarPrevia = (lead, fotos2 = [], preferido = "") => montarPrevia(lead, fotos2, preferido);
+var renderizarPrevia = (lead, fotos2 = [], preferido = "", anterior = null) => montarPrevia(lead, fotos2, preferido, anterior);
 export {
   renderizarPrevia
 };

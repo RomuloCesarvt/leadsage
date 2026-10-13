@@ -4,4 +4,5 @@
  */
 import { montarPrevia } from './previa';
 
-export const renderizarPrevia = (lead: unknown, fotos: string[] = [], preferido = '') => montarPrevia(lead, fotos, preferido);
+export const renderizarPrevia = (lead: unknown, fotos: string[] = [], preferido = '', anterior: Record<string, unknown> | null = null) =>
+  montarPrevia(lead, fotos, preferido, anterior);

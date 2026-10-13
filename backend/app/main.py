@@ -1117,6 +1117,10 @@ async def _funcoes_da_fila(user: dict):
 
     async def gerar(lead: Dict[str, Any], canal: str, tom: str = "Consultivo") -> Dict[str, Any]:
         previa = await _previa_do_lead(uid, str(lead.get("id", "")), sites_do_usuario)
+        if previa == "criada":
+            # prévia feita por uma versão antiga do motor de sites: refeita (mesmo link) antes de o link seguir na mensagem
+            from app import previa_site
+            await previa_site.atualizar_se_antigo(uid, email or "", lead)
         pitch = await AIGenerator.generate_pitch(
             PitchGenerationRequest(lead=_lead_para_pitch(lead), channel=canal, tone=tom,
                                    sender_name=remetente, user_product=produto, previa=previa,

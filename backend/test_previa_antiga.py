@@ -17,7 +17,7 @@ def _preparar(monkeypatch, site):
     async def listar(uid):
         return [site]
 
-    async def renderizar(lead, fotos, modelo=""):
+    async def renderizar(lead, fotos, modelo="", anterior=None):
         gravados.append(("modelo", modelo))
         return {"html": "<html>novo</html>", "template": "Natural", "company": "Psicóloga Isabelly", "builder_data": json.dumps({"empresa": "x"})}
 
@@ -65,7 +65,7 @@ def test_falha_ao_renderizar_nao_derruba_o_envio(monkeypatch):
     site = {"id": "s1", "lead_id": "l1", "slug": "psico", "template": "Natural", "builder_data": "{}", "updated_at": ""}
     _preparar(monkeypatch, site)
 
-    async def quebra(lead, fotos, modelo=""):
+    async def quebra(lead, fotos, modelo="", anterior=None):
         raise RuntimeError("motor fora do ar")
 
     monkeypatch.setattr(previa_site, "renderizar", quebra)
