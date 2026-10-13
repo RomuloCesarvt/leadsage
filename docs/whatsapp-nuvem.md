@@ -42,6 +42,23 @@ WORKER_SECRET="O_SEGREDO" bash instalar.sh
 Para atualizar depois, rode o mesmo comando. Ver o que está acontecendo: `journalctl -u leadsage-nuvem -f`.
 As sessões ficam em `/var/lib/leadsage-nuvem`; faça backup dessa pasta se quiser que sobrevivam a uma VM perdida.
 
+## Sem cartão: hospedagem gratuita que dorme (Render + UptimeRobot)
+
+Se não houver cartão para a VM, o serviço roda numa hospedagem gratuita **sem disco**. Por isso a sessão
+do WhatsApp de cada usuário fica **no banco do LeadSage, cifrada** (`AUTH=banco`, o padrão): o serviço
+pode ser reiniciado, adormecer ou trocar de servidor sem derrubar ninguém. Se o LeadSage não conseguir
+ler a sessão, o serviço **não começa uma nova**; só começa do zero quando o banco confirma que não há nada.
+
+1. No Render (render.com), entre com o GitHub e crie um **Blueprint** apontando para este repositório
+   (ele lê o `render.yaml` da raiz). Informe `WORKER_SECRET` quando pedir. O plano é o gratuito.
+2. O plano gratuito **dorme após 15 minutos sem visitas**. Para não dormir, crie um monitor gratuito no
+   UptimeRobot (uptimerobot.com) que abra `https://SEU-SERVICO.onrender.com/` a cada 5 minutos.
+3. Conferir: essa página responde `{"ok":true,"sessoes":N}`.
+
+Limites: 512 MB de memória (uns 5 a 10 números), 750 horas por mês (cabe um serviço o mês inteiro) e
+reinício periódico (as sessões voltam sozinhas, lendo do banco). Se o Render pedir cartão no cadastro,
+use a VM gratuita (Google ou Oracle) ou um computador/celular antigo ligado em casa com `instalar-vm.sh`.
+
 ## Como o usuário usa
 
 Robô → Canais → WhatsApp → **Conectar pela nuvem**. Aparece o QR code (ou ele digita o número e recebe

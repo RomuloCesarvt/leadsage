@@ -68,3 +68,18 @@ def test_gerar_chave_do_computador_tira_a_nuvem(nuvem):
     from app import main
     main._SESSOES_NUVEM.clear()
     assert sessoes(nuvem).json()["sessoes"] == []
+
+
+def test_sessao_guardada_vai_e_volta_e_some_ao_apagar(nuvem):
+    h = {"x-worker-secret": SEGREDO}
+    assert nuvem.get("/api/worker/auth/alice", headers=h).json() == {"blob": ""}
+    assert nuvem.put("/api/worker/auth/alice", headers=h, json={"blob": "Y2lmcmFkbw=="}).status_code == 200
+    assert nuvem.get("/api/worker/auth/alice", headers=h).json() == {"blob": "Y2lmcmFkbw=="}
+    assert nuvem.delete("/api/worker/auth/alice", headers=h).status_code == 200
+    assert nuvem.get("/api/worker/auth/alice", headers=h).json() == {"blob": ""}
+
+
+def test_sessao_guardada_exige_o_segredo_e_uid_valido(nuvem):
+    assert nuvem.get("/api/worker/auth/alice").status_code == 401
+    assert nuvem.put("/api/worker/auth/alice", headers={"x-worker-secret": "errado"}, json={"blob": "x"}).status_code == 401
+    assert nuvem.get("/api/worker/auth/a%20b", headers={"x-worker-secret": SEGREDO}).status_code in (400, 404)

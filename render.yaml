@@ -1,17 +1,17 @@
+# Blueprint do Render para o servico "LeadSage Nuvem" (WhatsApp de cada usuario, sempre ligado).
+# A sessao do WhatsApp fica no banco do LeadSage (cifrada), entao nao precisa de disco.
 services:
   - type: web
-    name: leadsage-api
+    name: leadsage-nuvem
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    plan: free
+    dockerfilePath: ./nuvem/Dockerfile
+    dockerContext: .
+    healthCheckPath: /
     envVars:
-      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+      - key: WORKER_SECRET
         sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      # Sem esta chave a busca de leads falha com "Chave da API do
-      # Google Maps ausente" — faltava na configuracao do Render.
-      - key: GOOGLE_MAPS_API_KEY
-        sync: false
-      - key: PORT
-        value: 8000
+      - key: LEADSAGE_URL
+        value: https://leadsageofc.vercel.app
+      - key: AUTH
+        value: banco

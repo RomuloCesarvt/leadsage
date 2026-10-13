@@ -1550,13 +1550,51 @@ async def nuvem_desligar(user: dict = Depends(get_current_user)):
 _SESSOES_NUVEM: Dict[str, Any] = {}
 
 
-@app.get("/api/worker/sessoes")
-async def worker_sessoes(request: Request):
-    """Para o servico da nuvem: quem deve estar com o WhatsApp ligado, e a chave de cada um."""
+def _exigir_worker(request: Request) -> None:
     segredo = settings.WORKER_SECRET
     enviado = request.headers.get("x-worker-secret", "")
     if not segredo or not hmac.compare_digest(enviado.encode(), segredo.encode()):
         raise HTTPException(status_code=401, detail="Segredo inválido.")
+
+
+class SessaoGuardada(BaseModel):
+    blob: str = Field(max_length=950_000)
+
+
+@app.get("/api/worker/auth/{uid}")
+async def worker_auth_ler(uid: str, request: Request):
+    """A sessão do WhatsApp daquele usuário (já cifrada pelo serviço da nuvem; aqui é só um texto)."""
+    _exigir_worker(request)
+    if not nuvem_auth.uid_valido(uid):
+        raise HTTPException(status_code=400, detail="Usuário inválido.")
+    blob = await nuvem_auth.ler(uid)
+    if blob is None:
+        raise HTTPException(status_code=503, detail="Banco indisponível agora.")  # nunca "vazio" por engano
+    return {"blob": blob}
+
+
+@app.put("/api/worker/auth/{uid}")
+async def worker_auth_gravar(uid: str, req: SessaoGuardada, request: Request):
+    _exigir_worker(request)
+    if not nuvem_auth.uid_valido(uid):
+        raise HTTPException(status_code=400, detail="Usuário inválido.")
+    await nuvem_auth.gravar(uid, req.blob)
+    return {"ok": True}
+
+
+@app.delete("/api/worker/auth/{uid}")
+async def worker_auth_apagar(uid: str, request: Request):
+    _exigir_worker(request)
+    if not nuvem_auth.uid_valido(uid):
+        raise HTTPException(status_code=400, detail="Usuário inválido.")
+    await nuvem_auth.apagar(uid)
+    return {"ok": True}
+
+
+@app.get("/api/worker/sessoes")
+async def worker_sessoes(request: Request):
+    """Para o servico da nuvem: quem deve estar com o WhatsApp ligado, e a chave de cada um."""
+    _exigir_worker(request)
     guardado = _SESSOES_NUVEM.get("lista")
     if guardado and time.monotonic() - guardado[0] < 40:
         return {"sessoes": guardado[1]}
@@ -2168,5 +2206,5 @@ def get_suggested_niches():
     ]
 
 
-from app import admin_painel  # noqa: E402
+from app import admin_painel, nuvem_auth  # noqa: E402
 app.include_router(admin_painel.router)

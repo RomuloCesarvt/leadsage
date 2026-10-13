@@ -139,3 +139,55 @@ test('sessão: conecta, avisa o LeadSage, envia a tarefa e atende pedido de cód
   assert.equal(ciclos.sairam, true);
   assert.equal(ciclos.at(-1).parear, '5514999019705');
 });
+
+// ------------------------------------------------------------------ sessão guardada no banco
+
+import { authRemoto, cifrar, decifrar } from './auth-remoto.mjs';
+
+function bancoFalso(inicial = '') {
+  const b = { blob: inicial, puts: 0, deletes: 0, falhaLeitura: false };
+  b.buscar = async (url, init = {}) => {
+    const ok = (corpo) => ({ ok: true, status: 200, json: async () => corpo });
+    if (init.method === 'PUT') { b.blob = JSON.parse(init.body).blob; b.puts++; return ok({ ok: true }); }
+    if (init.method === 'DELETE') { b.blob = ''; b.deletes++; return ok({ ok: true }); }
+    if (b.falhaLeitura) return { ok: false, status: 503, json: async () => ({}) };
+    return ok({ blob: b.blob });
+  };
+  return b;
+}
+
+test('sessão guardada: cifra e decifra, e o texto cifrado não mostra o conteúdo', () => {
+  const c = cifrar('credenciais secretas', 'segredo-1234567890123456');
+  assert.ok(!c.includes('secretas'));
+  assert.equal(decifrar(c, 'segredo-1234567890123456'), 'credenciais secretas');
+  assert.throws(() => decifrar(c, 'outro-segredo-1234567890123'));
+});
+
+test('sessão guardada: sem nada no banco começa do zero; ao mudar, grava cifrado e volta igual', async () => {
+  const b = bancoFalso('');
+  const seg = 'segredo-1234567890123456';
+  const a1 = await authRemoto({ site: 'https://x.test', segredo: seg, uid: 'u1', esperaMs: 10, buscar: b.buscar });
+  assert.ok(a1.state.creds.noiseKey);                       // credenciais novas
+  await a1.state.keys.set({ 'pre-key': { 7: { public: Buffer.from('abc'), private: Buffer.from('def') } } });
+  await new Promise((r) => setTimeout(r, 60));
+  assert.equal(b.puts, 1);
+  const a2 = await authRemoto({ site: 'https://x.test', segredo: seg, uid: 'u1', esperaMs: 10, buscar: b.buscar });
+  const k = (await a2.state.keys.get('pre-key', ['7']))['7'];
+  assert.equal(Buffer.from(k.public).toString(), 'abc');
+  assert.deepEqual(a2.state.creds.noiseKey.public, a1.state.creds.noiseKey.public);  // a mesma sessão
+});
+
+test('sessão guardada: se não consegue LER, não começa uma nova (apagaria a que existe)', async () => {
+  const b = bancoFalso('');
+  b.falhaLeitura = true;
+  await assert.rejects(() => authRemoto({ site: 'https://x.test', segredo: 'segredo-1234567890123456', uid: 'u1', buscar: b.buscar }), /Não consegui ler/);
+});
+
+test('sessão guardada: depois de apagar, nada ressuscita a sessão', async () => {
+  const b = bancoFalso('');
+  const a = await authRemoto({ site: 'https://x.test', segredo: 'segredo-1234567890123456', uid: 'u1', esperaMs: 10, buscar: b.buscar });
+  await a.apagar();
+  await a.saveCreds();                                      // o Baileys ainda avisa depois do logout
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(b.deletes, 1); assert.equal(b.puts, 0); assert.equal(b.blob, '');
+});

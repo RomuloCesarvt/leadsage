@@ -41,7 +41,7 @@ if [ -d "$PASTA/.git" ]; then git -C "$PASTA" pull --ff-only; else git clone --d
 echo "== Servico"
 mkdir -p "$DADOS"
 umask 077
-printf 'WORKER_SECRET=%s\nLEADSAGE_URL=%s\nDADOS_DIR=%s\nPORT=8080\n' "$WORKER_SECRET" "$SITE" "$DADOS" > "$ENV_ARQ"
+printf 'WORKER_SECRET=%s\nLEADSAGE_URL=%s\nDADOS_DIR=%s\nPORT=8080\nAUTH=disco\n' "$WORKER_SECRET" "$SITE" "$DADOS" > "$ENV_ARQ"
 cat > /etc/systemd/system/leadsage-nuvem.service <<UNIT
 [Unit]
 Description=LeadSage Nuvem (WhatsApp de cada usuario)

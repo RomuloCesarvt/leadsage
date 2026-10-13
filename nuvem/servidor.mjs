@@ -16,12 +16,14 @@ import {
   clienteLeadsage, criarAgrupador, criarHistorico, enviarPendentes, entregarMensagem, tentarDeNovo,
 } from '../conector/leadsage-conector.mjs';
 import { iniciarBaileys } from './adaptador-baileys.mjs';
+import { authRemoto } from './auth-remoto.mjs';
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const agora = () => new Date().toISOString().slice(11, 19);
 
 export class Sessao {
-  constructor({ uid, chave, site, dados, aviso, fabrica = iniciarBaileys }) {
+  constructor({ uid, chave, site, dados, aviso, fabrica = iniciarBaileys, authFabrica = null }) {
+    this.authFabrica = authFabrica; // sessão no banco (servidor sem disco); sem ele, usa a pasta
     this.uid = uid;
     this.chave = chave;
     this.site = site;
@@ -57,6 +59,7 @@ export class Sessao {
     this.wa = await this.fabrica({
       dir: this.dir,
       parear,
+      auth: this.authFabrica ? await this.authFabrica(this.uid) : null,
       historico: this.historico,
       aviso: this.aviso,
       aoQr: async (qr) => {
@@ -176,7 +179,9 @@ export class Sessao {
 
 // ------------------------------------------------------------------ o gerente de sessões
 
-export function criarGerente({ site, segredo, dados, aviso = console.log, fabricaSessao = (o) => new Sessao(o) }) {
+export function criarGerente({ site, segredo, dados, aviso = console.log, sessaoNoBanco = false, fabricaSessao = null }) {
+  const authFabrica = sessaoNoBanco ? (uid) => authRemoto({ site, segredo, uid, aviso }) : null;
+  fabricaSessao = fabricaSessao || ((o) => new Sessao({ ...o, authFabrica }));
   const ativas = new Map(); // uid -> { sessao, chave }
 
   async function lista() {
@@ -229,7 +234,10 @@ async function principal() {
   }
   mkdirSync(dados, { recursive: true });
   const aviso = (...a) => console.log(agora(), ...a);
-  const gerente = criarGerente({ site, segredo, dados, aviso });
+  // padrão: a sessão do WhatsApp fica no banco do LeadSage (criptografada), então o serviço roda em
+  // hospedagem sem disco. AUTH=disco guarda em arquivos (VM com disco próprio).
+  const sessaoNoBanco = (process.env.AUTH || 'banco') !== 'disco';
+  const gerente = criarGerente({ site, segredo, dados, aviso, sessaoNoBanco });
 
   // a plataforma (Fly, Railway...) confere se o processo está vivo por aqui
   http.createServer((req, res) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true, sessoes: gerente.total() })); })

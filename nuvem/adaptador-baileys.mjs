@@ -97,7 +97,7 @@ export function telefoneDoRemetente(key) {
 
 // ------------------------------------------------------------------ o adaptador
 
-export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPronto, aoCair, aoReceber, historico, aviso = () => {} }) {
+export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPronto, aoCair, aoReceber, historico, aviso = () => {}, auth = null }) {
   const authDir = join(dir, 'auth');
   const destinos = new Map(); // telefone -> id da conversa de verdade
   let sock = null;
@@ -128,7 +128,8 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
 
   async function abrir() {
     if (parado) return;
-    const { state, saveCreds } = await B.useMultiFileAuthState(authDir);
+    // `auth`: sessão guardada no banco (servidor sem disco). Sem ele, usa a pasta.
+    const { state, saveCreds } = auth ? { state: auth.state, saveCreds: auth.saveCreds } : await B.useMultiFileAuthState(authDir);
     const { version } = await B.fetchLatestBaileysVersion().catch(() => ({}));
     const s = makeWASocket({
       ...(version ? { version } : {}),
@@ -180,6 +181,7 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
         if (parado) return;
         if (codigo === B.DisconnectReason.loggedOut) {
           rmSync(authDir, { recursive: true, force: true });
+          await auth?.apagar();
           jaPediuCodigo = false;
           aoCair('o WhatsApp foi desconectado pelo celular');
         }
@@ -223,13 +225,14 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
     async lida(chatId) { historico.lida(chatId); },
     digitar: (contato, ligado) => (ligado ? digitando.iniciar(contato) : digitando.parar(contato)),
     diagnostico: () => ({ fonteChats: 'historico', fonteMensagens: 'historico', erros: {} }),
-    async parar() { parado = true; try { sock?.end(undefined); } catch { /* já fechou */ } },
+    async parar() { parado = true; try { sock?.end(undefined); } catch { /* já fechou */ } await auth?.descarregar(); },
     /** Sai do número (some da lista de aparelhos conectados) e apaga a sessão. */
     async sair() {
       parado = true;
       try { await sock?.logout(); } catch { /* já estava fora */ }
       try { sock?.end(undefined); } catch { /* idem */ }
       rmSync(authDir, { recursive: true, force: true });
+      await auth?.apagar();
     },
   };
 }
