@@ -105,6 +105,7 @@ export class Sessao {
       historico: this.historico,
       aviso: this.aviso,
       aoQr: async (qr) => {
+        this.aviso('QR code gerado, aguardando leitura.');
         this.estado = { ...this.estado, fase: 'qr', codigo: '', qr: await qrParaTexto(qr) };
         this.empurrar().catch(() => {});
       },

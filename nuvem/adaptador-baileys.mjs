@@ -178,6 +178,7 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
       if (u.connection === 'close') {
         pronto = false;
         const codigo = u.lastDisconnect?.error?.output?.statusCode;
+        aviso(`Conexão fechada (código ${codigo ?? '?'}: ${String(u.lastDisconnect?.error?.message || '').slice(0, 80)}).`);
         if (parado) return;
         if (codigo === B.DisconnectReason.loggedOut) {
           rmSync(authDir, { recursive: true, force: true });
