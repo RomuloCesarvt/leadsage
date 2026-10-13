@@ -168,6 +168,7 @@ test('sessão guardada: sem nada no banco começa do zero; ao mudar, grava cifra
   const seg = 'segredo-1234567890123456';
   const a1 = await authRemoto({ site: 'https://x.test', segredo: seg, uid: 'u1', esperaMs: 10, buscar: b.buscar });
   assert.ok(a1.state.creds.noiseKey);                       // credenciais novas
+  a1.state.creds.account = { details: 'x' };                // o WhatsApp confirmou o aparelho
   await a1.state.keys.set({ 'pre-key': { 7: { public: Buffer.from('abc'), private: Buffer.from('def') } } });
   await new Promise((r) => setTimeout(r, 60));
   assert.equal(b.puts, 1);
@@ -183,10 +184,25 @@ test('sessão guardada: se não consegue LER, não começa uma nova (apagaria a 
   await assert.rejects(() => authRemoto({ site: 'https://x.test', segredo: 'segredo-1234567890123456', uid: 'u1', buscar: b.buscar }), /Não consegui ler/);
 });
 
+test('sessão guardada: pareamento pela metade não é guardado nem carregado', async () => {
+  const b = bancoFalso('');
+  const seg = 'segredo-1234567890123456';
+  const a = await authRemoto({ site: 'https://x.test', segredo: seg, uid: 'u1', esperaMs: 10, buscar: b.buscar });
+  a.state.creds.me = { id: '5514999019705@s.whatsapp.net', name: '~' };   // o que o pedido de código deixa
+  await a.saveCreds();
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(b.puts, 0);
+  const velho = bancoFalso(cifrar(JSON.stringify({ creds: { me: { id: 'x' } }, keys: {} }), seg));
+  const c = await authRemoto({ site: 'https://x.test', segredo: seg, uid: 'u1', buscar: velho.buscar });
+  assert.ok(!c.state.creds.me && c.state.creds.noiseKey);   // recomeça do zero
+});
+
 test('sessão guardada: depois de apagar, nada ressuscita a sessão', async () => {
   const b = bancoFalso('');
   const a = await authRemoto({ site: 'https://x.test', segredo: 'segredo-1234567890123456', uid: 'u1', esperaMs: 10, buscar: b.buscar });
+  a.state.creds.account = { details: 'x' };
   await a.apagar();
+  assert.ok(!a.state.creds.account);                       // zerou na memória
   await a.saveCreds();                                      // o Baileys ainda avisa depois do logout
   await new Promise((r) => setTimeout(r, 50));
   assert.equal(b.deletes, 1); assert.equal(b.puts, 0); assert.equal(b.blob, '');

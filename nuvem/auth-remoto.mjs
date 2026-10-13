@@ -36,16 +36,18 @@ export async function authRemoto({ site, segredo, uid, aviso = () => {}, esperaM
   if (!r.ok) throw new Error(`Não consegui ler a sessão guardada (HTTP ${r.status}).`);
   const { blob } = await r.json();
 
+  // Só vale uma sessão que terminou de parear (`account` aparece quando o WhatsApp confirma o aparelho).
+  // Credenciais de um pareamento pela metade, carregadas de novo, fazem o WhatsApp responder "desconectado" em ciclo.
+  const completa = (c) => Boolean(c && c.account);
   let creds = null;
   let keys = {};
   if (blob) {
     const j = JSON.parse(decifrar(blob, segredo), B.BufferJSON.reviver);
-    creds = j.creds; keys = j.keys || {};
+    if (completa(j.creds)) { creds = j.creds; keys = j.keys || {}; }
   }
   if (!creds) creds = B.initAuthCreds();
 
   let sujo = false;
-  let encerrado = false; // depois de apagar, nada pode ressuscitar a sessão
   let timer = null;
   let gravando = Promise.resolve();
 
@@ -64,7 +66,7 @@ export async function authRemoto({ site, segredo, uid, aviso = () => {}, esperaM
   }
 
   const marcar = () => {
-    if (encerrado) return;
+    if (!completa(creds)) return; // pareamento em andamento: nada a guardar ainda
     sujo = true;
     if (timer) return;
     timer = setTimeout(() => { timer = null; gravando = gravando.then(gravar); }, esperaMs);
@@ -101,10 +103,13 @@ export async function authRemoto({ site, segredo, uid, aviso = () => {}, esperaM
     async descarregar() { if (timer) { clearTimeout(timer); timer = null; } gravando = gravando.then(gravar); await gravando; },
     /** O usuário desconectou: apaga a sessão guardada. */
     async apagar() {
-      encerrado = true;
       if (timer) { clearTimeout(timer); timer = null; }
       sujo = false;
       try { await buscar(url, { method: 'DELETE', headers: cab, signal: AbortSignal.timeout(20000) }); } catch (e) { aviso('Não consegui apagar a sessão guardada:', e.message); }
+      // volta ao zero na memória (o mesmo objeto, que o Baileys já segura): a próxima conexão pede QR ou código de novo
+      for (const k of Object.keys(creds)) delete creds[k];
+      Object.assign(creds, B.initAuthCreds());
+      keys = {};
     },
   };
 }

@@ -215,7 +215,8 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
 
       <div className="space-y-3">
         {/* WhatsApp: o canal principal, pelo computador do usuário */}
-        <ConectorWhatsApp cfg={cfg} aoMudar={aoMudar} />
+        {cfg.nuvem_disponivel && <ConectorWhatsApp cfg={cfg} aoMudar={aoMudar} modo="nuvem" />}
+        <ConectorWhatsApp cfg={cfg} aoMudar={aoMudar} modo="pc" />
 
         {/* Facebook + Instagram */}
         <div className="p-4 rounded-xl border border-slate-200 flex flex-wrap items-center gap-4">

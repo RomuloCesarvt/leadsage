@@ -119,19 +119,22 @@ function useEstadoRemoto(ativo: boolean): EstadoRemoto | null {
 
 const noCelular = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) => void }> = ({ cfg, aoMudar }) => {
+export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) => void; modo?: 'nuvem' | 'pc' }> = ({ cfg, aoMudar, modo = 'pc' }) => {
   const [entendi, setEntendi] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const [chave, setChave] = useState('');
   const [erro, setErro] = useState('');
-  const local = useConectorLocal(cfg.conector_criado && !cfg.conector_online);
-  const remoto = useEstadoRemoto(cfg.conector_criado);
+  // dois cartões, um por jeito de conectar; só um número fica ligado por vez, e o cartão ativo é o que está em uso
+  const nuvem = modo === 'nuvem';
+  const ativo = nuvem ? Boolean(cfg.nuvem) : Boolean(cfg.conector_criado && !cfg.nuvem);
+  const outroAtivo = nuvem ? Boolean(cfg.conector_criado && !cfg.nuvem) : Boolean(cfg.nuvem);
+  const local = useConectorLocal(ativo && !nuvem && !cfg.conector_online);
+  const remoto = useEstadoRemoto(ativo);
   const [numeroParear, setNumeroParear] = useState('');
   const [pedindo, setPedindo] = useState(false);
   const [pedido, setPedido] = useState(false);
   const [demorou, setDemorou] = useState(false);
   const celular = noCelular();
-  const nuvem = Boolean(cfg.nuvem);
   const conectado = cfg.conector_online && (!remoto?.fase || remoto.fase === 'pronto');
   // o QR/código que aparece aqui vem do computador (local) ou, no celular, do servidor
   const qr = local?.fase === 'qr' && local.qr ? local.qr : remoto?.fase === 'qr' && remoto.qr ? remoto.qr : '';
@@ -153,7 +156,8 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
   };
 
   const gerar = async () => {
-    if (cfg.conector_criado && !window.confirm('Gerar uma chave nova derruba o Conector que está rodando agora. Continuar?')) return;
+    if (cfg.nuvem && !window.confirm('Usar o computador desliga o WhatsApp da nuvem (um número por vez). Continuar?')) return;
+    if (!cfg.nuvem && cfg.conector_criado && !window.confirm('Gerar uma chave nova derruba o Conector que está rodando agora. Continuar?')) return;
     setOcupado(true);
     setErro('');
     try {
@@ -168,6 +172,7 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
   };
 
   const ligarNuvem = async () => {
+    if (cfg.conector_criado && !cfg.nuvem && !window.confirm('Usar a nuvem desliga o Conector do computador (um número por vez), e o número precisa ser conectado de novo. Continuar?')) return;
     setOcupado(true);
     setErro('');
     try { aoMudar(await api.nuvemLigar()); }
@@ -196,25 +201,28 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
         <WhatsAppIcon className="w-7 h-7 text-emerald-500" />
         <div className="flex-1 min-w-[180px]">
           <p className="font-bold text-slate-800 text-sm flex items-center gap-2">
-            WhatsApp
-            <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{nuvem ? 'na nuvem' : 'pelo computador'}</span>
+            WhatsApp {nuvem ? 'na nuvem' : 'pelo computador'}
+            {ativo && <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">em uso</span>}
+            <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{nuvem ? 'sem computador' : 'precisa do PC ligado'}</span>
           </p>
           <p className="text-xs text-slate-500">
-            {cfg.conector_criado
+            {ativo
               ? conectado
                 ? <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold"><Wifi className="w-3.5 h-3.5" /> Conectado{cfg.conector_numero ? ` · ${cfg.conector_numero}` : ''}</span>
                 : <span className="inline-flex items-center gap-1 text-slate-500"><WifiOff className="w-3.5 h-3.5" /> {nuvem ? 'Aguardando a conexão do número.' : 'Desconectado. Abra o Conector no computador.'}</span>
-              : 'Sem pagar API: o seu computador envia e recebe pelo seu próprio WhatsApp, e o robô do LeadSage conversa.'}
+              : nuvem
+                ? 'Fica conectado na sua conta, em um servidor, sem nenhum aparelho ligado. Funciona no celular e no computador.'
+                : 'O seu computador envia e recebe pelo seu próprio WhatsApp, e o robô do LeadSage conversa. O computador precisa ficar ligado.'}
           </p>
         </div>
-        {cfg.conector_criado && (
+        {ativo && (
           <button onClick={revogar} className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 flex items-center gap-1.5">
             <Unplug className="w-3.5 h-3.5" /> Desligar
           </button>
         )}
       </div>
 
-      {!cfg.conector_criado && (
+      {!ativo && (
         <div className="space-y-3">
           <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed flex gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -228,27 +236,27 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
             <input type="checkbox" checked={entendi} onChange={e => setEntendi(e.target.checked)} className="mt-0.5 accent-emerald-600" />
             <span>Li o aviso e entendo o risco para o número que eu conectar.</span>
           </label>
-          {cfg.nuvem_disponivel && (
+          {nuvem && (
             <div className="space-y-1">
               <button onClick={ligarNuvem} disabled={!entendi || ocupado}
                 className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold flex items-center gap-2">
                 {ocupado ? <Loader2 className="w-4 h-4 animate-spin" /> : <WhatsAppIcon className="w-4 h-4" />}
-                Conectar pela nuvem (recomendado)
+                {outroAtivo ? 'Usar a nuvem' : 'Conectar pela nuvem'}
               </button>
-              <p className="text-[11px] text-slate-500">Funciona no celular e no computador. O número fica conectado na sua conta, sem nenhum aparelho ligado, até você desconectar.</p>
+              <p className="text-[11px] text-slate-500">O número fica conectado até você desconectar.{outroAtivo ? ' Desliga o Conector do computador (um número por vez).' : ''}</p>
             </div>
           )}
-          <button onClick={gerar} disabled={!entendi || ocupado}
-            className={cfg.nuvem_disponivel
-              ? 'px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 text-xs font-bold flex items-center gap-2'
-              : 'px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold flex items-center gap-2'}>
-            {ocupado ? <Loader2 className="w-4 h-4 animate-spin" /> : <WhatsAppIcon className="w-4 h-4" />}
-            {cfg.nuvem_disponivel ? 'Prefiro usar o computador' : 'Gerar chave do Conector'}
-          </button>
+          {!nuvem && (
+            <button onClick={gerar} disabled={!entendi || ocupado}
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold flex items-center gap-2">
+              {ocupado ? <Loader2 className="w-4 h-4 animate-spin" /> : <WhatsAppIcon className="w-4 h-4" />}
+              {outroAtivo ? 'Usar o computador' : 'Gerar chave do Conector'}
+            </button>
+          )}
         </div>
       )}
 
-      {cfg.conector_criado && (
+      {ativo && (
         <div className="space-y-3">
           {nuvem ? (
             <ol className="text-sm text-slate-700 list-decimal pl-5 space-y-1">
