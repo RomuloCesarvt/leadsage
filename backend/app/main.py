@@ -918,6 +918,11 @@ class RoboConfigRequest(BaseModel):
     oferta: Optional[Dict[str, Any]] = None
 
 
+class PreviaPorTelefone(BaseModel):
+    telefone: str = Field(min_length=8, max_length=40)
+    chat_id: str = Field(default="", max_length=60)
+
+
 class RoboTextoRequest(BaseModel):
     texto: str = Field(min_length=1, max_length=2000)
 
@@ -1347,6 +1352,18 @@ async def robo_enviar_previa(cid: str, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=409, detail="Esta pessoa ainda não respondeu: a prévia vai quando ela responder ou pelo disparo.")
     try:
         return await robo_service.enviar_previa(user.get("uid"), user.get("email", ""), cid)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except meta_canais.EnvioFalhou as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.post("/api/robo/previa")
+async def robo_previa_por_telefone(req: PreviaPorTelefone, user: dict = Depends(get_current_user)):
+    """Manda a prévia do site ao contato com este telefone (cria o site se ainda não existe), de qualquer tela."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    try:
+        return await robo_service.enviar_previa_por_telefone(user.get("uid"), user.get("email", ""), req.telefone, req.chat_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except meta_canais.EnvioFalhou as exc:

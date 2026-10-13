@@ -322,3 +322,18 @@ def test_botao_enviar_previa_cria_o_site_e_manda_o_link_na_conversa(rodar, com_r
     rodar(robo_service.enviar_previa, "alice", "alice@example.com", c["id"], envio)
     assert envio.enviados[0].split(": ")[1].split("\n")[0] == envio.enviados[1].split(": ")[1].split("\n")[0]
     assert len([s for s in rodar(list_sites, "alice") if s.get("lead_id") == "L77"]) == 1
+
+
+def test_previa_por_telefone_funciona_de_qualquer_tela(rodar, com_robo):
+    from app import pipeline_store
+    envio = Envio()
+    rodar(pipeline_store.registrar, "alice", {**LEAD_CLINICA})
+    r = rodar(robo_service.enviar_previa_por_telefone, "alice", "alice@example.com", "5514998005560", "", envio)
+    assert "/s/clinica-alluve-" in r["url"] and len(envio.enviados) == 1 and r["url"] in envio.enviados[0]
+    with pytest.raises(LookupError):
+        rodar(robo_service.enviar_previa_por_telefone, "alice", "alice@example.com", "5511900000000", "", envio)
+
+
+def test_rota_de_previa_por_telefone(client, com_robo):
+    r = client.post("/api/robo/previa", json={"telefone": "5511900000000"})
+    assert r.status_code in (404, 402, 403)

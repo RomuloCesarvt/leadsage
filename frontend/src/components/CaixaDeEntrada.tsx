@@ -114,6 +114,13 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
 
   const mandarPrevia = async () => {
     if (!aberta) return;
+    if (aberta.somente_leitura || aberta.id.startsWith('envio:')) {
+      if (!window.confirm(`Criar a prévia do site de ${aberta.nome || 'este lead'} (se ainda não existe) e enviar o link agora no WhatsApp?`)) return;
+      setEnviando(true); setErro('');
+      try { const r = await api.roboPreviaPorTelefone(aberta.contato); setErro(''); window.alert(`Prévia enviada: ${r.url}`); carregar(); }
+      catch (e: any) { setErro(e.message); } finally { setEnviando(false); }
+      return;
+    }
     if (!window.confirm(`Criar a prévia do site de ${aberta.nome || 'este lead'} (se ainda não existe) e enviar o link agora na conversa?`)) return;
     setEnviando(true);
     setErro('');
@@ -322,8 +329,15 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
             </div>
 
             {aberta.somente_leitura ? (
-              <div className="p-4 border-t border-slate-100 text-sm text-slate-500 text-center">
+              <div className="p-4 border-t border-slate-100 text-sm text-slate-500 text-center space-y-3">
+                {aberta.canal === 'whatsapp' && (
+                  <button onClick={mandarPrevia} disabled={enviando}
+                    className="px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold disabled:opacity-60">Enviar a prévia do site agora</button>
+                )}
+                {erro && <p className="text-xs text-red-600">{erro}</p>}
+                <p>
                 Esta mensagem já foi enviada. Quando {aberta.nome || 'a pessoa'} responder, a conversa continua aqui e o robô atende.
+                </p>
               </div>
             ) : (
               <div className="p-3 border-t border-slate-100">

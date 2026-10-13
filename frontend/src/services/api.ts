@@ -285,6 +285,10 @@ export const api = {
     });
   },
 
+  async roboPreviaPorTelefone(telefone: string, chatId = ''): Promise<{ url: string; texto: string; nome: string }> {
+    return await fetchWithToken('/robo/previa', { method: 'POST', body: JSON.stringify({ telefone, chat_id: chatId }) });
+  },
+
   async roboEnviarPrevia(id: string): Promise<RoboConversa> {
     return await fetchWithToken(`/robo/conversas/${encodeURIComponent(id)}/previa`, { method: 'POST' });
   },

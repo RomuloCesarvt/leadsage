@@ -201,6 +201,22 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
 
   const naoLidasTotal = (chats || []).filter(c => !c.grupo).reduce((n, c) => n + (c.naoLidas ? 1 : 0), 0);
 
+  const [enviandoPrevia, setEnviandoPrevia] = useState(false);
+  const mandarPrevia = async () => {
+    if (!aberto) return;
+    if (!window.confirm(`Criar a prévia do site de ${aberto.nome} (se ainda não existe) e enviar o link agora?`)) return;
+    setEnviandoPrevia(true);
+    setErro('');
+    try {
+      const r = await api.roboPreviaPorTelefone(aberto.telefone, aberto.id);
+      setAviso(`Prévia enviada: ${r.url}`);
+    } catch (e: any) {
+      setErro(e?.message || 'Não foi possível enviar a prévia.');
+    } finally {
+      setEnviandoPrevia(false);
+    }
+  };
+
   const alternarRobo = async () => {
     const conv = conversaDoRobo(aberto);
     if (!conv) return;
@@ -404,6 +420,12 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
                 <p className="font-bold text-base text-slate-800 truncate">{aberto.nome}</p>
                 <p className="text-xs text-slate-500">{aberto.grupo ? 'Grupo' : aberto.telefone ? `+${aberto.telefone}` : ''}</p>
               </div>
+              {!aberto.grupo && aberto.telefone && (
+                <button onClick={mandarPrevia} disabled={enviandoPrevia} title="Cria a prévia do site deste lead (se não existe) e envia o link"
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-60 whitespace-nowrap">
+                  {enviandoPrevia ? 'Enviando…' : 'Enviar prévia'}
+                </button>
+              )}
               {conv && (
                 <button onClick={alternarRobo}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 ${

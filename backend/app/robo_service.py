@@ -503,6 +503,47 @@ async def enviar_previa(uid: str, email: str, cid: str, enviar: Optional[Enviar]
     return conversa
 
 
+async def enviar_previa_por_telefone(uid: str, email: str, telefone: str, chat_id: str = "",
+                                      enviar: Optional[Enviar] = None) -> Dict[str, Any]:
+    """Cria (se preciso) a previa do site do lead com este telefone e manda o link pelo WhatsApp.
+
+    Funciona de qualquer tela que mostre o contato (conversas, chat, abordagem enviada): o que importa e o numero.
+    `chat_id`: o id da conversa quando o contato e novo (@lid), para a mensagem ir para o lugar certo.
+    """
+    from app import previa_site
+    from app.conector_whatsapp import enfileirar_resposta
+
+    item = await pipeline_store.achar_por_telefone(uid, telefone)
+    if item is None:
+        raise LookupError("Não achei este contato entre os seus leads: a prévia é feita a partir de um lead da busca.")
+    lead = _lead_do_item(item)
+    nome = lead.get("company") or lead.get("name") or ""
+    cfg = await robo_store.canal_do_usuario(uid) or {}
+    cfg = {**cfg, "uid": uid, "email": email}
+
+    url = await _site_do_lead(uid, lead["id"])
+    if not url:
+        url, falha = await previa_site.criar(uid, email, lead)
+        if not url:
+            raise meta_canais.EnvioFalhou(f"Não consegui criar a prévia agora: {falha}")
+
+    texto = f"Aqui está a prévia do site{f' da {nome}' if nome else ''}: {url}\nDá uma olhada e me conta o que achou."
+    if enviar is None and not (cfg.get("wa_token") and cfg.get("wa_phone_id")) and cfg.get("cw_hash"):
+        meta_id = await enfileirar_resposta(cfg, telefone, texto, chat_id)
+    else:
+        meta_id = await (enviar or meta_canais.enviar)("whatsapp", telefone, texto, cfg)
+
+    cid = robo_store.id_da_conversa("whatsapp", telefone)
+    conversa = await robo_store.obter_conversa(uid, cid)
+    if conversa:
+        conversa["mensagens"].append({"de": "robo", "texto": texto, "em": robo_store.agora(), "meta_id": meta_id})
+        conversa["precisa_humano"] = False
+        conversa["motivo"] = ""
+        conversa.setdefault("sdr", {})["previa_enviada"] = url
+        await robo_store.salvar_conversa(uid, conversa)
+    return {"url": url, "texto": texto, "nome": nome}
+
+
 async def responder_sem_guardar(
     cfg: Dict[str, Any],
     mensagens: list,
