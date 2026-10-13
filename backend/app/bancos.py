@@ -14,6 +14,7 @@ copia de um para o outro quando quiser juntar.
 """
 import asyncio
 import os
+import re
 import time
 import uuid
 from typing import Any, Dict, List, Optional
@@ -48,6 +49,10 @@ def urls_dos_bancos(env=None) -> List[str]:
     # bancos ligados pela aba Storage da Vercel (Neon, Supabase...) chegam com estes nomes
     brutas.append(env.get("POSTGRES_URL") or "")
     brutas.append(env.get("POSTGRES_PRISMA_URL") or "")
+    # com prefixo (NEON_DATABASE_URL, SUPA_POSTGRES_URL...): quando ha mais de um banco ligado pela Vercel
+    for chave in sorted(env):
+        if re.fullmatch(r"[A-Z][A-Z0-9]*_(DATABASE|POSTGRES)_URL", chave):
+            brutas.append(env.get(chave) or "")
     vistas: List[str] = []
     for u in (_normalizar(x) for x in brutas):
         if u and u not in vistas:

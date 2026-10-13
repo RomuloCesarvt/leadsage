@@ -32,6 +32,19 @@ def test_bancos_ligados_pela_vercel_entram_como_reserva():
     assert bancos.urls_dos_bancos({"POSTGRES_URL": "postgres://sup:2@s:6543/postgres"})[0].startswith("postgresql+asyncpg://sup")
 
 
+def test_bancos_da_vercel_com_prefixo_entram_e_os_nao_agrupados_ficam_de_fora():
+    env = {
+        "NEON_DATABASE_URL": "postgresql://neon:1@n-pooler/db?sslmode=require",
+        "NEON_DATABASE_URL_UNPOOLED": "postgresql://neon:1@n/db",
+        "SUPA_POSTGRES_URL": "postgres://sup:2@s:6543/postgres",
+        "NEON_PGHOST": "x",
+    }
+    assert bancos.urls_dos_bancos(env) == [
+        "postgresql+asyncpg://neon:1@n-pooler/db?sslmode=require",
+        "postgresql+asyncpg://sup:2@s:6543/postgres",
+    ]
+
+
 def test_sem_nenhuma_conexao_usa_sqlite():
     assert bancos.urls_dos_bancos({})[0].startswith("sqlite")
     assert bancos.urls_dos_bancos({"VERCEL": "1"})[0].endswith("/tmp/leadsage.db")
