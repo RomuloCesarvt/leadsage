@@ -269,6 +269,8 @@ async def preparar_lote(
             "texto": corpo,
             "link": link_do_canal(canal, lead, corpo),
             "gancho": (pronto.get("hook") or "")[:240],
+            "previa": pronto.get("previa") or "",
+            "previa_url": pronto.get("previa_url") or "",
             "seguimentos": pronto.get("follow_ups") or [],
             "contato": {"email": lead.get("email") or "", "phone": lead.get("phone") or "",
                         "instagram": _instagram(lead), "linkedin": _linkedin(lead)},

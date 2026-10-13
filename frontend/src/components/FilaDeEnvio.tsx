@@ -17,6 +17,7 @@ import { useApp } from '../context/AppContext';
 import { WhatsAppIcon, InstagramIcon, LinkedInIcon } from './BrandIcons';
 import { ehSalvo } from '../lib/leadsSalvos';
 import { sondar } from '../lib/sondagem';
+import { montarPreviaDoLead } from './SiteBuilder';
 import type { CanalFila, EstadoFilaWhats, ItemFila, LeadItem, ResultadoPreparo, ResumoFila } from '../types';
 
 const SEM_CONTATO_AINDA = new Set(['', 'Novo Lead', 'Novos', 'Novo']);
@@ -85,6 +86,12 @@ export const FilaDeEnvio: React.FC = () => {
   // edição em andamento: id -> { texto, assunto }
   const [edicao, setEdicao] = useState<Record<string, { texto: string; assunto: string }>>({});
   const [enviados, setEnviados] = useState(false);
+  // criar a prévia do site de cada lead antes de gerar as mensagens (assim a mensagem pode dizer "montei" com verdade)
+  const [criarPrevia, setCriarPrevia] = useState(true);
+  const [cota, setCota] = useState<{ usados: number; cota: number | null; ilimitado: boolean } | null>(null);
+  const [previas, setPrevias] = useState({ feitas: 0, total: 0 });
+  const [avisoPrevias, setAvisoPrevias] = useState('');
+  const vagasDeSite = cota ? (cota.ilimitado ? Infinity : Math.max(0, (cota.cota || 0) - cota.usados)) : 0;
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -112,6 +119,7 @@ export const FilaDeEnvio: React.FC = () => {
   }, []);
 
   useEffect(() => { void carregar(); void carregarWhats(); }, [carregar, carregarWhats]);
+  useEffect(() => { api.cotaDeSites().then(c => { setCota(c); if (!c.ilimitado && (c.cota || 0) - c.usados <= 0) setCriarPrevia(false); }).catch(() => {}); }, []);
   // a fila anda sozinha (o Conector envia): a tela acompanha, com a aba à vista
   useEffect(() => sondar(() => { void carregar(); void carregarWhats(); }, 15000), [carregar, carregarWhats]);
   useEffect(() => () => setLeadsParaContato([]), [setLeadsParaContato]);
@@ -150,8 +158,31 @@ export const FilaDeEnvio: React.FC = () => {
     setErro('');
     setResultados([]);
     setProgresso({ feitos: 0, total: escolhidos.length });
+    setAvisoPrevias('');
     try {
       await atualizarPipeline(); // o servidor só conhece os leads que o navegador já entregou
+      // 0. a prévia do site de cada lead (se a pessoa quis): é o que torna verdadeira a frase "montei uma prévia"
+      if (criarPrevia) {
+        const jaTem = new Set((await api.getSites()).map(s => s.lead_id).filter(Boolean) as string[]);
+        const atual = await api.cotaDeSites();
+        const vagas = atual.ilimitado ? Infinity : Math.max(0, (atual.cota || 0) - atual.usados);
+        const faltam = escolhidos.filter(l => !jaTem.has(l.id));
+        const criar = faltam.slice(0, vagas);
+        setPrevias({ feitas: 0, total: criar.length });
+        let feitas = 0; let falhas = 0; let proximo = 0;
+        const trabalhador = async () => {
+          while (proximo < criar.length) {
+            const lead = criar[proximo++];
+            try { await api.publishSite(montarPreviaDoLead(lead)); } catch { falhas++; }
+            feitas++; setPrevias({ feitas, total: criar.length });
+          }
+        };
+        await Promise.all([trabalhador(), trabalhador(), trabalhador()]);
+        const semVaga = faltam.length - criar.length;
+        if (falhas || semVaga) {
+          setAvisoPrevias(`${criar.length - falhas} prévia(s) criada(s).${semVaga ? ` ${semVaga} lead(s) ficaram sem prévia por falta de vagas de site no seu plano` : ''}${falhas ? ` ${falhas} falharam` : ''}: para eles a mensagem oferece montar a prévia, em vez de dizer que já está pronta.`);
+        }
+      }
       for (let i = 0; i < escolhidos.length; i += LOTE) {
         const parte = escolhidos.slice(i, i + LOTE);
         const r = await api.filaPreparar(parte as unknown as Record<string, unknown>[], 'Consultivo', true);
@@ -261,8 +292,14 @@ export const FilaDeEnvio: React.FC = () => {
           <b className="text-sm text-slate-900 truncate flex-1">{item.nome}</b>
           <span className={`text-[11px] font-bold rounded-full px-2.5 py-1 shrink-0 ${est.cor}`}>{est.rotulo}</span>
         </div>
-        <p className="text-[11px] font-semibold text-slate-500 mb-1.5">
-          {NOME_CANAL[item.canal]}{item.editado ? ' · editada por você' : ''}
+        <p className="text-[11px] font-semibold text-slate-500 mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span>{NOME_CANAL[item.canal]}{item.editado ? ' · editada por você' : ''}</span>
+          {item.previa === 'criada' && (
+            <span className="text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5">
+              Prévia criada{item.previa_url ? <> · <a href={item.previa_url} target="_blank" rel="noreferrer" className="underline">ver</a></> : null}
+            </span>
+          )}
+          {item.previa === 'oferecer' && <span className="text-amber-800 bg-amber-50 rounded-full px-2 py-0.5">Sem prévia: a mensagem oferece montar</span>}
         </p>
 
         {ed ? (
@@ -413,13 +450,28 @@ export const FilaDeEnvio: React.FC = () => {
                     );
                   })}
                 </ul>
+                <label className="mt-4 flex items-start gap-3 p-3 rounded-xl border border-blue-100 bg-blue-50/50 cursor-pointer">
+                  <input type="checkbox" checked={criarPrevia} onChange={e => setCriarPrevia(e.target.checked)} className="w-5 h-5 mt-0.5 accent-blue-600 shrink-0" />
+                  <span className="text-sm">
+                    <b className="text-slate-800">Criar a prévia do site de cada lead antes</b>
+                    <span className="block text-xs text-slate-600 mt-0.5 leading-relaxed">
+                      {criarPrevia
+                        ? 'A mensagem diz que a prévia já está pronta e pede licença para mandar o link. Usa 1 vaga de site por lead.'
+                        : 'A mensagem oferece montar a prévia, sem dizer que já existe. Se o lead aceitar, o robô passa a conversa para você criar.'}
+                      {cota && !cota.ilimitado ? ` Você tem ${vagasDeSite} vaga(s) de site disponível(is).` : ''}
+                    </span>
+                  </span>
+                </label>
                 <button onClick={gerar} disabled={preparando || marcados.size === 0}
                   className="mt-4 w-full sm:w-auto px-5 py-3 md:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-sm flex items-center justify-center gap-2">
                   {preparando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
-                  {preparando ? `Escrevendo ${progresso.feitos}/${progresso.total}…` : `Gerar ${marcados.size || ''} mensagem(ns) para revisar`}
+                  {preparando
+                    ? (previas.total > 0 && previas.feitas < previas.total ? `Criando prévias ${previas.feitas}/${previas.total}…` : `Escrevendo ${progresso.feitos}/${progresso.total}…`)
+                    : `Gerar ${marcados.size || ''} mensagem(ns) para revisar`}
                 </button>
               </>
             )}
+            {avisoPrevias && <p className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2.5">{avisoPrevias}</p>}
             {resultados.length > 0 && (
               <ul className="mt-4 space-y-1.5">
                 {resultados.map((r, i) => (

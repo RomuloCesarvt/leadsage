@@ -310,6 +310,16 @@ async def generate_pitch(request: Request, req: PitchGenerationRequest, user: di
         raise HTTPException(status_code=503, detail=str(e))
 
 
+async def _previa_do_lead(uid: str, lead_id: str, sites: Optional[List[Dict[str, Any]]] = None) -> str:
+    """"criada" se já existe um site feito para este lead; senão "oferecer". A mensagem nunca promete o que não existe."""
+    from app.sites_store import list_sites
+    try:
+        lista = sites if sites is not None else await list_sites(uid)
+    except Exception:
+        lista = []
+    return "criada" if any(s.get("lead_id") == lead_id and s.get("slug") for s in lista) else "oferecer"
+
+
 async def _preparar_pitch(user: dict, req: PitchGenerationRequest) -> None:
     """O produto vem do cadastro do dono, nunca do navegador: e ele que garante que a
     mensagem so cita preco, prazo e entrega reais."""
@@ -320,6 +330,8 @@ async def _preparar_pitch(user: dict, req: PitchGenerationRequest) -> None:
     if not req.sender_name or req.sender_name == "Prospecção LeadSage":
         req.sender_name = perfil.company_name or perfil.name or req.sender_name
     req.service_brief = abordagem_mestra.produto(canal_robo, req.lead.model_dump(), req.user_product or "")
+    if req.previa not in ("criada", "oferecer"):
+        req.previa = await _previa_do_lead(user.get("uid"), req.lead.id)
 
 
 @app.post("/api/generate-followups")
@@ -1092,14 +1104,25 @@ async def _funcoes_da_fila(user: dict):
     produto = produto or perfil.product_description or ""
     remetente = perfil.company_name or perfil.name or "Prospecção LeadSage"
 
+    from app.sites_store import list_sites
+    try:
+        sites_do_usuario = await list_sites(uid)
+    except Exception:
+        sites_do_usuario = []
+
     async def gerar(lead: Dict[str, Any], canal: str, tom: str = "Consultivo") -> Dict[str, Any]:
+        previa = await _previa_do_lead(uid, str(lead.get("id", "")), sites_do_usuario)
         pitch = await AIGenerator.generate_pitch(
             PitchGenerationRequest(lead=_lead_para_pitch(lead), channel=canal, tone=tom,
-                                   sender_name=remetente, user_product=produto,
+                                   sender_name=remetente, user_product=produto, previa=previa,
                                    service_brief=abordagem_mestra.produto(canal_robo, lead, produto)),
             api_key=settings.GEMINI_API_KEY,
         )
-        return {"subject": pitch.subject, "body": pitch.body, "hook": pitch.hook,
+        url = ""
+        if previa == "criada":
+            slug = next((s.get("slug") for s in sites_do_usuario if s.get("lead_id") == str(lead.get("id", "")) and s.get("slug")), "")
+            url = f"{settings.APP_URL}/s/{slug}" if slug else ""
+        return {"subject": pitch.subject, "body": pitch.body, "hook": pitch.hook, "previa": previa, "previa_url": url,
                 "follow_ups": [f.model_dump() for f in (pitch.follow_ups or [])]}
 
     async def enviar(lead: Dict[str, Any], assunto: str, corpo: str) -> str:

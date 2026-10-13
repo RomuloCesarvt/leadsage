@@ -64,6 +64,18 @@ const dadosIniciais = (lead: any): SiteData => {
   return lead ? semearConteudo(base, { cores: true }) : base;
 };
 
+/**
+ * A prévia de um lead, pronta para publicar: os dados reais dele, o layout do ramo e o conteúdo semeado do ramo.
+ * Sem chamar IA: é o mesmo caminho do construtor, só que em lote (o disparo cria uma por lead).
+ */
+export const montarPreviaDoLead = (lead: any) => {
+  const dados = dadosIniciais(lead);
+  const ramo = lead?.niche || lead?.role || '';
+  const template = SITE_TEMPLATES.find(t => t.id === layoutDoRamo(ramo)) || sugerirTemplate(ramo);
+  const html = template.render({ ...dados, selo: true });
+  return { company: dados.empresa, html, template: template.nome, lead_id: String(lead?.id || ''), builder_data: JSON.stringify(dados) };
+};
+
 const PALETAS = [
   { nome: 'Azul', primaria: '#2563eb', destaque: '#f59e0b' },
   { nome: 'Verde', primaria: '#059669', destaque: '#f97316' },

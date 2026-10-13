@@ -118,6 +118,9 @@ class PitchGenerationRequest(BaseModel):
     service_brief: Optional[str] = ""
     # Os seguimentos custam outra chamada de IA: a tela os pede a parte, depois da primeira mensagem.
     com_seguimentos: bool = False
+    # A previa do site deste lead: 'criada' (ja existe, a mensagem pede licenca para mandar o link) ou 'oferecer'
+    # (nao existe: a mensagem oferece montar). Vazio = o servidor descobre pelos sites do usuario.
+    previa: Optional[str] = ""
 
 class FollowupsRequest(BaseModel):
     pitch: PitchGenerationRequest

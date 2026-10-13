@@ -555,6 +555,9 @@ export interface ItemFila {
   motivo?: string;
   /** a pessoa mudou o texto gerado pelo robô */
   editado?: boolean;
+  /** a prévia do site deste lead: já criada (a mensagem pede licença para mandar o link) ou a oferecer */
+  previa?: 'criada' | 'oferecer' | '';
+  previa_url?: string;
   criado: string;
   enviado_em?: string;
   enviado_por?: string;

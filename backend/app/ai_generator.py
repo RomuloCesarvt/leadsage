@@ -161,7 +161,7 @@ O RAMO DESTE NEGÓCIO
 
 {abordagem_mestra.TEMPERATURA}
 
-{abordagem_mestra.estrutura(assina, sem_site=sem_site)}
+{abordagem_mestra.estrutura(assina, sem_site=sem_site, previa=(req.previa or ''))}
 
 {abordagem_mestra.GATILHOS}
 
@@ -204,7 +204,7 @@ RETORNO: JSON puro com a chave "follow_ups": lista de exatamente 2 objetos com "
 """
 
 
-def _melhor_versao(atual: Dict[str, Any], nova: Dict[str, Any], canal: str, sem_site: bool = True) -> Dict[str, Any]:
+def _melhor_versao(atual: Dict[str, Any], nova: Dict[str, Any], canal: str, sem_site: bool = True, previa: str = "") -> Dict[str, Any]:
     """Fica com a versão que tem menos defeitos, não com a mais recente.
 
     A reescrita costuma melhorar, mas não sempre: pedir correção às vezes
@@ -214,7 +214,7 @@ def _melhor_versao(atual: Dict[str, Any], nova: Dict[str, Any], canal: str, sem_
     if not nova.get("body"):
         return atual
     def defeitos(d):
-        return len(revisar_copy(d.get("body", ""), canal)) + len(abordagem_mestra.revisar_calor(d.get("body", ""), canal)) + len(abordagem_mestra.revisar_roteiro(d.get("body", ""), sem_site))
+        return len(revisar_copy(d.get("body", ""), canal)) + len(abordagem_mestra.revisar_calor(d.get("body", ""), canal)) + len(abordagem_mestra.revisar_roteiro(d.get("body", ""), sem_site, previa))
     if defeitos(nova) <= defeitos(atual):
         return nova
     return atual
@@ -262,7 +262,7 @@ class AIGenerator:
 
         problemas = (revisar_copy(dados.get("body", ""), canal)
                      + abordagem_mestra.revisar_calor(dados.get("body", ""), canal)
-                     + abordagem_mestra.revisar_roteiro(dados.get("body", ""), sem_site))
+                     + abordagem_mestra.revisar_roteiro(dados.get("body", ""), sem_site, req.previa or ""))
 
         seguimentos: List[Dict[str, str]] = []
         if getattr(req, "com_seguimentos", False):

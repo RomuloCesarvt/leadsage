@@ -196,7 +196,8 @@ def bloco_do_servico(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]]) -> str
         if tem_site:
             regra_esboco = (
                 "ESBOÇO: já existe um esboço pronto para este negócio (link no dossiê). Ele é o seu trunfo: "
-                "mande o link, peça a opinião em uma frase e proponha a reunião curta para ajustar. É grátis e sem compromisso."
+                "mande o link (se ele já disse sim para receber), com UMA frase de contexto sobre o que ele vai ver e peça a opinião dele. "
+                "Só depois que ele opinar proponha a reunião curta de uns 10 minutos para ajustar. É grátis e sem compromisso."
             )
         else:
             regra_esboco = (

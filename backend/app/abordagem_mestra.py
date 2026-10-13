@@ -81,12 +81,23 @@ ESTRUTURA = """COMO UMA BOA PRIMEIRA MENSAGEM É CONSTRUÍDA (nesta ordem, em pr
    "posso te mostrar por aqui mesmo, ou prefere um papo rápido de uns 10 minutinhos, sem nenhuma obrigação?" (adapte ao canal e ao tom).
    Deixe claro que a prévia é para apresentar SEM OBRIGAÇÃO nenhuma da parte dele. A conversa é opção, nunca exigência."""
 
+# A previa existe ou nao: a mensagem nunca pode dizer que "montou" algo que ainda nao existe.
+PREVIA_CRIADA = """   c) Diga que JÁ montou uma prévia de como o site dele poderia ficar (está pronta, feita com os dados reais do negócio) e peça
+      licença para enviar. Não mande o link neste primeiro toque."""
+PREVIA_OFERECER = """   c) Diga que pode montar, sem custo e sem compromisso, uma prévia de como o site dele poderia ficar. NÃO diga que já montou nem que
+      já está pronta: ela ainda não existe. Não mande link."""
+PERGUNTA_CRIADA = """5. PERGUNTA DE BAIXO ATRITO: UMA só, no fim, que se responde com um "sim":
+   "posso te mandar o link da prévia por aqui, sem compromisso?" (adapte ao canal e ao tom). Não ofereça reunião nesta mensagem:
+   a conversa rápida vem depois que ele vir a prévia."""
+PERGUNTA_OFERECER = """5. PERGUNTA DE BAIXO ATRITO: UMA só, no fim, que se responde com um "sim":
+   "posso montar essa prévia para você dar uma olhada, sem compromisso?" (adapte ao canal e ao tom). Não ofereça reunião nesta mensagem."""
+
 PONTO_SEM_SITE = """4. A LACUNA, O BENEFÍCIO E A PRÉVIA (é o coração da mensagem), em três frases curtas:
    a) Diga que NÃO encontrou um site do negócio e que quer confirmar se realmente não existe (como afirmação, sem ponto de
       interrogação, para a pergunta final ser a única; ex.: "não encontrei o site de vocês e queria confirmar se realmente ainda não existe").
    b) Diga como um site ajudaria ESTE negócio, na moeda dele: quem pesquisa no Google chega, vê serviços, fotos, horários e avaliações,
       e fala direto no WhatsApp, inclusive fora do horário de atendimento.
-   c) Diga que montou uma prévia de como o site dele poderia ficar e que gostaria de apresentá-la sem obrigação nenhuma.
+{previa_c}
    Não mande link neste primeiro toque."""
 
 PONTO_COM_SITE = """4. A OPORTUNIDADE, O BENEFÍCIO E A PRÉVIA, em três frases curtas. O negócio já tem site, então NÃO diga que não achou:
@@ -94,7 +105,7 @@ PONTO_COM_SITE = """4. A OPORTUNIDADE, O BENEFÍCIO E A PRÉVIA, em três frases
       pouco claro no celular). Se o dossiê não listar problema, NÃO invente: diga apenas que olhou o site e viu espaço para
       mostrar melhor o trabalho dele.
    b) Diga o que isso muda para o dono: o cliente que chega pelo celular decide e chama no WhatsApp com mais facilidade.
-   c) Diga que montou uma prévia de como o site poderia ficar e que gostaria de apresentá-la sem obrigação nenhuma.
+{previa_c}
    Não mande link neste primeiro toque."""
 
 
@@ -129,11 +140,20 @@ def quem_sou(sender_name: str) -> str:
     return f"Eu sou da {nome} e ajudo negócios locais a serem encontrados e escolhidos no Google"
 
 
-def estrutura(sender_name: str, agora: Optional[datetime] = None, sem_site: bool = True) -> str:
-    return ESTRUTURA.format(
+def estrutura(sender_name: str, agora: Optional[datetime] = None, sem_site: bool = True, previa: str = "") -> str:
+    """`previa`: "criada", "oferecer" ou vazio (comportamento antigo: montou e oferece mostrar por aqui ou em 10 minutos)."""
+    ponto = PONTO_SEM_SITE if sem_site else PONTO_COM_SITE
+    antigo_c = ("   c) Diga que montou uma prévia de como o site dele poderia ficar e que gostaria de apresentá-la sem obrigação nenhuma.")
+    previa_c = {"criada": PREVIA_CRIADA, "oferecer": PREVIA_OFERECER}.get(previa, antigo_c)
+    texto = ESTRUTURA.format(
         saudacao=saudacao_do_horario(agora), apresentacao=quem_sou(sender_name),
-        ponto_do_site=PONTO_SEM_SITE if sem_site else PONTO_COM_SITE,
+        ponto_do_site=ponto.format(previa_c=previa_c),
     )
+    pergunta = {"criada": PERGUNTA_CRIADA, "oferecer": PERGUNTA_OFERECER}.get(previa)
+    if pergunta:
+        i = texto.index("5. PERGUNTA DE BAIXO ATRITO")
+        texto = texto[:i] + pergunta
+    return texto
 
 
 def bloco_do_ramo(nicho: Optional[str]) -> str:
@@ -159,10 +179,27 @@ def revisar_calor(texto: str, canal: str = "email") -> list:
     return problemas
 
 
-def revisar_roteiro(texto: str, sem_site: bool) -> list:
+def revisar_roteiro(texto: str, sem_site: bool, previa: str = "") -> list:
     """A mensagem precisa trazer o que o dono pediu: a prévia e, sem site, a confirmação."""
     t = (texto or "").lower()
     problemas = []
+    if previa in ("criada", "oferecer"):
+        montou = re.search(r"(montei|preparei|criei|fiz|deixei)[^.?!]{0,40}(pr[eé]via|esbo[çc]o)", t)
+        if previa == "criada":
+            if not montou:
+                problemas.append("não diz que você já montou a prévia do site")
+            if not re.search(r"(posso|quer|gostaria)[^.?!]{0,30}(mandar|enviar|compartilhar|te mostrar)|te (mando|envio)", t):
+                problemas.append("não pede licença para enviar o link da prévia (ex.: \"posso te mandar o link por aqui?\")")
+        else:
+            if montou:
+                problemas.append("diz que já montou a prévia, mas ela ainda não existe: ofereça montar")
+            if not re.search(r"(posso|quer|gostaria)[^.?!]{0,30}(montar|criar|preparar|fazer)|montar (uma |essa )?pr[eé]via|criar (uma |essa )?pr[eé]via", t):
+                problemas.append("não oferece montar a prévia (ex.: \"posso montar uma prévia para você ver?\")")
+        if sem_site and not re.search(r"confirmar|realmente|de fato|certeza|existe|n[aã]o tem|n[aã]o encontr", t):
+            problemas.append("não diz que não encontrou o site e que quer confirmar se realmente não existe")
+        if not re.search(r"sem compromisso|sem obriga[çc][aã]o|sem nenhuma obriga", t):
+            problemas.append("não deixa claro que é sem compromisso")
+        return problemas
     if not re.search(r"(montei|preparei|criei|fiz|deixei)[^.?!]{0,40}(pr[eé]via|esbo[çc]o)", t):
         problemas.append("não diz que você já montou uma prévia do site (use: \"montei uma prévia\") para apresentar sem compromisso")
     if sem_site and not re.search(r"confirmar|realmente|de fato|certeza|existe|n[aã]o tem", t):

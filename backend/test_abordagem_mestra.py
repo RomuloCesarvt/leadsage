@@ -6,7 +6,8 @@ ramo, horário) e a revisão de frieza.
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from app import abordagem_mestra as am
+from app import abordagem_mestra, abordagem_mestra as am
+from test_robo import com_robo, rodar  # noqa: F401
 from app.ai_generator import _prompt_da_abordagem
 from app.models import LeadItem, PitchGenerationRequest
 
@@ -88,3 +89,36 @@ def test_prompt_pede_achei_no_google_e_a_previa():
     assert "pesquisando no Google" in p and "prévia" in p and "confirmar se realmente" in p
     com_site = _prompt_da_abordagem(PitchGenerationRequest(lead=lead(site_status="own"), channel="whatsapp", sender_name="X"), "whatsapp")
     assert "NÃO diga que não achou" in com_site
+
+
+# ------------------------------------------------------------------ previa criada ou a oferecer
+
+def test_estrutura_muda_conforme_a_previa_exista():
+    criada = abordagem_mestra.estrutura("LeadSage", previa="criada")
+    oferecer = abordagem_mestra.estrutura("LeadSage", previa="oferecer")
+    assert "JÁ montou uma prévia" in criada and "posso te mandar o link" in criada and "10 minutinhos" not in criada
+    assert "ainda não existe" in oferecer and "posso montar essa prévia" in oferecer and "JÁ montou" not in oferecer
+    assert "10 minutinhos" in abordagem_mestra.estrutura("LeadSage")      # sem modo: o texto antigo
+
+
+def test_roteiro_com_previa_criada_pede_licenca_para_enviar():
+    bom = "Boa tarde! Montei uma prévia do site de vocês, sem compromisso. Posso te mandar o link por aqui?"
+    assert abordagem_mestra.revisar_roteiro(bom, False, "criada") == []
+    sem_pedido = "Boa tarde! Montei uma prévia do site de vocês, sem compromisso."
+    assert any("licença" in p for p in abordagem_mestra.revisar_roteiro(sem_pedido, False, "criada"))
+
+
+def test_roteiro_sem_previa_nao_pode_dizer_que_montou():
+    mentira = "Boa tarde! Montei uma prévia do site de vocês, sem compromisso. Posso montar uma prévia para você ver?"
+    assert any("ainda não existe" in p for p in abordagem_mestra.revisar_roteiro(mentira, False, "oferecer"))
+    bom = "Boa tarde! Não encontrei o site de vocês e queria confirmar. Posso montar uma prévia para você ver, sem compromisso?"
+    assert abordagem_mestra.revisar_roteiro(bom, True, "oferecer") == []
+
+
+def test_servidor_descobre_se_a_previa_existe(rodar, com_robo):
+    from app import main
+    from app.sites_store import create_site
+    assert rodar(main._previa_do_lead, "alice", "L1") == "oferecer"
+    rodar(create_site, "alice", "Padaria", "<html><body>x</body></html>", "", "L1")
+    assert rodar(main._previa_do_lead, "alice", "L1") == "criada"
+    assert rodar(main._previa_do_lead, "alice", "L2") == "oferecer"
