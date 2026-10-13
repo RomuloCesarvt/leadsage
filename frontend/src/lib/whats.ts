@@ -22,12 +22,13 @@ const paraEstado = (e: Awaited<ReturnType<typeof api.whatsEstado>>): EstadoConec
 type Acesso = { url: string; token: string; ate: number };
 let acesso: Acesso | null = null; // endereço + token do worker da nuvem (vale ~12 h; renova antes)
 let semNuvemAte = 0; // depois de uma falha, não insiste por alguns segundos
-let direto = false; // a última lista veio direto do worker
+let direto = false;
+let ultimoErroDireto = ''; // por que a leitura direta não valeu (aparece no aviso da tela) // a última lista veio direto do worker
 
 async function acessoNuvem(): Promise<Acesso | null> {
   if (acesso && acesso.ate > Date.now()) return acesso;
   const r = await api.whatsAcesso().catch(() => null);
-  if (!r?.nuvem || !r.url || !r.token) { acesso = null; return null; }
+  if (!r?.nuvem || !r.url || !r.token) { acesso = null; ultimoErroDireto = r ? 'a conta não está no modo nuvem' : 'não consegui pedir o acesso ao servidor'; return null; }
   acesso = { url: r.url, token: r.token, ate: Date.now() + 11 * 3600 * 1000 };
   return acesso;
 }
@@ -44,14 +45,17 @@ async function doWorker<T>(caminho: string, init?: RequestInit): Promise<T | nul
         signal: AbortSignal.timeout(20000),
       });
       if (r.status === 401) { acesso = null; continue; } // token vencido: pega outro e tenta de novo
-      if (!r.ok) return null;
+      if (!r.ok) { ultimoErroDireto = `nuvem respondeu ${r.status}: ${((await r.json().catch(() => ({}))) as any).erro || ''}`; return null; }
+      ultimoErroDireto = '';
       return (await r.json()) as T;
-    } catch { return null; }
+    } catch (e: any) { ultimoErroDireto = `sem resposta da nuvem (${e?.name || 'erro'})`; return null; }
   }
   return null;
 }
 
 export const whats = {
+  diagnosticoDireto: () => ultimoErroDireto,
+
   /** null: sem Conector em lugar nenhum. */
   async estado(): Promise<EstadoConector | null> {
     const local = await conectorLocal.estado().catch(() => null);
