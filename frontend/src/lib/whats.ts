@@ -8,7 +8,7 @@
 import { api } from '../services/api';
 import { conectorLocal, type ChatWhats, type EstadoConector, type FonteLista, type MensagemWhats } from './conectorLocal';
 
-export type ListaWhats = { chats: ChatWhats[]; fonte: FonteLista; remoto: boolean; idade_s: number | null };
+export type ListaWhats = { chats: ChatWhats[]; fonte: FonteLista; remoto: boolean; idade_s: number | null; nuvem?: boolean };
 
 const paraEstado = (e: Awaited<ReturnType<typeof api.whatsEstado>>): EstadoConector | null => {
   if (!e.conectado) return null;
@@ -64,7 +64,7 @@ export const whats = {
     if (l) return { ...l, remoto: false, idade_s: 0 };
     if (Date.now() > semNuvemAte) {
       const d = await doWorker<{ chats: ChatWhats[] }>(`?limite=${limite}`);
-      if (d && Array.isArray(d.chats)) { direto = true; return { chats: d.chats, fonte: '', remoto: true, idade_s: 0 }; }
+      if (d && Array.isArray(d.chats)) { direto = true; return { chats: d.chats, fonte: '', remoto: true, idade_s: 0, nuvem: true }; }
       direto = false;
       if (acesso) semNuvemAte = Date.now() + 15000; // worker fora do ar agora: usa o espelho um tempo
     }

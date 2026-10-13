@@ -90,6 +90,7 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
   const [carregandoMais, setCarregandoMais] = useState(false);
   const alturaAntes = useRef(0);
   const chatsVistos = useRef(0);
+  const [viaNuvem, setViaNuvem] = useState(false);
 
   const carregarChats = useCallback(async () => {
     try {
@@ -104,6 +105,7 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
       if (l.chats.length > 0 || chatsVistos.current === 0) { chatsVistos.current = l.chats.length; setChats(l.chats); }
       setFonte(l.fonte);
       setRemoto(l.remoto);
+      setViaNuvem(Boolean(l.nuvem));
       setIdade(l.idade_s ?? 0);
     } catch (e: any) {
       // o Conector respondeu, mas não conseguiu ler as conversas
@@ -355,7 +357,7 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
           )}
           {remoto && (
             <p className="text-[11px] text-sky-800 bg-sky-50 border border-sky-200 rounded-lg px-2.5 py-1.5">
-              Vendo pelo celular{idade > 15 ? ` · atualizado há ${idade}s` : ''}. O WhatsApp fica ligado no computador do Conector; a primeira atualização pode levar até 1 minuto.
+              {viaNuvem ? 'Ligado direto na nuvem: as conversas aparecem em tempo real. O WhatsApp só entrega o histórico antigo ao conectar o aparelho; mensagens novas entram sozinhas.' : <>Vendo pelo celular{idade > 15 ? ` · atualizado há ${idade}s` : ''}. O WhatsApp fica ligado no computador do Conector; a primeira atualização pode levar até 1 minuto.</>}
             </p>
           )}
           {notaHistorico && (
