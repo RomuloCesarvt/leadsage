@@ -1,6 +1,7 @@
 import time
 import re
 import hashlib
+import hmac
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -1491,6 +1492,9 @@ async def conector_gerar(user: dict = Depends(get_current_user)):
     canal = await robo_conexao._canal(uid, user.get("email", ""))
     _exigir_banco_disponivel()
     antigo = canal.get("cw_hash")
+    if canal.pop("nuvem_chave", None):
+        await robo_store.esquecer_nuvem(uid)  # o WhatsApp passa a ser o do computador, não o da nuvem
+        _SESSOES_NUVEM.clear()
     chave = await conector_whatsapp.criar_chave(canal)
     await robo_store.registrar_ativo("conector", canal["cw_hash"], uid, canal["gancho"])
     canal = await robo_store.substituir_canal(uid, canal)
@@ -1500,6 +1504,71 @@ async def conector_gerar(user: dict = Depends(get_current_user)):
     if antigo:
         _CACHE_CONECTOR.pop(antigo, None)
     return {"chave": chave, **robo_store.visao_publica(canal, settings.APP_URL)}
+
+
+@app.post("/api/robo/nuvem/ligar")
+async def nuvem_ligar(user: dict = Depends(get_current_user)):
+    """O WhatsApp da conta fica ligado na nuvem: nao depende do computador nem do celular do usuario."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    if not settings.WORKER_SECRET:
+        raise HTTPException(status_code=409, detail="A conexão pela nuvem ainda não está ativada neste LeadSage.")
+    uid = user.get("uid")
+    canal = await robo_conexao._canal(uid, user.get("email", ""))
+    _exigir_banco_disponivel()
+    if not canal.get("nuvem_chave"):
+        antigo = canal.get("cw_hash")
+        chave = await conector_whatsapp.criar_chave(canal)  # a chave é do serviço da nuvem; o usuário nunca a vê
+        await robo_store.registrar_ativo("conector", canal["cw_hash"], uid, canal["gancho"])
+        canal["nuvem_chave"] = chave
+        canal = await robo_store.substituir_canal(uid, canal)
+        if robo_store.firestore_falhou_agora():
+            raise HTTPException(status_code=503, detail=MSG_BANCO_SEM_COTA)
+        await robo_store.registrar_nuvem(uid, canal["gancho"])
+        _SESSOES_NUVEM.clear()
+        if antigo:
+            _CACHE_CONECTOR.pop(antigo, None)
+    return robo_store.visao_publica(canal, settings.APP_URL)
+
+
+@app.post("/api/robo/nuvem/desligar")
+async def nuvem_desligar(user: dict = Depends(get_current_user)):
+    """Desconecta o WhatsApp da nuvem e apaga a sessão guardada. É o único jeito de ele cair."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    uid = user.get("uid")
+    canal = await robo_conexao._canal(uid, user.get("email", ""))
+    antigo = canal.get("cw_hash")
+    canal.pop("nuvem_chave", None)
+    canal = await conector_whatsapp.revogar(canal)
+    canal = await robo_store.substituir_canal(uid, canal)
+    await robo_store.esquecer_nuvem(uid)
+    _SESSOES_NUVEM.clear()
+    if antigo:
+        _CACHE_CONECTOR.pop(antigo, None)
+    return robo_store.visao_publica(canal, settings.APP_URL)
+
+
+_SESSOES_NUVEM: Dict[str, Any] = {}
+
+
+@app.get("/api/worker/sessoes")
+async def worker_sessoes(request: Request):
+    """Para o servico da nuvem: quem deve estar com o WhatsApp ligado, e a chave de cada um."""
+    segredo = settings.WORKER_SECRET
+    enviado = request.headers.get("x-worker-secret", "")
+    if not segredo or not hmac.compare_digest(enviado.encode(), segredo.encode()):
+        raise HTTPException(status_code=401, detail="Segredo inválido.")
+    guardado = _SESSOES_NUVEM.get("lista")
+    if guardado and time.monotonic() - guardado[0] < 40:
+        return {"sessoes": guardado[1]}
+    sessoes = []
+    for uid, gancho in (await robo_store.listar_nuvem()).items():
+        canal = await robo_store.canal_por_gancho(gancho)
+        if canal and canal.get("nuvem_chave") and canal.get("cw_hash"):
+            sessoes.append({"uid": uid, "chave": canal["nuvem_chave"]})
+    if robo_store.firestore_falhou_agora():
+        raise HTTPException(status_code=503, detail="Banco indisponível agora.")  # o serviço não desliga ninguém
+    _SESSOES_NUVEM["lista"] = (time.monotonic(), sessoes)
+    return {"sessoes": sessoes}
 
 
 @app.post("/api/robo/conector/revogar")

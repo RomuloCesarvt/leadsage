@@ -131,6 +131,8 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
   const [pedido, setPedido] = useState(false);
   const [demorou, setDemorou] = useState(false);
   const celular = noCelular();
+  const nuvem = Boolean(cfg.nuvem);
+  const conectado = cfg.conector_online && (!remoto?.fase || remoto.fase === 'pronto');
   // o QR/código que aparece aqui vem do computador (local) ou, no celular, do servidor
   const qr = local?.fase === 'qr' && local.qr ? local.qr : remoto?.fase === 'qr' && remoto.qr ? remoto.qr : '';
   const codigo = remoto?.fase === 'codigo' ? remoto.codigo || '' : '';
@@ -165,11 +167,22 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
     }
   };
 
+  const ligarNuvem = async () => {
+    setOcupado(true);
+    setErro('');
+    try { aoMudar(await api.nuvemLigar()); }
+    catch (e: any) { setErro(e?.message || 'Não foi possível ligar a nuvem.'); }
+    finally { setOcupado(false); }
+  };
+
   const revogar = async () => {
-    if (!window.confirm('Desligar o WhatsApp pelo computador? O Conector deixa de funcionar na hora.')) return;
+    const aviso = nuvem
+      ? 'Desconectar o WhatsApp? O número sai da nuvem e o robô para de responder. Você poderá conectar de novo quando quiser.'
+      : 'Desligar o WhatsApp pelo computador? O Conector deixa de funcionar na hora.';
+    if (!window.confirm(aviso)) return;
     setErro('');
     try {
-      aoMudar(await api.conectorRevogar());
+      aoMudar(nuvem ? await api.nuvemDesligar() : await api.conectorRevogar());
       setChave('');
       setEntendi(false);
     } catch (e: any) {
@@ -184,13 +197,13 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
         <div className="flex-1 min-w-[180px]">
           <p className="font-bold text-slate-800 text-sm flex items-center gap-2">
             WhatsApp
-            <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">pelo computador</span>
+            <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{nuvem ? 'na nuvem' : 'pelo computador'}</span>
           </p>
           <p className="text-xs text-slate-500">
             {cfg.conector_criado
-              ? cfg.conector_online
+              ? conectado
                 ? <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold"><Wifi className="w-3.5 h-3.5" /> Conectado{cfg.conector_numero ? ` · ${cfg.conector_numero}` : ''}</span>
-                : <span className="inline-flex items-center gap-1 text-slate-500"><WifiOff className="w-3.5 h-3.5" /> Desconectado. Abra o Conector no computador.</span>
+                : <span className="inline-flex items-center gap-1 text-slate-500"><WifiOff className="w-3.5 h-3.5" /> {nuvem ? 'Aguardando a conexão do número.' : 'Desconectado. Abra o Conector no computador.'}</span>
               : 'Sem pagar API: o seu computador envia e recebe pelo seu próprio WhatsApp, e o robô do LeadSage conversa.'}
           </p>
         </div>
@@ -215,21 +228,41 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
             <input type="checkbox" checked={entendi} onChange={e => setEntendi(e.target.checked)} className="mt-0.5 accent-emerald-600" />
             <span>Li o aviso e entendo o risco para o número que eu conectar.</span>
           </label>
+          {cfg.nuvem_disponivel && (
+            <div className="space-y-1">
+              <button onClick={ligarNuvem} disabled={!entendi || ocupado}
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold flex items-center gap-2">
+                {ocupado ? <Loader2 className="w-4 h-4 animate-spin" /> : <WhatsAppIcon className="w-4 h-4" />}
+                Conectar pela nuvem (recomendado)
+              </button>
+              <p className="text-[11px] text-slate-500">Funciona no celular e no computador. O número fica conectado na sua conta, sem nenhum aparelho ligado, até você desconectar.</p>
+            </div>
+          )}
           <button onClick={gerar} disabled={!entendi || ocupado}
-            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold flex items-center gap-2">
+            className={cfg.nuvem_disponivel
+              ? 'px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 text-xs font-bold flex items-center gap-2'
+              : 'px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold flex items-center gap-2'}>
             {ocupado ? <Loader2 className="w-4 h-4 animate-spin" /> : <WhatsAppIcon className="w-4 h-4" />}
-            Gerar chave do Conector
+            {cfg.nuvem_disponivel ? 'Prefiro usar o computador' : 'Gerar chave do Conector'}
           </button>
         </div>
       )}
 
       {cfg.conector_criado && (
         <div className="space-y-3">
+          {nuvem ? (
+            <ol className="text-sm text-slate-700 list-decimal pl-5 space-y-1">
+              <li>Escaneie o <b>QR code</b> que aparece aqui: no celular, WhatsApp → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b>.</li>
+              <li>Só tem este celular? Use <b>conectar pelo número</b> abaixo: o WhatsApp mostra um código e você digita nele.</li>
+              <li>Pronto: o número fica conectado na sua conta. Pode fechar o LeadSage e desligar o computador. Só desconecta se você clicar em <b>Desligar</b>.</li>
+            </ol>
+          ) : (
           <ol className="text-sm text-slate-700 list-decimal pl-5 space-y-1">
             <li>{celular ? <>No <b>computador</b> onde o WhatsApp vai ficar ligado, abra o LeadSage e baixe o arquivo de conexão.</> : <>Baixe o arquivo e <b>dê dois cliques</b> nele (no computador onde o WhatsApp vai ficar).</>}</li>
             <li>O <b>QR code aparece aqui mesmo</b>, nesta tela. No celular: WhatsApp → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b>. Só tem este celular? Use a opção <b>conectar pelo número</b> abaixo.</li>
             <li>Pronto. Esta tela passa a mostrar <b>Conectado</b>. Deixe a janela preta aberta.</li>
           </ol>
+          )}
           {qr && (
             <div className="p-4 rounded-xl bg-white border border-emerald-200 flex flex-col items-center gap-2 text-center">
               <img src={qr} alt="QR code do WhatsApp" className="w-56 h-56" />
@@ -246,10 +279,10 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
               <p className="text-[11px] text-slate-500">WhatsApp → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b> → <b>Conectar com número de telefone</b>.</p>
             </div>
           )}
-          {!cfg.conector_online && !remoto?.codigo && (
+          {!conectado && !remoto?.codigo && (
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
               <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5" /> Conectar pelo número (sem escanear)</p>
-              <p className="text-[11px] text-slate-500">Para quem só tem o celular na mão: o WhatsApp devolve um código de 8 caracteres e você digita nele. O Conector continua rodando no computador.</p>
+              <p className="text-[11px] text-slate-500">Para quem só tem o celular na mão: o WhatsApp devolve um código de 8 caracteres e você digita nele.{nuvem ? '' : ' O Conector continua rodando no computador.'}</p>
               <div className="flex gap-2">
                 <input value={numeroParear} onChange={e => setNumeroParear(e.target.value)} inputMode="tel" placeholder="(14) 99999-9999" aria-label="Número do WhatsApp"
                   className="flex-1 min-w-0 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500" />
@@ -260,14 +293,15 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
               </div>
               {pedido && demorou && !codigo && (
                 <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
-                  O código não veio. Quem responde ao pedido é o Conector no computador: confira se o computador está ligado (e não em repouso),
-                  se a janela do Conector está aberta e se o número tem WhatsApp. Depois peça de novo.
+                  {nuvem
+                    ? 'O código não veio. Confira o número (com DDD) e se ele tem WhatsApp, e peça de novo. Se continuar, o serviço da nuvem pode estar fora do ar.'
+                    : 'O código não veio. Quem responde ao pedido é o Conector no computador: confira se o computador está ligado (e não em repouso), se a janela do Conector está aberta e se o número tem WhatsApp. Depois peça de novo.'}
                 </p>
               )}
               {pedido && !demorou && <p className="text-[11px] text-emerald-700">Pedido enviado. O código aparece aqui em instantes (com o Conector aberto no computador, pode levar até 1 minuto).</p>}
             </div>
           )}
-          {celular ? (
+          {nuvem ? null : celular ? (
             <p className="text-xs text-slate-500">O arquivo do Conector é para Windows: baixe-o no computador. Depois, daqui do celular você vê as conversas, responde, dispara e o robô atende.</p>
           ) : chave ? (
             <button onClick={() => baixar('Conectar-WhatsApp.bat', arquivoDoConector(chave, window.location.origin))}
@@ -279,14 +313,14 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
               O arquivo leva a sua chave ({cfg.conector_prefixo}…), que só aparece ao gerar. Para baixar de novo, gere outra chave.
             </p>
           )}
-          <p className="text-[11px] text-slate-500 leading-relaxed">
+          {!nuvem && <p className="text-[11px] text-slate-500 leading-relaxed">
             Na primeira vez ele instala o que falta (cerca de 1 minuto) e usa o Edge ou o Chrome que você já tem. Se o Windows avisar
             “protegeu o computador”, clique em <b>Mais informações → Executar assim mesmo</b>. Só para Windows por enquanto.
             Se o QR não aparecer aqui (alguns navegadores bloqueiam), <a className="text-blue-600 hover:underline" href={PAGINA_LOCAL} target="_blank" rel="noreferrer">abra a página do Conector</a>.
-          </p>
+          </p>}
           <p className="text-[11px] text-slate-500">
             Hoje: <b>{cfg.conector_frio_hoje}</b> de <b>{cfg.conector_frio_limite}</b> abordagens frias permitidas (o limite sobe a cada dia).
-            O computador precisa ficar ligado com o Conector aberto para o robô responder.
+            {nuvem ? 'O robô responde 24 horas, sem computador ligado.' : 'O computador precisa ficar ligado com o Conector aberto para o robô responder.'}
           </p>
         </div>
       )}

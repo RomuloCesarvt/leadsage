@@ -321,6 +321,14 @@ export const api = {
     return await fetchWithToken('/robo/conector/gerar', { method: 'POST' });
   },
 
+  async nuvemLigar(): Promise<RoboConfig> {
+    return await fetchWithToken('/robo/nuvem/ligar', { method: 'POST' });
+  },
+
+  async nuvemDesligar(): Promise<RoboConfig> {
+    return await fetchWithToken('/robo/nuvem/desligar', { method: 'POST' });
+  },
+
   async conectorRevogar(): Promise<RoboConfig> {
     return await fetchWithToken('/robo/conector/revogar', { method: 'POST' });
   },

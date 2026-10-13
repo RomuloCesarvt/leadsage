@@ -382,6 +382,10 @@ export interface RoboConfig extends Omit<RoboConfigEntrada, 'app_secret' | 'wa_t
   telegram_pronto: boolean;
   /** WhatsApp pelo computador (Conector + OpenWA) */
   conector_criado: boolean;
+  /** o WhatsApp está ligado na nuvem (sem computador) */
+  nuvem?: boolean;
+  /** o serviço da nuvem está ativado neste LeadSage */
+  nuvem_disponivel?: boolean;
   conector_prefixo: string;
   conector_online: boolean;
   conector_visto: string;

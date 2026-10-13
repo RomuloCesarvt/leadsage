@@ -1,0 +1,141 @@
+// Testes do serviço da nuvem (sem rede e sem WhatsApp de verdade).
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  paraChatId, paraJid, lerConteudo, resumoBaileys, telefoneDoRemetente, desembrulhar,
+} from './adaptador-baileys.mjs';
+import { criarGerente } from './servidor.mjs';
+
+test('ids: o formato do Baileys vira o do Conector e volta', () => {
+  assert.equal(paraChatId('5511999990000@s.whatsapp.net'), '5511999990000@c.us');
+  assert.equal(paraChatId('5511999990000:12@s.whatsapp.net'), '5511999990000@c.us');
+  assert.equal(paraChatId('120363@g.us'), '120363@g.us');
+  assert.equal(paraChatId('128625865191513@lid'), '128625865191513@lid');
+  assert.equal(paraJid('5511999990000@c.us'), '5511999990000@s.whatsapp.net');
+  assert.equal(paraJid('128625865191513@lid'), '128625865191513@lid');
+});
+
+test('mensagens: texto, legenda de mídia e embrulhos', () => {
+  assert.deepEqual(lerConteudo({ conversation: 'oi' }), { tipo: 'text', texto: 'oi' });
+  assert.deepEqual(lerConteudo({ extendedTextMessage: { text: 'link aqui' } }), { tipo: 'text', texto: 'link aqui' });
+  assert.deepEqual(lerConteudo({ imageMessage: { caption: 'minha foto' } }), { tipo: 'image', texto: 'minha foto' });
+  assert.equal(lerConteudo({ audioMessage: { ptt: true } }).tipo, 'ptt');
+  assert.deepEqual(lerConteudo({ ephemeralMessage: { message: { conversation: 'temporária' } } }), { tipo: 'text', texto: 'temporária' });
+  assert.equal(lerConteudo({}).tipo, 'unknown');
+  assert.deepEqual(desembrulhar(undefined), {});
+});
+
+test('resumo: mídia sem legenda ganha rótulo; minha e status', () => {
+  const r = resumoBaileys({ key: { id: 'A1', fromMe: false }, message: { imageMessage: {} }, messageTimestamp: 1760000000 });
+  assert.equal(r.texto, '[imagem]'); assert.equal(r.midia, true); assert.equal(r.minha, false); assert.equal(r.quando, 1760000000);
+  const m = resumoBaileys({ key: { id: 'A2', fromMe: true }, message: { conversation: 'ola' }, messageTimestamp: { low: 1760000001 }, status: 4 });
+  assert.equal(m.minha, true); assert.equal(m.status, 3); assert.equal(m.quando, 1760000001);
+});
+
+test('telefone: contato novo (@lid) usa o número que o WhatsApp mandou à parte', () => {
+  assert.equal(telefoneDoRemetente({ remoteJid: '5511999990000@s.whatsapp.net' }), '5511999990000');
+  assert.equal(telefoneDoRemetente({ remoteJid: '128625865191513@lid', remoteJidAlt: '5511964623668@s.whatsapp.net' }), '5511964623668');
+  assert.equal(telefoneDoRemetente({ remoteJid: '128625865191513@lid' }), '128625865191513');
+});
+
+// ------------------------------------------------------------------ o gerente
+
+function gerenteFalso(respostas) {
+  const eventos = [];
+  const sessoes = [];
+  const antes = globalThis.fetch;
+  globalThis.fetch = async () => {
+    const r = respostas.shift();
+    if (r === 'rede') throw new Error('sem rede');
+    return { ok: r.ok ?? true, status: r.status ?? 200, json: async () => r.corpo };
+  };
+  const g = criarGerente({
+    site: 'https://x.test', segredo: 's'.repeat(20), dados: '/tmp/x', aviso: (...a) => eventos.push(a.join(' ')),
+    fabricaSessao: ({ uid, chave }) => {
+      const s = { uid, chave, paradas: [], rodar: () => new Promise(() => {}), parar: async (o = {}) => { s.paradas.push(o); } };
+      sessoes.push(s);
+      return s;
+    },
+  });
+  return { g, sessoes, eventos, restaurar: () => { globalThis.fetch = antes; } };
+}
+
+test('gerente: liga quem entrou na lista e não repete', async () => {
+  const t = gerenteFalso([{ corpo: { sessoes: [{ uid: 'u1', chave: 'k1' }] } }, { corpo: { sessoes: [{ uid: 'u1', chave: 'k1' }] } }]);
+  await t.g.sincronizar(); await t.g.sincronizar();
+  assert.equal(t.sessoes.length, 1); assert.equal(t.g.total(), 1);
+  t.restaurar();
+});
+
+test('gerente: sem resposta do LeadSage, ninguém é desligado', async () => {
+  const t = gerenteFalso([{ corpo: { sessoes: [{ uid: 'u1', chave: 'k1' }] } }, 'rede', { ok: false, status: 503, corpo: {} }]);
+  await t.g.sincronizar(); await t.g.sincronizar(); await t.g.sincronizar();
+  assert.equal(t.g.total(), 1); assert.deepEqual(t.sessoes[0].paradas, []);
+  t.restaurar();
+});
+
+test('gerente: usuário que desligou sai da lista e o WhatsApp dele é desconectado', async () => {
+  const t = gerenteFalso([{ corpo: { sessoes: [{ uid: 'u1', chave: 'k1' }, { uid: 'u2', chave: 'k2' }] } }, { corpo: { sessoes: [{ uid: 'u2', chave: 'k2' }] } }]);
+  await t.g.sincronizar(); await t.g.sincronizar();
+  assert.equal(t.g.total(), 1);
+  assert.deepEqual(t.sessoes[0].paradas, [{ sair: true }]);
+  assert.deepEqual(t.sessoes[1].paradas, []);
+  t.restaurar();
+});
+
+test('gerente: chave nova recomeça a sessão sem desconectar o WhatsApp', async () => {
+  const t = gerenteFalso([{ corpo: { sessoes: [{ uid: 'u1', chave: 'k1' }] } }, { corpo: { sessoes: [{ uid: 'u1', chave: 'k9' }] } }]);
+  await t.g.sincronizar(); await t.g.sincronizar();
+  assert.equal(t.sessoes.length, 2); assert.deepEqual(t.sessoes[0].paradas, [{}]);
+  assert.equal(t.g.ativas.get('u1').chave, 'k9');
+  t.restaurar();
+});
+
+// ------------------------------------------------------------------ uma sessão inteira
+
+import { Sessao } from './servidor.mjs';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+test('sessão: conecta, avisa o LeadSage, envia a tarefa e atende pedido de código', async () => {
+  const chamadas = [];
+  const antes = globalThis.fetch;
+  let entregue = false;
+  globalThis.fetch = async (url, init) => {
+    const u = String(url);
+    const corpo = init?.body ? JSON.parse(init.body) : null;
+    chamadas.push([u.split('/api/conector')[1], corpo]);
+    const json = (o) => ({ ok: true, status: 200, text: async () => JSON.stringify(o) });
+    if (u.endsWith('/ping')) return json({ ok: true, robo_ativo: true, remoto: false, abrir: [], parear: entregue ? '5514999019705' : '' });
+    if (u.endsWith('/tarefas')) {
+      const tarefas = entregue ? [] : [{ id: 't1', tipo: 'resposta', contato: '5511911112222', texto: 'Oi!', digitando_ms: 1000, chat_id: '5511911112222@c.us' }];
+      entregue = true;
+      return json({ tarefas, proxima_em: 1, remoto: false, abrir: [], parear: '5514999019705' });
+    }
+    return json({ ok: true });
+  };
+  const enviados = [];
+  const ciclos = [];
+  const fabrica = async (o) => {
+    ciclos.push({ parear: o.parear });
+    setTimeout(() => o.aoPronto(ciclos.length === 1 ? '5511900000000' : '5514999019705'), 20);
+    return {
+      enviar: async (c, t, ms, chat) => { enviados.push([c, t, chat]); return { ok: true }; },
+      chats: async () => [], mensagens: async () => [], digitar() {}, parar: async () => {}, sair: async () => { ciclos.sairam = true; },
+    };
+  };
+  const s = new Sessao({ uid: 'u1', chave: 'lsc_x', site: 'https://x.test', dados: mkdtempSync(join(tmpdir(), 'nv-')), aviso: () => {}, fabrica });
+  const rodando = s.rodar();
+  await new Promise((r) => setTimeout(r, 2500));
+  await s.parar();
+  await rodando;
+  globalThis.fetch = antes;
+
+  assert.deepEqual(enviados[0], ['5511911112222', 'Oi!', '5511911112222@c.us']);
+  assert.ok(chamadas.some(([rota, b]) => rota === '/ping' && b.fase === 'pronto' && b.numero === '5511900000000'));
+  assert.ok(chamadas.some(([rota]) => rota === '/tarefas/t1/resultado'));
+  // pediram o código para outro número: sai do atual e reconecta pelo código
+  assert.equal(ciclos.sairam, true);
+  assert.equal(ciclos.at(-1).parear, '5514999019705');
+});

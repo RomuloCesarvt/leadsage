@@ -322,6 +322,48 @@ async def esquecer_ativo(tipo: str, ativo_id: str) -> None:
             await s.commit()
 
 
+# Quem tem o WhatsApp ligado na nuvem: uid -> gancho do canal. O servico da nuvem le esta lista.
+_NUVEM_DOC = ("sistema", "nuvem")
+
+
+async def registrar_nuvem(uid: str, gancho: str) -> None:
+    if firestore_db is not None:
+        try:
+            firestore_db.collection(_NUVEM_DOC[0]).document(_NUVEM_DOC[1]).set({uid: gancho}, merge=True)
+            return
+        except Exception as exc:
+            _FALHA[0] = time.monotonic()
+            print(f"Falha ao registrar a nuvem: {exc}")
+    lista = await _sql_get("sistema:nuvem") or {}
+    lista[uid] = gancho
+    await _sql_put("sistema:nuvem", "sistema", "sistema", lista)
+
+
+async def esquecer_nuvem(uid: str) -> None:
+    if firestore_db is not None:
+        try:
+            from firebase_admin import firestore as _fs
+            firestore_db.collection(_NUVEM_DOC[0]).document(_NUVEM_DOC[1]).update({uid: _fs.DELETE_FIELD})
+            return
+        except Exception as exc:
+            print(f"Falha ao remover da nuvem: {exc}")
+    lista = await _sql_get("sistema:nuvem") or {}
+    if uid in lista:
+        lista.pop(uid)
+        await _sql_put("sistema:nuvem", "sistema", "sistema", lista)
+
+
+async def listar_nuvem() -> Dict[str, str]:
+    if firestore_db is not None:
+        try:
+            doc = firestore_db.collection(_NUVEM_DOC[0]).document(_NUVEM_DOC[1]).get()
+            return dict(doc.to_dict() or {}) if doc.exists else {}
+        except Exception as exc:
+            _FALHA[0] = time.monotonic()
+            print(f"Falha ao listar a nuvem: {exc}")
+    return await _sql_get("sistema:nuvem") or {}
+
+
 async def canal_por_ativo(tipo: str, ativo_id: str) -> Optional[Dict[str, Any]]:
     """A configuracao do cliente dono daquela pagina, conta ou numero."""
     if not ativo_id:

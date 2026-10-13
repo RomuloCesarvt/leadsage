@@ -829,7 +829,7 @@ export async function executar() {
           empurrarEstado().catch(() => {});
         },
         aoPronto: async (numero) => {
-          pronto = true; pareando = ''; estado.fase = 'pronto'; estado.numero = numero; estado.qr = ''; estado.codigo = '';
+          pronto = true; estado.fase = 'pronto'; estado.numero = numero; estado.qr = ''; estado.codigo = '';
           estado.mensagem = 'Tudo certo. O robô está atendendo.';
           const p = await empurrarEstado();
           if (p.status === 401) { estado.fase = 'erro'; estado.mensagem = 'A chave é inválida ou foi revogada. Gere outra no LeadSage.'; }
@@ -837,7 +837,7 @@ export async function executar() {
           log(`WhatsApp pronto${numero ? ` (${numero})` : ''}.`);
         },
         aoCair: (motivo) => {
-          pronto = false; estado.fase = 'erro'; estado.mensagem = `WhatsApp desconectado (${motivo}). Feche e abra o Conector.`; log(estado.mensagem);
+          pronto = false; pareando = ''; estado.fase = 'erro'; estado.mensagem = `WhatsApp desconectado (${motivo}). Feche e abra o Conector.`; log(estado.mensagem);
           empurrarEstado().catch(() => {});
         },
         aoReceber: async (m) => {

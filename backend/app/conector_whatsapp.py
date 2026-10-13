@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 
 from app import fila_envio, robo_store
+from app.config import settings
 from app.database import AsyncSessionLocal, DBRobo
 from app.firebase_config import db as firestore_db
 from app.meta_canais import EnvioFalhou
@@ -133,6 +134,8 @@ def visao(canal: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         "conector_status": c.get("cw_status", ""),
         "conector_frio_hoje": frios_hoje,
         "conector_frio_limite": limite_frio_do_dia(c),
+        "nuvem": bool(c.get("nuvem_chave")),
+        "nuvem_disponivel": bool(settings.WORKER_SECRET),
     }
 
 
