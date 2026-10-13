@@ -401,9 +401,28 @@ async def _processar(
             _marcar(conversa, "sem créditos para o robô responder")
             return await salvar()
 
+    textos = list(decisao.mensagens or ([decisao.resposta] if decisao.resposta else []))
+    # O lead aceitou a previa e ela nao existe: cria o site agora e manda o link de verdade, na mesma conversa.
+    if decisao.criar_previa and textos:
+        from app import previa_site
+        url, falha = await previa_site.criar(uid, email, {**(lead or {}), "id": (lead or {}).get("id") or conversa.get("lead_id") or cid,
+                                                       "name": (lead or {}).get("name") or conversa.get("nome") or ""})
+        if url:
+            if lead is not None:
+                lead["site_publicado"] = url
+            textos = [re.sub(r"\[LINK[A-Z0-9_ ]{0,30}\]", url, t) for t in textos]
+            if not any(url in t for t in textos):
+                textos[-1] = f"{textos[-1]} {url}".strip()
+            conversa.setdefault("sdr", {})["previa_enviada"] = url
+        else:
+            # nao deu para criar agora: nunca sai marcador nem promessa de link; o dono assume
+            textos = ["Perfeito! Estou finalizando a prévia e já te envio o link por aqui."]
+            decisao.passar_para_humano = True
+            decisao.motivo = f"o lead aceitou a prévia, mas não consegui criar o site agora ({falha}): crie e envie o link"
+
     # Uma ou duas mensagens curtas, enviadas em sequencia — como uma
     # pessoa escreve. A resposta fixa de saida vem em `resposta`.
-    for texto in (decisao.mensagens or ([decisao.resposta] if decisao.resposta else [])):
+    for texto in textos:
         try:
             meta_id = await enviar(msg.canal, msg.contato, texto, cfg)
             conversa["mensagens"].append({

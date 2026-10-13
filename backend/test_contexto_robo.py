@@ -202,7 +202,7 @@ def test_prompt_diz_se_a_previa_existe():
     from app.ai_sdr import montar_prompt
     sem = montar_prompt(HISTORICO, "whatsapp", {}, {"ativo": True}, {"name": "Clínica"})
     com = montar_prompt(HISTORICO, "whatsapp", {}, {"ativo": True}, {"name": "Clínica", "site_publicado": "https://x.test/s/c"})
-    assert "NÃO existe nenhuma prévia criada" in sem and "https://x.test/s/c" in com and "NÃO existe nenhuma prévia" not in com
+    assert "Ainda NÃO existe prévia criada" in sem and "https://x.test/s/c" in com and "Ainda NÃO existe prévia" not in com
 
 
 @pytest.mark.parametrize("auto", [
@@ -231,3 +231,73 @@ def test_a_mesma_mensagem_do_lead_so_e_respondida_uma_vez_mesmo_com_chamadas_sim
 
     rodar(varias)
     assert len(envio.enviados) == 1 and len(chamadas) == 1
+
+
+# ------------------------------------------------------------------ o lead disse "ok": o robo CRIA a previa e manda o link
+
+LEAD_CLINICA = {"id": "L77", "name": "Clínica Alluve", "company": "Clínica Alluve", "niche": "Estética", "city": "Botucatu",
+                "phone": "5514998005560", "rating": 4.8, "rating_count": 115, "address": "Rua Amando de Barros, 480"}
+
+
+def test_previa_rapida_e_uma_pagina_completa_e_segura():
+    from app import previa_site
+    html = previa_site.renderizar({**LEAD_CLINICA, "company": "<script>alert(1)</script> Alluve"})
+    assert html.startswith("<!DOCTYPE html>") and "<script>alert(1)</script>" not in html
+    assert "115 avaliações" in html and "4,8" in html and "wa.me/5514998005560" in html and "viewport" in html
+    assert "Esboço inicial" in html and "undefined" not in html
+
+
+def test_criar_previa_publica_o_site_do_lead_e_devolve_o_link(rodar, com_robo):
+    from app import previa_site
+    from app.sites_store import list_sites
+    url, falha = rodar(previa_site.criar, "alice", "alice@example.com", LEAD_CLINICA)
+    assert falha == "" and "/s/clinica-alluve-" in url
+    assert any(s.get("lead_id") == "L77" for s in rodar(list_sites, "alice"))
+
+
+def test_decidir_marca_para_criar_a_previa_quando_o_lead_aceita():
+    hist = [{"de": "robo", "texto": ABORDAGEM}, {"de": "contato", "texto": "Ok"}]
+    d = decidir(hist, "whatsapp", {}, {"ativo": True}, {"id": "L77", "name": "Clínica"},
+                lambda p: {"mensagens": ["Perfeito! Aqui está a prévia: [LINK_DA_PREVIA] Me conta o que achou?"], "enviar_previa": True})
+    assert d.criar_previa and not d.passar_para_humano and "[LINK_DA_PREVIA]" in d.mensagens[0]
+
+
+def test_conversa_completa_o_lead_diz_ok_recebe_o_link_de_verdade_e_uma_unica_resposta(rodar, com_robo):
+    import asyncio
+    from app import pipeline_store
+    envio = Envio()
+    rodar(pipeline_store.registrar, "alice", {**LEAD_CLINICA})
+    rodar(fila_envio._gravar, "alice", {"id": "f_L77", "lead_id": "L77", "nome": "Clínica Alluve", "canal": "whatsapp", "texto": ABORDAGEM,
+                                         "status": "enviado", "enviado_em": "2026-10-14T12:00:00+00:00", "contato": {"phone": "5514998005560"}})
+    chamadas = []
+
+    def gerar(p):
+        chamadas.append(p)
+        return {"mensagens": ["Perfeito! Aqui está a prévia: [LINK_DA_PREVIA] Me conta o que achou?"], "enviar_previa": True, "etapa": "proposta"}
+
+    async def fluxo():
+        m = meta_canais.Recebida(canal="whatsapp", contato="5514998005560", nome="Clínica", texto="Ok", meta_id="mOK", momento=1)
+        await robo_service.processar(cfg(), m, gerar=gerar, enviar=envio, adiar=True)
+        return await asyncio.gather(*[robo_service.processar(cfg(), m, gerar=gerar, enviar=envio, reprocessar=True) for _ in range(3)])
+
+    rodar(fluxo)
+    assert len(envio.enviados) == 1
+    texto = envio.enviados[0]
+    assert "[LINK" not in texto and "/s/clinica-alluve-" in texto and "Me conta o que achou" in texto
+    from app.sites_store import list_sites
+    assert len([s for s in rodar(list_sites, "alice") if s.get("lead_id") == "L77"]) == 1   # criou UM site, nao tres
+
+
+def test_se_nao_da_para_criar_a_previa_sai_so_o_aviso_e_o_dono_assume(rodar, com_robo, monkeypatch):
+    from app import previa_site
+    from app import pipeline_store
+
+    async def falha(uid, email, lead):
+        return "", "sem vagas"
+    monkeypatch.setattr(previa_site, "criar", falha)
+    envio = Envio()
+    rodar(pipeline_store.registrar, "alice", {**LEAD_CLINICA})
+    m = meta_canais.Recebida(canal="whatsapp", contato="5514998005560", nome="Clínica", texto="Ok", meta_id="mOK2", momento=1)
+    c = rodar(robo_service.processar, cfg(), m, gerar=lambda p: {"mensagens": ["Aqui está: [LINK_DA_PREVIA]"], "enviar_previa": True}, enviar=envio)
+    assert envio.enviados == ["Perfeito! Estou finalizando a prévia e já te envio o link por aqui."]
+    assert c["precisa_humano"] and "crie e envie o link" in c["motivo"]

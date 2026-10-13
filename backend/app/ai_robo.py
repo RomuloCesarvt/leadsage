@@ -68,6 +68,8 @@ class Decisao:
     sdr: Dict[str, Any] = field(default_factory=dict)
     # a mensagem do outro lado parece de um robo (atendimento automatico): nao se responde
     automatica: bool = False
+    # o lead aceitou a previa e ela ainda nao existe: o servico cria o site e troca [LINK_DA_PREVIA] pelo link
+    criar_previa: bool = False
 
 
 def _normal(texto: str) -> str:
@@ -249,14 +251,16 @@ def decidir(
     # Conferencia em codigo: preco fora do catalogo e motivo inventado nao
     # saem. Uma chance de corrigir; errou de novo, o humano assume.
     n["mensagens"] = resolver_marcadores(n["mensagens"], lead)
-    erros = problemas_da_resposta(n["mensagens"], cfg, mensagens, lead or {}) + forma_do_preco(n["mensagens"], mensagens)
+    # o cliente aceitou e nao ha previa: o servico vai criar o site e trocar o marcador (vale so quando o modelo avisou)
+    criar_previa = bool(n.get("enviar_previa")) and not ((lead or {}).get("site_publicado") or "").strip()
+    erros = problemas_da_resposta(n["mensagens"], cfg, mensagens, lead or {}, criar_previa) + forma_do_preco(n["mensagens"], mensagens)
     if erros:
         correcao = (prompt + "\n\n== SUA RESPOSTA ANTERIOR FOI RECUSADA ==\n"
                     + "\n".join(f"- {e}" for e in erros)
                     + "\nReescreva sem isso. Para negar algo, basta dizer que não é possível.")
         n = normalizar(gerar_json(correcao), sdr)
         n["mensagens"] = resolver_marcadores(n["mensagens"], lead)
-        restantes = problemas_da_resposta(n["mensagens"], cfg, mensagens, lead or {})
+        restantes = problemas_da_resposta(n["mensagens"], cfg, mensagens, lead or {}, criar_previa)
         if restantes:
             return Decisao(passar_para_humano=True, usou_ia=True, sdr=n["sdr"],
                            motivo="a resposta do robô não passou na conferência (" + restantes[0][:110] + ") — responda você")
@@ -284,4 +288,5 @@ def decidir(
         motivo=n["motivo"] if humano else "",
         usou_ia=True,
         sdr=n["sdr"],
+        criar_previa=criar_previa,
     )

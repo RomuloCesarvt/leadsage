@@ -121,10 +121,12 @@ def _bloco_da_previa(lead: Optional[Dict[str, Any]]) -> str:
         return (f"EXISTE uma prévia pronta: {url}\n"
                 "- Quando o cliente aceitar ver (\"pode mandar\", \"ok\", \"sim\"), envie ESTE link, escrito por inteiro na mensagem, com uma frase do que ele vai ver. "
                 "Nunca escreva marcadores entre colchetes como [LINK]: só o endereço de verdade.")
-    return ("NÃO existe nenhuma prévia criada para este negócio (não há link).\n"
-            "- NUNCA diga que preparou, montou ou criou a prévia, que está pronta, nem que vai mandar o link agora, e NUNCA escreva marcadores como [LINK].\n"
-            "- Se o cliente aceitou ver ou receber a prévia: diga em UMA frase que está finalizando e envia por aqui em breve, e marque "
-            "passar_para_humano=true com o motivo \"aceitou a prévia, mas ela ainda não existe: crie o site e envie o link\". Não faça mais perguntas.")
+    return ("Ainda NÃO existe prévia criada para este negócio, mas o SISTEMA CRIA NA HORA quando o cliente aceita.\n"
+            "- O cliente aceitou ver ou receber a prévia (\"ok\", \"pode mandar\", \"sim\", \"quero ver\")? Marque \"enviar_previa\": true e escreva a mensagem "
+            "com o marcador [LINK_DA_PREVIA] exatamente onde vai o link: o sistema cria o site agora e troca o marcador pelo endereço de verdade. "
+            "Ex.: \"Perfeito! Aqui está a prévia: [LINK_DA_PREVIA] Me conta o que achou?\". Uma mensagem curta, sem reunião agora.\n"
+            "- O cliente ainda NÃO aceitou? NÃO diga que preparou, montou ou criou, que está pronta, nem que vai mandar o link; "
+            "não escreva marcadores e deixe \"enviar_previa\": false.")
 
 
 def _formatar_estado(sdr: Dict[str, Any]) -> str:
@@ -314,6 +316,7 @@ que você não sabe; reclamação; pedido explícito para falar com uma pessoa.
 {{"entendi": "uma frase: o que o cliente disse ou quer",
  "tipo": "pergunta|interesse|objecao|agradecimento|indicou_contato|automatica|outro",
  "automatica": false,
+ "enviar_previa": false,
  "mensagens": ["primeira mensagem", "segunda (opcional)"],
  "etapa": "{'|'.join(ETAPAS)}",
  "temperatura": "frio|morno|quente",
@@ -374,6 +377,7 @@ def normalizar(dados: Dict[str, Any], anterior: Optional[Dict[str, Any]] = None)
             "entendi": _texto(dados.get("entendi"), 200),
         },
         "automatica": bool(dados.get("automatica")) or dados.get("tipo") == "automatica",
+        "enviar_previa": bool(dados.get("enviar_previa")),
         "passar_para_humano": bool(dados.get("passar_para_humano")),
         "motivo": _texto(dados.get("motivo")),
     }
@@ -492,16 +496,20 @@ def resolver_marcadores(textos: List[str], lead: Optional[Dict[str, Any]]) -> Li
     return [_re.sub(r"\[LINK[A-Z0-9_ ]{0,30}\]|\{\{\s*link[^}]{0,30}\}\}|\{link[a-z_]{0,20}\}|<LINK[A-Z_]{0,20}>", url, t, flags=_re.I) for t in textos]
 
 
-def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: List[Dict[str, Any]], lead: Optional[Dict[str, Any]] = None) -> List[str]:
+def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: List[Dict[str, Any]], lead: Optional[Dict[str, Any]] = None,
+                          criando_previa: bool = False) -> List[str]:
+    """`criando_previa`: o sistema vai criar o site agora e trocar [LINK_DA_PREVIA] pelo link; o marcador e a promessa do link valem."""
     erros: List[str] = []
     # 1) marcador de modelo nunca vai para o cliente
-    for t in textos:
+    for t in ([] if criando_previa else textos):
         m = _MARCADOR.search(t)
         if m:
             erros.append(f'você deixou o marcador "{m.group(0)}" na mensagem: escreva só o texto final, com o link de verdade ou sem ele')
             break
     # 2) sem previa criada, nada de dizer que preparou nem de prometer link agora
-    if lead is not None and not (lead.get("site_publicado") or "").strip():
+    if criando_previa:
+        pass
+    elif lead is not None and not (lead.get("site_publicado") or "").strip():
         for t in textos:
             if _ALEGA_PREVIA.search(t):
                 erros.append('você disse que preparou a prévia ou que vai mandar o link, mas NENHUMA prévia foi criada para este negócio: '
