@@ -138,8 +138,17 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
 
   const carregarMensagens = useCallback(async (id: string, max: number) => {
     try {
-      const m = await whats.mensagens(id, max, remoto);
-      if (m) setMensagens(m);
+      const m = await whats.mensagens(id, max, remoto).catch(() => null);
+      if (m && m.length) { setMensagens(m); return; }
+      // o WhatsApp ainda não entregou esta conversa: mostra o que o LeadSage guardou dela
+      const r = roboRef.current.find(c => c.canal === 'whatsapp' && ultimos10(c.contato) === ultimos10(id));
+      if (r) {
+        const conv = await api.roboConversa(r.id);
+        setMensagens(conv.mensagens.map((x, i) => ({
+          id: `r${i}`, texto: x.texto, minha: x.de !== 'contato', tipo: 'chat', midia: false, status: 2,
+          quando: Math.floor((Date.parse(x.em || '') || 0) / 1000),
+        })));
+      } else if (m) setMensagens(m);
     } catch (e: any) { setErro(e?.message || 'Não foi possível carregar a conversa.'); }
   }, [remoto]);
 
@@ -197,17 +206,39 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
   }, [robo]);
   const conversaDoRobo = (c: ChatWhats | null) => (c && c.telefone ? doRobo.get(ultimos10(c.telefone)) : undefined);
 
+  // as conversas do robô também aparecem aqui (as mesmas de "Todos os canais"): se o WhatsApp ainda não entregou
+  // uma conversa, ela já está na lista, com o que o LeadSage guardou dela
+  const chatsComRobo = useMemo<ChatWhats[]>(() => {
+    const base = chats || [];
+    const tem = new Set(base.map(c => ultimos10(c.telefone)));
+    const extras: ChatWhats[] = [];
+    for (const r of robo) {
+      if (r.canal !== 'whatsapp') continue;
+      const dig = (r.contato || '').replace(/\D/g, '');
+      if (dig.length < 10 || tem.has(ultimos10(dig))) continue;
+      tem.add(ultimos10(dig));
+      extras.push({
+        id: `${dig}@c.us`, nome: r.nome || `+${dig}`, grupo: false, telefone: dig, naoLidas: 0,
+        quando: Math.floor((Date.parse(r.atualizado) || 0) / 1000),
+        ultima: r.ultima ? { texto: r.ultima.texto, minha: r.ultima.de !== 'contato' } : null,
+      });
+    }
+    return [...base, ...extras].sort((a, b) => b.quando - a.quando);
+  }, [chats, robo]);
+  const roboRef = useRef<RoboConversaResumo[]>([]);
+  roboRef.current = robo;
+
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    return (chats || []).filter(c => {
+    return chatsComRobo.filter(c => {
       if (filtro === 'grupos' ? !c.grupo : c.grupo) return false;
       if (filtro === 'naoLidas' && !c.naoLidas) return false;
       if (filtro === 'robo') { const r = conversaDoRobo(c); if (!r || r.contato_robo || !r.robo_ativo) return false; }
       return !q || `${c.nome} ${c.telefone}`.toLowerCase().includes(q);
     });
-  }, [chats, filtro, busca, doRobo]);
+  }, [chatsComRobo, filtro, busca, doRobo]);
 
-  const naoLidasTotal = (chats || []).filter(c => !c.grupo).reduce((n, c) => n + (c.naoLidas ? 1 : 0), 0);
+  const naoLidasTotal = chatsComRobo.filter(c => !c.grupo).reduce((n, c) => n + (c.naoLidas ? 1 : 0), 0);
 
   const [enviandoPrevia, setEnviandoPrevia] = useState(false);
   const mandarPrevia = async () => {
@@ -259,7 +290,7 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
   };
 
   // ------------------------------------------------------------ sem conexão
-  if (chats === null && offline) {
+  if (chats === null && offline && !robo.length) {
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-10 shadow-sm text-center">
         <WhatsAppIcon className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
@@ -324,7 +355,7 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
     );
   }
 
-  if (chats === null) return <div className="text-slate-400 text-sm p-8 text-center">Carregando suas conversas…</div>;
+  if (chats === null && !robo.length) return <div className="text-slate-400 text-sm p-8 text-center">Carregando suas conversas…</div>;
 
   const conv = conversaDoRobo(aberto);
 
