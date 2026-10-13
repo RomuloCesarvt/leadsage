@@ -14,6 +14,11 @@ Para o SQL não depender de um só lugar, dá para ligar **vários** bancos grat
 
 Depois, *Redeploy*. Confira em `/api/status`: o campo `bancos` mostra cada banco (`ok`, `ativo`) sem expor conexão.
 
+## O jeito mais rápido (sem copiar nada)
+Vercel → seu projeto → **Storage** → **Create Database** → **Neon** (plano grátis) → **Connect Project**. A Vercel cria o banco e
+coloca as variáveis sozinha (`DATABASE_URL`, `POSTGRES_URL`...); o LeadSage já lê esses nomes. Repita com **Supabase** para ter dois.
+Depois, *Redeploy*.
+
 ## Onde conseguir bancos gratuitos
 - **Supabase** (supabase.com): usar a conexão *Transaction pooler* (porta 6543). Veja `docs/supabase.md`.
 - **Neon** (neon.tech): copiar a *connection string* do projeto.

@@ -45,6 +45,9 @@ def urls_dos_bancos(env=None) -> List[str]:
         brutas.append(env.get(f"DATABASE_URL_{i}") or "")
     for item in (env.get("DATABASE_URLS") or "").replace(",", " ").split():
         brutas.append(item)
+    # bancos ligados pela aba Storage da Vercel (Neon, Supabase...) chegam com estes nomes
+    brutas.append(env.get("POSTGRES_URL") or "")
+    brutas.append(env.get("POSTGRES_PRISMA_URL") or "")
     vistas: List[str] = []
     for u in (_normalizar(x) for x in brutas):
         if u and u not in vistas:
