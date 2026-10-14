@@ -318,3 +318,68 @@ test('lista parcial (banco principal sem cota): liga quem aparece e não para ni
     assert.deepEqual([...g.ativas.keys()], ['c']);
   } finally { globalThis.fetch = antes; }
 });
+
+// ---- vários serviços da nuvem: só um atende cada número, e o outro assume quando o primeiro some
+function tabelaDeConcessoes() {
+  const t = new Map(); // uid -> quem
+  const para = (quem) => ({
+    quem,
+    tomar: async (uid) => { const d = t.get(uid); if (!d || d === quem) { t.set(uid, quem); return true; } return false; },
+    liberar: async (uid) => { if (t.get(uid) === quem) t.delete(uid); return true; },
+  });
+  return { t, para, vencer: (uid) => t.delete(uid) };
+}
+const fabricaFalsa = (paradas) => ({ uid }) => ({ rodar: () => new Promise(() => {}), parar: async () => { paradas.push(uid); } });
+const listaFalsa = (corpo) => { globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => corpo }); };
+
+test('dois serviços: só um liga o número; quando o primeiro some, o segundo assume', async () => {
+  const antes = globalThis.fetch;
+  listaFalsa({ sessoes: [{ uid: 'u1', chave: 'k1' }], desligar: [] });
+  const c = tabelaDeConcessoes();
+  const pA = [], pB = [];
+  try {
+    const A = criarGerente({ site: 'https://x.test', segredo: 'x'.repeat(20), dados: '/tmp/x', aviso: () => {}, fabricaSessao: fabricaFalsa(pA), concessao: c.para('render') });
+    const B = criarGerente({ site: 'https://x.test', segredo: 'x'.repeat(20), dados: '/tmp/x', aviso: () => {}, fabricaSessao: fabricaFalsa(pB), concessao: c.para('reserva') });
+    await A.sincronizar(); await B.sincronizar();
+    assert.equal(A.total(), 1); assert.equal(B.total(), 0);                 // só o primeiro atende
+    await B.sincronizar(); assert.equal(B.total(), 0);                       // enquanto o primeiro vive, o segundo espera
+    // o primeiro some (hospedagem fora do ar): a concessão vence sem ele renovar
+    c.vencer('u1');
+    await B.sincronizar();
+    assert.equal(B.total(), 1);                                              // o segundo assume sozinho
+    // o primeiro volta: percebe que perdeu e para (sem desconectar o número)
+    await A.renovar();
+    assert.equal(A.total(), 0); assert.deepEqual(pA, ['u1']);
+  } finally { globalThis.fetch = antes; }
+});
+
+test('serviço desligando devolve a concessão e o outro assume na hora', async () => {
+  const antes = globalThis.fetch;
+  listaFalsa({ sessoes: [{ uid: 'u1', chave: 'k1' }], desligar: [] });
+  const c = tabelaDeConcessoes();
+  const pA = [], pB = [];
+  try {
+    const A = criarGerente({ site: 'https://x.test', segredo: 'x'.repeat(20), dados: '/tmp/x', aviso: () => {}, fabricaSessao: fabricaFalsa(pA), concessao: c.para('render') });
+    const B = criarGerente({ site: 'https://x.test', segredo: 'x'.repeat(20), dados: '/tmp/x', aviso: () => {}, fabricaSessao: fabricaFalsa(pB), concessao: c.para('reserva') });
+    await A.sincronizar(); await B.sincronizar();
+    await A.liberarTodas();                                                  // deploy/desligamento
+    assert.equal(A.total(), 0);
+    await B.sincronizar();
+    assert.equal(B.total(), 1);
+  } finally { globalThis.fetch = antes; }
+});
+
+test('pedido de desligar: só o serviço que atende (ou consegue a concessão) cuida dele', async () => {
+  const antes = globalThis.fetch;
+  const avisadas = [];
+  globalThis.fetch = async (url) => { if (String(url).includes('/desligadas/')) { avisadas.push(url); return { ok: true, json: async () => ({}) }; } return { ok: true, status: 200, json: async () => ({ sessoes: [], desligar: ['u1'] }) }; };
+  const c = tabelaDeConcessoes();
+  c.t.set('u1', 'render');
+  const desconectados = [];
+  try {
+    const B = criarGerente({ site: 'https://x.test', segredo: 'x'.repeat(20), dados: '/tmp/x', aviso: () => {}, fabricaSessao: fabricaFalsa([]), concessao: c.para('reserva'), desconectar: async (uid) => { desconectados.push(uid); } });
+    await B.sincronizar();
+    assert.deepEqual(desconectados, []);                                     // o reserva nao mexe no numero que e do outro
+    assert.equal(avisadas.length, 0);
+  } finally { globalThis.fetch = antes; }
+});

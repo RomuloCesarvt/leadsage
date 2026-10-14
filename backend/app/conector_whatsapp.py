@@ -160,7 +160,7 @@ def _doc(uid: str, sid: str):
 
 async def _gravar(uid: str, item: Dict[str, Any]) -> None:
     item["atualizado"] = robo_store.agora()
-    if firestore_db is not None:
+    if firestore_db is not None and not robo_store._sql_primeiro():
         try:
             _doc(uid, item["id"]).set(item)
             return
@@ -183,7 +183,7 @@ ABERTOS = ("pendente", "enviando")
 async def _listar_saida(uid: str) -> List[Dict[str, Any]]:
     """Só as saídas em aberto: o Firestore cobra por documento lido, e o
     Conector pergunta com frequência."""
-    if firestore_db is not None:
+    if firestore_db is not None and not robo_store._sql_primeiro():
         try:
             q = firestore_db.collection("users").document(uid).collection("conector_saida").where("status", "in", list(ABERTOS))
             return [d.to_dict() for d in q.stream()]
@@ -196,7 +196,7 @@ async def _listar_saida(uid: str) -> List[Dict[str, Any]]:
 
 async def _fila_whatsapp(uid: str) -> List[Dict[str, Any]]:
     """Itens de WhatsApp da Fila de envio que ainda não saíram."""
-    if firestore_db is not None:
+    if firestore_db is not None and not robo_store._sql_primeiro():
         try:
             q = (firestore_db.collection("users").document(uid).collection("fila_envio")
                  .where("canal", "==", "whatsapp").where("status", "in", list(ABERTOS)))
@@ -207,7 +207,7 @@ async def _fila_whatsapp(uid: str) -> List[Dict[str, Any]]:
 
 
 async def _obter_saida(uid: str, sid: str) -> Optional[Dict[str, Any]]:
-    if firestore_db is not None:
+    if firestore_db is not None and not robo_store._sql_primeiro():
         try:
             doc = _doc(uid, sid).get()
             return doc.to_dict() if doc.exists else None

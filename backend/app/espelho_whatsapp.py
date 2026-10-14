@@ -68,7 +68,8 @@ def _caminho(nome: str) -> str:
 
 
 async def _gravar(uid: str, nome: str, dados: Dict[str, Any]) -> None:
-    if firestore_db is not None:
+    # o espelho (QR, estado, lista de conversas) e passageiro: com Postgres no ar vive so nele, sem gastar cota do Firestore
+    if firestore_db is not None and not robo_store._sql_primeiro():
         try:
             firestore_db.collection("users").document(uid).collection("espelho").document(nome).set(dados)
             await robo_store._espelhar_sql(f"espelho:{uid}:{nome}", uid, "espelho", dados)
@@ -79,13 +80,15 @@ async def _gravar(uid: str, nome: str, dados: Dict[str, Any]) -> None:
 
 
 async def _ler(uid: str, nome: str) -> Dict[str, Any]:
+    if robo_store._sql_primeiro():
+        return await robo_store._sql_get(f"espelho:{uid}:{nome}") or {}
     if firestore_db is not None:
         try:
             doc = firestore_db.collection("users").document(uid).collection("espelho").document(nome).get()
             no_firestore = (doc.to_dict() or {}) if doc.exists else {}
             if no_firestore:
                 copia = await robo_store._sql_get(f"espelho:{uid}:{nome}") or {}
-                return robo_store._mais_novo(no_firestore, copia, "em") or no_firestore if copia.get("em") else no_firestore
+                return (robo_store._mais_novo(no_firestore, copia, "em") or no_firestore) if copia.get("em") else no_firestore
         except Exception as exc:
             print(f"Espelho: falha ao ler {nome}: {exc}")
     return await robo_store._sql_get(f"espelho:{uid}:{nome}") or {}

@@ -233,7 +233,31 @@ export class Sessao {
 
 // ------------------------------------------------------------------ o gerente de sessões
 
-export function criarGerente({ site, segredo, dados, aviso = console.log, sessaoNoBanco = false, fabricaSessao = null, desconectar = async () => {} }) {
+/**
+ * Concessão do WhatsApp de cada usuário: com vários serviços da nuvem rodando (hospedagens gratuitas diferentes), só um atende
+ * cada número por vez. `tomar` devolve true (é nosso), false (é de outro) ou null (não deu para perguntar: não mexe em nada).
+ */
+export function criarConcessao({ site, segredo, quem }) {
+  const chamar = async (caminho) => {
+    try {
+      const r = await fetch(`${site}/api/worker/lease/${caminho}`, {
+        method: 'POST', headers: { 'x-worker-secret': segredo, 'content-type': 'application/json' },
+        body: JSON.stringify({ quem, ttl_s: 120 }), signal: AbortSignal.timeout(20000),
+      });
+      if (!r.ok) return null;
+      return (await r.json()).ok === true;
+    } catch { return null; }
+  };
+  return {
+    quem,
+    tomar: (uid) => chamar(encodeURIComponent(uid)),
+    liberar: (uid) => chamar(`${encodeURIComponent(uid)}/liberar`),
+  };
+}
+
+export function criarGerente({ site, segredo, dados, aviso = console.log, sessaoNoBanco = false, fabricaSessao = null, desconectar = async () => {}, concessao = null }) {
+  // sem concessão (um serviço só): tudo é nosso
+  concessao = concessao || { quem: 'unico', tomar: async () => true, liberar: async () => true };
   const authFabrica = sessaoNoBanco ? (uid) => authRemoto({ site, segredo, uid, aviso }) : null;
   fabricaSessao = fabricaSessao || ((o) => new Sessao({ ...o, authFabrica, segredo }));
   const ativas = new Map(); // uid -> { sessao, chave }
@@ -260,12 +284,14 @@ export function criarGerente({ site, segredo, dados, aviso = console.log, sessao
     // 1) quem clicou em Desligar: este é o ÚNICO caso em que o WhatsApp é desconectado
     for (const uid of alvo.desligar) {
       const atual = ativas.get(uid);
+      if (!atual && (await concessao.tomar(uid)) !== true) continue; // o serviço que atende este usuário cuida do pedido
       aviso(`Desconectando ${uid.slice(0, 6)} (o usuário pediu).`);
       ativas.delete(uid);
       try {
         if (atual) await atual.sessao.parar({ sair: true });
         else await desconectar(uid);
         await avisarDesligada(uid);
+        await concessao.liberar(uid);
       } catch (e) { aviso('Não consegui desconectar agora; tento de novo:', e.message); }
     }
     const pediramSair = new Set(alvo.desligar);
@@ -275,12 +301,13 @@ export function criarGerente({ site, segredo, dados, aviso = console.log, sessao
       if (pediramSair.has(uid)) continue;
       const atual = ativas.get(uid);
       if (atual && atual.chave === chave) continue;
+      if (!atual && (await concessao.tomar(uid)) !== true) continue; // outro serviço atende este usuário agora
       if (atual) await atual.sessao.parar(); // a chave mudou: recomeça com a nova (a sessão do WhatsApp continua)
       const sessao = fabricaSessao({ uid, chave, site, dados, aviso });
       ativas.set(uid, { sessao, chave });
       aviso(`Sessão ligada: ${uid.slice(0, 6)}`);
       sessao.rodar().catch((e) => aviso('Sessão caiu:', e.message)).finally(() => {
-        if (ativas.get(uid)?.sessao === sessao) ativas.delete(uid); // volta na próxima rodada
+        if (ativas.get(uid)?.sessao === sessao) { ativas.delete(uid); void concessao.liberar(uid); } // volta na próxima rodada
       });
     }
     // 3) sumiu da lista sem pedir para desligar (falha momentânea, banco): só para de atender aqui.
@@ -292,11 +319,33 @@ export function criarGerente({ site, segredo, dados, aviso = console.log, sessao
         aviso(`Fora da lista, sem pedido de desligar: mantendo o WhatsApp conectado (${uid.slice(0, 6)}).`);
         ativas.delete(uid);
         await sessao.parar();
+        await concessao.liberar(uid);
       }
     }
   }
 
-  return { sincronizar, ativas, total: () => ativas.size };
+  /** Renova a concessão de quem atendemos; se outro serviço a tomou, para por aqui (sem desconectar o número). */
+  async function renovar() {
+    for (const [uid, { sessao }] of [...ativas]) {
+      const r = await concessao.tomar(uid);
+      if (r === false) {
+        aviso(`Outro serviço assumiu ${uid.slice(0, 6)}: parando aqui (o número continua conectado).`);
+        ativas.delete(uid);
+        await sessao.parar();
+      }
+    }
+  }
+
+  /** Serviço desligando: devolve as concessões para outro assumir já, sem esperar o prazo. */
+  async function liberarTodas() {
+    for (const [uid, { sessao }] of [...ativas]) {
+      ativas.delete(uid);
+      try { await sessao.parar(); } catch { /* já parou */ }
+      await concessao.liberar(uid);
+    }
+  }
+
+  return { sincronizar, renovar, liberarTodas, ativas, total: () => ativas.size };
 }
 
 // ------------------------------------------------------------------ principal
@@ -328,7 +377,12 @@ async function principal() {
       let wa;
     });
   };
-  const gerente = criarGerente({ site, segredo, dados, aviso, sessaoNoBanco, desconectar });
+  const quem = `${process.env.RENDER_SERVICE_NAME || process.env.HOSTNAME || 'servico'}-${process.pid}-${Math.random().toString(36).slice(2, 7)}`;
+  const gerente = criarGerente({ site, segredo, dados, aviso, sessaoNoBanco, desconectar, concessao: criarConcessao({ site, segredo, quem }) });
+  setInterval(() => { gerente.renovar().catch(() => {}); }, 30000).unref();
+  const sair = async () => { aviso('Desligando: devolvendo os números para outro serviço assumir.'); await Promise.race([gerente.liberarTodas(), dormir(8000)]); process.exit(0); };
+  process.on('SIGTERM', sair);
+  process.on('SIGINT', sair);
 
   // a plataforma (Fly, Railway...) confere se o processo está vivo por aqui
   http.createServer(criarApiChat({ gerente, segredo }))

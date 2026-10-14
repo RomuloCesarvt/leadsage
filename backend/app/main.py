@@ -18,6 +18,7 @@ import json
 
 from app.config import settings
 from app import bancos
+from app import worker_lease as worker_lease_mod
 from app.database import init_db, get_db, DBLead, DBSearchHistory, EH_POSTGRES, chave_do_lead, chaves_do_lead
 
 from app.models import (
@@ -1667,6 +1668,28 @@ def _exigir_worker(request: Request) -> None:
 
 class SessaoGuardada(BaseModel):
     blob: str = Field(max_length=950_000)
+
+
+class LeaseCorpo(BaseModel):
+    quem: str = Field(min_length=4, max_length=120)
+    ttl_s: int = Field(default=120, ge=15, le=600)
+
+
+@app.post("/api/worker/lease/{uid}")
+async def worker_lease(uid: str, corpo: LeaseCorpo, request: Request):
+    """Concessao do WhatsApp deste usuario para um servico da nuvem: so um serviço atende cada número por vez."""
+    _exigir_worker(request)
+    if not nuvem_auth.uid_valido(uid):
+        raise HTTPException(status_code=400, detail="Usuário inválido.")
+    return await worker_lease_mod.tomar(uid, corpo.quem, corpo.ttl_s)
+
+
+@app.post("/api/worker/lease/{uid}/liberar")
+async def worker_lease_liberar(uid: str, corpo: LeaseCorpo, request: Request):
+    _exigir_worker(request)
+    if not nuvem_auth.uid_valido(uid):
+        raise HTTPException(status_code=400, detail="Usuário inválido.")
+    return {"ok": await worker_lease_mod.liberar(uid, corpo.quem)}
 
 
 @app.post("/api/worker/desligadas/{uid}")

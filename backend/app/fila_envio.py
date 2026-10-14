@@ -24,6 +24,7 @@ from sqlalchemy import select
 from app import pipeline_store
 from app.database import AsyncSessionLocal, DBRobo
 from app.firebase_config import db as firestore_db
+from app import robo_store
 from app.robo_store import agora
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
@@ -105,7 +106,7 @@ def _doc(uid: str, item_id: str):
 
 async def _gravar(uid: str, item: Dict[str, Any]) -> None:
     item["atualizado"] = agora()
-    if firestore_db is not None:
+    if firestore_db is not None and not robo_store._sql_primeiro():
         try:
             _doc(uid, item["id"]).set(item)
             return
@@ -123,27 +124,37 @@ async def _gravar(uid: str, item: Dict[str, Any]) -> None:
 
 
 async def obter(uid: str, item_id: str) -> Optional[Dict[str, Any]]:
+    async with AsyncSessionLocal() as s:
+        row = (await s.execute(select(DBRobo).where(DBRobo.chave == _chave(uid, item_id)))).scalar_one_or_none()
+        no_sql = dict(row.data or {}) if row else None
+    if no_sql and robo_store._sql_primeiro():
+        return no_sql
     if firestore_db is not None:
         try:
             doc = _doc(uid, item_id).get()
-            return doc.to_dict() if doc.exists else None
+            return doc.to_dict() if doc.exists else no_sql
         except Exception as exc:
             print(f"Falha ao ler a fila: {exc}")
-    async with AsyncSessionLocal() as s:
-        row = (await s.execute(select(DBRobo).where(DBRobo.chave == _chave(uid, item_id)))).scalar_one_or_none()
-        return dict(row.data or {}) if row else None
+    return no_sql
 
 
 async def listar(uid: str) -> List[Dict[str, Any]]:
     itens: List[Dict[str, Any]] = []
     lido = False
-    if firestore_db is not None:
+    sql_principal = robo_store._sql_primeiro()
+    if firestore_db is not None and (not sql_principal or not await robo_store._sql_get(f"sistema:fila_quente:{uid}")):
         try:
             itens = [d.to_dict() for d in firestore_db.collection("users").document(uid).collection("fila_envio").stream()]
             lido = True
+            if sql_principal:
+                # primeira vez com o SQL como principal: copia os itens antigos (uma leitura so) e nunca mais le o Firestore
+                for i in itens:
+                    if i.get("id"):
+                        await robo_store._espelhar_sql(_chave(uid, i["id"]), uid, "fila", i)
+                await robo_store._espelhar_sql(f"sistema:fila_quente:{uid}", uid, "sistema", {"em": agora()})
         except Exception as exc:
             print(f"Falha ao listar a fila: {exc}")
-    if not lido:
+    if not lido or sql_principal:
         async with AsyncSessionLocal() as s:
             rows = (await s.execute(select(DBRobo).where(DBRobo.uid == uid, DBRobo.tipo == "fila"))).scalars().all()
             itens = [dict(r.data or {}) for r in rows]
