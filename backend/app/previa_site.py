@@ -15,7 +15,7 @@ import httpx
 
 from app import banco_imagens
 from app.config import settings
-from app.credit_system import is_admin
+from app.credit_system import acesso_total
 
 # Versao do motor de sites. Ao mudar o visual (cores, modelos, titulos), troque o valor: as previas ja criadas e
 # nunca editadas sao refeitas, com o mesmo link, na proxima vez que forem enviadas.
@@ -144,7 +144,7 @@ async def criar(uid: str, email: str, lead: Dict[str, Any]) -> Tuple[str, str]:
         for antigo in await list_sites(uid):
             if antigo.get("lead_id") == lead_id and antigo.get("template") == "Prévia rápida":
                 await delete_site(uid, antigo["id"])
-        if not is_admin(email):
+        if not acesso_total(email):
             cota = (await get_profile(uid)).sites_quota or 0
             if await contar_sites(uid) >= cota:
                 return "", "o plano não tem mais vagas de site"

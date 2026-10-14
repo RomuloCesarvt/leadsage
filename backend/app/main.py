@@ -44,7 +44,7 @@ from app.sites_store import (
     create_site, update_site, list_sites, get_site, delete_site, contar_sites,
     html_publico, garantir_apelido,
 )
-from app.credit_system import is_admin, BancoDeCreditosIndisponivel
+from app.credit_system import is_admin, acesso_total, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
 from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, abordagem_mestra, conector_whatsapp, caixa_de_entrada, ai_providers, espelho_whatsapp
 from fastapi.responses import RedirectResponse
@@ -92,7 +92,7 @@ async def exigir_recurso(user: dict, recurso: str, o_que: str) -> str:
     Admin passa direto — voce precisa testar tudo sem comprar plano.
     Devolve o plan_id para quem precisar dele em seguida.
     """
-    if is_admin(user.get("email")):
+    if acesso_total(user.get("email")):
         return "agencia"
 
     perfil = await get_profile(user.get("uid"))
@@ -171,7 +171,7 @@ def _identidade(profile: UserProfile, user: dict) -> UserProfile:
     profile.name = profile.name or user.get("name") or ""
     profile.email = profile.email or user.get("email") or ""
     profile.avatar = profile.avatar or user.get("picture") or ""
-    if is_admin(user.get("email")):
+    if acesso_total(user.get("email")):
         profile.plan = plano_de("agencia")["nome"]
     else:
         profile.plan = plano_de(profile.plan_id or "previa")["nome"]
@@ -225,7 +225,7 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
         )
 
     # Previa e Start buscam so no Brasil; Portugal e EUA a partir do Pro.
-    if not is_admin(email):
+    if not acesso_total(email):
         perfil_busca = await get_profile(uid)
         permitidos = paises_do_plano(perfil_busca.plan_id or "previa")
         pais = detectar_pais(req.location)
@@ -672,7 +672,7 @@ async def publish_site(req: SiteCreateRequest, user: dict = Depends(get_current_
             raise HTTPException(status_code=404, detail="Site não encontrado.")
         return atualizado
 
-    if not is_admin(user.get("email")):
+    if not acesso_total(user.get("email")):
         perfil = await get_profile(uid)
         cota = perfil.sites_quota or 0
         usados = await contar_sites(uid)
@@ -767,9 +767,9 @@ async def exportar_leads(user: dict = Depends(get_current_user), db: AsyncSessio
 async def meu_plano(user: dict = Depends(get_current_user)):
     """O que o plano do usuario libera, para a tela nao oferecer o que
     vai ser barrado depois."""
-    if is_admin(user.get("email")):
+    if acesso_total(user.get("email")):
         plano = plano_de("agencia")
-        return {**plano, "plan_id": "agencia", "admin": True}
+        return {**plano, "plan_id": "agencia", "admin": is_admin(user.get("email"))}
     perfil = await get_profile(user.get("uid"))
     plano = plano_de(perfil.plan_id or "previa")
     return {**plano, "plan_id": plano["id"], "admin": False}
@@ -818,7 +818,7 @@ async def cota_de_sites(user: dict = Depends(get_current_user)):
     """Quanto da cota ja foi usado, para a tela mostrar."""
     uid = user.get("uid")
     usados = await contar_sites(uid)
-    if is_admin(user.get("email")):
+    if acesso_total(user.get("email")):
         return {"usados": usados, "cota": None, "ilimitado": True}
     perfil = await get_profile(uid)
     return {"usados": usados, "cota": perfil.sites_quota or 0, "ilimitado": False}

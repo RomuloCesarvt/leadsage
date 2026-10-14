@@ -38,6 +38,9 @@ class Settings(BaseModel):
     # documento do usuario for recriado (check_and_deduct_credits recria
     # com role="user"). Esta lista nao se perde.
     ADMIN_EMAILS: str = os.getenv("ADMIN_EMAILS", "")
+    # E-mails com ACESSO TOTAL: creditos infinitos, todos os recursos do plano maximo e sites sem limite de vagas.
+    # Nao sao admin: nao veem o painel de administracao nem dados de outros usuarios.
+    ILIMITADOS_EMAILS: str = os.getenv("ILIMITADOS_EMAILS", "")
     # Contas que usam o sistema sem ver a area de assinatura e compra de creditos.
     HIDE_SUBSCRIPTION_EMAILS: str = os.getenv("HIDE_SUBSCRIPTION_EMAILS", "")
     # Segredo do servico "LeadSage Nuvem" (o WhatsApp de cada usuario ligado num servidor). Vazio = recurso desligado.
@@ -84,6 +87,10 @@ class Settings(BaseModel):
     @property
     def admin_emails(self) -> set:
         return {e.strip().lower() for e in self.ADMIN_EMAILS.split(",") if e.strip()}
+
+    @property
+    def ilimitados_emails(self) -> set:
+        return {e.strip().lower() for e in self.ILIMITADOS_EMAILS.split(",") if e.strip()}
 
     @property
     def sem_assinatura_emails(self) -> set:

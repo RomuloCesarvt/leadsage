@@ -22,7 +22,7 @@ from sqlalchemy import select
 from app import fila_envio, meta_canais, pipeline_store, robo_store
 from app.ai_robo import Decisao, decidir
 from app.config import settings
-from app.credit_system import BancoDeCreditosIndisponivel, check_and_deduct_credits, is_admin
+from app.credit_system import BancoDeCreditosIndisponivel, acesso_total, check_and_deduct_credits, is_admin
 from app.database import AsyncSessionLocal, DBLead, chaves_do_lead, id_publico
 from app.payments import tem_recurso
 from app.profile_store import get_profile
@@ -336,7 +336,7 @@ async def _processar(
 
     # 4. plano
     perfil = await get_profile(uid)
-    if not is_admin(email) and not tem_recurso(perfil.plan_id or "previa", "robo_ia"):
+    if not acesso_total(email) and not tem_recurso(perfil.plan_id or "previa", "robo_ia"):
         _marcar(conversa, "seu plano não inclui o robô de atendimento")
         return await salvar()
 
@@ -572,7 +572,7 @@ async def responder_sem_guardar(
     """
     uid, email = cfg["uid"], cfg.get("email", "")
     perfil = await get_profile(uid)
-    if not is_admin(email) and not tem_recurso(perfil.plan_id or "previa", "robo_ia"):
+    if not acesso_total(email) and not tem_recurso(perfil.plan_id or "previa", "robo_ia"):
         raise PermissionError("seu plano não inclui o robô de atendimento")
 
     historico = [

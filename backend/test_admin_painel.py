@@ -40,3 +40,32 @@ def test_liberar_creditos_infinitos_e_retirar(client, admin, rodar):
     assert client.get("/api/admin/usuarios").json()[0]["ilimitado"] is True
     client.post("/api/admin/usuarios/bia/ilimitado", json={"ativo": False})
     assert rodar(cs.check_and_deduct_credits, "bia", 5) == 40
+
+
+# ---- acesso total (creditos infinitos e todos os recursos) sem ser admin
+def test_acesso_total_nao_e_admin(client, monkeypatch, rodar):
+    monkeypatch.setattr(settings, "ADMIN_EMAILS", "dono@x.com")
+    monkeypatch.setattr(settings, "ILIMITADOS_EMAILS", "alice@example.com")
+    assert cs.acesso_total("alice@example.com") is True and cs.is_admin("alice@example.com") is False
+    assert cs.acesso_total("Alice@Example.com ") is True            # maiusculas e espacos nao importam
+    assert cs.acesso_total("outro@x.com") is False and cs.acesso_total("dono@x.com") is True  # o admin continua com tudo
+    # creditos: nunca cobra
+    assert rodar(cs.check_and_deduct_credits, "alice", 10_000, "alice@example.com") == cs.UNLIMITED
+    saldo = rodar(cs.get_user_balance, "alice", "alice@example.com")
+    assert saldo["credits"] == cs.UNLIMITED and saldo["is_admin"] is False
+    # recursos do plano maximo, mas sem a marca de admin que abre o painel
+    plano = client.get("/api/plan").json()
+    assert plano["plan_id"] == "agencia" and plano["admin"] is False
+    # painel de administracao e dados de outros usuarios: bloqueados
+    assert client.get("/api/admin/usuarios").status_code == 403
+    assert client.get("/api/admin/usuarios/bia/pipeline").status_code == 403
+    assert client.post("/api/admin/usuarios/bia/ilimitado", json={"ativo": True}).status_code == 403
+    # sites sem limite de vagas
+    assert client.get("/api/sites/quota").json()["ilimitado"] is True
+
+
+def test_sem_acesso_total_o_plano_continua_sendo_o_da_conta(client, monkeypatch):
+    monkeypatch.setattr(settings, "ADMIN_EMAILS", "")
+    monkeypatch.setattr(settings, "ILIMITADOS_EMAILS", "outra@x.com")
+    assert client.get("/api/plan").json()["plan_id"] != "agencia"
+    assert client.get("/api/sites/quota").json()["ilimitado"] is False

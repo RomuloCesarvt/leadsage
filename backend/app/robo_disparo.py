@@ -18,7 +18,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from app import meta_canais, meta_oauth, pipeline_store, robo_store
-from app.credit_system import BancoDeCreditosIndisponivel, add_credits, check_and_deduct_credits, is_admin
+from app.credit_system import BancoDeCreditosIndisponivel, acesso_total, add_credits, check_and_deduct_credits, is_admin
 
 TAMANHO_LOTE = 20
 CUSTO_DISPARO = 1
@@ -155,7 +155,7 @@ async def disparar(
             meta_id = await meta_canais.enviar_modelo(cfg, contato, NOME_MODELO, IDIOMA, variaveis)
         except meta_canais.EnvioFalhou as exc:
             # nao cobra o que nao saiu
-            if not is_admin(email):
+            if not acesso_total(email):
                 try:
                     await add_credits(uid, CUSTO_DISPARO, "Estorno: mensagem não entregue")
                 except Exception:

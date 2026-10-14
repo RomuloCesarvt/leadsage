@@ -37,6 +37,11 @@ def is_admin(email: Optional[str]) -> bool:
     return bool(email) and email.strip().lower() in settings.admin_emails
 
 
+def acesso_total(email: Optional[str]) -> bool:
+    """Creditos infinitos e todos os recursos: os admins e quem esta em ILIMITADOS_EMAILS. Admin so quem esta em ADMIN_EMAILS."""
+    return bool(email) and (is_admin(email) or email.strip().lower() in settings.ilimitados_emails)
+
+
 def _sql_principal() -> bool:
     """Creditos no banco SQL (Supabase) em vez do Firestore."""
     return db is None and settings.FIRESTORE_DESLIGADO
@@ -110,10 +115,10 @@ async def check_and_deduct_credits(
 ) -> Optional[int]:
     """
     Checks if user has enough credits and deducts them.
-    Admins (por e-mail ou pelo papel no Firestore) nao consomem creditos.
+    Admins e contas de acesso total (por e-mail ou pelo papel no Firestore) nao consomem creditos.
     Returns the new balance or None if insufficient credits.
     """
-    if is_admin(email):
+    if acesso_total(email):
         return UNLIMITED
 
     if _sql_principal():
@@ -158,8 +163,8 @@ async def check_and_deduct_credits(
     return new_credits
 
 async def get_user_balance(uid: str, email: Optional[str] = None) -> Dict[str, Any]:
-    if is_admin(email):
-        return {"credits": UNLIMITED, "history": [], "is_admin": True}
+    if acesso_total(email):
+        return {"credits": UNLIMITED, "history": [], "is_admin": is_admin(email)}
 
     if _sql_principal():
         return await _sql_saldo(uid)
