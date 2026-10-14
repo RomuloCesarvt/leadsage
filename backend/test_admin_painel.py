@@ -69,3 +69,18 @@ def test_sem_acesso_total_o_plano_continua_sendo_o_da_conta(client, monkeypatch)
     monkeypatch.setattr(settings, "ILIMITADOS_EMAILS", "outra@x.com")
     assert client.get("/api/plan").json()["plan_id"] != "agencia"
     assert client.get("/api/sites/quota").json()["ilimitado"] is False
+
+
+def test_admin_ve_de_onde_vieram_os_creditos_do_usuario(client, admin, rodar):
+    rodar(cs.add_credits, "bia", 500, "Compra: pro")
+    r = client.get("/api/admin/usuarios/bia/creditos")
+    assert r.status_code == 200
+    j = r.json()
+    assert j["creditos"] >= 500 and "50 créditos" in j["como_funciona"]
+    assert any("Compra: pro" in h["description"] for h in j["historico"]) or j["historico"] == []
+    assert j["ilimitado"] is False
+
+
+def test_creditos_de_outro_usuario_so_para_admin(client, monkeypatch):
+    monkeypatch.setattr(settings, "ADMIN_EMAILS", "outro@x.com")
+    assert client.get("/api/admin/usuarios/bia/creditos").status_code == 403

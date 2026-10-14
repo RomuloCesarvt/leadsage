@@ -81,6 +81,21 @@ async def pesquisas_do_usuario(uid: str, _: dict = Depends(exigir_admin), db: As
              "timestamp": h.timestamp, "leads_preview": h.leads_preview} for h in linhas]
 
 
+@router.get("/usuarios/{uid}/creditos")
+async def creditos_do_usuario(uid: str, _: dict = Depends(exigir_admin)):
+    """O saldo e de onde ele veio (cadastro, compras, gastos, estornos): responde "por que essa conta tem tantos creditos?"."""
+    from app.profile_store import get_profile
+    saldo = await credit_system.get_user_balance(uid, None)
+    perfil = await get_profile(uid)
+    return {
+        "creditos": saldo.get("credits", 0),
+        "plano": perfil.plan or "",
+        "historico": saldo.get("history") or [],
+        "ilimitado": await credit_system.e_ilimitado(uid),
+        "como_funciona": "Toda conta nova começa com 50 créditos. Planos e recargas pagos somam 150, 500 ou 3.000. Disparo e busca gastam; mensagem não entregue é estornada.",
+    }
+
+
 @router.post("/usuarios/{uid}/ilimitado")
 async def definir_ilimitado(uid: str, req: Ilimitado, admin: dict = Depends(exigir_admin)):
     await credit_system.definir_ilimitado(uid, req.ativo, por=admin.get("email") or "")

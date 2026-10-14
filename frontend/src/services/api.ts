@@ -432,6 +432,10 @@ export const api = {
     return await fetchWithToken(`/admin/usuarios/${encodeURIComponent(uid)}/pesquisas`);
   },
 
+  async adminCreditos(uid: string): Promise<{ creditos: number; plano: string; historico: { description: string; amount: number; type: string; timestamp: string }[]; ilimitado: boolean; como_funciona: string }> {
+    return await fetchWithToken(`/admin/usuarios/${encodeURIComponent(uid)}/creditos`);
+  },
+
   async adminIlimitado(uid: string, ativo: boolean): Promise<{ ilimitado: boolean }> {
     return await fetchWithToken(`/admin/usuarios/${encodeURIComponent(uid)}/ilimitado`, { method: 'POST', body: JSON.stringify({ ativo }) });
   },

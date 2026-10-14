@@ -14,7 +14,8 @@ export const AdminScreen: React.FC = () => {
   const [erro, setErro] = useState('');
   const [busca, setBusca] = useState('');
   const [aberto, setAberto] = useState<UsuarioAdmin | null>(null);
-  const [aba, setAba] = useState<'pipeline' | 'pesquisas'>('pipeline');
+  const [aba, setAba] = useState<'pipeline' | 'pesquisas' | 'creditos'>('pipeline');
+  const [creditos, setCreditos] = useState<Awaited<ReturnType<typeof api.adminCreditos>> | null>(null);
   const [itens, setItens] = useState<any[] | null>(null);
   const [pesquisas, setPesquisas] = useState<any[] | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -25,9 +26,10 @@ export const AdminScreen: React.FC = () => {
 
   useEffect(() => {
     if (!aberto) return;
-    setItens(null); setPesquisas(null); setAba('pipeline');
+    setItens(null); setPesquisas(null); setCreditos(null); setAba('pipeline');
     api.adminPipeline(aberto.uid).then(r => setItens(r.itens)).catch(e => setErro(e?.message || ''));
     api.adminPesquisas(aberto.uid).then(setPesquisas).catch(() => setPesquisas([]));
+    api.adminCreditos(aberto.uid).then(setCreditos).catch(() => setCreditos(null));
   }, [aberto?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtrados = useMemo(() => {
@@ -89,10 +91,10 @@ export const AdminScreen: React.FC = () => {
           {erro && <p className="text-xs text-red-600">{erro}</p>}
 
           <div className="flex gap-2">
-            {(['pipeline', 'pesquisas'] as const).map(a => (
+            {(['pipeline', 'pesquisas', 'creditos'] as const).map(a => (
               <button key={a} onClick={() => setAba(a)}
                 className={`px-4 py-2 rounded-full text-sm font-bold border ${aba === a ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-600'}`}>
-                {a === 'pipeline' ? `Pipeline${itens ? ` (${itens.length})` : ''}` : `Pesquisas${pesquisas ? ` (${pesquisas.length})` : ''}`}
+                {a === 'pipeline' ? `Pipeline${itens ? ` (${itens.length})` : ''}` : a === 'pesquisas' ? `Pesquisas${pesquisas ? ` (${pesquisas.length})` : ''}` : `Créditos${creditos ? ` (${creditos.ilimitado ? '∞' : creditos.creditos})` : ''}`}
               </button>
             ))}
           </div>
@@ -108,6 +110,23 @@ export const AdminScreen: React.FC = () => {
                   <span className="text-[11px] font-bold bg-slate-100 text-slate-600 rounded-full px-2.5 py-1 shrink-0">{i.etapa}</span>
                 </div>
               ))}
+            </div>
+          ))}
+
+          {aba === 'creditos' && (creditos === null ? <p className="text-sm text-slate-400">Carregando…</p> : (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-700"><b>{creditos.ilimitado ? 'Créditos infinitos' : `${creditos.creditos} créditos`}</b>{creditos.plano ? ` · plano ${creditos.plano}` : ''}</p>
+              <p className="text-xs text-slate-500">{creditos.como_funciona}</p>
+              {!creditos.historico.length ? <p className="text-sm text-slate-400">Sem movimentações registradas.</p> : (
+                <div className="divide-y divide-slate-100">
+                  {creditos.historico.map((h, i) => (
+                    <div key={i} className="py-2 flex items-center gap-3">
+                      <div className="min-w-0 flex-1"><p className="text-sm text-slate-800 truncate">{h.description}</p><p className="text-xs text-slate-400">{data(h.timestamp)}</p></div>
+                      <span className={`text-sm font-bold shrink-0 ${h.amount >= 0 ? 'text-emerald-600' : 'text-slate-500'}`}>{h.amount > 0 ? `+${h.amount}` : h.amount}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
 
