@@ -16,10 +16,11 @@ RUINS_GERAIS = {
 CURADORIA: List[Dict[str, Any]] = [
     {   # psicologia: ambiente calmo, luz natural, plantas, conversa, caderno e chá. Nada de cosmético, spa, fruta ou academia.
         "chaves": ("psicolog", "psicanal", "psiquiat", "terapia", "terapeut", "neuropsic", "fonoaud", "saude mental", "constelac"),
-        "termos": ["cozy room", "house plant", "tea cup", "journal desk", "meditation", "plants indoor", "reading journal", "indoor garden"],
+        "termos": ["psychologist office", "therapy session", "cozy room", "house plant", "tea cup", "journal desk", "meditation", "plants indoor", "reading journal", "indoor garden"],
         "bons": {"calm", "peaceful", "serene", "cozy", "comfortable", "harmony", "plant", "plants", "indoor", "indoors", "interior", "home",
                  "minimal", "tea", "journal", "diary", "notebook", "nature", "relax", "light", "book", "reading", "couch", "chair",
-                 "meditation", "meditate", "conversation", "support", "window", "greenery", "botanical"},
+                 "meditation", "meditate", "conversation", "support", "window", "greenery", "botanical", "therapist", "therapy", "counseling",
+                 "psychologist", "psychology", "session", "talking", "listening", "sofa", "armchair", "comfort", "empathy", "office"},
         "ruins": {"cosmetic", "cosmetics", "cosmeticoil", "essentialoil", "aromatherapy", "skin", "skincare", "beauty", "bodybuilding",
                   "fitness", "fashion", "food", "fruit", "kiwi", "bottle", "glassbottle", "spa", "massage", "bath", "bathtub", "soap"},
         "exigir": True,
