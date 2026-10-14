@@ -85,6 +85,14 @@ export class Sessao {
     const e = this.estado;
     const p = await this.ls.ping(e.numero, e.fase === 'pronto' ? 'ready' : e.fase, { fase: e.fase, qr: e.fase === 'qr' ? e.qr : '', codigo: e.codigo });
     this.ultimoPing = Date.now();
+    if (!p?.ok) {
+      // sem isto, um ping recusado (chave que não vale, banco fora) deixava a tela em "aguardando" sem nenhuma pista
+      const agora = Date.now();
+      if (!this.ultimoAvisoPing || agora - this.ultimoAvisoPing > 60000) {
+        this.ultimoAvisoPing = agora;
+        this.aviso(`O LeadSage recusou o aviso de estado (HTTP ${p?.status ?? '?'}): ${String(p?.dados?.detail || p?.dados?.erro || '').slice(0, 120)}`);
+      }
+    }
     this.lerPing(p);
     return p;
   }

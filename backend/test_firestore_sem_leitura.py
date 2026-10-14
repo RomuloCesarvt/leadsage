@@ -97,3 +97,40 @@ def test_saida_da_nuvem_marcada_com_leitura_bloqueada_e_lida(client, monkeypatch
         return await robo_store.listar_nuvem_sair()
 
     assert _rodar(fluxo()) == ["u1"]
+
+
+def test_fluxo_completo_do_qr_com_firestore_sem_leitura(client, monkeypatch):
+    """O caminho inteiro: Conectar pela nuvem -> o servico da nuvem pede a lista -> manda o QR -> a tela mostra o QR."""
+    from app import bancos, main
+    from app.config import settings
+    from test_robo import com_robo  # noqa: F401
+
+    segredo = "segredo-da-nuvem-1234567890"
+    fs = FirestoreSoEscreve()
+    monkeypatch.setattr(settings, "WORKER_SECRET", segredo)
+    for modulo in (robo_store, espelho_whatsapp):
+        monkeypatch.setattr(modulo, "firestore_db", fs)
+    monkeypatch.setattr(bancos.CONJUNTO, "tem_postgres", lambda: True)
+    main._SESSOES_NUVEM.clear()
+    main._CACHE_CONECTOR.clear()
+
+    # o plano do robo precisa estar concedido (igual aos outros testes de nuvem)
+    from app import payments
+    monkeypatch.setattr(main, "exigir_recurso", _sempre_libera)
+
+    r = client.post("/api/robo/nuvem/ligar")
+    assert r.status_code == 200, r.text
+    lista = client.get("/api/worker/sessoes", headers={"x-worker-secret": segredo})
+    assert lista.status_code == 200
+    sessoes = lista.json()["sessoes"]
+    assert [s["uid"] for s in sessoes] == ["alice"]
+    chave = sessoes[0]["chave"]
+    ping = client.post("/api/conector/ping", headers={"x-conector-key": chave},
+                       json={"fase": "qr", "qr": "data:image/png;base64,AAAA", "status": "qr"})
+    assert ping.status_code == 200, ping.text
+    estado = client.get("/api/robo/whats/estado").json()
+    assert estado["conectado"] is True and estado["fase"] == "qr" and estado["qr"].startswith("data:image/png")
+
+
+async def _sempre_libera(*a, **k):
+    return None
