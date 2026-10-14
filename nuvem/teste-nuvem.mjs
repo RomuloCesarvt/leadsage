@@ -298,3 +298,23 @@ test('API do chat: lê e envia direto da sessão do dono, e ninguém vê a do ou
     assert.equal(pre.headers.get('access-control-allow-origin'), 'https://leadsageofc.vercel.app');
   } finally { servidor.close(); }
 });
+
+test('lista parcial (banco principal sem cota): liga quem aparece e não para ninguém', async () => {
+  const paradas = [];
+  const fabricaSessao = ({ uid }) => ({ rodar: () => new Promise(() => {}), parar: async () => { paradas.push(uid); } });
+  let resposta = { sessoes: [{ uid: 'a', chave: 'k1' }, { uid: 'b', chave: 'k2' }], desligar: [] };
+  const antes = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => resposta });
+  try {
+    const g = criarGerente({ site: 'https://x.test', segredo: 'x'.repeat(20), dados: '/tmp/x', aviso: () => {}, fabricaSessao });
+    await g.sincronizar();
+    assert.deepEqual([...g.ativas.keys()].sort(), ['a', 'b']);
+    resposta = { sessoes: [{ uid: 'c', chave: 'k3' }], desligar: [], parcial: true };   // só o novo aparece
+    await g.sincronizar();
+    assert.deepEqual([...g.ativas.keys()].sort(), ['a', 'b', 'c']);                      // a e b continuam
+    assert.deepEqual(paradas, []);
+    resposta = { sessoes: [{ uid: 'c', chave: 'k3' }], desligar: [] };                   // lista completa: aí sim, quem sumiu para
+    await g.sincronizar();
+    assert.deepEqual([...g.ativas.keys()], ['c']);
+  } finally { globalThis.fetch = antes; }
+});

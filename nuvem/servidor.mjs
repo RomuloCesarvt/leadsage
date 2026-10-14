@@ -235,7 +235,7 @@ export function criarGerente({ site, segredo, dados, aviso = console.log, sessao
       const r = await fetch(`${site}/api/worker/sessoes`, { headers: { 'x-worker-secret': segredo }, signal: AbortSignal.timeout(20000) });
       if (!r.ok) { aviso(`LeadSage respondeu ${r.status} ao pedir as sessões.`); return null; }
       const j = await r.json();
-      return { sessoes: j.sessoes || [], desligar: j.desligar || [] };
+      return { sessoes: j.sessoes || [], desligar: j.desligar || [], parcial: Boolean(j.parcial) };
     } catch (e) {
       aviso('Sem resposta do LeadSage:', e.message);
       return null; // sem lista: não mexe em ninguém
@@ -277,7 +277,9 @@ export function criarGerente({ site, segredo, dados, aviso = console.log, sessao
     }
     // 3) sumiu da lista sem pedir para desligar (falha momentânea, banco): só para de atender aqui.
     //    A sessão do WhatsApp continua guardada e conectada; nada é desconectado.
+    //    Lista parcial (o banco principal está sem cota): só liga quem aparece, ninguém é parado.
     for (const [uid, { sessao }] of ativas) {
+      if (alvo.parcial) break;
       if (!uids.has(uid) && !pediramSair.has(uid)) {
         aviso(`Fora da lista, sem pedido de desligar: mantendo o WhatsApp conectado (${uid.slice(0, 6)}).`);
         ativas.delete(uid);

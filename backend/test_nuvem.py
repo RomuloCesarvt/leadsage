@@ -129,3 +129,24 @@ def test_token_do_chat_da_nuvem_confere_com_o_worker():
     assert uid == "u1" and int(exp) == 1000 + 12 * 3600
     esperado = hmac.new(b"segredo-de-teste-1234567890", f"u1.{exp}".encode(), hashlib.sha256).hexdigest()
     assert sig == esperado
+
+
+def test_firestore_sem_cota_com_postgres_de_reserva_lista_parcial_e_sem_postgres_recusa(nuvem, monkeypatch):
+    from app import bancos, main
+    monkeypatch.setattr(robo_store, "firestore_falhou_agora", lambda *a, **k: True)
+    monkeypatch.setattr(bancos.CONJUNTO, "tem_postgres", lambda: True)
+    main._SESSOES_NUVEM.clear()
+    r = sessoes(nuvem)
+    assert r.status_code == 200 and r.json()["parcial"] is True  # o servico liga quem aparece e nao para ninguem
+    assert "lista" not in main._SESSOES_NUVEM                      # lista parcial nao fica em cache
+    monkeypatch.setattr(bancos.CONJUNTO, "tem_postgres", lambda: False)
+    assert sessoes(nuvem).status_code == 503                       # sem banco durável, o servico nao mexe em ninguem
+
+
+def test_ligar_nuvem_com_firestore_sem_cota_funciona_se_ha_postgres_de_reserva(nuvem, monkeypatch):
+    from app import bancos
+    monkeypatch.setattr(robo_store, "firestore_falhou_agora", lambda *a, **k: True)
+    monkeypatch.setattr(bancos.CONJUNTO, "tem_postgres", lambda: True)
+    assert nuvem.post("/api/robo/nuvem/ligar").status_code == 200
+    monkeypatch.setattr(bancos.CONJUNTO, "tem_postgres", lambda: False)
+    assert nuvem.post("/api/robo/nuvem/ligar").status_code in (200, 503)

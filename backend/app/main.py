@@ -1744,12 +1744,17 @@ async def worker_sessoes(request: Request):
         canal = await robo_store.canal_por_gancho(gancho)
         if canal and canal.get("nuvem_chave") and canal.get("cw_hash"):
             sessoes.append({"uid": uid, "chave": canal["nuvem_chave"]})
-    if robo_store.firestore_falhou_agora():
+    if _sem_banco_duravel():
         raise HTTPException(status_code=503, detail="Banco indisponível agora.")  # o serviço não desliga ninguém
     resposta = {"sessoes": sessoes, "desligar": await robo_store.listar_nuvem_sair()}
-    if robo_store.firestore_falhou_agora():
+    if _sem_banco_duravel():
         raise HTTPException(status_code=503, detail="Banco indisponível agora.")
-    _SESSOES_NUVEM["lista"] = (time.monotonic(), resposta)
+    # Firestore sem cota, mas o Postgres de reserva respondeu: a lista só tem o que foi gravado nele. O serviço liga quem está
+    # nela e NÃO para quem não aparece (esses voltam quando o Firestore voltar).
+    parcial = robo_store.firestore_falhou_agora()
+    resposta["parcial"] = parcial
+    if not parcial:
+        _SESSOES_NUVEM["lista"] = (time.monotonic(), resposta)
     return resposta
 
 

@@ -95,19 +95,45 @@ async def _sql_listar(uid: str, tipo: str) -> List[Dict[str, Any]]:
         return [dict(r.data or {}) for r in rows]
 
 
+async def _espelhar_sql(chave: str, uid: str, tipo: str, dados: Dict[str, Any]) -> None:
+    """Copia no banco SQL o que acabou de ir para o Firestore.
+
+    Sem isso, o que e gravado enquanto o Firestore aceita escrita mas recusa leitura (cota) some na hora de ler: a escrita
+    foi para um lado e a leitura cai no outro. Com a copia, o SQL sempre tem o dado mais recente.
+    """
+    try:
+        await _sql_put(chave, uid, tipo, dados)
+    except Exception as exc:  # a copia e reforco: nunca derruba a gravacao principal
+        print(f"Falha ao copiar no banco SQL ({chave}): {exc}")
+
+
+def _mais_novo(a: Optional[Dict[str, Any]], b: Optional[Dict[str, Any]], campo: str = "atualizado") -> Optional[Dict[str, Any]]:
+    """Entre duas copias do mesmo registro, a de `campo` mais recente (ISO). Uma so? Ela."""
+    if not a:
+        return b or None
+    if not b:
+        return a
+    return b if str(b.get(campo) or "") > str(a.get(campo) or "") else a
+
+
 # -------------------------------------------------------------- canal
 
 async def canal_por_gancho(gancho: str) -> Optional[Dict[str, Any]]:
     if not gancho or not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", gancho):
         return None
+    no_firestore = None
     if firestore_db is not None:
         try:
             doc = firestore_db.collection("robo_canais").document(gancho).get()
-            return doc.to_dict() if doc.exists else None
+            no_firestore = doc.to_dict() if doc.exists else None
         except Exception as exc:
             _FALHA[0] = time.monotonic()
             print(f"Falha ao ler canal do robo: {exc}")
-    return await _sql_get(f"canal:{gancho}")
+    try:
+        no_sql = await _sql_get(f"canal:{gancho}")
+    except Exception:
+        no_sql = None
+    return _mais_novo(no_firestore, no_sql)
 
 
 # O canal do usuario custa duas leituras no Firestore e e pedido em quase toda
@@ -179,6 +205,7 @@ async def salvar_canal(uid: str, email: str, mudancas: Dict[str, Any]) -> Dict[s
             firestore_db.collection("users").document(uid).set(
                 {"robo_gancho": gancho}, merge=True
             )
+            await _espelhar_sql(f"canal:{gancho}", uid, "canal", atual)
             _CANAIS.pop(uid, None)
             return atual
         except Exception as exc:
@@ -298,6 +325,7 @@ async def registrar_ativo(tipo: str, ativo_id: str, uid: str, gancho: str) -> No
     if firestore_db is not None:
         try:
             firestore_db.collection("robo_ativos").document(chave).set(dados)
+            await _espelhar_sql(f"ativo:{chave}", uid, "ativo", dados)
             return
         except Exception as exc:
             _FALHA[0] = time.monotonic()
@@ -330,6 +358,9 @@ async def registrar_nuvem(uid: str, gancho: str) -> None:
     if firestore_db is not None:
         try:
             firestore_db.collection(_NUVEM_DOC[0]).document(_NUVEM_DOC[1]).set({uid: gancho}, merge=True)
+            copia = await _sql_get("sistema:nuvem") or {}
+            copia[uid] = gancho
+            await _espelhar_sql("sistema:nuvem", "sistema", "sistema", copia)
             return
         except Exception as exc:
             _FALHA[0] = time.monotonic()
@@ -344,6 +375,10 @@ async def esquecer_nuvem(uid: str) -> None:
         try:
             from firebase_admin import firestore as _fs
             firestore_db.collection(_NUVEM_DOC[0]).document(_NUVEM_DOC[1]).update({uid: _fs.DELETE_FIELD})
+            copia = await _sql_get("sistema:nuvem") or {}
+            if uid in copia:
+                copia.pop(uid)
+                await _espelhar_sql("sistema:nuvem", "sistema", "sistema", copia)
             return
         except Exception as exc:
             print(f"Falha ao remover da nuvem: {exc}")
@@ -357,7 +392,8 @@ async def listar_nuvem() -> Dict[str, str]:
     if firestore_db is not None:
         try:
             doc = firestore_db.collection(_NUVEM_DOC[0]).document(_NUVEM_DOC[1]).get()
-            return dict(doc.to_dict() or {}) if doc.exists else {}
+            no_firestore = dict(doc.to_dict() or {}) if doc.exists else {}
+            return {**(await _sql_get("sistema:nuvem") or {}), **no_firestore}
         except Exception as exc:
             _FALHA[0] = time.monotonic()
             print(f"Falha ao listar a nuvem: {exc}")
@@ -369,6 +405,9 @@ async def marcar_nuvem_sair(uid: str) -> None:
     if firestore_db is not None:
         try:
             firestore_db.collection("sistema").document("nuvem_sair").set({uid: agora()}, merge=True)
+            copia = await _sql_get("sistema:nuvem_sair") or {}
+            copia[uid] = agora()
+            await _espelhar_sql("sistema:nuvem_sair", "sistema", "sistema", copia)
             return
         except Exception as exc:
             _FALHA[0] = time.monotonic()
@@ -383,6 +422,10 @@ async def limpar_nuvem_sair(uid: str) -> None:
         try:
             from firebase_admin import firestore as _fs
             firestore_db.collection("sistema").document("nuvem_sair").update({uid: _fs.DELETE_FIELD})
+            copia = await _sql_get("sistema:nuvem_sair") or {}
+            if uid in copia:
+                copia.pop(uid)
+                await _espelhar_sql("sistema:nuvem_sair", "sistema", "sistema", copia)
             return
         except Exception as exc:
             print(f"Falha ao limpar a saida da nuvem: {exc}")
@@ -396,7 +439,8 @@ async def listar_nuvem_sair() -> List[str]:
     if firestore_db is not None:
         try:
             doc = firestore_db.collection("sistema").document("nuvem_sair").get()
-            return list((doc.to_dict() or {}).keys()) if doc.exists else []
+            no_firestore = list((doc.to_dict() or {}).keys()) if doc.exists else []
+            return sorted(set(no_firestore) | set((await _sql_get("sistema:nuvem_sair") or {}).keys()))
         except Exception as exc:
             _FALHA[0] = time.monotonic()
             print(f"Falha ao listar saidas da nuvem: {exc}")
@@ -433,6 +477,7 @@ async def substituir_canal(uid: str, canal: Dict[str, Any]) -> Dict[str, Any]:
     if firestore_db is not None:
         try:
             firestore_db.collection("robo_canais").document(canal["gancho"]).set(canal)
+            await _espelhar_sql(f"canal:{canal['gancho']}", uid, "canal", canal)
             _CANAIS.pop(canal.get("uid", ""), None)
             return canal
         except Exception as exc:

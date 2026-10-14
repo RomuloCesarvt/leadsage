@@ -71,6 +71,7 @@ async def _gravar(uid: str, nome: str, dados: Dict[str, Any]) -> None:
     if firestore_db is not None:
         try:
             firestore_db.collection("users").document(uid).collection("espelho").document(nome).set(dados)
+            await robo_store._espelhar_sql(f"espelho:{uid}:{nome}", uid, "espelho", dados)
             return
         except Exception as exc:
             print(f"Espelho: falha ao gravar {nome}: {exc}")
@@ -81,7 +82,10 @@ async def _ler(uid: str, nome: str) -> Dict[str, Any]:
     if firestore_db is not None:
         try:
             doc = firestore_db.collection("users").document(uid).collection("espelho").document(nome).get()
-            return (doc.to_dict() or {}) if doc.exists else {}
+            no_firestore = (doc.to_dict() or {}) if doc.exists else {}
+            if no_firestore:
+                copia = await robo_store._sql_get(f"espelho:{uid}:{nome}") or {}
+                return robo_store._mais_novo(no_firestore, copia, "em") or no_firestore if copia.get("em") else no_firestore
         except Exception as exc:
             print(f"Espelho: falha ao ler {nome}: {exc}")
     return await robo_store._sql_get(f"espelho:{uid}:{nome}") or {}
