@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Tuple
 import httpx
 
 from app.config import settings
+from app.curadoria_imagens import CURADORIA, RUINS_GERAIS, escolher
 
 # Buscas em ingles rendem muito mais nos dois bancos. Cada nicho tem
 # termos testados: "advogado" puro trazia pintura do seculo XVII.
@@ -226,32 +227,50 @@ def _singular(texto: str) -> str:
     return " ".join(um(p) for p in texto.split())
 
 
-def termos_para(nicho: str) -> List[str]:
-    """Termos de busca em ingles para o ramo.
+def _chave_casa(c: str, n: str) -> bool:
+    chave = re.sub(r"[^a-z0-9]+", " ", c).strip()
+    if not chave:
+        return False
+    padrao = f" {chave} " if c.endswith(" ") else f" {chave}"
+    return padrao in n
 
-    Casa por INICIO DE PALAVRA ("pet" nao pode casar com "carpete") e a chave
-    mais longa vence ("clinica odontologica" -> dentista, nao clinica medica).
-    Empate: a primeira da lista.
+
+def _tam(c: str) -> int:
+    return len(re.sub(r"[^a-z0-9]+", " ", c).strip())
+
+
+def perfil_para(nicho: str) -> Dict[str, Any]:
+    """Termos de busca em ingles e, quando ha curadoria do ramo, o que pontua e o que nunca entra.
+
+    Casa por INICIO DE PALAVRA ("pet" nao pode casar com "carpete") e a chave mais longa vence
+    ("clinica odontologica" -> dentista, nao clinica medica). Empate: a curadoria do ramo.
     """
     base = re.sub(r"[^a-z0-9]+", " ", _sem_acento(nicho)).strip()
     # o catalogo e quase todo plural ("Hospitais", "Bares", "Galpoes"): casa pelas duas formas
     n = f" {base} {_singular(base)} "
+    cur, pontos_c = None, 0
+    for item in CURADORIA:
+        for c in item["chaves"]:
+            if _chave_casa(c, n) and _tam(c) > pontos_c:
+                cur, pontos_c = item, _tam(c)
     melhor: List[str] = []
     pontos = 0
     for chaves, termos in TERMOS_POR_NICHO:
         for c in chaves:
-            chave = re.sub(r"[^a-z0-9]+", " ", c).strip()
-            if not chave:
-                continue
-            # "bar " (com espaco) pede fim de palavra; as demais aceitam radical ("dentist" em "dentistas")
-            padrao = f" {chave} " if c.endswith(" ") else f" {chave}"
-            if padrao in n and len(chave) > pontos:
-                melhor, pontos = termos, len(chave)
+            if _chave_casa(c, n) and _tam(c) > pontos:
+                melhor, pontos = termos, _tam(c)
+    if cur and pontos_c >= pontos:
+        return {"termos": list(cur["termos"]), "bons": set(cur["bons"]), "ruins": set(cur["ruins"]) | RUINS_GERAIS, "exigir": bool(cur.get("exigir"))}
     if melhor:
-        return melhor
+        return {"termos": list(melhor), "bons": set(), "ruins": set(RUINS_GERAIS)}
     # nicho desconhecido: tenta o proprio texto, depois o generico
     limpo = re.sub(r"[^a-z ]", " ", n).strip()
-    return ([limpo] if limpo else []) + TERMOS_GENERICOS
+    return {"termos": ([limpo] if limpo else []) + TERMOS_GENERICOS, "bons": set(), "ruins": set(RUINS_GERAIS)}
+
+
+def termos_para(nicho: str) -> List[str]:
+    """Termos de busca em ingles para o ramo."""
+    return perfil_para(nicho)["termos"]
 
 
 async def _pexels(termo: str, quantidade: int) -> List[Dict[str, Any]]:
@@ -272,6 +291,8 @@ async def _pexels(termo: str, quantidade: int) -> List[Dict[str, Any]]:
             "largura": f.get("width"), "altura": f.get("height"),
             "autor": f.get("photographer", ""), "fonte": "Pexels",
             "pagina": f.get("url", ""),
+            "titulo": f.get("alt", "") or "",
+            "tags": [],
         })
     return saida
 
@@ -296,6 +317,8 @@ async def _openverse(termo: str, quantidade: int) -> List[Dict[str, Any]]:
             "largura": f.get("width"), "altura": f.get("height"),
             "autor": f.get("creator", ""), "fonte": "StockSnap",
             "pagina": f.get("foreign_landing_url", ""),
+            "titulo": f.get("title", ""),
+            "tags": [str(t.get("name", "")).lower() for t in (f.get("tags") or []) if t.get("name")],
         })
     return saida
 
@@ -303,15 +326,17 @@ async def _openverse(termo: str, quantidade: int) -> List[Dict[str, Any]]:
 async def buscar(nicho: str = "", termo: str = "", quantidade: int = 18) -> Dict[str, Any]:
     """Fotos para o nicho (ou para um termo digitado). Nunca levanta erro:
     sem foto, o site cai no fundo desenhado em CSS, como antes."""
-    termos = [termo] if termo else termos_para(nicho)
-    chave = f"{settings.PEXELS_API_KEY[:4]}|{'|'.join(termos)}|{quantidade}"
+    perfil = {"termos": [termo], "bons": set(), "ruins": set(RUINS_GERAIS)} if termo else perfil_para(nicho)
+    termos = perfil["termos"]
+    chave = f"v2|{settings.PEXELS_API_KEY[:4]}|{'|'.join(termos)}|{quantidade}"
     guardado = _cache.get(chave)
     if guardado and time.time() - guardado[0] < VALIDADE:
         return {"imagens": guardado[1], "fonte": guardado[1][0]["fonte"] if guardado[1] else ""}
 
     fotos: List[Dict[str, Any]] = []
     vistos = set()
-    por_termo = max(4, quantidade // max(1, len(termos)) + 2)
+    # busca mais do que precisa: o filtro de assunto descarta parte do que o banco devolve
+    por_termo = max(10, quantidade // max(1, len(termos)) * 2 + 4)
     for t in termos:
         try:
             lote = await (_pexels(t, por_termo) if settings.PEXELS_API_KEY else _openverse(t, por_termo))
@@ -321,9 +346,9 @@ async def buscar(nicho: str = "", termo: str = "", quantidade: int = 18) -> Dict
             if f["url"] and f["url"] not in vistos:
                 vistos.add(f["url"])
                 fotos.append(f)
-        if len(fotos) >= quantidade:
+        if len(fotos) >= quantidade * 3:
             break
 
-    fotos = fotos[:quantidade]
+    fotos = escolher(fotos, perfil["bons"], perfil["ruins"], quantidade, bool(perfil.get("exigir")))
     _cache[chave] = (time.time(), fotos)
     return {"imagens": fotos, "fonte": fotos[0]["fonte"] if fotos else ""}

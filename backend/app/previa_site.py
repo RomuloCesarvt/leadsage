@@ -19,7 +19,7 @@ from app.credit_system import is_admin
 
 # Versao do motor de sites. Ao mudar o visual (cores, modelos, titulos), troque o valor: as previas ja criadas e
 # nunca editadas sao refeitas, com o mesmo link, na proxima vez que forem enviadas.
-MOTOR_VERSAO = "2026-10-13-direcao-de-arte-2"
+MOTOR_VERSAO = "2026-10-14-marca-e-fotos"
 
 # o que o motor de sites sabe usar de um lead
 CAMPOS_DO_LEAD = (
