@@ -27,6 +27,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from app import ai_oferta, nicho_guia
+from app.playbook_sites import FALA_DO_ROBO_SOBRE_SITES
 
 ETAPAS = ("abertura", "descoberta", "diagnostico", "proposta", "objecao", "agendamento", "fechamento", "perdido")
 TEMPERATURAS = ("frio", "morno", "quente")
@@ -236,6 +237,9 @@ Instruções do dono: {cfg.get('instrucoes') or '(nenhuma)'}
 
 == A PRÉVIA DO SITE DESTE NEGÓCIO ==
 {_bloco_da_previa(lead)}
+
+== SITES: O QUE UM ESPECIALISTA SABE ==
+{FALA_DO_ROBO_SOBRE_SITES}
 
 == ONDE A CONVERSA ESTÁ ==
 {_formatar_estado(sdr or {})}

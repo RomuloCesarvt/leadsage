@@ -14,6 +14,8 @@ import { comEditor, editarCampo, listarTextos, restaurarTexto } from '../templat
 import { FONTES } from '../templates/sites/premium-base';
 import { LAYOUTS_ANTIGOS } from '../templates/sites/layouts';
 import { semearConteudo } from '../templates/sites/semear';
+import { direcaoDeArte } from '../templates/sites/direcao-de-arte';
+import { limparSlogan } from '../templates/sites/marca';
 import { dadosDoLead, escolherTemplate, montarPrevia } from '../templates/sites/previa';
 import { ConteudoDoSite } from './ConteudoDoSite';
 import type { DestinoFoto, FotoBanco } from './BancoImagens';
@@ -318,7 +320,8 @@ export const SiteBuilder: React.FC = () => {
       setDados(d => semearConteudo({
         ...d,
         categoria: r.categoria || d.categoria,
-        slogan: r.slogan || d.slogan,
+        // a capa diz o que a pessoa ganha; a cidade da busca não entra nela
+        slogan: limparSlogan(r.slogan || '', lead?.city || '') || d.slogan,
         sobre: r.sobre || d.sobre,
         servicos: r.servicos?.length
           ? r.servicos.slice(0, 6).map(s => ({
@@ -326,19 +329,16 @@ export const SiteBuilder: React.FC = () => {
               descricao: String(s.descricao || ''),
             }))
           : d.servicos,
-        corPrimaria: r.identidade?.primaria || d.corPrimaria,
-        corDestaque: r.identidade?.destaque || d.corDestaque,
-        tipografia: (r.identidade?.tipografia as SiteData['tipografia']) || d.tipografia,
-        cantos: (r.identidade?.cantos as SiteData['cantos']) || d.cantos,
+        // cor, fonte e modelo vêm da direção de arte do segmento (a mesma do disparo e do robô), não do cálculo antigo do servidor
+        corPrimaria: direcaoDeArte(r.categoria || d.categoria, d.empresa).paleta.primaria,
+        corDestaque: direcaoDeArte(r.categoria || d.categoria, d.empresa).paleta.destaque,
+        segmento: direcaoDeArte(r.categoria || d.categoria, d.empresa).segmento.id,
       }));
 
       // O layout sugerido só entra quando o usuário ainda não escolheu
       // um de propósito: trocar o template debaixo da mão de quem já
       // estava editando seria pior do que manter o que ele escolheu.
-      if (r.identidade?.layout && !escolheuLayout) {
-        const achado = SITE_TEMPLATES.find(t => t.id === r.identidade.layout);
-        if (achado) setTemplate(achado);
-      }
+      if (!escolheuLayout) setTemplate(escolherTemplate(r.categoria || dados.categoria || lead?.niche || '', dados.empresa));
       setIdentidade(r.identidade || null);
     } catch (err: any) {
       setErro(err?.message || 'Não foi possível gerar os textos.');

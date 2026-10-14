@@ -1578,6 +1578,32 @@ function semearConteudo(d, opcoes = {}) {
   return saida;
 }
 
+// src/templates/sites/marca.ts
+var semAcento3 = (t) => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+var escapar = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+var REGISTRO = /\b(?:CRP|CRO|CRM|CRN|CREFITO|CREFONO|CRESS|CREA|CAU|CRC|CRECI|OAB)\b[\s:/\-.]*(?:[A-Z]{2}\b)?[\s:/\-.]*[\d][\d./\-]*/gi;
+var limparNomeDaMarca = (nome, cidade = "") => {
+  const original = (nome || "").replace(/\s+/g, " ").trim();
+  if (!original) return { marca: "", descritor: "" };
+  let texto = original.replace(REGISTRO, " ").replace(/\s+/g, " ").trim();
+  const cid = cidade.trim();
+  const partes = texto.split(/\s+[|–—]\s+|\s+-\s+|\s*\|\s*/).map((p) => p.trim()).filter(Boolean);
+  let marca2 = partes[0] || texto;
+  let descritor = partes.slice(1).join(" ").trim();
+  if (cid) {
+    const c = escapar(cid);
+    const emCidade = new RegExp(`\\s+(?:em|de|na|no|da|do|-|,|/)\\s+${c}(?:\\s*[-/,]\\s*[A-Za-z]{2})?\\s*$`, "i");
+    marca2 = marca2.replace(emCidade, "").trim();
+    descritor = descritor.replace(new RegExp(`\\s*(?:em|de|na|no|da|do|-|,|/)?\\s*${c}(?:\\s*[-/,]\\s*[A-Za-z]{2})?\\s*$`, "i"), "").trim();
+  }
+  if (!descritor && /\b(?:psic[óo]log|dentista|advogad|nutricionist|fisioterapeut|arquitet|m[ée]dic)[a-zç ]*\s+em\s+\S+(?:\s+\S+)?$/i.test(marca2) && cid) {
+    marca2 = marca2.replace(/\s+em\s+\S+(?:\s+\S+)?$/i, "").trim();
+  }
+  marca2 = marca2.replace(/[\s|–—,:;/-]+$/, "").trim();
+  if (semAcento3(marca2).length < 3) marca2 = original.replace(REGISTRO, "").replace(/\s+/g, " ").trim();
+  return { marca: marca2, descritor: descritor.replace(/[\s|–—,:;/-]+$/, "").trim() };
+};
+
 // src/templates/sites/premium-base.ts
 var FONTES = {
   elegante: {
@@ -6250,7 +6276,7 @@ var SITE_TEMPLATES = [
     return aplicarTextos(t.render(p), p);
   }
 }));
-var semAcento3 = (t) => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+var semAcento4 = (t) => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 var POR_RAMO = [
   ["aurora", ["padaria", "panific", "confeit", "cafe", "restaurante", "pizz", "lanch", "hamburg", "bistro", "doceria", "sorvet", "acai", "gastronom", "bar "]],
   ["clinica", ["odonto", "dentist", "clinic", "medic", "saude", "fisio", "nutri", "psicolog", "estetica", "harmoniz", "laborat", "farmac"]],
@@ -6260,7 +6286,7 @@ var POR_RAMO = [
   ["vibrante", ["academia", "fitness", "crossfit", "pilates", "pet", "veterin", "escola", "curso", "idioma", "infantil", "brinqued", "festa", "buffet", "danca", "natacao"]]
 ];
 var sugerirTemplate = (nicho) => {
-  const alvo = semAcento3(nicho);
+  const alvo = semAcento4(nicho);
   for (const [id, palavras2] of POR_RAMO) {
     if (palavras2.some((p) => alvo.includes(p))) return SITE_TEMPLATES.find((t) => t.id === id);
   }
@@ -6270,7 +6296,8 @@ var sugerirTemplate = (nicho) => {
 // src/templates/sites/previa.ts
 var dadosDoLead = (lead) => {
   const base = {
-    empresa: lead?.company || lead?.name || "Minha Empresa",
+    // a marca no topo do site é o nome, sem a cidade da busca nem o "| descrição" que o Google Meu Negócio cola no título
+    empresa: limparNomeDaMarca(lead?.company || lead?.name || "", lead?.city || "").marca || "Minha Empresa",
     // o ramo da busca ("Dentistas") casa melhor com o banco do que o cargo do contato
     categoria: lead?.niche || lead?.role || "",
     cidade: lead?.city || "",

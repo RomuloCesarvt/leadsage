@@ -13,12 +13,14 @@ import type { SiteData, SiteTemplate } from './base';
 import { resumirSemana } from './profissional';
 import { semearConteudo } from './semear';
 import { direcaoDeArte } from './direcao-de-arte';
+import { limparNomeDaMarca } from './marca';
 import { SITE_TEMPLATES, sugerirTemplate } from './layouts';
 
 /** Os dados iniciais de um site: os do lead quando há, já com o conteúdo do ramo. */
 export const dadosDoLead = (lead: any): SiteData => {
   const base: SiteData = {
-    empresa: lead?.company || lead?.name || 'Minha Empresa',
+    // a marca no topo do site é o nome, sem a cidade da busca nem o "| descrição" que o Google Meu Negócio cola no título
+    empresa: limparNomeDaMarca(lead?.company || lead?.name || '', lead?.city || '').marca || 'Minha Empresa',
     // o ramo da busca ("Dentistas") casa melhor com o banco do que o cargo do contato
     categoria: lead?.niche || lead?.role || '',
     cidade: lead?.city || '',

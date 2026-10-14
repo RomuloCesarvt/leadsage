@@ -273,6 +273,13 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
                 ? 'Fica conectado na sua conta, em um servidor, sem nenhum aparelho ligado. Funciona no celular e no computador.'
                 : 'O seu computador envia e recebe pelo seu próprio WhatsApp, e o robô do LeadSage conversa. O computador precisa ficar ligado.'}
           </p>
+          {nuvem && ativo && !conectado && (
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {remoto
+                ? `Servidor da nuvem avisou ${remoto.visto_s == null ? 'nunca' : `há ${remoto.visto_s}s`} · etapa: ${remoto.fase || 'sem informação'}${remoto.estado_s != null ? ` (gravada há ${remoto.estado_s}s)` : ''}. O QR code aparece abaixo assim que o servidor gerar.`
+                : 'Lendo o estado da conexão…'}
+            </p>
+          )}
         </div>
         {ativo && (
           <button onClick={revogar} className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 flex items-center gap-1.5">

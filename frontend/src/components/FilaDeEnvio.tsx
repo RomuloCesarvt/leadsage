@@ -164,11 +164,16 @@ export const FilaDeEnvio: React.FC = () => {
       await atualizarPipeline(); // o servidor só conhece os leads que o navegador já entregou
       // 0. a prévia do site de cada lead (se a pessoa quis): é o que torna verdadeira a frase "montei uma prévia"
       if (criarPrevia) {
-        const jaTem = new Set((await api.getSites()).map(s => s.lead_id).filter(Boolean) as string[]);
+        // todo disparo gera o site de novo com o motor atual: quem já tinha site o recebe refeito, no mesmo endereço e sem gastar vaga;
+        // só quem ainda não tinha usa uma vaga nova
+        const existentes = new Map<string, string>();
+        for (const s of await api.getSites()) { if (s.lead_id && s.template !== 'Prévia rápida') existentes.set(s.lead_id, s.id); }
         const atual = await api.cotaDeSites();
         const vagas = atual.ilimitado ? Infinity : Math.max(0, (atual.cota || 0) - atual.usados);
-        const faltam = escolhidos.filter(l => !jaTem.has(l.id));
-        const criar = faltam.slice(0, vagas);
+        const faltam = escolhidos.filter(l => !existentes.has(l.id));
+        const refazer = escolhidos.filter(l => existentes.has(l.id));
+        const novas = faltam.slice(0, vagas);
+        const criar = [...refazer, ...novas];
         setPrevias({ feitas: 0, total: criar.length });
         let feitas = 0; let falhas = 0; let proximo = 0;
         // as fotos do ramo (banco de imagens), uma busca por ramo: o site sai com imagens de verdade, não com gradiente
@@ -184,15 +189,15 @@ export const FilaDeEnvio: React.FC = () => {
               const fotos = (fotosPorRamo.get((lead.niche || lead.role || '').trim()) || []);
               // cada lead começa em um ponto diferente da lista: dois negócios do mesmo ramo não ficam com as mesmas fotos
               const giro = fotos.length ? (proximo * 2) % fotos.length : 0;
-              await api.publishSite(montarPreviaDoLead(lead, [...fotos.slice(giro), ...fotos.slice(0, giro)]));
+              await api.publishSite({ ...montarPreviaDoLead(lead, [...fotos.slice(giro), ...fotos.slice(0, giro)]), site_id: existentes.get(lead.id) });
             } catch { falhas++; }
             feitas++; setPrevias({ feitas, total: criar.length });
           }
         };
         await Promise.all([trabalhador(), trabalhador(), trabalhador()]);
-        const semVaga = faltam.length - criar.length;
+        const semVaga = faltam.length - novas.length;
         if (falhas || semVaga) {
-          setAvisoPrevias(`${criar.length - falhas} prévia(s) criada(s).${semVaga ? ` ${semVaga} lead(s) ficaram sem prévia por falta de vagas de site no seu plano` : ''}${falhas ? ` ${falhas} falharam` : ''}: para eles a mensagem oferece montar a prévia, em vez de dizer que já está pronta.`);
+          setAvisoPrevias(`${criar.length - falhas} site(s) gerado(s) agora.${semVaga ? ` ${semVaga} lead(s) ficaram sem prévia por falta de vagas de site no seu plano` : ''}${falhas ? ` ${falhas} falharam` : ''}: para eles a mensagem oferece montar a prévia, em vez de dizer que já está pronta.`);
         }
       }
       for (let i = 0; i < escolhidos.length; i += LOTE) {
@@ -465,10 +470,10 @@ export const FilaDeEnvio: React.FC = () => {
                 <label className="mt-4 flex items-start gap-3 p-3 rounded-xl border border-blue-100 bg-blue-50/50 cursor-pointer">
                   <input type="checkbox" checked={criarPrevia} onChange={e => setCriarPrevia(e.target.checked)} className="w-5 h-5 mt-0.5 accent-blue-600 shrink-0" />
                   <span className="text-sm">
-                    <b className="text-slate-800">Criar a prévia do site de cada lead antes</b>
+                    <b className="text-slate-800">Gerar o site de cada lead agora, do zero</b>
                     <span className="block text-xs text-slate-600 mt-0.5 leading-relaxed">
                       {criarPrevia
-                        ? 'A mensagem diz que a prévia já está pronta e pede licença para mandar o link. Usa 1 vaga de site por lead.'
+                        ? 'Cada lead recebe um site novo, feito agora com o nome, o ramo e as fotos dele. Quem já tinha site recebe o site refeito no mesmo endereço, sem gastar outra vaga; só quem não tinha usa 1 vaga.'
                         : 'A mensagem oferece montar a prévia, sem dizer que já existe. Se o lead aceitar, o robô passa a conversa para você criar.'}
                       {cota && !cota.ilimitado ? ` Você tem ${vagasDeSite} vaga(s) de site disponível(is).` : ''}
                     </span>

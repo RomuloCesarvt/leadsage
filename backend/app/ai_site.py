@@ -20,6 +20,7 @@ um modelo não dá:
 do projeto já decidido.
 """
 import hashlib
+import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -240,6 +241,8 @@ def _contexto(d: Dict[str, Any]) -> str:
     return "\n".join(linhas)
 
 
+from app.playbook_sites import PLAYBOOK_DE_SITES  # noqa: E402
+
 REGRAS_DE_CONTEUDO = """REGRAS DE CONTEÚDO (valem para tudo que você escrever)
 - Escreva em português do Brasil, na voz do próprio negócio ("atendemos",
   "nossa equipe"), nunca na voz de quem vende o site.
@@ -275,6 +278,8 @@ PROJETO VISUAL JÁ DEFINIDO (não mude, só escreva dentro dele)
 - Identidade: {briefing['motivo']}
 - Layout: {briefing['layout']}
 
+{PLAYBOOK_DE_SITES}
+
 {REGRAS_DE_CONTEUDO}
 
 RETORNO
@@ -288,6 +293,18 @@ JSON puro, sem markdown, com estas chaves:
 - "seo_titulo": título da aba, até 60 caracteres, com serviço e cidade
 - "seo_descricao": até 155 caracteres, convidativa e específica
 """
+
+
+def slogan_sem_cidade(slogan: str, cidade: str) -> str:
+    """A frase de capa diz o que a pessoa ganha; a cidade da busca nunca entra nela. Com a cidade no meio da frase, devolve vazio
+    (a tela usa então um título do banco do ramo)."""
+    t = re.sub(r"\s+", " ", slogan or "").strip()
+    cid = (cidade or "").strip()
+    if not t or not cid:
+        return t
+    c = re.escape(cid)
+    t = re.sub(rf"\s*(?:,|-|–|—)?\s*(?:em|de|na|no|da|do|para)\s+{c}(?:\s*[-/,]\s*[A-Za-z]{{2}})?(?=[.!?]?$)", "", t, flags=re.I).strip()
+    return "" if re.search(rf"(?<!\w){c}(?!\w)", t, flags=re.I) else t
 
 
 async def gerar_conteudo_de_site(
@@ -325,7 +342,7 @@ async def gerar_conteudo_de_site(
 
     return {
         "categoria": str(dados.get("categoria") or d.get("role") or "")[:60],
-        "slogan": str(dados.get("slogan") or "")[:140],
+        "slogan": slogan_sem_cidade(str(dados.get("slogan") or ""), d.get("city", ""))[:140],
         "sobre": str(dados.get("sobre") or "")[:600],
         "servicos": servicos,
         "diferenciais": [str(x)[:80] for x in (dados.get("diferenciais") or [])[:4] if str(x).strip()],

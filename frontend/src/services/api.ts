@@ -436,7 +436,7 @@ export const api = {
     return await fetchWithToken(`/admin/usuarios/${encodeURIComponent(uid)}/ilimitado`, { method: 'POST', body: JSON.stringify({ ativo }) });
   },
 
-  async whatsEstado(): Promise<{ conectado: boolean; online: boolean; fase?: string; qr?: string; codigo?: string; numero?: string }> {
+  async whatsEstado(): Promise<{ conectado: boolean; online: boolean; fase?: string; qr?: string; codigo?: string; numero?: string; visto_s?: number | null; estado_s?: number | null; nuvem?: boolean }> {
     return await fetchWithToken('/robo/whats/estado');
   },
 

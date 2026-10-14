@@ -1846,8 +1846,11 @@ async def conector_ping(req: ConectorPing, request: Request):
         await _gravar_canal_do_conector(canal)
     # a conexao mudou (QR novo, codigo, pronto): a tela do celular precisa ver
     marca = f"{req.fase}|{req.codigo}|{hashlib.md5(req.qr.encode()).hexdigest()[:8] if req.qr else ''}"
-    if req.fase and marca != canal.get("cw_marca_estado"):
+    # o estado e regravado quando muda E de tempos em tempos: se uma gravacao se perdeu (banco fora, cota), a tela volta a ver o estado certo
+    marca_velha = (agora_dt - (conector_whatsapp._ler_data(canal.get("cw_marca_em")) or datetime.min.replace(tzinfo=timezone.utc))).total_seconds() > 120
+    if req.fase and (marca != canal.get("cw_marca_estado") or marca_velha):
         canal["cw_marca_estado"] = marca
+        canal["cw_marca_em"] = agora_dt.isoformat()
         await espelho_whatsapp.salvar_estado(canal["uid"], req.fase, req.qr, req.codigo, req.numero)
         await _gravar_canal_do_conector(canal)
     if req.fase == "pronto":
@@ -1875,7 +1878,11 @@ async def whats_estado(user: dict = Depends(get_current_user)):
     uid = user.get("uid")
     canal = await robo_store.canal_do_usuario(uid) or {}
     estado = await espelho_whatsapp.ler_estado(uid)
-    return {"conectado": bool(canal.get("cw_hash")), "online": conector_whatsapp.online(canal), **estado}
+    # pistas para a tela: ha quanto tempo o servico da nuvem/Conector avisou e ha quanto tempo o estado foi gravado
+    visto = conector_whatsapp._ler_data(canal.get("cw_visto"))
+    visto_s = int((datetime.now(timezone.utc) - visto).total_seconds()) if visto else None
+    return {"conectado": bool(canal.get("cw_hash")), "online": conector_whatsapp.online(canal), **estado,
+            "visto_s": visto_s, "estado_s": espelho_whatsapp._idade_s(estado.get("em")), "nuvem": bool(canal.get("nuvem_chave"))}
 
 
 def token_do_chat_nuvem(uid: str, segredo: str, validade_s: int = 12 * 3600, agora_s: Optional[int] = None) -> str:

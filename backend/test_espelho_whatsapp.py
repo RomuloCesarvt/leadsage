@@ -143,3 +143,25 @@ def test_pedido_de_codigo_so_some_quando_aquele_numero_conecta(client, chave):
     assert p["parear"] == "5514999019705"
     p = client.post("/api/conector/ping", headers=cabecalho(chave), json={"fase": "pronto", "numero": "5514999019705", "status": "ready"}).json()
     assert p["parear"] == ""
+
+
+def test_estado_perdido_e_regravado_mesmo_sem_mudar(client, chave, rodar):
+    """Se a gravacao do estado se perdeu, o proximo aviso (mesmo igual ao anterior) a refaz depois de um tempo."""
+    from datetime import datetime, timedelta, timezone
+    pronto = {"fase": "pronto", "numero": "5514999990000", "status": "ready"}
+    client.post("/api/conector/ping", headers=cabecalho(chave), json=pronto)
+    assert client.get("/api/robo/whats/estado").json()["fase"] == "pronto"
+    # o estado some do espelho (gravacao perdida)
+    from app import espelho_whatsapp as e
+    _rodar = rodar
+    _rodar(e._gravar, "alice", "estado", {})
+    assert client.get("/api/robo/whats/estado").json().get("fase") in (None, "")
+    client.post("/api/conector/ping", headers=cabecalho(chave), json=pronto)          # logo depois: nada a regravar
+    assert client.get("/api/robo/whats/estado").json().get("fase") in (None, "")
+    canal = _rodar(robo_store.canal_do_usuario, "alice")
+    canal["cw_marca_em"] = (datetime.now(timezone.utc) - timedelta(seconds=200)).isoformat()
+    _rodar(robo_store.substituir_canal, "alice", canal)
+    from app import main
+    main._CACHE_CONECTOR.clear()                                                        # o cache curto de canais do Conector
+    client.post("/api/conector/ping", headers=cabecalho(chave), json=pronto)          # passou o tempo: regrava
+    assert client.get("/api/robo/whats/estado").json()["fase"] == "pronto"
