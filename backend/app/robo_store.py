@@ -162,12 +162,16 @@ async def _canal_do_usuario(uid: str) -> Optional[Dict[str, Any]]:
         except Exception as exc:
             _FALHA[0] = time.monotonic()
             print(f"Falha ao ler o gancho do robo: {exc}")
+    candidatos = []
     if gancho:
-        return await canal_por_gancho(gancho)
-
-    for c in await _sql_listar(uid, "canal"):
-        return c
-    return None
+        candidatos.append(await canal_por_gancho(gancho))
+    # canais deste usuario no banco SQL: um canal criado enquanto o Firestore estava sem cota so existe aqui, e ganha do antigo
+    try:
+        candidatos.extend(await _sql_listar(uid, "canal"))
+    except Exception as exc:
+        print(f"Falha ao listar canais no SQL: {exc}")
+    validos = [c for c in candidatos if c]
+    return max(validos, key=lambda c: str(c.get("atualizado") or "")) if validos else None
 
 
 async def salvar_canal(uid: str, email: str, mudancas: Dict[str, Any]) -> Dict[str, Any]:
