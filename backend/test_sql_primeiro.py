@@ -203,3 +203,57 @@ def test_sem_postgres_tudo_continua_como_antes(client, monkeypatch):
     assert rodar(fluxo()) == {"u1": "g" * 24}
     assert fs.escritas >= 1  # modo antigo: o Firestore recebe a gravacao
     robo_store._FALHA[0] = 0.0
+
+
+def test_usuario_novo_com_firestore_fora_consegue_o_qr_e_quem_tem_sessao_antiga_nao_perde_a_dela(sql_principal):
+    fs = sql_principal
+    fs.quebrado = True
+    assert rodar(nuvem_auth.ler("novo")) is None                    # sem marca: nao se sabe (pode haver sessao antiga)
+    rodar(nuvem_auth.marcar_novo("novo"))
+    assert rodar(nuvem_auth.ler("novo")) == ""                      # pediu conexao nova: o QR sai na hora
+    rodar(nuvem_auth.gravar("novo", "creds-novas"))
+    assert rodar(nuvem_auth.ler("novo")) == "creds-novas"           # conectou: a sessao nova vale
+
+
+def test_desligar_de_proposito_nao_volta_com_a_copia_antiga_do_firestore(sql_principal):
+    fs = sql_principal
+    gancho = "g" * 24
+    fs.dados.update({"sistema/nuvem": {"u9": gancho}, "nuvem_auth/u9": {"blob": "creds-antigas"}})
+    rodar(robo_store.esquecer_nuvem("u9"))
+    rodar(nuvem_auth.apagar("u9"))
+    assert rodar(robo_store.listar_nuvem()) == {}                   # a primeira copia do Firestore nao traz de volta
+    assert rodar(nuvem_auth.ler("u9")) == ""                        # e a sessao apagada nao reaparece
+    # voltar a ligar depois funciona
+    rodar(robo_store.registrar_nuvem("u9", gancho))
+    assert rodar(robo_store.listar_nuvem()) == {"u9": gancho}
+
+
+def test_desligar_e_conectar_de_novo_com_firestore_fora_do_ar_chega_ao_qr(sql_principal, client, monkeypatch):
+    """O que a pessoa faz na tela quando a nuvem travou: Desligar, Conectar pela nuvem. Sem depender do Firestore."""
+    from app import main
+    from app.config import settings
+
+    fs = sql_principal
+    fs.quebrado = True
+    fs.quebrado_escrita = True
+    segredo = "segredo-da-nuvem-1234567890"
+    monkeypatch.setattr(settings, "WORKER_SECRET", segredo)
+
+    async def libera(*a, **k):
+        return None
+
+    monkeypatch.setattr(main, "exigir_recurso", libera)
+    main._SESSOES_NUVEM.clear()
+    main._CACHE_CONECTOR.clear()
+    assert client.post("/api/robo/nuvem/desligar").status_code == 200
+    assert client.post("/api/robo/nuvem/ligar").status_code == 200
+    lista = client.get("/api/worker/sessoes", headers={"x-worker-secret": segredo}).json()
+    assert [s["uid"] for s in lista["sessoes"]] == ["alice"] and lista["desligar"] == []
+    # o servico pede a sessao guardada: "nao ha" (o QR sai), nunca "banco indisponivel"
+    r = client.get("/api/worker/auth/alice", headers={"x-worker-secret": segredo})
+    assert r.status_code == 200 and r.json()["blob"] == ""
+    chave = lista["sessoes"][0]["chave"]
+    ping = client.post("/api/conector/ping", headers={"x-conector-key": chave}, json={"fase": "qr", "qr": "data:image/png;base64,AAAA", "status": "qr"})
+    assert ping.status_code == 200
+    estado = client.get("/api/robo/whats/estado").json()
+    assert estado["fase"] == "qr" and estado["qr"].startswith("data:image/png")

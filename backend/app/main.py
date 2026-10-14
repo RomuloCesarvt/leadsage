@@ -1631,6 +1631,7 @@ async def nuvem_ligar(user: dict = Depends(get_current_user)):
             raise HTTPException(status_code=503, detail=MSG_BANCO_SEM_COTA)
         await robo_store.registrar_nuvem(uid, canal["gancho"])
         await robo_store.limpar_nuvem_sair(uid)
+        await nuvem_auth.marcar_novo(uid)
         _SESSOES_NUVEM.clear()
         if antigo:
             _CACHE_CONECTOR.pop(antigo, None)

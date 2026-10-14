@@ -422,6 +422,10 @@ async def registrar_nuvem(uid: str, gancho: str) -> None:
         lista = await _sql_get("sistema:nuvem") or {}
         lista[uid] = gancho
         await _sql_put("sistema:nuvem", "sistema", "sistema", lista)
+        esquecidos = await _sql_get("sistema:nuvem_esquecidos") or {}
+        if uid in esquecidos:
+            esquecidos.pop(uid)
+            await _sql_put("sistema:nuvem_esquecidos", "sistema", "sistema", esquecidos)
         return
     if firestore_db is not None:
         try:
@@ -449,6 +453,10 @@ async def esquecer_nuvem(uid: str) -> None:
     if uid in lista:
         lista.pop(uid)
         await _sql_put("sistema:nuvem", "sistema", "sistema", lista)
+    if _sql_primeiro():
+        esquecidos = await _sql_get("sistema:nuvem_esquecidos") or {}
+        esquecidos[uid] = agora()  # quem desligou de proposito nao volta da copia do Firestore
+        await _sql_put("sistema:nuvem_esquecidos", "sistema", "sistema", esquecidos)
 
 
 async def listar_nuvem() -> Dict[str, str]:
@@ -460,7 +468,9 @@ async def listar_nuvem() -> Dict[str, str]:
         if firestore_db is not None:
             try:
                 doc = firestore_db.collection(_NUVEM_DOC[0]).document(_NUVEM_DOC[1]).get()
-                uniao = {**(dict(doc.to_dict() or {}) if doc.exists else {}), **no_sql}
+                esquecidos = await _sql_get("sistema:nuvem_esquecidos") or {}
+                legado = {u: g for u, g in (dict(doc.to_dict() or {}) if doc.exists else {}).items() if u not in esquecidos}
+                uniao = {**legado, **no_sql}
                 await _espelhar_sql("sistema:nuvem", "sistema", "sistema", uniao)
                 await _espelhar_sql("sistema:nuvem_quente", "sistema", "sistema", {"em": agora()})
                 return uniao
