@@ -226,6 +226,8 @@ export interface UserProfile {
   credits: number;
   plan: string;
   avatar: string;
+  /** o servidor não respondeu: nome e e-mail são do login; saldo e plano não são conhecidos (a tela mostra "—") */
+  semDados?: boolean;
   // Preferências de prospecção
   services?: string[];
   niches?: string[];

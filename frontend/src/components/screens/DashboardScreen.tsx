@@ -142,7 +142,7 @@ export const DashboardScreen: React.FC = () => {
         <div>
           <span className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-2 block">Seu Uso</span>
           <div className="flex gap-6 text-sm font-bold text-slate-800">
-            <span>Créditos: <span className="font-medium text-slate-600">{user?.credits ?? 0} restantes</span></span>
+            <span>Créditos: <span className="font-medium text-slate-600">{user?.semDados ? '—' : (user?.credits ?? 0)} restantes</span></span>
             <span>Plano: <span className="font-medium text-slate-600">{user?.plan ?? 'Free'}</span></span>
           </div>
         </div>

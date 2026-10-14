@@ -92,15 +92,18 @@ export const api = {
     try {
       return await fetchWithToken('/profile');
     } catch {
+      // Sem resposta do servidor: mostra só o que é verdadeiro (quem entrou). Nada de nome, plano ou saldo inventados:
+      // um saldo falso já apareceu aqui para outra pessoa.
       return {
-        id: 'usr_default',
-        name: auth.currentUser?.displayName || 'Dr. Rômulo Leite',
-        email: auth.currentUser?.email || 'romulo@leadsage.ai',
-        company_name: 'LeadSage Corp',
-        niche_focus: 'Saúde & Farmacêutica',
-        credits: 450,
-        plan: 'Pro Builder',
-        avatar: auth.currentUser?.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+        id: auth.currentUser?.uid || '',
+        name: auth.currentUser?.displayName || '',
+        email: auth.currentUser?.email || '',
+        company_name: '',
+        niche_focus: '',
+        credits: 0,
+        plan: '',
+        avatar: auth.currentUser?.photoURL || '',
+        semDados: true,
       };
     }
   },
@@ -194,7 +197,7 @@ export const api = {
     try {
       return await fetchWithToken('/credits/balance');
     } catch {
-      return { credits: 450, history: [] };
+      return { credits: 0, history: [] };
     }
   },
 

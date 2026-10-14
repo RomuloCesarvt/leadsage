@@ -50,7 +50,7 @@ export const Header: React.FC<{ toggleSidebar: () => void }> = ({ toggleSidebar 
           
           <div className="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-full bg-white border border-slate-200 text-sm font-bold text-slate-700 shadow-sm">
             <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
-            <span>{user?.credits ?? 0} créditos</span>
+            <span>{user?.semDados ? '—' : (user?.credits ?? 0)} créditos</span>
           </div>
 
           <button className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors">

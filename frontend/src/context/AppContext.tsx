@@ -202,6 +202,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         try {
           const profile = await api.getProfile();
           setUser(profile);
+          // o servidor não respondeu (banco ocupado): tenta de novo até o saldo e o plano verdadeiros chegarem
+          if (profile.semDados) {
+            let tentativas = 0;
+            const reler = async () => {
+              if (++tentativas > 8 || auth.currentUser?.uid !== currentUser.uid) return;
+              try {
+                const p = await api.getProfile();
+                if (p.semDados) { setTimeout(reler, 6000); return; }
+                setUser(p);
+              } catch { setTimeout(reler, 6000); }
+            };
+            setTimeout(reler, 4000);
+          }
         } catch (error) {
           console.error("Erro ao puxar perfil da API", error);
         }

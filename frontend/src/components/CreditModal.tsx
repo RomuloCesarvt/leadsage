@@ -70,7 +70,7 @@ export const CreditModal: React.FC = () => {
                 Gestão & Recarga de Créditos
               </h3>
               <p className="text-xs text-slate-400">
-                Saldo Atual: <strong className="text-amber-400 font-extrabold">{user?.credits ?? 0} CR</strong>
+                Saldo Atual: <strong className="text-amber-400 font-extrabold">{user?.semDados ? '—' : (user?.credits ?? 0)} CR</strong>
               </p>
             </div>
           </div>
