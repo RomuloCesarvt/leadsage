@@ -124,6 +124,36 @@ const COR_NIVEL = {
 } as const;
 
 /** Dispositivo conectado + termômetro de risco de banimento do número. */
+/** Manda uma mensagem do número conectado para ele mesmo e mostra se o WhatsApp confirmou: a prova de que o envio chega de verdade. */
+const TesteDeEnvio: React.FC = () => {
+  const [estado, setEstado] = useState<'parado' | 'enviando' | 'ok' | 'erro'>('parado');
+  const [texto, setTexto] = useState('');
+  const testar = async () => {
+    setEstado('enviando'); setTexto('Enviando…');
+    try {
+      const { id } = await api.whatsTeste();
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        const s = await api.whatsTesteStatus(id);
+        if (s.status === 'enviado') { setEstado('ok'); setTexto(`O WhatsApp confirmou o envio. Abra o WhatsApp do celular${s.numero ? ` (número ${s.numero})` : ''}: a mensagem de teste está na conversa com você mesmo. Se ela NÃO estiver lá, o número está com problema.`); return; }
+        if (s.status === 'falhou') { setEstado('erro'); setTexto(`Não foi enviada: ${s.erro || 'o WhatsApp não confirmou'}.`); return; }
+      }
+      setEstado('erro'); setTexto('O serviço da nuvem não respondeu em 90 segundos. Tente de novo em instantes.');
+    } catch (e: any) { setEstado('erro'); setTexto(e?.message || 'Não foi possível testar agora.'); }
+  };
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm space-y-2">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div><p className="font-bold text-slate-800">Teste de envio</p><p className="text-xs text-slate-500">Manda uma mensagem do número conectado para ele mesmo e confere se chegou.</p></div>
+        <button onClick={testar} disabled={estado === 'enviando'} className="px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-60">
+          {estado === 'enviando' ? 'Testando…' : 'Enviar mensagem de teste'}
+        </button>
+      </div>
+      {texto && <p className={`text-xs ${estado === 'ok' ? 'text-emerald-700' : estado === 'erro' ? 'text-red-600' : 'text-slate-500'}`}>{texto}</p>}
+    </div>
+  );
+};
+
 const SaudeDoNumeroPainel: React.FC<{ numero: string; ativo: boolean }> = ({ numero, ativo }) => {
   const [s, setS] = useState<SaudeDoNumero | null>(null);
   const [aberto, setAberto] = useState(false);
@@ -329,6 +359,7 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
               O serviço da nuvem está sem responder à tela há alguns minutos. O número continua conectado e volta a atualizar sozinho. Nada precisa ser feito.
             </p>
           )}
+          {conectado && <TesteDeEnvio />}
           {conectado && <SaudeDoNumeroPainel numero={remoto?.numero || cfg.conector_numero || ''} ativo={ativo} />}
           {nuvem ? (
             <ol className="text-sm text-slate-700 list-decimal pl-5 space-y-1">

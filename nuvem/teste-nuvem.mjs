@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  paraChatId, paraJid, lerConteudo, resumoBaileys, telefoneDoRemetente, desembrulhar,
+  paraChatId, paraJid, lerConteudo, resumoBaileys, telefoneDoRemetente, desembrulhar, criarRastreadorDeEntrega,
 } from './adaptador-baileys.mjs';
 import { createHmac } from 'node:crypto';
 import http from 'node:http';
@@ -382,4 +382,25 @@ test('pedido de desligar: só o serviço que atende (ou consegue a concessão) c
     assert.deepEqual(desconectados, []);                                     // o reserva nao mexe no numero que e do outro
     assert.equal(avisadas.length, 0);
   } finally { globalThis.fetch = antes; }
+});
+
+test('envio só vale quando o WhatsApp confirma: confirmou, recusou ou ficou sem resposta', async () => {
+  const r = criarRastreadorDeEntrega();
+  // confirmou antes de alguém esperar: vale na hora
+  r.registrar('A', 2);
+  assert.equal(await r.aguardar('A', 50), 2);
+  // confirma durante a espera
+  const espera = r.aguardar('B', 2000);
+  setTimeout(() => r.registrar('B', 3), 20);
+  assert.equal(await espera, 3);
+  // recusou
+  const recusa = r.aguardar('C', 2000);
+  setTimeout(() => r.registrar('C', 0), 20);
+  assert.equal(await recusa, 0);
+  // pendente (1) nao basta: sem confirmacao no prazo, devolve null
+  r.registrar('D', 1);
+  assert.equal(await r.aguardar('D', 80), null);
+  // um status menor nao rebaixa o maior ja visto
+  r.registrar('E', 3); r.registrar('E', 2);
+  assert.equal(r.nivel('E'), 3);
 });

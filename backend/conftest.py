@@ -121,3 +121,13 @@ def free_port():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
+
+
+@pytest.fixture(autouse=True)
+def _ritmo_de_envio_deterministico(monkeypatch):
+    """A janela de horario (seg a sab, 8h as 19h) depende do relogio: sem isto os testes passariam de dia e falhariam a noite.
+    Os testes do ritmo (test_ritmo_de_envio.py) usam datas explicitas e as funcoes reais."""
+    from app import conector_whatsapp as _cw
+    monkeypatch.setattr(_cw, "janela_aberta", lambda agora: True)
+    monkeypatch.setattr(_cw, "INTERVALO_PRIORIDADE_S", 0)
+    monkeypatch.setattr(_cw, "_sortear", lambda a, b: a)  # o menor intervalo, sempre o mesmo

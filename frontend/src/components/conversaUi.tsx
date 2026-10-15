@@ -59,6 +59,12 @@ export const Balao: React.FC<{ m: RoboMensagem }> = ({ m }) => {
           </span>
         )}
         {m.texto}
+        {meu && m.entrega === 'falhou' && (
+          <span className="block text-[11px] mt-1 font-semibold text-red-600">Não enviada: {m.erro || 'o WhatsApp não confirmou o envio'}</span>
+        )}
+        {meu && m.entrega === 'enviada' && (
+          <span className={`block text-[10px] mt-1 text-right ${m.de === 'voce' ? 'text-blue-100' : 'text-emerald-600'}`}>✓ confirmada pelo WhatsApp</span>
+        )}
         {m.em && (
           <span className={`block text-[10px] mt-1 text-right ${m.de === 'voce' ? 'text-blue-100' : 'text-slate-400'}`}>
             {quando(m.em)}

@@ -410,6 +410,9 @@ export interface RoboMensagem {
   de: 'contato' | 'robo' | 'voce';
   texto: string;
   em?: string;
+  /** só vale como enviada quando o WhatsApp confirma: 'enviada' (confirmada) ou 'falhou' (não chegou) */
+  entrega?: 'enviada' | 'falhou';
+  erro?: string;
 }
 
 /** Como está o envio de WhatsApp pelo Conector: online, quantas esperam, quanto saiu hoje. */

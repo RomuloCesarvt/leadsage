@@ -245,7 +245,7 @@ export const FilaDeEnvio: React.FC = () => {
   const enviarSelecionados = async () => {
     if (!selecionados.length) return;
     const emails = selEmail ? ` ${selEmail} e-mail(s) saem agora (custam 2 créditos cada).` : '';
-    if (!window.confirm(`Enviar ${selecionados.length} mensagem(ns)?${emails}${selWhats ? ` ${selWhats} de WhatsApp entram na fila e saem com intervalo de segurança.` : ''}`)) return;
+    if (!window.confirm(`Enviar ${selecionados.length} mensagem(ns)?${emails}${selWhats ? ` ${selWhats} de WhatsApp entram na fila e saem aos poucos: de 3 a 7 minutos entre uma e outra, de segunda a sábado, das 8h às 19h (Brasília), para proteger o número.` : ''}`)) return;
     setTrabalhando('aprovar');
     try {
       const r = await api.filaAprovar(selecionados.map(i => i.id));

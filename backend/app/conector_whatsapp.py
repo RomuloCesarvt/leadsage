@@ -21,12 +21,13 @@ as **abordagens frias** preparadas na Fila de envio. Só as frias têm limite:
 reduzem o risco, não o eliminam, e a tela diz isso antes de conectar.
 """
 import hashlib
+import random
 import re
 import secrets
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import select
 
@@ -39,13 +40,24 @@ from app.meta_canais import EnvioFalhou
 PREFIXO = "lsc_"
 CHAVE_RE = re.compile(r"^lsc_[A-Za-z0-9_-]{30,60}$")
 ONLINE_SEGUNDOS = 200
-INTERVALO_FRIO_S = 90          # entre uma abordagem fria e a seguinte
+INTERVALO_FRIO_S = 90          # (antigo) so vale para contas conectadas antes do ritmo variavel
+# Ritmo de abordagem fria. Numero que dispara em ritmo de maquina e bloqueado: pessoas mandam mensagem a qualquer hora,
+# com intervalos irregulares e param para descansar.
+INTERVALO_MIN_S = 180          # entre uma abordagem fria e a seguinte: de 3 a 7 minutos, sorteado a cada envio
+INTERVALO_MAX_S = 420
+LOTE_ATE_PAUSA = 5             # a cada 5 abordagens, uma pausa longa
+PAUSA_LONGA_S = (900, 1500)    # de 15 a 25 minutos, somados ao intervalo
+INTERVALO_PRIORIDADE_S = 60    # "Enviar agora" dispensa o intervalo, nao a prudencia: no minimo 1 minuto desde a ultima
+JANELA_HORAS = (8, 19)         # abordagem fria so de segunda a sabado, das 8h as 19h (Brasilia)
+FALHAS_PARA_PAUSAR = 3         # tres falhas seguidas: o numero pode estar restrito; para por 2 horas
+PAUSA_POR_FALHAS_S = 2 * 3600
 FRIO_INICIAL = 10              # por dia, no primeiro dia da conexão
 FRIO_POR_DIA = 5               # quanto o limite cresce a cada dia
 FRIO_MAXIMO = 60               # teto diário: acima disso o risco de banimento sobe muito
 MAX_TAREFAS = 3
 CAMPOS_CONECTOR = ("cw_hash", "cw_prefixo", "cw_criado", "cw_visto", "cw_primeiro", "cw_numero",
-                   "cw_status", "cw_ultimo_frio", "cw_versao", "cw_frio_dia", "cw_frio_n", "cw_atividade")
+                   "cw_status", "cw_ultimo_frio", "cw_versao", "cw_frio_dia", "cw_frio_n", "cw_atividade",
+                   "cw_proximo_frio_em", "cw_falhas", "cw_pausa_ate")
 
 AVISO_SAIR = "\n\n(Se preferir não receber mais mensagens, é só responder SAIR.)"
 
@@ -138,6 +150,49 @@ def visao(canal: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         "nuvem": bool(c.get("nuvem_chave")),
         "nuvem_disponivel": bool(settings.WORKER_SECRET),
     }
+
+
+FUSO_BRASIL = timezone(timedelta(hours=-3))
+_sortear = random.randint  # trocado nos testes
+
+
+def janela_aberta(agora: datetime) -> bool:
+    """Segunda a sabado, das 8h as 19h em Brasilia."""
+    h = agora.astimezone(FUSO_BRASIL)
+    return h.weekday() != 6 and JANELA_HORAS[0] <= h.hour < JANELA_HORAS[1]
+
+
+def _hhmm(quando: datetime) -> str:
+    return quando.astimezone(FUSO_BRASIL).strftime("%H:%M")
+
+
+def politica_frio(canal: Dict[str, Any], agora: datetime, prioritario: bool = False) -> Tuple[bool, str, int]:
+    """Pode sair uma abordagem fria agora? Devolve (pode, motivo, segundos de espera)."""
+    pausa = _ler_data(canal.get("cw_pausa_ate"))
+    if pausa and agora < pausa:
+        return False, f"pausado por falhas seguidas de envio, volta às {_hhmm(pausa)} (confira se o número está restrito)", int((pausa - agora).total_seconds())
+    if not janela_aberta(agora):
+        return False, "fora do horário de envio (segunda a sábado, das 8h às 19h de Brasília)", 0
+    ultimo = _ler_data(canal.get("cw_ultimo_frio"))
+    if prioritario:
+        espera = max(0, INTERVALO_PRIORIDADE_S - int((agora - ultimo).total_seconds())) if ultimo else 0
+    else:
+        proximo = _ler_data(canal.get("cw_proximo_frio_em"))
+        if proximo:
+            espera = max(0, int((proximo - agora).total_seconds()))
+        else:  # conta antiga, sem horario sorteado: usa o intervalo de antes
+            espera = max(0, INTERVALO_FRIO_S - int((agora - ultimo).total_seconds())) if ultimo else 0
+    if espera:
+        return False, f"intervalo entre abordagens ({espera}s)", espera
+    return True, "", 0
+
+
+def agendar_proxima_fria(canal: Dict[str, Any], agora: datetime, enviadas_hoje: int) -> None:
+    """Sorteia quando pode sair a proxima; a cada lote de 5 acrescenta uma pausa longa."""
+    espera = _sortear(INTERVALO_MIN_S, INTERVALO_MAX_S)
+    if enviadas_hoje and enviadas_hoje % LOTE_ATE_PAUSA == 0:
+        espera += _sortear(*PAUSA_LONGA_S)
+    canal["cw_proximo_frio_em"] = (agora + timedelta(seconds=espera)).isoformat()
 
 
 def telefone_whatsapp(bruto: str) -> str:
@@ -271,25 +326,20 @@ async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Di
     frios_hoje = int(canal.get("cw_frio_n") or 0) if canal.get("cw_frio_dia") == hoje else 0
     limite = limite_frio_do_dia(canal, agora)
 
-    ultimo = _ler_data(canal.get("cw_ultimo_frio"))
-    espera = 0
-    if ultimo:
-        espera = max(0, INTERVALO_FRIO_S - int((agora - ultimo).total_seconds()))
-
     pendentes = sorted(
         (i for i in itens if i.get("canal") == "whatsapp" and _disponivel(i, agora)
          and len(telefone_whatsapp((i.get("contato") or {}).get("phone", ""))) >= 12),
         # quem o usuario mandou enviar agora vai na frente
         key=lambda i: (0 if i.get("prioridade") else 1, i.get("criado") or ""),
     )
-    # "Enviar agora" dispensa o intervalo entre abordagens, nao o limite do dia (esse protege o numero)
     prioritario = bool(pendentes and pendentes[0].get("prioridade"))
+    pode, motivo_politica, _ = politica_frio(canal, agora, prioritario)
 
     motivo_sem_frio = ""
     if frios_hoje >= limite:
         motivo_sem_frio = f"limite de hoje atingido ({frios_hoje}/{limite}); o número ganha volume a cada dia"
-    elif espera and not prioritario:
-        motivo_sem_frio = f"intervalo entre abordagens ({espera}s)"
+    elif not pode:
+        motivo_sem_frio = motivo_politica
     elif not saida:
         if pendentes:
             i = pendentes[0]
@@ -297,6 +347,7 @@ async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Di
             await fila_envio._gravar(uid, i)
             canal["cw_ultimo_frio"] = agora.isoformat()
             canal["cw_frio_dia"], canal["cw_frio_n"] = hoje, frios_hoje + 1
+            agendar_proxima_fria(canal, agora, frios_hoje + 1)
             texto = i["texto"] if "responder SAIR" in i["texto"] else i["texto"].rstrip() + AVISO_SAIR
             saida.append({"id": f"fila:{i['id']}", "tipo": "abordagem",
                           "contato": telefone_whatsapp(i["contato"]["phone"]), "texto": texto,
@@ -323,17 +374,17 @@ async def estado_da_fila(canal: Dict[str, Any], agora: Optional[datetime] = None
     hoje = agora.strftime("%Y-%m-%d")
     frios_hoje = int(canal.get("cw_frio_n") or 0) if canal.get("cw_frio_dia") == hoje else 0
     limite = limite_frio_do_dia(canal, agora)
-    ultimo = _ler_data(canal.get("cw_ultimo_frio"))
-    espera = max(0, INTERVALO_FRIO_S - int((agora - ultimo).total_seconds())) if ultimo else 0
     pendentes = [i for i in itens if i.get("status") == "pendente"]
+    pode, motivo_politica, espera = politica_frio(canal, agora, bool(pendentes and pendentes[0].get("prioridade")))
     if not canal.get("cw_hash"):
         motivo = "O WhatsApp pelo computador ainda não foi conectado."
     elif not online(canal, agora):
         motivo = "O Conector está fechado. Abra o programa “Conectar-WhatsApp” no computador."
     elif frios_hoje >= limite:
         motivo = f"Limite de hoje atingido ({frios_hoje} de {limite}). O número ganha volume a cada dia."
-    elif pendentes and espera:
-        motivo = f"Próxima abordagem em cerca de {espera} segundos (intervalo de segurança)."
+    elif pendentes and not pode:
+        motivo = (f"Próxima abordagem em cerca de {max(1, round(espera / 60))} min (intervalo de segurança)."
+                  if espera and motivo_politica.startswith("intervalo") else motivo_politica[:1].upper() + motivo_politica[1:] + ".")
     elif pendentes:
         motivo = "A próxima sai em instantes."
     else:
@@ -356,8 +407,20 @@ async def enviar_agora(uid: str, item_id: str) -> bool:
 
 
 async def registrar_resultado(canal: Dict[str, Any], tarefa_id: str, ok: bool, erro: str = "") -> bool:
-    """O Conector diz se enviou. Abordagem fria move o lead no funil."""
+    """O Conector diz se enviou. Abordagem fria move o lead no funil.
+
+    "Enviou" aqui e "o WhatsApp confirmou o recebimento no servidor": sem confirmacao o Conector reporta falha.
+    Tres falhas seguidas pausam as abordagens frias por 2 horas (numero possivelmente restrito).
+    """
     uid = canal["uid"]
+    agora = _agora_dt()
+    if ok:
+        canal["cw_falhas"] = 0
+    else:
+        canal["cw_falhas"] = int(canal.get("cw_falhas") or 0) + 1
+        if canal["cw_falhas"] >= FALHAS_PARA_PAUSAR:
+            canal["cw_pausa_ate"] = (agora + timedelta(seconds=PAUSA_POR_FALHAS_S)).isoformat()
+            canal["cw_falhas"] = 0
     if tarefa_id.startswith("fila:"):
         item_id = tarefa_id[5:]
         item = await fila_envio.obter(uid, item_id)
@@ -383,7 +446,28 @@ async def registrar_resultado(canal: Dict[str, Any], tarefa_id: str, ok: bool, e
     if not ok:
         s["erro"] = (erro or "")[:200]
     await _gravar(uid, s)
+    await _marcar_entrega_na_conversa(uid, s, ok, erro)
     return True
+
+
+async def _marcar_entrega_na_conversa(uid: str, saida: Dict[str, Any], ok: bool, erro: str) -> None:
+    """A conversa mostrava a resposta como enviada assim que entrava na fila; agora ela so vale quando o WhatsApp confirmou."""
+    try:
+        cid = robo_store.id_da_conversa("whatsapp", saida.get("contato", ""))
+        conversa = await robo_store.obter_conversa(uid, cid)
+        if not conversa:
+            return
+        mudou = False
+        for m in conversa.get("mensagens") or []:
+            if m.get("meta_id") == saida.get("id"):
+                m["entrega"] = "enviada" if ok else "falhou"
+                if not ok:
+                    m["erro"] = (erro or "o WhatsApp não confirmou o envio")[:200]
+                mudou = True
+        if mudou:
+            await robo_store.salvar_conversa(uid, conversa)
+    except Exception as exc:  # reforco: nunca derruba o resultado do envio
+        print(f"Conector: falha ao marcar a entrega na conversa: {exc}")
 
 
 # ------------------------------------------------------------------ saude do numero

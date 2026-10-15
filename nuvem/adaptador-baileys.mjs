@@ -19,6 +19,35 @@ const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 // ------------------------------------------------------------------ ids
 
 /** "5511999990000:12@s.whatsapp.net" -> "5511999990000@c.us"; grupos e @lid ficam como estão. */
+/**
+ * Confirmação de envio: `sendMessage` volta assim que a mensagem sai daqui, mesmo que o WhatsApp a recuse depois (número
+ * restrito, conta limitada). Só vale como enviada quando o servidor do WhatsApp confirma (status 2 ou mais).
+ * 0 = erro, 1 = pendente, 2 = servidor recebeu, 3 = entregue, 4 = lida.
+ */
+export function criarRastreadorDeEntrega() {
+  const nivel = new Map();      // id -> maior status visto
+  const esperando = new Map();  // id -> [resolver]
+  const registrar = (id, status) => {
+    if (!id) return;
+    const n = Number(status);
+    if (!Number.isFinite(n)) return;
+    const atual = nivel.get(id);
+    if (n !== 0 && atual !== undefined && n <= atual) return;
+    nivel.set(id, n);
+    if (nivel.size > 500) nivel.delete(nivel.keys().next().value);
+    if (n === 0 || n >= 2) for (const r of esperando.get(id) || []) r(n);
+    if (n === 0 || n >= 2) esperando.delete(id);
+  };
+  const aguardar = (id, ms = 25000) => new Promise((resolve) => {
+    const ja = nivel.get(id);
+    if (ja === 0 || (ja !== undefined && ja >= 2)) { resolve(ja); return; }
+    const t = setTimeout(() => { esperando.set(id, (esperando.get(id) || []).filter((x) => x !== fim)); resolve(null); }, ms);
+    const fim = (n) => { clearTimeout(t); resolve(n); };
+    esperando.set(id, [...(esperando.get(id) || []), fim]);
+  });
+  return { registrar, aguardar, nivel: (id) => nivel.get(id) };
+}
+
 export function paraChatId(jid) {
   const j = String(jid || '');
   const [usuario, servidor] = j.split('@');
@@ -103,6 +132,7 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
   let sock = null;
   let parado = false;
   let pronto = false;
+  const entregas = criarRastreadorDeEntrega();
   let jaPediuCodigo = false;
   let tentativas = 0;
 
@@ -145,6 +175,9 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
     s.ev.on('messaging-history.set', ({ messages }) => {
       for (const m of messages || []) { try { guardar(m); } catch { /* uma mensagem estranha não derruba o resto */ } }
     });
+    // confirmações do WhatsApp para o que enviamos (servidor recebeu, entregue, lida)
+    s.ev.on('messages.update', (lista) => { for (const u of lista || []) entregas.registrar(u?.key?.id, u?.update?.status); });
+    s.ev.on('message-receipt.update', (lista) => { for (const u of lista || []) if (u?.key?.fromMe) entregas.registrar(u.key.id, u.receipt?.readTimestamp ? 4 : 3); });
     s.ev.on('messages.upsert', ({ messages, type }) => {
       for (const m of messages || []) {
         try {
@@ -215,8 +248,13 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
         await dormir(espera);
         await sock.sendPresenceUpdate('paused', jid).catch(() => {});
         const enviada = await sock.sendMessage(jid, { text: texto });
-        if (enviada) guardar({ ...enviada, key: { ...enviada.key, fromMe: true }, message: { conversation: texto }, status: 2 });
-        return { ok: true };
+        if (!enviada?.key?.id) return { ok: false, erro: 'o WhatsApp não devolveu o envio' };
+        // só conta como enviada quando o servidor do WhatsApp confirma; sem isso a tela dizia "enviado" e o celular não tinha nada
+        const confirmacao = await entregas.aguardar(enviada.key.id, 25000);
+        if (confirmacao === 0) return { ok: false, erro: 'o WhatsApp recusou a mensagem (o número pode estar restrito)' };
+        if (confirmacao === null) return { ok: false, erro: 'o WhatsApp não confirmou o envio (o número pode estar restrito ou sem conexão)' };
+        guardar({ ...enviada, key: { ...enviada.key, fromMe: true }, message: { conversation: texto }, status: confirmacao });
+        return { ok: true, entrega: confirmacao };
       } catch (e) {
         return { ok: false, erro: String(e.message || e).slice(0, 200) };
       }
@@ -225,8 +263,11 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
     async enviarNoChat(chatId, texto) {
       if (!sock || !pronto) throw new Error('O WhatsApp não está conectado agora.');
       const enviada = await sock.sendMessage(paraJid(chatId), { text: texto });
-      const msg = { ...(enviada || {}), key: { ...(enviada?.key || {}), remoteJid: paraJid(chatId), fromMe: true }, message: { conversation: texto }, status: 2 };
-      if (!msg.key.id) msg.key.id = `local_${Date.now()}`;
+      if (!enviada?.key?.id) throw new Error('o WhatsApp não devolveu o envio');
+      const confirmacao = await entregas.aguardar(enviada.key.id, 25000);
+      if (confirmacao === 0) throw new Error('o WhatsApp recusou a mensagem (o número pode estar restrito)');
+      if (confirmacao === null) throw new Error('o WhatsApp não confirmou o envio: a mensagem pode não ter chegado');
+      const msg = { ...enviada, key: { ...enviada.key, remoteJid: paraJid(chatId), fromMe: true }, message: { conversation: texto }, status: confirmacao };
       guardar(msg);
       return resumoBaileys(msg);
     },

@@ -1895,6 +1895,30 @@ async def conector_espelho(req: ConectorEspelho, request: Request):
     return {"ok": True}
 
 
+@app.post("/api/robo/whats/teste")
+async def whats_teste(user: dict = Depends(get_current_user)):
+    """Manda uma mensagem do numero conectado para ele mesmo: a prova de que o envio chega no WhatsApp de verdade."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    uid = user.get("uid")
+    canal = await robo_store.canal_do_usuario(uid) or {}
+    numero = re.sub(r"\D", "", str(canal.get("cw_numero") or ""))
+    if not canal.get("cw_hash") or len(numero) < 10:
+        raise HTTPException(status_code=409, detail="O WhatsApp ainda não está conectado.")
+    sid = await conector_whatsapp.enfileirar_resposta(
+        {**canal, "uid": uid}, numero, "Teste do LeadSage: se esta mensagem chegou no seu WhatsApp, o envio está funcionando.")
+    return {"id": sid}
+
+
+@app.get("/api/robo/whats/teste/{sid}")
+async def whats_teste_status(sid: str, user: dict = Depends(get_current_user)):
+    uid = user.get("uid")
+    s = await conector_whatsapp._obter_saida(uid, sid)
+    if not s:
+        raise HTTPException(status_code=404, detail="Teste não encontrado.")
+    canal = await robo_store.canal_do_usuario(uid) or {}
+    return {"status": s.get("status", ""), "erro": s.get("erro", ""), "numero": canal.get("cw_numero", "")}
+
+
 @app.get("/api/robo/whats/estado")
 async def whats_estado(user: dict = Depends(get_current_user)):
     """A conexao do WhatsApp vista de qualquer aparelho: QR code, codigo de pareamento, online."""
@@ -2005,6 +2029,7 @@ async def conector_resultado(tarefa_id: str, req: ConectorResultado, request: Re
     canal = await _canal_do_conector(request)
     if not await conector_whatsapp.registrar_resultado(canal, tarefa_id, req.ok, req.erro):
         raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
+    await _gravar_canal_do_conector(canal)  # falhas seguidas e pausas ficam no canal
     return {"ok": True}
 
 

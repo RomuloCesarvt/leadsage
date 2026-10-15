@@ -419,6 +419,14 @@ export const api = {
     return await fetchWithToken(`/robo/fila/${encodeURIComponent(id)}/enviado`, { method: 'POST' });
   },
 
+  async whatsTeste(): Promise<{ id: string }> {
+    return await fetchWithToken('/robo/whats/teste', { method: 'POST' });
+  },
+
+  async whatsTesteStatus(id: string): Promise<{ status: string; erro: string; numero: string }> {
+    return await fetchWithToken(`/robo/whats/teste/${encodeURIComponent(id)}`);
+  },
+
   async conectorFila(): Promise<EstadoFilaWhats> {
     return await fetchWithToken('/robo/conector/fila');
   },
