@@ -251,6 +251,20 @@ def test_descartar_tira_da_fila_sem_enviar_e_nao_mexe_no_que_ja_saiu(rodar, com_
     assert status == {"f_A": "enviado", "f_B": "pulado"}
 
 
+def test_descartar_todos_esvazia_a_fila_e_preserva_o_enviado(rodar, com_robo):
+    p = Pontas()
+    revisar(rodar, [lead("A", email="a@b.com"), lead("B", phone="14998003784"), lead("C", phone="14998003785")], p)
+    rodar(fila_envio.aprovar, UID, ["f_A"], p.enviar, p.pode, p.cobrar, 0)        # A sai; B e C seguem como rascunho
+    assert rodar(fila_envio.descartar_todos, UID) == 2
+    status = {i["id"]: i["status"] for i in rodar(fila_envio.listar, UID)}
+    assert status == {"f_A": "enviado", "f_B": "pulado", "f_C": "pulado"}
+    assert rodar(fila_envio.descartar_todos, UID) == 0                            # repetir nao quebra
+
+
+def test_rota_descartar_todos(client, com_robo):
+    assert client.post("/api/robo/fila/descartar-todos").json()["descartadas"] == 0
+
+
 def test_rotas_de_revisao(client, com_robo):
     from app.main import app  # noqa: F401
     r = client.post("/api/robo/fila/aprovar", json={"ids": []})

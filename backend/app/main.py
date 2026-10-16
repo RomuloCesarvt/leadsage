@@ -1218,6 +1218,14 @@ async def fila_descartar(req: FilaIdsRequest, user: dict = Depends(get_current_u
     return {"descartadas": n, "resumo": fila_envio.resumo(await fila_envio.listar(user.get("uid")))}
 
 
+@app.post("/api/robo/fila/descartar-todos")
+async def fila_descartar_todos(user: dict = Depends(get_current_user)):
+    """Esvazia a fila inteira de uma vez (rascunhos, pendentes, com falha); o que ja foi enviado fica."""
+    await exigir_recurso(user, "ia_abordagem", "O disparo")
+    n = await fila_envio.descartar_todos(user.get("uid"))
+    return {"descartadas": n, "resumo": fila_envio.resumo(await fila_envio.listar(user.get("uid")))}
+
+
 @app.post("/api/robo/fila/{item_id}/enviado")
 async def fila_marcar_enviado(item_id: str, user: dict = Depends(get_current_user)):
     await exigir_recurso(user, "ia_abordagem", "O disparo")

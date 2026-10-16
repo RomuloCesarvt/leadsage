@@ -407,6 +407,9 @@ export const api = {
     return await fetchWithToken('/robo/fila/aprovar', { method: 'POST', body: JSON.stringify({ ids }) });
   },
 
+  async filaDescartarTodos(): Promise<{ descartadas: number; resumo: ResumoFila }> {
+    return await fetchWithToken('/robo/fila/descartar-todos', { method: 'POST' });
+  },
   async filaDescartar(ids: string[]): Promise<{ descartadas: number; resumo: ResumoFila }> {
     return await fetchWithToken('/robo/fila/descartar', { method: 'POST', body: JSON.stringify({ ids }) });
   },

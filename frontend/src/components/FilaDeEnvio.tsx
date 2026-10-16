@@ -271,6 +271,20 @@ export const FilaDeEnvio: React.FC = () => {
     finally { setTrabalhando(''); }
   };
 
+  const descartaveis = rascunhos.length + itens.filter(i => i.status === 'pendente').length + comProblema.length;
+  const descartarTodos = async () => {
+    if (!descartaveis) return;
+    if (!window.confirm(`Descartar TODAS as ${descartaveis} mensagens da fila (para revisar, esperando para sair e com problema)? Elas não serão enviadas. O que já foi enviado não muda.`)) return;
+    setTrabalhando('descartar');
+    try {
+      const r = await api.filaDescartarTodos();
+      setResumo(r.resumo);
+      setSel(new Set());
+      await carregar();
+    } catch (err: any) { setErro(err?.message || 'Não foi possível descartar a fila.'); }
+    finally { setTrabalhando(''); }
+  };
+
   // ------------------------------------------------------------ ações por item
   const copiar = async (id: string, texto: string) => {
     try { await navigator.clipboard.writeText(texto); setCopiado(id); setTimeout(() => setCopiado(''), 2000); } catch { /* o texto segue visível */ }
@@ -507,6 +521,12 @@ export const FilaDeEnvio: React.FC = () => {
       <section className="space-y-3">
         <div className="flex items-center gap-2">
           <h2 className="font-bold text-slate-800 flex-1">2. Revisar e enviar</h2>
+          {descartaveis > 0 && (
+            <button onClick={descartarTodos} disabled={!!trabalhando}
+              className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-red-300 hover:text-red-700 disabled:opacity-40 text-slate-600 text-xs font-bold flex items-center gap-1.5">
+              <Trash2 className="w-3.5 h-3.5" /> Descartar todas ({descartaveis})
+            </button>
+          )}
           <button onClick={() => { void carregar(); void carregarWhats(); }} title="Atualizar" className="p-2 rounded-lg hover:bg-slate-100 text-slate-500">
             <RefreshCw className={`w-4 h-4 ${carregando ? 'animate-spin' : ''}`} />
           </button>

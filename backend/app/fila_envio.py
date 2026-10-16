@@ -555,6 +555,18 @@ async def descartar(uid: str, ids: List[str]) -> int:
     return n
 
 
+async def descartar_todos(uid: str) -> int:
+    """Esvazia a fila: tudo que ainda nao saiu (rascunho, pendente, esperando limite, com falha). Nao mexe no que esta saindo agora."""
+    n = 0
+    for item in await listar(uid):
+        if item.get("status") in EDITAVEIS:
+            item["status"] = "pulado"
+            item["motivo"] = "fila descartada pelo usuário"
+            await _gravar(uid, item)
+            n += 1
+    return n
+
+
 async def aprovar(uid: str, ids: List[str], enviar_email: EnviarEmail, pode_enviar: PodeEnviar,
                   cobrar_email: Cobrar, pausa: float = 0.8) -> Dict[str, Any]:
     """Libera para sair as mensagens revisadas.
