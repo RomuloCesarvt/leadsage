@@ -84,3 +84,12 @@ def test_admin_ve_de_onde_vieram_os_creditos_do_usuario(client, admin, rodar):
 def test_creditos_de_outro_usuario_so_para_admin(client, monkeypatch):
     monkeypatch.setattr(settings, "ADMIN_EMAILS", "outro@x.com")
     assert client.get("/api/admin/usuarios/bia/creditos").status_code == 403
+
+
+def test_lista_extra_soma_com_a_principal_e_tambem_nao_e_admin(monkeypatch):
+    monkeypatch.setattr(settings, "ADMIN_EMAILS", "dono@x.com")
+    monkeypatch.setattr(settings, "ILIMITADOS_EMAILS", "alice@example.com")
+    monkeypatch.setattr(settings, "ILIMITADOS_EXTRAS", "Thais@Example.com")
+    assert cs.acesso_total("thais@example.com") is True and cs.is_admin("thais@example.com") is False
+    assert cs.acesso_total("alice@example.com") is True               # a lista principal continua valendo
+    assert cs.acesso_total("outra@x.com") is False

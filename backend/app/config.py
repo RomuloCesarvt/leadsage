@@ -41,6 +41,8 @@ class Settings(BaseModel):
     # E-mails com ACESSO TOTAL: creditos infinitos, todos os recursos do plano maximo e sites sem limite de vagas.
     # Nao sao admin: nao veem o painel de administracao nem dados de outros usuarios.
     ILIMITADOS_EMAILS: str = os.getenv("ILIMITADOS_EMAILS", "")
+    # Mais e-mails com acesso total, somados aos de cima (assim da para acrescentar uma pessoa sem reescrever a lista toda).
+    ILIMITADOS_EXTRAS: str = os.getenv("ILIMITADOS_EXTRAS", "")
     # Contas que usam o sistema sem ver a area de assinatura e compra de creditos.
     HIDE_SUBSCRIPTION_EMAILS: str = os.getenv("HIDE_SUBSCRIPTION_EMAILS", "")
     # Segredo do servico "LeadSage Nuvem" (o WhatsApp de cada usuario ligado num servidor). Vazio = recurso desligado.
@@ -90,7 +92,7 @@ class Settings(BaseModel):
 
     @property
     def ilimitados_emails(self) -> set:
-        return {e.strip().lower() for e in self.ILIMITADOS_EMAILS.split(",") if e.strip()}
+        return {e.strip().lower() for e in f"{self.ILIMITADOS_EMAILS},{self.ILIMITADOS_EXTRAS}".split(",") if e.strip()}
 
     @property
     def sem_assinatura_emails(self) -> set:
