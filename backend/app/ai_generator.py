@@ -161,7 +161,7 @@ O RAMO DESTE NEGÓCIO
 
 {abordagem_mestra.TEMPERATURA}
 
-{abordagem_mestra.estrutura(assina, sem_site=sem_site, previa=(req.previa or ''))}
+{abordagem_mestra.estrutura(assina, sem_site=sem_site, previa=(req.previa or ''), canal=canal, lead_id=str(lead.id), variacao=req.variacao, evitar=req.evitar)}
 
 {abordagem_mestra.GATILHOS}
 
@@ -266,8 +266,11 @@ class AIGenerator:
 
         seguimentos: List[Dict[str, str]] = []
         if getattr(req, "com_seguimentos", False):
-            seguimentos, extras = await AIGenerator.generate_followups(req, str(dados.get("body") or ""), api_key=active_key)
-            problemas += extras
+            try:
+                seguimentos, extras = await AIGenerator.generate_followups(req, str(dados.get("body") or ""), api_key=active_key)
+                problemas += extras
+            except Exception as exc:  # os seguimentos sao um extra: a primeira mensagem nunca falha por causa deles
+                problemas.append(f"os seguimentos não puderam ser escritos agora ({str(exc)[:80]})")
 
         return PitchGenerationResponse(
             lead_id=lead.id,

@@ -164,7 +164,7 @@ def test_abordagem_fria_com_aviso_de_sair_intervalo_e_funil(client, chave, rodar
     t = client.get("/api/conector/tarefas", headers=cabecalho(chave)).json()
     [tarefa] = t["tarefas"]
     assert tarefa["tipo"] == "abordagem" and tarefa["id"] == "fila:f_L1" and tarefa["contato"] == "5514998003784"
-    assert "responder SAIR" in tarefa["texto"]
+    assert "responder SAIR" not in tarefa["texto"]  # sem aviso de SAIR no WhatsApp
 
     # a segunda espera o intervalo
     t2 = client.get("/api/conector/tarefas", headers=cabecalho(chave)).json()
@@ -308,7 +308,7 @@ def test_editor_envia_pelo_conector(client, chave, rodar):
     item = rodar(fila_envio.obter, "alice", "f_L9")
     assert item["prioridade"] == 1 and item["contato"]["phone"] == "5514998003786"
     t = client.get("/api/conector/tarefas", headers=cabecalho(chave)).json()
-    assert t["tarefas"][0]["contato"] == "5514998003786" and "responder SAIR" in t["tarefas"][0]["texto"]
+    assert t["tarefas"][0]["contato"] == "5514998003786" and "responder SAIR" not in t["tarefas"][0]["texto"]
     assert client.post("/api/robo/conector/enviar", json={"lead_id": "L1", "telefone": "123", "texto": "oi"}).status_code == 422
 
 

@@ -140,7 +140,56 @@ def quem_sou(sender_name: str) -> str:
     return f"Eu sou da {nome} e ajudo negócios locais a serem encontrados e escolhidos no Google"
 
 
-def estrutura(sender_name: str, agora: Optional[datetime] = None, sem_site: bool = True, previa: str = "") -> str:
+ESTRUTURA_WHATSAPP = """COMO ESCREVER A PRIMEIRA MENSAGEM (prosa corrida, de 4 a 6 frases curtas, em linhas curtas, sem listas)
+1. {saudacao}, <nome da pessoa se estiver no dossiê>! + quem você é em UMA frase curta: "{apresentacao}".
+2. COMO ACHOU E A REPUTAÇÃO: diz que encontrou o negócio pesquisando no Google e cita o dado REAL do dossiê (nota, número de
+   avaliações ou o que os clientes elogiam). Elogio verdadeiro, sem exagero.
+3. {lacuna}
+4. {previa_c}
+5. {pergunta}
+ESTILO DESTA MENSAGEM (para ela ser diferente das outras do lote): {estilo}
+{evitar}"""
+
+ESTILOS_DE_ABERTURA = (
+    "abra pela reputação: comece citando a nota ou as avaliações e só depois se apresente.",
+    "abra com o cumprimento e o nome, apresente-se e vá direto ao que achou no Google.",
+    "abra com uma observação específica sobre o negócio (algo que os clientes elogiam) e depois se apresente.",
+    "tom bem informal, como mensagem de WhatsApp entre conhecidos do bairro, com frases bem curtas.",
+    "abra contando que estava pesquisando o ramo no Google quando viu o negócio; depois fale da nota.",
+    "abra falando da prévia: diga que fez algo para a pessoa e explique por quê (reputação boa, mas sem site).",
+)
+
+
+def estilo_da_mensagem(lead_id: str = "", variacao: int = 0) -> str:
+    """Um jeito de abrir que muda de um lead para outro (estavel por lead; a tentativa seguinte troca)."""
+    base = sum(ord(c) for c in str(lead_id or "")) + int(variacao or 0)
+    return ESTILOS_DE_ABERTURA[base % len(ESTILOS_DE_ABERTURA)]
+
+
+def estrutura(sender_name: str, agora: Optional[datetime] = None, sem_site: bool = True, previa: str = "",
+              canal: str = "", lead_id: str = "", variacao: int = 0, evitar: Optional[list] = None) -> str:
+    if (canal or "").startswith("whatsapp"):
+        lacuna = ("Diz que, apesar dessa reputação, NÃO encontrou o site do negócio (como afirmação, sem ponto de interrogação)."
+                  if sem_site else
+                  "Cite com respeito UM ponto concreto do site atual SÓ se estiver no diagnóstico do dossiê; senão diga apenas que olhou o site e viu espaço para mostrá-lo melhor.")
+        if previa == "oferecer":
+            previa_c = ("Diz que, por isso, pode montar uma prévia do site dele(a) sem custo, para apresentar e mostrar o quanto isso pode ajudar "
+                        "ainda mais o negócio (mais gente achando e chamando no WhatsApp). NÃO diga que já existe. Não mande link.")
+            pergunta = 'UMA pergunta de sim, no fim: "posso montar essa prévia para você dar uma olhada, sem compromisso?" (adapte, com suas palavras).'
+        else:
+            previa_c = ("Diz que, por isso, criou uma prévia do site dele(a), já pronta, para apresentar e mostrar o quanto isso pode ajudar ainda mais "
+                        "o negócio (mais gente achando e chamando no WhatsApp). Não mande o link neste primeiro toque.")
+            pergunta = 'UMA pergunta de sim, no fim: "posso te enviar o link da prévia por aqui, sem compromisso?" (adapte, com suas palavras).'
+        passadas = [str(x).strip()[:80] for x in (evitar or []) if str(x).strip()][:6]
+        return ESTRUTURA_WHATSAPP.format(
+            saudacao=saudacao_do_horario(agora), apresentacao=quem_sou(sender_name), lacuna=lacuna, previa_c=previa_c,
+            pergunta=pergunta, estilo=estilo_da_mensagem(lead_id, variacao),
+            evitar=("NÃO comece como estas mensagens já usadas neste lote: " + " | ".join(f'"{p}"' for p in passadas)) if passadas else "",
+        )
+    return _estrutura_longa(sender_name, agora, sem_site, previa)
+
+
+def _estrutura_longa(sender_name: str, agora: Optional[datetime] = None, sem_site: bool = True, previa: str = "") -> str:
     """`previa`: "criada", "oferecer" ou vazio (comportamento antigo: montou e oferece mostrar por aqui ou em 10 minutos)."""
     ponto = PONTO_SEM_SITE if sem_site else PONTO_COM_SITE
     antigo_c = ("   c) Diga que montou uma prévia de como o site dele poderia ficar e que gostaria de apresentá-la sem obrigação nenhuma.")
@@ -171,7 +220,7 @@ _APRESENTACAO = re.compile(
 def revisar_calor(texto: str, canal: str = "email") -> list:
     """Defeitos de frieza: sem cumprimento ou sem dizer quem escreve."""
     problemas = []
-    inicio = " ".join((texto or "").split()[:10])
+    inicio = " ".join((texto or "").split()[:20])
     if not _CUMPRIMENTO.search(inicio):
         problemas.append("não começa cumprimentando (Oi/Olá/Bom dia + o nome, se souber); está seco demais")
     if not _APRESENTACAO.search(texto or ""):

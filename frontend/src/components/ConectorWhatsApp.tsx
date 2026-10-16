@@ -325,7 +325,7 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
             <span>
               Isso usa o <b>WhatsApp Web</b>, e não a API oficial da Meta. O WhatsApp pode <b>restringir ou banir o número</b>.
               Use um número secundário e não aumente o ritmo: no começo o robô envia poucas abordagens por dia,
-              com intervalo entre elas, e a cada mensagem avisa que a pessoa pode responder SAIR.
+              de 3 a 7 minutos entre elas, de segunda a sábado, no melhor horário de cada ramo. Quem pedir para parar nunca mais recebe mensagem.
             </span>
           </div>
           <label className="flex items-start gap-2 text-xs text-slate-700 cursor-pointer">
@@ -360,6 +360,12 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
             </p>
           )}
           {conectado && <TesteDeEnvio />}
+          {conectado && (
+            <p className="text-xs text-slate-500 leading-relaxed">
+              <b>Dica que aumenta as respostas:</b> no WhatsApp do celular, coloque uma foto (seu rosto ou o logotipo), o nome da empresa e uma descrição curta no perfil.
+              Número sem foto e sem nome parece golpe, e as pessoas não respondem nem salvam o contato.
+            </p>
+          )}
           {conectado && <SaudeDoNumeroPainel numero={remoto?.numero || cfg.conector_numero || ''} ativo={ativo} />}
           {nuvem ? (
             <ol className="text-sm text-slate-700 list-decimal pl-5 space-y-1">

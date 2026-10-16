@@ -152,7 +152,30 @@ def visao(canal: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+# Melhor horario por ramo (Brasilia): o dono atende o WhatsApp quando nao esta no pico do negocio dele.
+# (palavras do ramo sem acento, dias da semana 0=segunda..6=domingo, janelas em horas decimais)
+JANELAS_DO_RAMO = (
+    (("odont", "dentist", "clinic", "medic", "saude", "psicolog", "terap", "fisio", "nutri", "estetic", "veterin"), (0, 1, 2, 3, 4), ((9, 11.5), (14, 16.5))),
+    (("restaurante", "pizz", "lanch", "hamburg", "churrasc", "bar ", "bistro", "sushi", "marmit"), (0, 1, 2, 3, 4), ((14.5, 17.5),)),
+    (("padaria", "confeit", "cafe", "doceria", "sorvet", "acai"), (0, 1, 2, 3, 4), ((13.5, 16.5),)),
+    (("barbear", "salao", "cabelei", "beleza", "manicure", "tatuag"), (1, 2, 3, 4, 5), ((9, 12), (14, 17))),
+    (("advoga", "juridic", "contab", "imobili", "consult", "seguro"), (0, 1, 2, 3, 4), ((9, 11.5), (14, 17))),
+    (("academia", "fitness", "crossfit", "pilates", "danca", "esporte"), (0, 1, 2, 3, 4), ((9, 11), (14, 16))),
+)
+
 FUSO_BRASIL = timezone(timedelta(hours=-3))
+_sem_acento = lambda t: __import__("unicodedata").normalize("NFKD", t or "").encode("ascii", "ignore").decode().lower()
+
+
+def janela_do_ramo(ramo: str, agora: datetime) -> bool:
+    """O horario combina com o ramo? Ramo sem regra propria vale a janela geral (seg a sab, 8h as 19h)."""
+    h = agora.astimezone(FUSO_BRASIL)
+    alvo = f" {_sem_acento(ramo)} "
+    for palavras, dias, janelas in JANELAS_DO_RAMO:
+        if any(p in alvo for p in palavras):
+            hora = h.hour + h.minute / 60
+            return h.weekday() in dias and any(a <= hora < b for a, b in janelas)
+    return janela_aberta(agora)
 _sortear = random.randint  # trocado nos testes
 
 
@@ -308,6 +331,29 @@ def _digitando_ms(texto: str) -> int:
     return min(9000, 1200 + 45 * len(texto or ""))
 
 
+def _pontos_de_reputacao(item: Dict[str, Any]) -> float:
+    try:
+        return float(item.get("nota") or 0) if int(item.get("avaliacoes") or 0) >= 10 else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
+_ULTIMA_PROMOCAO: Dict[str, float] = {}
+PROMOVER_A_CADA_S = 300
+
+
+async def _promover_seguimentos_vencidos(uid: str) -> None:
+    """De tempos em tempos, seguimentos que venceram entram na fila (a menos que a pessoa tenha respondido)."""
+    agora_m = time.monotonic()
+    if agora_m - _ULTIMA_PROMOCAO.get(uid, 0.0) < PROMOVER_A_CADA_S:
+        return
+    _ULTIMA_PROMOCAO[uid] = agora_m
+    try:
+        await fila_envio.promover_seguimentos(uid)
+    except Exception as exc:  # reforco: nunca derruba a entrega de tarefas
+        print(f"Conector: falha ao promover seguimentos: {exc}")
+
+
 async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Dict[str, Any]:
     """O que o Conector deve enviar agora: respostas primeiro, depois uma fria no máximo."""
     agora = agora or _agora_dt()
@@ -321,19 +367,24 @@ async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Di
             saida.append({"id": s["id"], "tipo": "resposta", "contato": s["contato"], "texto": s["texto"],
                           "chat_id": s.get("chat_id", ""), "digitando_ms": _digitando_ms(s["texto"])})
 
+    await _promover_seguimentos_vencidos(uid)
     itens = await _fila_whatsapp(uid)
     hoje = agora.strftime("%Y-%m-%d")
     frios_hoje = int(canal.get("cw_frio_n") or 0) if canal.get("cw_frio_dia") == hoje else 0
     limite = limite_frio_do_dia(canal, agora)
 
-    pendentes = sorted(
+    todos_pendentes = sorted(
         (i for i in itens if i.get("canal") == "whatsapp" and _disponivel(i, agora)
          and len(telefone_whatsapp((i.get("contato") or {}).get("phone", ""))) >= 12),
-        # quem o usuario mandou enviar agora vai na frente
-        key=lambda i: (0 if i.get("prioridade") else 1, i.get("criado") or ""),
+        # quem o usuario mandou enviar agora vai na frente; depois, quem tem a melhor reputacao (dono mais engajado)
+        key=lambda i: (0 if i.get("prioridade") else 1, -_pontos_de_reputacao(i), i.get("criado") or ""),
     )
+    # so sai quem esta no melhor horario do proprio ramo; os outros esperam a vez deles
+    pendentes = [i for i in todos_pendentes if i.get("prioridade") or janela_do_ramo(i.get("ramo", ""), agora)]
     prioritario = bool(pendentes and pendentes[0].get("prioridade"))
     pode, motivo_politica, _ = politica_frio(canal, agora, prioritario)
+    if todos_pendentes and not pendentes and pode:
+        pode, motivo_politica = False, "fora do melhor horário para o ramo dos contatos na fila (cada ramo tem a sua janela)"
 
     motivo_sem_frio = ""
     if frios_hoje >= limite:
@@ -348,7 +399,7 @@ async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Di
             canal["cw_ultimo_frio"] = agora.isoformat()
             canal["cw_frio_dia"], canal["cw_frio_n"] = hoje, frios_hoje + 1
             agendar_proxima_fria(canal, agora, frios_hoje + 1)
-            texto = i["texto"] if "responder SAIR" in i["texto"] else i["texto"].rstrip() + AVISO_SAIR
+            texto = i["texto"]  # sem aviso de "responda SAIR": parece disparo em massa; quem pede para sair e atendido pelo robo
             saida.append({"id": f"fila:{i['id']}", "tipo": "abordagem",
                           "contato": telefone_whatsapp(i["contato"]["phone"]), "texto": texto,
                           "digitando_ms": _digitando_ms(texto)})

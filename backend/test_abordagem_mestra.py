@@ -61,7 +61,7 @@ def test_prompt_tem_o_metodo_completo():
     req = PitchGenerationRequest(lead=lead(), channel="whatsapp", tone="Direto", sender_name="Sites Já", user_product="Site profissional",
                                  service_brief=am.produto({}, None, "Site profissional"))
     p = _prompt_da_abordagem(req, "whatsapp")
-    for trecho in ("CUMPRIMENTO", "QUEM É VOCÊ", "O PRODUTO", "GATILHOS", "O RAMO DESTE NEGÓCIO", "TEMPERATURA", "Agora é"):
+    for trecho in ("COMO ESCREVER A PRIMEIRA MENSAGEM", "quem você é em UMA frase", "ESTILO DESTA MENSAGEM", "O PRODUTO", "GATILHOS", "O RAMO DESTE NEGÓCIO", "TEMPERATURA", "Agora é"):
         assert trecho in p, trecho
     assert "Eu sou da Sites Já" in p
     assert "Nunca por saudação" not in p
@@ -86,9 +86,9 @@ def test_lead_sem_site_reconhece_redes_e_agregadores():
 def test_prompt_pede_achei_no_google_e_a_previa():
     req = PitchGenerationRequest(lead=lead(site_status="none"), channel="whatsapp", sender_name="Sites Já", user_product="Site")
     p = _prompt_da_abordagem(req, "whatsapp")
-    assert "pesquisando no Google" in p and "prévia" in p and "confirmar se realmente" in p
+    assert "pesquisando no Google" in p and "prévia" in p and "NÃO encontrou o site" in p
     com_site = _prompt_da_abordagem(PitchGenerationRequest(lead=lead(site_status="own"), channel="whatsapp", sender_name="X"), "whatsapp")
-    assert "NÃO diga que não achou" in com_site
+    assert "ponto concreto do site atual" in com_site and "NÃO encontrou o site" not in com_site
 
 
 # ------------------------------------------------------------------ previa criada ou a oferecer
@@ -122,3 +122,33 @@ def test_servidor_descobre_se_a_previa_existe(rodar, com_robo):
     rodar(create_site, "alice", "Padaria", "<html><body>x</body></html>", "", "L1")
     assert rodar(main._previa_do_lead, "alice", "L1") == "criada"
     assert rodar(main._previa_do_lead, "alice", "L2") == "oferecer"
+
+
+# ------------------------------------------------------------------ whatsapp: curta, completa e diferente de uma para outra
+
+def test_whatsapp_pede_as_cinco_partes_em_45_a_65_palavras_e_email_continua_longo():
+    req = PitchGenerationRequest(lead=lead(site_status="none"), channel="whatsapp", sender_name="Sites Já", user_product="Site", previa="criada")
+    p = _prompt_da_abordagem(req, "whatsapp")
+    assert "de 45 a 65 palavras" in p and "no máximo 65 palavras" in p
+    for parte in ("quem você é", "pesquisando no Google", "reputação", "NÃO encontrou o site", "criou uma prévia", "mostrar o quanto isso pode ajudar", "posso te enviar o link"):
+        assert parte in p, parte
+    longo = _prompt_da_abordagem(PitchGenerationRequest(lead=lead(site_status="none"), channel="email", sender_name="X"), "email")
+    assert "CUMPRIMENTO humano" in longo and "COMO ESCREVER A PRIMEIRA MENSAGEM" not in longo
+
+
+def test_cada_lead_abre_de_um_jeito_e_a_tentativa_seguinte_troca():
+    estilos = {am.estilo_da_mensagem(f"lead-{i}") for i in range(40)}
+    assert len(estilos) == len(am.ESTILOS_DE_ABERTURA)             # os seis jeitos aparecem
+    assert am.estilo_da_mensagem("x", 0) != am.estilo_da_mensagem("x", 1)
+    assert am.estilo_da_mensagem("x", 3) == am.estilo_da_mensagem("x", 3)   # estavel para o mesmo lead e tentativa
+
+
+def test_aberturas_ja_usadas_entram_no_prompt_para_nao_repetir():
+    req = PitchGenerationRequest(lead=lead(), channel="whatsapp", sender_name="X", evitar=["Oi, Ana! Aqui é a Júlia da Sites Já"], variacao=2)
+    p = _prompt_da_abordagem(req, "whatsapp")
+    assert "NÃO comece como estas mensagens já usadas" in p and "Aqui é a Júlia da Sites Já" in p
+
+
+def test_cumprimento_pode_vir_depois_da_reputacao_nos_estilos_variados():
+    texto = "Sua nota 4,9 no Google com 120 avaliações me chamou atenção. Oi, Ana! Sou a Júlia, da Sites Já, e ajudo negócios locais. Posso te mandar uma ideia?"
+    assert [p for p in am.revisar_calor(texto) if "cumprimentando" in p] == []

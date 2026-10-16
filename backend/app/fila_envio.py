@@ -15,7 +15,7 @@ marcar como enviado, o card do lead anda no pipeline para "Contato Enviado".
 """
 import asyncio
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 from urllib.parse import quote
 
@@ -26,6 +26,7 @@ from app.database import AsyncSessionLocal, DBRobo
 from app.firebase_config import db as firestore_db
 from app import robo_store
 from app.robo_store import agora
+agora_iso = agora  # (o parametro `agora` de promover_seguimentos e um datetime)
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
 
@@ -204,6 +205,116 @@ async def _ja_contatado(uid: str, lead_id: str, existentes: List[Dict[str, Any]]
     return ""
 
 
+SEGUIMENTO_DIAS_UTEIS = (2, 5)   # o 1o seguimento 2 dias uteis depois do envio; o 2o, 5 dias uteis depois
+
+
+def dias_uteis_depois(base: datetime, n: int) -> datetime:
+    """n dias uteis (segunda a sexta) depois de `base`."""
+    atual = base
+    while n > 0:
+        atual += timedelta(days=1)
+        if atual.weekday() < 5:
+            n -= 1
+    return atual
+
+
+def agendar_seguimentos(item: Dict[str, Any], base: Optional[datetime] = None) -> None:
+    """Depois de enviada a abordagem de WhatsApp, agenda os 2 seguimentos escritos junto com ela (se houver)."""
+    if item.get("canal") != "whatsapp" or item.get("tipo") == "seguimento" or item.get("agenda_seguimentos"):
+        return
+    base = base or datetime.now(timezone.utc)
+    agenda = []
+    for n, (dias, seg) in enumerate(zip(SEGUIMENTO_DIAS_UTEIS, item.get("seguimentos") or []), start=1):
+        texto = str((seg or {}).get("texto") or "").strip()
+        if texto:
+            agenda.append({"n": n, "ate": dias_uteis_depois(base, dias).isoformat(), "texto": texto[:1200], "estado": "agendado"})
+    if agenda:
+        item["agenda_seguimentos"] = agenda
+
+
+async def promover_seguimentos(uid: str, agora: Optional[datetime] = None) -> int:
+    """Seguimentos que venceram viram itens da fila (e saem no ritmo seguro dos disparos), a menos que a pessoa ja tenha respondido.
+
+    Quem respondeu, ou pediu para sair, nunca recebe seguimento: o robo atende a conversa.
+    """
+    agora = agora or datetime.now(timezone.utc)
+    promovidos = 0
+    for item in await listar(uid):
+        agenda = item.get("agenda_seguimentos") or []
+        if not agenda or item.get("canal") != "whatsapp" or not any(a.get("estado") == "agendado" for a in agenda):
+            continue
+        telefone = re.sub(r"\D", "", (item.get("contato") or {}).get("phone", ""))
+        conversa = await robo_store.obter_conversa(uid, robo_store.id_da_conversa("whatsapp", telefone)) if telefone else None
+        respondeu = bool(conversa) and (conversa.get("optout") or any(m.get("de") == "contato" for m in conversa.get("mensagens") or []))
+        mudou = False
+        for a in agenda:
+            if a.get("estado") != "agendado":
+                continue
+            if respondeu:
+                a["estado"], mudou = "cancelado", True
+                continue
+            quando = datetime.fromisoformat(a["ate"])
+            anterior_ok = all(b.get("estado") != "agendado" for b in agenda if b.get("n", 0) < a.get("n", 0))
+            if quando <= agora and anterior_ok:
+                contato = item.get("contato") or {}
+                await _gravar(uid, {
+                    "id": f"{item['id']}_s{a['n']}", "lead_id": item.get("lead_id", ""), "nome": item.get("nome", ""), "canal": "whatsapp",
+                    "assunto": "", "texto": a["texto"], "link": link_do_canal("whatsapp", {"phone": contato.get("phone", "")}, a["texto"]),
+                    "gancho": f"seguimento {a['n']}", "previa": item.get("previa", ""), "previa_url": item.get("previa_url", ""),
+                    "seguimentos": [], "tipo": "seguimento", "seguimento_de": item["id"], "contato": contato,
+                    "ramo": item.get("ramo", ""), "nota": item.get("nota"), "avaliacoes": item.get("avaliacoes"),
+                    "status": "pendente", "criado": agora_iso(),
+                })
+                a["estado"], mudou = "na_fila", True
+                promovidos += 1
+        if mudou:
+            await _gravar(uid, item)
+    return promovidos
+
+
+LIMIAR_DE_SEMELHANCA = 0.35   # trechos de 3 palavras em comum: acima disso a mensagem parece copia da outra
+
+
+def _trigramas(texto: str) -> set:
+    palavras = re.findall(r"\w+", (texto or "").lower())
+    return {" ".join(palavras[i:i + 3]) for i in range(max(0, len(palavras) - 2))}
+
+
+def semelhanca(a: str, b: str) -> float:
+    """Quanto da menor mensagem aparece na outra (trechos de 3 palavras). 0 = diferentes, 1 = iguais."""
+    ta, tb = _trigramas(a), _trigramas(b)
+    return len(ta & tb) / max(1, min(len(ta), len(tb)))
+
+
+def _abertura(texto: str, palavras: int = 9) -> str:
+    return " ".join((texto or "").split()[:palavras])
+
+
+async def _chamar_gerar(gerar, lead: Dict[str, Any], canal: str, evitar: List[str], variacao: int):
+    """Chama o gerador com as aberturas a evitar, se ele aceitar (os geradores de teste antigos so recebem lead e canal)."""
+    import inspect
+    parametros = inspect.signature(gerar).parameters
+    if "evitar" in parametros or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in parametros.values()):
+        return await gerar(lead, canal, evitar=evitar, variacao=variacao)
+    return await gerar(lead, canal)
+
+
+async def _diferenciar(gerar, lead: Dict[str, Any], canal: str, pronto: Dict[str, Any], usados: List[str]) -> Dict[str, Any]:
+    """Cada mensagem tem de ser diferente das outras do lote: se esta parece copia, pede de novo (ate 2 vezes) sem a mesma abertura."""
+    for tentativa in (1, 2):
+        corpo = (pronto.get("body") or "").strip()
+        parecida = [u for u in usados if semelhanca(corpo, u) >= LIMIAR_DE_SEMELHANCA]
+        if not corpo or not parecida:
+            break
+        try:
+            nova = await _chamar_gerar(gerar, lead, canal, [_abertura(u) for u in parecida[:4]], tentativa)
+        except Exception:
+            break
+        if nova and (nova.get("body") or "").strip() and max((semelhanca(nova["body"], u) for u in usados), default=0) < max((semelhanca(corpo, u) for u in usados), default=0):
+            pronto = nova
+    return pronto
+
+
 async def preparar_lote(
     uid: str,
     leads: List[Dict[str, Any]],
@@ -255,6 +366,7 @@ async def preparar_lote(
     textos = await asyncio.gather(*[escrever(l, c) for l, c in alvos])
 
     # 3) entrega cada uma no canal dela
+    usados: List[str] = [i.get("texto", "") for i in existentes if i.get("canal") == "whatsapp"][:40]
     for (lead, canal), pronto in zip(alvos, textos):
         lid = str(lead["id"])
         nome = lead.get("company") or lead.get("name") or lid
@@ -262,6 +374,9 @@ async def preparar_lote(
             saida.append({"lead_id": lid, "nome": nome, "resultado": "falhou",
                           "motivo": f"não foi possível escrever a mensagem: {str(pronto)[:120]}"})
             continue
+        if canal == "whatsapp":
+            pronto = await _diferenciar(gerar, lead, canal, pronto, usados)
+            usados.append((pronto.get("body") or "").strip())
 
         assunto = (pronto.get("subject") or "").strip()
         corpo = (pronto.get("body") or "").strip()
@@ -283,6 +398,8 @@ async def preparar_lote(
             "previa": pronto.get("previa") or "",
             "previa_url": pronto.get("previa_url") or "",
             "seguimentos": pronto.get("follow_ups") or [],
+            "ramo": str(lead.get("niche") or lead.get("role") or "")[:80],
+            "nota": lead.get("rating"), "avaliacoes": lead.get("rating_count"),
             "contato": {"email": lead.get("email") or "", "phone": lead.get("phone") or "",
                         "instagram": _instagram(lead), "linkedin": _linkedin(lead)},
             "status": "pendente",
@@ -341,6 +458,7 @@ async def marcar_enviado(uid: str, item_id: str) -> Optional[Dict[str, Any]]:
         item["status"] = "enviado"
         item["enviado_em"] = agora()
         item["enviado_por"] = "voce"
+        agendar_seguimentos(item)
         await _gravar(uid, item)
         await pipeline_store.mover(uid, item["lead_id"], "Contato Enviado",
                                    motivo=f"mensagem enviada por você ({ROTULO_CANAL.get(item['canal'], item['canal'])})", por="voce")

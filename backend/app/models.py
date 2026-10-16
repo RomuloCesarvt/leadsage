@@ -121,6 +121,9 @@ class PitchGenerationRequest(BaseModel):
     # A previa do site deste lead: 'criada' (ja existe, a mensagem pede licenca para mandar o link) ou 'oferecer'
     # (nao existe: a mensagem oferece montar). Vazio = o servidor descobre pelos sites do usuario.
     previa: Optional[str] = ""
+    # Para cada mensagem ser diferente das outras do lote: aberturas ja usadas (a nova nao comeca igual) e a tentativa
+    evitar: List[str] = Field(default_factory=list)
+    variacao: int = 0
 
 class FollowupsRequest(BaseModel):
     pitch: PitchGenerationRequest

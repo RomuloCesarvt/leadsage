@@ -22,7 +22,7 @@ import { buscarFotos } from './BancoImagens';
 import type { CanalFila, EstadoFilaWhats, ItemFila, LeadItem, ResultadoPreparo, ResumoFila } from '../types';
 
 const SEM_CONTATO_AINDA = new Set(['', 'Novo Lead', 'Novos', 'Novo']);
-const LOTE = 8;
+const LOTE = 4; // a IA escreve a abertura e os seguimentos de cada lead: lotes menores cabem nos 60 s do servidor
 const MAXIMO_POR_RODADA = 40;
 const EMAIL_OK = /^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/;
 const EM_ANDAMENTO = ['rascunho', 'pendente', 'enviando', 'aguardando_limite', 'falhou'];

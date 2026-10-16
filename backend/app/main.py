@@ -1119,7 +1119,7 @@ async def _funcoes_da_fila(user: dict):
     except Exception:
         sites_do_usuario = []
 
-    async def gerar(lead: Dict[str, Any], canal: str, tom: str = "Consultivo") -> Dict[str, Any]:
+    async def gerar(lead: Dict[str, Any], canal: str, tom: str = "Consultivo", evitar: Optional[List[str]] = None, variacao: int = 0) -> Dict[str, Any]:
         previa = await _previa_do_lead(uid, str(lead.get("id", "")), sites_do_usuario)
         if previa == "criada":
             # prévia feita por uma versão antiga do motor de sites: refeita (mesmo link) antes de o link seguir na mensagem
@@ -1128,6 +1128,9 @@ async def _funcoes_da_fila(user: dict):
         pitch = await AIGenerator.generate_pitch(
             PitchGenerationRequest(lead=_lead_para_pitch(lead), channel=canal, tone=tom,
                                    sender_name=remetente, user_product=produto, previa=previa,
+                                   # o seguimento automatico (2 e 5 dias depois) sai do texto escrito agora
+                                   com_seguimentos=(canal == "whatsapp"),
+                                   evitar=evitar or [], variacao=variacao,
                                    service_brief=abordagem_mestra.produto(canal_robo, lead, produto)),
             api_key=settings.GEMINI_API_KEY,
         )

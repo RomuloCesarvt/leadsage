@@ -150,8 +150,8 @@ FORMATO_CANAL: Dict[str, Dict[str, Any]] = {
         "tom": "escrito, mas conversado, como um profissional educado escreve para alguém que não conhece",
     },
     "whatsapp": {
-        "limite": "de 60 a 95 palavras",
-        "estrutura": "cumprimento (com o nome) e um 'tudo bem?' leve; quem você é; o que viu no negócio e o que muda para ele; uma pergunta fácil. Em linhas curtas",
+        "limite": "de 45 a 65 palavras",
+        "estrutura": "cumprimento (com o nome); quem você é; achou no Google e a reputação REAL dele; não achou o site; por isso criou uma prévia do site dele para apresentar e mostrar o quanto isso pode ajudar; uma pergunta fácil. Em linhas curtas",
         "tom": "mensagem de pessoa, calorosa e respeitosa; sem assunto e sem assinatura formal",
     },
     "instagram_direct": {
@@ -351,8 +351,8 @@ _PROMESSA_NUMERICA = re.compile(
 
 LIMITE_DE_PALAVRAS = {
     "email": 180,
-    "whatsapp": 105,
-    "whatsapp_api": 105,
+    "whatsapp": 75,
+    "whatsapp_api": 75,
     "instagram_direct": 85,
     "linkedin_msg": 120,
     "webhook": 150,

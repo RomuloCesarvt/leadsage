@@ -59,7 +59,7 @@ def test_todo_mercado_esta_completo():
 
 
 @pytest.mark.parametrize("canal,maximo", [
-    ("email", "160"), ("whatsapp", "95"),
+    ("email", "160"), ("whatsapp", "65"),
     ("instagram_direct", "75"), ("linkedin_msg", "110"),
 ])
 def test_cada_canal_tem_limite_proprio(canal, maximo):

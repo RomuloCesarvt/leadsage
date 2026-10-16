@@ -131,3 +131,11 @@ def _ritmo_de_envio_deterministico(monkeypatch):
     monkeypatch.setattr(_cw, "janela_aberta", lambda agora: True)
     monkeypatch.setattr(_cw, "INTERVALO_PRIORIDADE_S", 0)
     monkeypatch.setattr(_cw, "_sortear", lambda a, b: a)  # o menor intervalo, sempre o mesmo
+
+
+@pytest.fixture(autouse=True)
+def _janela_do_ramo_neutra(monkeypatch):
+    """Como a janela geral: o horario de cada ramo depende do relogio. Os testes do ritmo usam as regras de verdade."""
+    from app import conector_whatsapp as _cw
+    monkeypatch.setattr(_cw, "janela_do_ramo", lambda ramo, agora: True)
+    monkeypatch.setattr(_cw, "PROMOVER_A_CADA_S", 0)
