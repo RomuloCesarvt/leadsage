@@ -1139,7 +1139,7 @@ async def _funcoes_da_fila(user: dict):
             slug = next((s.get("slug") for s in sites_do_usuario if s.get("lead_id") == str(lead.get("id", "")) and s.get("slug")), "")
             url = f"{settings.APP_URL}/s/{slug}" if slug else ""
         return {"subject": pitch.subject, "body": pitch.body, "hook": pitch.hook, "previa": previa, "previa_url": url,
-                "follow_ups": [f.model_dump() for f in (pitch.follow_ups or [])]}
+                "follow_ups": [dict(f) for f in (pitch.follow_ups or []) if isinstance(f, dict)]}
 
     async def enviar(lead: Dict[str, Any], assunto: str, corpo: str) -> str:
         req = DispatchRequest(lead_id=str(lead.get("id", "")), lead_name=lead.get("company") or lead.get("name") or "",

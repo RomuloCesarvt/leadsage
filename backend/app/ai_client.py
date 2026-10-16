@@ -85,8 +85,21 @@ def _config(limite_ms: int, max_tokens: Optional[int], com_thinking: bool) -> "t
 
 _SEM_THINKING_NAO_SUPORTADO: set = set()
 
+# Modelo que acabou de responder 429 (limite por minuto) descansa um pouco: insistir nele so gasta chamada e atrasa.
+_DESCANSO_S = 20.0
+_EM_DESCANSO: Dict[str, float] = {}
+
 
 def _tentar_modelo(client, model: str, prompt: str, limite_ms: int, max_tokens: Optional[int]) -> str:
+    try:
+        return _tentar_modelo_sem_descanso(client, model, prompt, limite_ms, max_tokens)
+    except Exception as exc:
+        if "429" in str(exc) or "RESOURCE_EXHAUSTED" in str(exc):
+            _EM_DESCANSO[model] = time.monotonic() + _DESCANSO_S
+        raise
+
+
+def _tentar_modelo_sem_descanso(client, model: str, prompt: str, limite_ms: int, max_tokens: Optional[int]) -> str:
     quer_sem_pensar = "lite" not in model and model not in _SEM_THINKING_NAO_SUPORTADO
     try:
         r = client.models.generate_content(model=model, contents=prompt, config=_config(limite_ms, max_tokens, not quer_sem_pensar))
@@ -113,7 +126,8 @@ def _candidatos(client, prompt: str, max_tokens: Optional[int], json_mode: bool)
             f"{prov['nome']}",
             lambda limite_s, prov=prov: ai_providers.chamar(prov, prompt, limite_s, max_tokens, json_mode),
         ))
-    gemini = list(MODEL_CHAIN)
+    agora_m = time.monotonic()
+    gemini = [m for m in MODEL_CHAIN if _EM_DESCANSO.get(m, 0.0) <= agora_m] or list(MODEL_CHAIN)  # todos cansados: tenta todos
     for modelo in gemini:
         itens.append((
             modelo,

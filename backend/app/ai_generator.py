@@ -178,8 +178,23 @@ LIMITE RÍGIDO: o "body" tem no máximo {LIMITE_DE_PALAVRAS.get(canal, 150) - 10
 
 RETORNO: JSON puro com as chaves "subject" (assunto curto; vazio se o canal não for email),
 "body" (a mensagem, com quebras de linha reais), "gancho" (o fato que abriu, até 12 palavras) e
-"raciocinio" (o que o serviço resolve para ele, em uma frase).
+"raciocinio" (o que o serviço resolve para ele, em uma frase).{_pedido_dos_seguimentos(req)}
 """
+
+
+def _pedido_dos_seguimentos(req: PitchGenerationRequest) -> str:
+    """Os seguimentos vão na MESMA chamada da abertura: uma chamada por lead em vez de duas.
+
+    O Gemini gratuito recusa (429) rajadas de chamadas; dobrar as chamadas do lote fazia leads inteiros falharem.
+    """
+    if not getattr(req, "com_seguimentos", False):
+        return ""
+    return (
+        '\nTambém inclua a chave "follow_ups": lista de exatamente 2 objetos com "quando" (ex.: "2 dias depois"), '
+        '"objetivo" (uma frase) e "texto" (a mensagem, até 40 palavras, no mesmo canal). São para quem NÃO respondeu: '
+        "não repetem o argumento da abertura e trazem algo novo tirado dos dados acima (outro gancho, outra avaliação, "
+        "o horário). NUNCA estatística de mercado, número de concorrente, percentual, preço ou prazo inventado."
+    )
 
 
 def _prompt_dos_seguimentos(req: PitchGenerationRequest, canal: str, primeira: str) -> str:
@@ -202,6 +217,30 @@ concorrente, percentual de resultado, preço ou prazo inventado. Clichês proibi
 RETORNO: JSON puro com a chave "follow_ups": lista de exatamente 2 objetos com "quando" (ex.: "3 dias depois"),
 "objetivo" (uma frase) e "texto" (a mensagem).
 """
+
+
+def _ler_seguimentos(brutos: Any, canal: str):
+    """Transforma a lista que o modelo devolveu em seguimentos limpos, com os avisos do que escapou."""
+    seguimentos: List[Dict[str, str]] = []
+    avisos: List[str] = []
+    for item in (brutos if isinstance(brutos, list) else [])[:2]:
+        if not isinstance(item, dict):
+            continue
+        texto = str(item.get("texto") or item.get("body") or "").strip()
+        if not texto:
+            continue
+        seguimentos.append({
+            "quando": str(item.get("quando") or "").strip() or "alguns dias depois",
+            "objetivo": str(item.get("objetivo") or "").strip(),
+            "texto": texto,
+        })
+        # É neles que a invenção costuma escapar: o modelo procura "algo novo para dizer"
+        # e inventa um dado de mercado.
+        for defeito in revisar_copy(texto, canal):
+            if "não termina em pergunta" in defeito:
+                continue  # o toque 2 não pede nada: entregar valor sem pergunta é o desenho
+            avisos.append(f"seguimento {len(seguimentos)}: {defeito}")
+    return seguimentos, avisos
 
 
 def _melhor_versao(atual: Dict[str, Any], nova: Dict[str, Any], canal: str, sem_site: bool = True, previa: str = "") -> Dict[str, Any]:
@@ -258,19 +297,20 @@ class AIGenerator:
         # junto: 15 a 40 s. Os seguimentos agora vem a parte, e o que a revisao local
         # acha vira aviso na tela em vez de outra ida ao modelo.
         limite = time.monotonic() + 40
-        dados = await asyncio.to_thread(gerar_json, client, prompt, ["body"], 2, limite, True, 600)
+        com_seguimentos = bool(getattr(req, "com_seguimentos", False))
+        dados = await asyncio.to_thread(gerar_json, client, prompt, ["body"], 2, limite, True, 900 if com_seguimentos else 600)
 
         problemas = (revisar_copy(dados.get("body", ""), canal)
                      + abordagem_mestra.revisar_calor(dados.get("body", ""), canal)
                      + abordagem_mestra.revisar_roteiro(dados.get("body", ""), sem_site, req.previa or ""))
 
+        # os seguimentos vieram na mesma resposta; se faltaram, a abertura segue sem eles (nunca uma 2a chamada em lote)
         seguimentos: List[Dict[str, str]] = []
-        if getattr(req, "com_seguimentos", False):
-            try:
-                seguimentos, extras = await AIGenerator.generate_followups(req, str(dados.get("body") or ""), api_key=active_key)
-                problemas += extras
-            except Exception as exc:  # os seguimentos sao um extra: a primeira mensagem nunca falha por causa deles
-                problemas.append(f"os seguimentos não puderam ser escritos agora ({str(exc)[:80]})")
+        if com_seguimentos:
+            seguimentos, extras = _ler_seguimentos(dados.get("follow_ups"), canal)
+            problemas += extras
+            if not seguimentos:
+                problemas.append("os seguimentos não vieram nesta resposta")
 
         return PitchGenerationResponse(
             lead_id=lead.id,
@@ -297,26 +337,7 @@ class AIGenerator:
             gerar_json, client, _prompt_dos_seguimentos(req, canal, primeira), ["follow_ups"], 2,
             time.monotonic() + 40, True, 500,
         )
-        seguimentos: List[Dict[str, str]] = []
-        avisos: List[str] = []
-        for item in (dados.get("follow_ups") or [])[:2]:
-            if not isinstance(item, dict):
-                continue
-            texto = str(item.get("texto") or item.get("body") or "").strip()
-            if not texto:
-                continue
-            seguimentos.append({
-                "quando": str(item.get("quando") or "").strip() or "alguns dias depois",
-                "objetivo": str(item.get("objetivo") or "").strip(),
-                "texto": texto,
-            })
-            # É neles que a invenção costuma escapar: o modelo procura "algo novo para dizer"
-            # e inventa um dado de mercado.
-            for defeito in revisar_copy(texto, canal):
-                if "não termina em pergunta" in defeito:
-                    continue  # o toque 2 não pede nada: entregar valor sem pergunta é o desenho
-                avisos.append(f"seguimento {len(seguimentos)}: {defeito}")
-        return seguimentos, avisos
+        return _ler_seguimentos(dados.get("follow_ups"), canal)
 
     @staticmethod
     async def generate_demo_site(req, api_key: str = None) -> dict:

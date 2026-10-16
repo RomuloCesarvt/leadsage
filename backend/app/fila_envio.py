@@ -15,6 +15,7 @@ marcar como enviado, o card do lead anda no pipeline para "Contato Enviado".
 """
 import asyncio
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 from urllib.parse import quote
@@ -301,7 +302,7 @@ async def _chamar_gerar(gerar, lead: Dict[str, Any], canal: str, evitar: List[st
 
 async def _diferenciar(gerar, lead: Dict[str, Any], canal: str, pronto: Dict[str, Any], usados: List[str]) -> Dict[str, Any]:
     """Cada mensagem tem de ser diferente das outras do lote: se esta parece copia, pede de novo (ate 2 vezes) sem a mesma abertura."""
-    for tentativa in (1, 2):
+    for tentativa in (1,):  # uma nova chance basta: cada chamada a mais pesa no limite por minuto da IA gratuita
         corpo = (pronto.get("body") or "").strip()
         parecida = [u for u in usados if semelhanca(corpo, u) >= LIMIAR_DE_SEMELHANCA]
         if not corpo or not parecida:
@@ -354,14 +355,21 @@ async def preparar_lote(
         alvos.append((lead, canal))
 
     # 2) escreve as mensagens, algumas por vez
-    sem = asyncio.Semaphore(4)
+    # duas por vez: o Gemini gratuito recusa (429) rajada de chamadas e o lead inteiro falhava
+    sem = asyncio.Semaphore(2)
+    inicio = time.monotonic()
 
     async def escrever(lead: Dict[str, Any], canal: str):
         async with sem:
-            try:
-                return await gerar(lead, canal)
-            except Exception as exc:
-                return exc
+            for tentativa in (1, 2):
+                try:
+                    return await gerar(lead, canal)
+                except Exception as exc:
+                    # pico de demanda: espera um pouco e tenta de novo, se ainda houver tempo dentro dos 55 s da requisicao
+                    if tentativa == 1 and "alta demanda" in str(exc) and time.monotonic() - inicio < 25:
+                        await asyncio.sleep(4)
+                        continue
+                    return exc
 
     textos = await asyncio.gather(*[escrever(l, c) for l, c in alvos])
 
