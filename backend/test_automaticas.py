@@ -300,3 +300,43 @@ def test_falha_passageira_da_ia_ao_decidir_nao_pausa_a_conversa(com_robo, rodar)
 
     c = rodar(robo_service.processar, cfg(), msg("oi, vocês fazem sites?", 1), gerar=sem_resposta, enviar=envio)
     assert c["robo_ativo"] is True                                     # nunca pausa de vez por falha da IA
+
+
+def test_varredura_recupera_quem_foi_pausado_por_engano_como_na_producao(com_robo, rodar):
+    """O caminho REAL do Conector: /reprocessar -> responder_pendentes. Conversa igual às de produção: 1 mensagem do contato, 'auto=3'."""
+    from datetime import datetime, timezone
+    from app import robo_store
+    agora = datetime.now(timezone.utc).isoformat()
+    cid = robo_store.id_da_conversa("whatsapp", "5511964623668")
+    rodar(robo_store.salvar_conversa, "alice", {
+        "id": cid, "canal": "whatsapp", "contato": "5511964623668", "nome": "Loja", "lead_id": "", "robo_ativo": False, "contato_robo": True,
+        "automaticas": 3, "optout": False, "precisa_humano": False, "motivo": "", "silencio": "Parece outro robô (3 mensagens automáticas)",
+        "mensagens": [{"de": "robo", "texto": "Oi!", "em": agora, "meta_id": "a"},
+                      {"de": "contato", "texto": "Boa tarde! Pode falar, estou ouvindo.", "em": agora, "meta_id": "b"}],
+        "criado": agora, "atualizado": agora})
+    envio = Envio()
+    r = rodar(robo_service.responder_pendentes, cfg(), gerar=ia("Oi! Que bom. Posso te mostrar a prévia do site?"), enviar=envio)
+    assert r["processadas"] == 1 and r["respondidas"] == 1
+    assert envio.enviados == ["Oi! Que bom. Posso te mostrar a prévia do site?"]
+    c = rodar(robo_store.obter_conversa, "alice", cid)
+    assert c["robo_ativo"] and not c.get("contato_robo")
+
+
+def test_varredura_nao_mexe_em_quem_o_dono_assumiu_nem_em_robo_de_verdade(com_robo, rodar):
+    from datetime import datetime, timezone
+    from app import robo_store
+    agora = datetime.now(timezone.utc).isoformat()
+    base = {"canal": "whatsapp", "nome": "Loja", "lead_id": "", "robo_ativo": False, "contato_robo": True, "optout": False,
+            "precisa_humano": False, "motivo": "", "criado": agora, "atualizado": agora}
+    assumida = {**base, "id": robo_store.id_da_conversa("whatsapp", "5511900000001"), "contato": "5511900000001",
+                "mensagens": [{"de": "contato", "texto": "oi", "em": agora, "meta_id": "a"}, {"de": "voce", "texto": "Oi! Max aqui", "em": agora},
+                              {"de": "contato", "texto": "ok", "em": agora, "meta_id": "b"}]}
+    mesmo_robo = {**base, "id": robo_store.id_da_conversa("whatsapp", "5511900000002"), "contato": "5511900000002", "automaticas": 3,
+                  "mensagens": [{"de": "contato", "texto": AUTOMATICAS[3], "em": "1", "meta_id": "a"}, {"de": "robo", "texto": "?", "em": "2"},
+                                {"de": "contato", "texto": AUTOMATICAS[3], "em": "3", "meta_id": "b"}, {"de": "robo", "texto": "?", "em": "4"},
+                                {"de": "contato", "texto": AUTOMATICAS[3], "em": "5", "meta_id": "c"}]}
+    for c in (assumida, mesmo_robo):
+        rodar(robo_store.salvar_conversa, "alice", c)
+    envio = Envio()
+    r = rodar(robo_service.responder_pendentes, cfg(), gerar=ia("não deveria"), enviar=envio)
+    assert r["processadas"] == 0 and envio.enviados == []

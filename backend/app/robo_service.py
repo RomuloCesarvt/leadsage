@@ -653,6 +653,10 @@ async def responder_sem_guardar(
 def _pausa_por_engano(c: Dict[str, Any]) -> bool:
     """Saiu da lista do robô como "outro robô", mas o contato falou menos vezes do que o necessário para isso (e ninguém assumiu).
     Era o defeito de contar a mesma mensagem várias vezes."""
+    from app.ai_robo import certeza_de_robo
+
+    if certeza_de_robo((c.get("ultima") or {}).get("texto", "")):
+        return False      # a última fala é mesmo de robô (menu, protocolo): continua fora da lista
     return bool(c.get("contato_robo")) and not c.get("optout") and not c.get("humano") and int(c.get("contatos") or 99) < MAX_AUTOMATICAS
 
 
@@ -706,7 +710,13 @@ async def responder_pendentes(
         if not conversa or not conversa.get("mensagens"):
             continue
         ultima = conversa["mensagens"][-1]
-        if ultima.get("de") != "contato" or conversa.get("optout") or conversa.get("contato_robo"):
+        recuperavel = _pausa_por_engano({
+            "contato_robo": conversa.get("contato_robo"), "optout": conversa.get("optout"),
+            "humano": any(m.get("de") == "voce" for m in conversa["mensagens"]),
+            "contatos": sum(1 for m in conversa["mensagens"] if m.get("de") == "contato"),
+            "ultima": ultima,
+        })
+        if ultima.get("de") != "contato" or conversa.get("optout") or (conversa.get("contato_robo") and not recuperavel):
             continue
         msg = meta_canais.Recebida(
             canal=conversa.get("canal", canal), contato=conversa.get("contato", ""), nome=conversa.get("nome", ""),
