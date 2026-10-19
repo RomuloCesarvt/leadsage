@@ -571,6 +571,7 @@ export interface ItemFila {
   previa_url?: string;
   /** este contato já recebeu mensagem antes: a pessoa confirma antes de enviar de novo */
   ja_contatado?: { quando: string; como: string; respondeu: boolean };
+  contato?: { email?: string; phone?: string; instagram?: string; linkedin?: string };
   criado: string;
   enviado_em?: string;
   enviado_por?: string;
@@ -584,6 +585,8 @@ export interface ResumoFila {
 export interface ResultadoPreparo {
   lead_id: string; nome: string; canal?: CanalFila;
   resultado: 'enviado' | 'na fila' | 'aguardando' | 'falhou' | 'ignorado' | 'para revisar'; motivo?: string;
+  /** falhou por limite da IA gratuita: em quantos segundos vale tentar de novo */
+  espera_s?: number;
 }
 
 export interface UsuarioAdmin {

@@ -54,7 +54,11 @@ _working_model: Optional[str] = None
 
 
 class AIIndisponivel(RuntimeError):
-    """Nenhum modelo respondeu. Vira 503 na API, nunca texto na tela."""
+    """Nenhum modelo respondeu. Vira 503 na API, nunca texto na tela. `espera_s`: em quantos segundos vale tentar de novo."""
+
+    def __init__(self, mensagem: str = "", espera_s: int = 0):
+        super().__init__(mensagem)
+        self.espera_s = espera_s
 
 
 def build_client(api_key: str, timeout_ms: int = REQUEST_TIMEOUT_MS) -> genai.Client:
@@ -85,41 +89,7 @@ def _config(limite_ms: int, max_tokens: Optional[int], com_thinking: bool) -> "t
 
 _SEM_THINKING_NAO_SUPORTADO: set = set()
 
-# Modelo que acabou de responder 429 (limite por minuto) descansa um pouco: insistir nele so gasta chamada e atrasa.
-_DESCANSO_S = 20.0
-_EM_DESCANSO: Dict[str, float] = {}
-
-
-def _esperar_descanso(prazo: float) -> None:
-    """Todos os modelos acabaram de recusar (limite gratuito por minuto): espera o primeiro voltar, se der tempo.
-
-    Chamar de novo na hora so gerava outra rajada de recusas (era isso que fazia o lote inteiro falhar com "alta demanda").
-    Sem tempo para esperar, recusa logo, sem gastar chamada.
-    """
-    from app import ai_providers
-
-    if ai_providers.ativos():
-        return  # ha outro motor gratuito para atender enquanto o Gemini descansa
-    agora_m = time.monotonic()
-    livres = [m for m in MODEL_CHAIN if _EM_DESCANSO.get(m, 0.0) <= agora_m]
-    if livres:
-        return
-    espera = min(_EM_DESCANSO.get(m, 0.0) for m in MODEL_CHAIN) - agora_m
-    if prazo - agora_m - espera < 8:
-        raise AIIndisponivel("O limite gratuito da IA por minuto foi atingido. Tente gerar de novo em 1 minuto.")
-    time.sleep(max(0.0, espera))
-
-
 def _tentar_modelo(client, model: str, prompt: str, limite_ms: int, max_tokens: Optional[int]) -> str:
-    try:
-        return _tentar_modelo_sem_descanso(client, model, prompt, limite_ms, max_tokens)
-    except Exception as exc:
-        if "429" in str(exc) or "RESOURCE_EXHAUSTED" in str(exc):
-            _EM_DESCANSO[model] = time.monotonic() + _DESCANSO_S
-        raise
-
-
-def _tentar_modelo_sem_descanso(client, model: str, prompt: str, limite_ms: int, max_tokens: Optional[int]) -> str:
     quer_sem_pensar = "lite" not in model and model not in _SEM_THINKING_NAO_SUPORTADO
     try:
         r = client.models.generate_content(model=model, contents=prompt, config=_config(limite_ms, max_tokens, not quer_sem_pensar))
@@ -135,159 +105,117 @@ def _tentar_modelo_sem_descanso(client, model: str, prompt: str, limite_ms: int,
     return texto
 
 
-def _candidatos(client, prompt: str, max_tokens: Optional[int], json_mode: bool) -> list:
-    """Quem pode responder, do mais rapido para o mais lento: provedores gratuitos com chave
-    (respondem em ~1 s), depois os modelos do Gemini. Cada item e (rotulo, funcao(limite_s))."""
-    from app import ai_providers
+def _tokens_do_pedido(prompt: str, max_tokens: Optional[int]) -> int:
+    """Quanto o pedido pesa no limite por minuto: entrada (~3 caracteres por token em português) mais a saída pedida."""
+    return int(len(prompt) / 3) + int(max_tokens or 1500)
 
-    itens = []
+
+def _alvos(client, prompt: str, max_tokens: Optional[int], json_mode: bool) -> list:
+    """Todos os modelos que podem responder, do mais rápido ao mais lento: cada modelo de cada provedor gratuito com chave
+    (respondem em ~1 s), depois os do Gemini. Cada um com o seu orçamento no portão (ia_gate)."""
+    from app import ai_providers, ia_gate
+
+    alvos = []
     for prov in ai_providers.ativos():
-        itens.append((
-            f"{prov['nome']}",
-            lambda limite_s, prov=prov: ai_providers.chamar(prov, prompt, limite_s, max_tokens, json_mode),
-        ))
-    agora_m = time.monotonic()
-    gemini = [m for m in MODEL_CHAIN if _EM_DESCANSO.get(m, 0.0) <= agora_m] or list(MODEL_CHAIN)  # todos cansados: tenta todos
-    for modelo in gemini:
-        itens.append((
-            modelo,
+        for modelo in ai_providers.modelos_alvo(prov):
+            chave = f"{prov['nome']}:{modelo}"
+            alvo = ia_gate.Alvo(chave, prov["nome"], None)
+
+            def chamar(limite_s, prov=prov, modelo=modelo, alvo=alvo):
+                def aprender(h, status):
+                    def num(nome):
+                        try:
+                            return float(str(h.get(nome)).rstrip("s")) if h.get(nome) is not None else None
+                        except ValueError:
+                            return None
+                    def segundos(nome):
+                        v = h.get(nome)
+                        if v is None:
+                            return None
+                        m = re.fullmatch(r"(?:(\d+)m)?(?:(\d+(?:\.\d+)?)(ms|s))?", str(v).strip())
+                        if not m or not any(m.groups()):
+                            return None
+                        total = int(m.group(1) or 0) * 60
+                        if m.group(2):
+                            total += float(m.group(2)) / (1000 if m.group(3) == "ms" else 1)
+                        return total
+                    ia_gate.aprender_cabecalhos(alvo, num("x-ratelimit-remaining-tokens"), segundos("x-ratelimit-reset-tokens"), num("x-ratelimit-limit-tokens"))
+                return ai_providers.chamar(prov, prompt, limite_s, max_tokens, json_mode, modelo=modelo, ao_responder=aprender)
+
+            alvo.chamar = chamar
+            alvos.append(alvo)
+    for modelo in MODEL_CHAIN:
+        alvos.append(ia_gate.Alvo(
+            f"gemini:{modelo}", "gemini",
             lambda limite_s, modelo=modelo: _tentar_modelo(client, modelo, prompt, int(max(3.0, limite_s) * 1000), max_tokens),
         ))
-    # o que respondeu da ultima vez vai na frente
-    for i, (rotulo, _) in enumerate(itens):
-        if rotulo == _working_model and i:
-            itens.insert(0, itens.pop(i))
-            break
-    return itens
+    return alvos
+
+
+def _falha_do_alvo(alvo, exc: Exception) -> None:
+    """Ensina ao portão o que a falha significa: pausa (429/503) ou fora do ar por um tempo (404, chave recusada)."""
+    from app import ia_gate
+
+    texto = str(exc)
+    status = int(getattr(exc, "status", 0) or 0)
+    if status in (401, 403, 404) or " 404 " in texto or "NOT_FOUND" in texto or "PERMISSION_DENIED" in texto or "API key not valid" in texto:
+        ia_gate.quebrou(alvo, texto)
+    elif status == 429 or "429" in texto or "RESOURCE_EXHAUSTED" in texto:
+        ia_gate.recusa(alvo, texto, getattr(exc, "retry_after", None))
+    elif status == 503 or "503" in texto or "UNAVAILABLE" in texto or "overloaded" in texto.lower():
+        ia_gate.recusa(alvo, "retry in 8s " + texto, None)
+    elif status >= 500 or "timeout" in texto.lower() or "timed out" in texto.lower():
+        ia_gate.recusa(alvo, "retry in 5s " + texto, None)
 
 
 def generate_hedged(client, prompt: str, prazo: float, atraso: float = 7.0, max_tokens: Optional[int] = None,
                     json_mode: bool = True) -> str:
-    """Resposta mais rapida: se o primeiro motor demora, o proximo ja comeca em paralelo.
+    """Escreve o texto no primeiro motor gratuito que está livre (portão da IA: ia_gate).
 
-    O Gemini as vezes leva 3 s e as vezes 80 s no mesmo pedido. Esperar o primeiro terminar
-    (ou estourar o tempo) para so entao tentar o segundo soma as esperas; aqui a primeira
-    resposta valida vence e as outras sao descartadas. Os motores gratuitos extras (Groq,
-    Cerebras, OpenRouter) entram na frente quando ha chave deles no ambiente.
-
-    `atraso` de 7 s: os modelos rapidos respondem em 3 a 7 s. Com 3 s, quase toda chamada disparava um segundo e um terceiro
-    modelo que tambem respondiam e eram jogados fora: o dobro de chamadas, o limite gratuito por minuto estourava (429) e
-    o lote inteiro ficava lento e com falhas. Recusa (429/503) continua chamando o proximo na hora.
+    Um pedido por vez em cada modelo, sem rajada: o motor livre mais rápido atende; se nenhum está livre, espera o primeiro
+    liberar (o tempo vem do próprio provedor); se a espera passa do prazo, falha na hora dizendo em quanto tempo tentar de novo.
+    Antes cada pedido disparava contra todos os modelos de uma vez e o limite gratuito acabava para todo mundo.
     """
     global _working_model
-    from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+    from app import ia_gate
 
-    _esperar_descanso(prazo)
-    candidatos = _candidatos(client, prompt, max_tokens, json_mode)
-    executor = ThreadPoolExecutor(max_workers=len(candidatos))
-    em_andamento: Dict[Any, str] = {}
-    proximo = 0
+    alvos = _alvos(client, prompt, max_tokens, json_mode)
+    tokens = _tokens_do_pedido(prompt, max_tokens)
     ultimo: Optional[Exception] = None
-    transitorio = False
-
-    def lancar() -> None:
-        nonlocal proximo
-        rotulo, fn = candidatos[proximo]
-        proximo += 1
-        limite_s = max(3.0, min(prazo - time.monotonic(), REQUEST_TIMEOUT_MS / 1000))
-        em_andamento[executor.submit(fn, limite_s)] = rotulo
-
-    lancar()
-    while True:
+    for _ in range(12):
         restante = prazo - time.monotonic()
-        if restante <= 0.5 or (not em_andamento and proximo >= len(candidatos)):
-            break
-        feitos, _ = wait(list(em_andamento), timeout=min(atraso, restante), return_when=FIRST_COMPLETED)
-        for f in feitos:
-            rotulo = em_andamento.pop(f)
-            try:
-                texto = f.result()
-            except Exception as exc:
-                ultimo = exc
-                transitorio = transitorio or _e_transitorio(exc)
-                continue
-            _working_model = rotulo
-            executor.shutdown(wait=False, cancel_futures=True)
+        alvo, espera = ia_gate.escolher(alvos, tokens)
+        if alvo is None:
+            if espera >= 1e8:
+                raise AIIndisponivel("Este pedido é grande demais para os motores gratuitos disponíveis agora.")
+            if espera > restante - 5:
+                raise AIIndisponivel(
+                    f"A fila da IA gratuita está cheia agora (muita gente gerando ao mesmo tempo). Tente de novo em {int(espera) + 1} segundos.",
+                    espera_s=int(espera) + 1,
+                )
+            time.sleep(min(espera + 0.2, max(0.0, restante - 5)))
+            continue
+        limite_s = max(4.0, min(restante, REQUEST_TIMEOUT_MS / 1000))
+        try:
+            texto = alvo.chamar(limite_s)
+            ia_gate.sucesso(alvo)
+            _working_model = alvo.chave
             return texto
-        # demorou, ou todos falharam: chama o proximo sem esperar os outros
-        if proximo < len(candidatos) and (not feitos or not em_andamento):
-            lancar()
-
-    executor.shutdown(wait=False, cancel_futures=True)
-    if transitorio or ultimo is None:
-        raise AIIndisponivel(
-            "A IA está com alta demanda no momento e demorou demais. Tente gerar de novo em alguns segundos."
-        )
-    raise AIIndisponivel(f"Nenhum motor de IA respondeu. Último erro: {ultimo}")
+        except Exception as exc:
+            ultimo = exc
+            _falha_do_alvo(alvo, exc)
+            if prazo - time.monotonic() < 2.5:
+                break
+    raise AIIndisponivel(
+        "A IA gratuita está com alta demanda neste momento. Tente de novo em alguns segundos."
+        if ultimo is None or _e_transitorio(ultimo) else f"Nenhum motor de IA respondeu. Último erro: {str(ultimo)[:160]}",
+        espera_s=15,
+    )
 
 
 def generate_with_fallback(client, prompt: str, tentativas: int = 2, prazo: Optional[float] = None) -> str:
-    """Tenta os modelos em ordem ate um responder. Memoriza o que funcionou.
-
-    Sem o cache, um cold start pagava ~36s tentando modelos mortos antes
-    de chegar ao que responde.
-
-    Quando TODOS respondem 503 — o Gemini tem picos de demanda em que isso
-    acontece com a familia inteira — espera e repete a rodada, em vez de
-    devolver erro na cara do usuario.
-    """
-    global _working_model
-
-    ultimo: Optional[Exception] = None
-    houve_transitorio = False
-
-    def restante() -> float:
-        return 1e9 if prazo is None else prazo - time.monotonic()
-
-    for rodada in range(max(1, tentativas)):
-        if rodada:
-            if restante() < 8:
-                break
-            time.sleep(1.5 * rodada)   # espera curta e crescente
-
-        chain = list(MODEL_CHAIN)
-        if _working_model in chain:
-            chain.remove(_working_model)
-            chain.insert(0, _working_model)
-
-        houve_transitorio = False
-        for model in chain:
-            if restante() < 4:
-                ultimo = ultimo or TimeoutError("o tempo para escrever acabou")
-                houve_transitorio = True
-                break
-            try:
-                if prazo is None:
-                    response = client.models.generate_content(model=model, contents=prompt)
-                else:
-                    # cada tentativa cabe no que sobrou do prazo: a funcao da
-                    # Vercel morre aos 60 s e a tela ficaria girando sem resposta
-                    limite_ms = int(max(3.0, min(restante(), REQUEST_TIMEOUT_MS / 1000)) * 1000)
-                    response = client.models.generate_content(
-                        model=model, contents=prompt,
-                        config=types.GenerateContentConfig(http_options=types.HttpOptions(timeout=limite_ms)),
-                    )
-                text = (response.text or "").strip()
-                if text:
-                    _working_model = model
-                    return text
-                ultimo = RuntimeError(f"{model} devolveu resposta vazia")
-            except Exception as exc:
-                ultimo = exc
-                if _e_transitorio(exc):
-                    houve_transitorio = True
-                continue
-
-        # Se nenhuma falha foi transitoria, repetir nao muda nada.
-        if not houve_transitorio:
-            break
-
-    if houve_transitorio:
-        raise AIIndisponivel(
-            "O Gemini está com alta demanda no momento e recusou as tentativas. "
-            "Aguarde alguns segundos e gere novamente."
-        )
-    raise AIIndisponivel(f"Nenhum modelo Gemini disponível. Último erro: {ultimo}")
+    """Texto longo (documentos, páginas): mesmo portão, sem modo JSON. `prazo` None = 45 s."""
+    return generate_hedged(client, prompt, prazo if prazo is not None else time.monotonic() + 45, max_tokens=4000, json_mode=False)
 
 
 def strip_code_fence(text: str) -> str:

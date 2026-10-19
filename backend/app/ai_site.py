@@ -241,7 +241,7 @@ def _contexto(d: Dict[str, Any]) -> str:
     return "\n".join(linhas)
 
 
-from app.playbook_sites import PLAYBOOK_DE_SITES  # noqa: E402
+from app.playbook_sites import PLAYBOOK_DE_SITES, PLAYBOOK_DE_TEXTO  # noqa: E402
 
 REGRAS_DE_CONTEUDO = """REGRAS DE CONTEÚDO (valem para tudo que você escrever)
 - Escreva em português do Brasil, na voz do próprio negócio ("atendemos",
@@ -290,7 +290,7 @@ PROJETO VISUAL JÁ DEFINIDO (não mude, só escreva dentro dele)
 - Identidade: {briefing['motivo']}
 - Layout: {briefing['layout']}
 
-{PLAYBOOK_DE_SITES}
+{PLAYBOOK_DE_TEXTO}
 
 {REGRAS_DE_CONTEUDO}
 
@@ -374,7 +374,7 @@ async def gerar_conteudo_de_site(
     if rapido:
         # quem espera na tela (disparo, robo): varios modelos em paralelo e prazo curto; a chamada bloqueia, entao roda em thread
         import asyncio
-        dados = await asyncio.to_thread(gerar_json, client, prompt, ["slogan", "sobre", "servicos"], 2, time.monotonic() + 30, True, 1800)
+        dados = await asyncio.to_thread(gerar_json, client, prompt, ["slogan", "sobre", "servicos"], 2, time.monotonic() + 40, True, 1500)
     else:
         dados = gerar_json(client, prompt, obrigatorias=["slogan", "sobre", "servicos"])
 

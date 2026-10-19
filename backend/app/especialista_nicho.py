@@ -25,6 +25,7 @@ SEGMENTOS_DO_MOTOR = (
 )
 
 _MEMORIA: Dict[str, Dict[str, Any]] = {}
+_EM_VOO: Dict[str, Any] = {}
 _FALHOU: Dict[str, float] = {}       # ramo cuja ficha falhou agora: nao tenta de novo por alguns minutos
 _ESPERA_APOS_FALHA_S = 300
 
@@ -138,7 +139,7 @@ async def _gerar(nicho: str) -> Optional[Dict[str, Any]]:
     from app.ai_client import TIMEOUT_LONGO_MS, build_client, gerar_json
 
     cliente = build_client(settings.GEMINI_API_KEY, TIMEOUT_LONGO_MS)
-    bruto = await asyncio.to_thread(gerar_json, cliente, _prompt(nicho), ["especialidade", "servicos_tipicos"], 2, time.monotonic() + 25, True, 1500)
+    bruto = await asyncio.to_thread(gerar_json, cliente, _prompt(nicho), ["especialidade", "servicos_tipicos"], 2, time.monotonic() + 20, True, 1300)
     return limpar(bruto, nicho)
 
 
@@ -149,6 +150,18 @@ async def garantir(nicho: Optional[str]) -> Optional[Dict[str, Any]]:
         return None
     if k in _MEMORIA:
         return _MEMORIA[k]
+    em_voo = _EM_VOO.get(k)
+    if em_voo is not None:
+        return await asyncio.shield(em_voo)          # vários leads do mesmo ramo ao mesmo tempo: uma ficha só, uma chamada de IA só
+    tarefa = asyncio.ensure_future(_garantir(k, nicho))
+    _EM_VOO[k] = tarefa
+    try:
+        return await asyncio.shield(tarefa)
+    finally:
+        _EM_VOO.pop(k, None)
+
+
+async def _garantir(k: str, nicho: Optional[str]) -> Optional[Dict[str, Any]]:
     ficha = await _ler_banco(k)
     if ficha and ficha.get("versao") == VERSAO:
         _MEMORIA[k] = ficha

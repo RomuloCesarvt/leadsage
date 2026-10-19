@@ -64,22 +64,6 @@ def test_pico_de_demanda_tenta_de_novo_uma_vez(monkeypatch, rodar):
     assert len(tentativas) == 2 and r["resultados"][0]["resultado"] == "para revisar"
 
 
-def test_modelo_com_429_descansa_e_sai_da_fila_de_candidatos(monkeypatch):
-    ai_client._EM_DESCANSO.clear()
-
-    def estoura(client, model, prompt, limite_ms, max_tokens):
-        raise RuntimeError("429 RESOURCE_EXHAUSTED")
-
-    monkeypatch.setattr(ai_client, "_tentar_modelo_sem_descanso", estoura)
-    with pytest.raises(RuntimeError):
-        ai_client._tentar_modelo(None, "gemini-3.5-flash", "oi", 3000, 100)
-    rotulos = [r for r, _ in ai_client._candidatos(None, "oi", 100, True)]
-    assert "gemini-3.5-flash" not in rotulos and "gemini-3.5-flash-lite" in rotulos
-    ai_client._EM_DESCANSO[ "gemini-3.5-flash" ] = time.monotonic() - 1     # descansou
-    assert "gemini-3.5-flash" in [r for r, _ in ai_client._candidatos(None, "oi", 100, True)]
-    ai_client._EM_DESCANSO.clear()
-
-
 def test_endpoint_da_fila_escreve_whatsapp_com_seguimentos_de_ponta_a_ponta(client, com_robo, monkeypatch):
     """O caminho real: /api/robo/fila/preparar -> gerar() -> generate_pitch -> fila. Quebrava com 'dict' sem model_dump."""
     def falso(c, prompt, obrigatorias=None, tentativas=2, prazo=None, rapido=False, max_tokens=None):
@@ -99,20 +83,6 @@ def test_endpoint_da_fila_escreve_whatsapp_com_seguimentos_de_ponta_a_ponta(clie
     assert res["resultado"] == "para revisar", res
     item = next(i for i in client.get("/api/robo/fila").json()["itens"] if i["lead_id"] == "L1")
     assert [s["texto"] for s in item["seguimentos"]] == ["Ana, viu a prévia?", "Ana, deixei a prévia pronta."]
-
-
-def test_todos_os_modelos_descansando_nao_gera_rajada_de_chamadas(monkeypatch):
-    ai_client._EM_DESCANSO.clear()
-    for m in ai_client.MODEL_CHAIN:
-        ai_client._EM_DESCANSO[m] = time.monotonic() + 30
-    with pytest.raises(ai_client.AIIndisponivel, match="limite gratuito"):
-        ai_client._esperar_descanso(time.monotonic() + 20)              # não dá tempo de esperar: recusa sem chamar
-    for m in ai_client.MODEL_CHAIN:
-        ai_client._EM_DESCANSO[m] = time.monotonic() + 0.2
-    inicio = time.monotonic()
-    ai_client._esperar_descanso(time.monotonic() + 20)                  # dá tempo: espera o primeiro voltar
-    assert 0.1 <= time.monotonic() - inicio < 2
-    ai_client._EM_DESCANSO.clear()
 
 
 def test_texto_do_site_do_mesmo_lead_nao_chama_a_ia_de_novo(client, com_robo, monkeypatch):

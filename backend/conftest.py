@@ -156,3 +156,14 @@ def _especialista_sem_rede(monkeypatch):
     yield
     especialista_nicho._MEMORIA.clear()
     especialista_nicho._FALHOU.clear()
+
+
+
+@pytest.fixture(autouse=True)
+def _portao_da_ia_zerado():
+    """O orçamento e as pausas dos motores de IA são do processo: cada teste começa com tudo livre."""
+    from app import ia_gate
+    ia_gate.reiniciar()
+    ia_gate.LOOP = None
+    yield
+    ia_gate.reiniciar()

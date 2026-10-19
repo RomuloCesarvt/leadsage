@@ -57,3 +57,22 @@ FALA_DO_ROBO_SOBRE_SITES = """QUANDO O DONO PERGUNTAR SOBRE O SITE (cores, texto
   mapa no rodapé porque o site vende e o Google só localiza.
 - Se ele pedir mudança de cor, texto ou foto, diga que ajusta na hora e confirme o que quer mudar. Não invente o que o
   site não tem."""
+
+
+def _so_o_que_vale_para_texto() -> str:
+    """O playbook sem os itens de cor, tipografia, painel, imagem e movimento: quem escreve o TEXTO do site não decide isso
+    (o motor decide) e cada item a mais custa tokens do limite gratuito da IA."""
+    import re
+
+    saida, pular = [], False
+    for linha in PLAYBOOK_DE_SITES.split("\n"):
+        m = re.match(r"^(\d+)\. ", linha)
+        if m:
+            pular = int(m.group(1)) in (5, 6, 7, 8, 14)
+        if not pular:
+            saida.append(linha)
+    return "\n".join(saida)
+
+
+PLAYBOOK_DE_TEXTO = _so_o_que_vale_para_texto()
+

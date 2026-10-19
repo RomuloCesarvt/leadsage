@@ -253,7 +253,7 @@ class ClienteFalso:
         def __init__(self, pai):
             self.pai = pai
 
-        def generate_content(self, model, contents):
+        def generate_content(self, model, contents, config=None):
             self.pai.pedidos.append(contents)
             texto = self.pai.respostas.pop(0)
 

@@ -300,7 +300,7 @@ class AIGenerator:
         # acha vira aviso na tela em vez de outra ida ao modelo.
         limite = time.monotonic() + 40
         com_seguimentos = bool(getattr(req, "com_seguimentos", False))
-        dados = await asyncio.to_thread(gerar_json, client, prompt, ["body"], 2, limite, True, 900 if com_seguimentos else 600)
+        dados = await asyncio.to_thread(gerar_json, client, prompt, ["body"], 2, limite, True, 700 if com_seguimentos else 500)
 
         problemas = (revisar_copy(dados.get("body", ""), canal)
                      + abordagem_mestra.revisar_calor(dados.get("body", ""), canal)

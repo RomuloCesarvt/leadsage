@@ -75,6 +75,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+@app.middleware("http")
+async def _laco_da_ia(request: Request, call_next):
+    """As threads da IA usam o laço do servidor para compartilhar o orçamento dos motores gratuitos com as outras instâncias."""
+    from app import ia_gate
+    ia_gate.LOOP = asyncio.get_running_loop()
+    return await call_next(request)
+
+
 # allow_origins=["*"] com allow_credentials=True e uma combinacao invalida
 # (o navegador recusa) e deixava qualquer site chamar a API. Com
 # ALLOWED_ORIGINS definido, so as origens listadas passam.
@@ -311,7 +319,7 @@ async def generate_pitch(request: Request, req: PitchGenerationRequest, user: di
         await _preparar_pitch(user, req)
         return await AIGenerator.generate_pitch(req, api_key=settings.GEMINI_API_KEY)
     except AIIndisponivel as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        raise HTTPException(status_code=503, detail=str(e), headers={"Retry-After": str(getattr(e, "espera_s", 0) or 15)})
 
 
 async def _previa_do_lead(uid: str, lead_id: str, sites: Optional[List[Dict[str, Any]]] = None) -> str:
@@ -347,7 +355,7 @@ async def generate_followups(req: FollowupsRequest, user: dict = Depends(get_cur
         seguimentos, avisos = await AIGenerator.generate_followups(req.pitch, req.primeira, api_key=settings.GEMINI_API_KEY)
         return {"follow_ups": seguimentos, "warnings": avisos}
     except AIIndisponivel as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        raise HTTPException(status_code=503, detail=str(e), headers={"Retry-After": str(getattr(e, "espera_s", 0) or 15)})
 
 
 @app.post("/api/generate-demo-site", response_model=DemoSiteResponse)
@@ -355,7 +363,7 @@ async def generate_demo_site(request: Request, req: DemoSiteRequest, user: dict 
     try:
         return await AIGenerator.generate_demo_site(req, api_key=settings.GEMINI_API_KEY)
     except AIIndisponivel as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        raise HTTPException(status_code=503, detail=str(e), headers={"Retry-After": str(getattr(e, "espera_s", 0) or 15)})
 
 
 @app.post("/api/generate-site-copy", response_model=SiteCopyResponse)
@@ -388,7 +396,7 @@ async def gerar_texto_do_site(req: SiteCopyRequest, user: dict = Depends(get_cur
             rapido=True,
         )
     except AIIndisponivel as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        raise HTTPException(status_code=503, detail=str(e), headers={"Retry-After": str(getattr(e, "espera_s", 0) or 15)})
     if lead_id:
         await ai_site.guardar_copia(user.get("uid"), lead_id, copia)
     return copia
@@ -432,7 +440,7 @@ async def gerar_documento_com_ia(
             req.kind, lead, perfil.model_dump(), req.model_dump(), settings.GEMINI_API_KEY
         )
     except AIIndisponivel as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        raise HTTPException(status_code=503, detail=str(e), headers={"Retry-After": str(getattr(e, "espera_s", 0) or 15)})
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

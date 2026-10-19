@@ -60,6 +60,11 @@ _CACHE_TTL_S = 3600
 class ProvedorFalhou(RuntimeError):
     """Falha de um provedor. O texto inclui o código HTTP: 429 e 503 contam como pico de demanda."""
 
+    def __init__(self, mensagem: str, status: int = 0, retry_after: Optional[str] = None):
+        super().__init__(mensagem)
+        self.status = status
+        self.retry_after = retry_after
+
 
 def ativos() -> List[Dict[str, Any]]:
     """Os provedores que têm chave configurada, na ordem de velocidade esperada."""
@@ -132,16 +137,42 @@ def _corpo(modelo: str, prompt: str, max_tokens: Optional[int], json_mode: bool,
     return corpo
 
 
+def modelos_alvo(p: Dict[str, Any], maximo: int = 3) -> List[str]:
+    """Os modelos deste provedor que vale usar ao mesmo tempo: cada um tem o seu limite gratuito, então três modelos são três vezes a cota."""
+    try:
+        disponiveis = modelos_do_provedor(p)
+    except Exception:
+        return []
+    forcado = (os.getenv(f"{p['nome'].upper()}_MODEL") or "").strip()
+    if forcado:
+        return [forcado]
+    achados = [m for m in p["preferidos"] if m in disponiveis]
+    if not achados:
+        try:
+            achados = [escolher_modelo(p, disponiveis)]
+        except ProvedorFalhou:
+            achados = []
+    return achados[:maximo]
+
+
 def chamar(p: Dict[str, Any], prompt: str, limite_s: float = 15.0, max_tokens: Optional[int] = None,
-           json_mode: bool = True, cliente: Optional[httpx.Client] = None) -> str:
-    """Um pedido de texto ao provedor. Devolve o texto ou levanta ProvedorFalhou."""
+           json_mode: bool = True, cliente: Optional[httpx.Client] = None, modelo: str = "", ao_responder=None) -> str:
+    """Um pedido de texto ao provedor. Devolve o texto ou levanta ProvedorFalhou.
+
+    `modelo` força o modelo (cada modelo tem o seu limite gratuito); `ao_responder(cabecalhos)` recebe os cabeçalhos de limite.
+    """
     c = cliente or httpx.Client(timeout=httpx.Timeout(limite_s, connect=5.0))
     try:
-        modelo = escolher_modelo(p, modelos_do_provedor(p, c))
+        modelo = modelo or escolher_modelo(p, modelos_do_provedor(p, c))
         extras = {"json_mode": json_mode, "raciocinio_baixo": True}
         for _ in range(3):
             r = c.post(f"{p['url']}/chat/completions", headers=_headers(p),
                        json=_corpo(modelo, prompt, max_tokens, **extras), timeout=limite_s)
+            if ao_responder is not None:
+                try:
+                    ao_responder(r.headers, r.status_code)
+                except Exception:
+                    pass
             if r.status_code == 400:
                 # parâmetro que este modelo não aceita: tira um por vez e repete
                 texto = r.text.lower()
@@ -155,7 +186,7 @@ def chamar(p: Dict[str, Any], prompt: str, limite_s: float = 15.0, max_tokens: O
         if r.status_code >= 400:
             if r.status_code == 404:
                 _CACHE_MODELOS.pop(p["nome"], None)  # o modelo saiu do ar: relê a lista na próxima
-            raise ProvedorFalhou(f"{p['nome']} HTTP {r.status_code}: {r.text[:160]}")
+            raise ProvedorFalhou(f"{p['nome']} HTTP {r.status_code}: {r.text[:300]}", status=r.status_code, retry_after=r.headers.get("retry-after"))
         escolhas = (r.json().get("choices") or [])
         texto = ((escolhas[0].get("message") or {}).get("content") or "").strip() if escolhas else ""
         if not texto:

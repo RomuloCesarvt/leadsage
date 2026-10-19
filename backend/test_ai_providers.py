@@ -113,58 +113,72 @@ def test_resposta_vazia_e_falha(monkeypatch):
         ai_providers.chamar(GROQ, "oi", cliente=c)
 
 
-# ------------------------------------------------------------------ a corrida
+# ------------------------------------------------------------------ o portão (um pedido por vez, no motor livre)
 
-def corrida(monkeypatch, itens, atraso=0.2, prazo_s=5):
-    monkeypatch.setattr(ai_client, "_candidatos", lambda *a, **k: itens)
-    return ai_client.generate_hedged(None, "x", time.monotonic() + prazo_s, atraso=atraso)
-
-
-def test_o_motor_lento_nao_segura_o_rapido(monkeypatch):
-    def lento(_):
-        time.sleep(2.0)
-        return "do lento"
-
-    t = time.monotonic()
-    texto = corrida(monkeypatch, [("lento", lento), ("rapido", lambda _: "do rapido")])
-    assert texto == "do rapido" and time.monotonic() - t < 1.2
-    assert ai_client._working_model == "rapido"   # na proxima, ele vai na frente
+def corrida(monkeypatch, itens, prazo_s=5, tokens_alvo=None):
+    from app import ia_gate
+    ia_gate.reiniciar()
+    alvos = [ia_gate.Alvo(r, "gemini", f, tpm=tokens_alvo) for r, f in itens]
+    monkeypatch.setattr(ai_client, "_alvos", lambda *a, **k: alvos)
+    return ai_client.generate_hedged(None, "x", time.monotonic() + prazo_s)
 
 
-def test_motor_que_falha_passa_a_vez_sem_esperar(monkeypatch):
+def test_o_primeiro_motor_livre_atende_e_vai_na_frente_da_proxima(monkeypatch):
+    chamados = []
+    texto = corrida(monkeypatch, [("a", lambda _: chamados.append("a") or "do a"), ("b", lambda _: chamados.append("b") or "do b")])
+    assert texto == "do a" and chamados == ["a"]          # sem rajada: o segundo nem é chamado
+    assert ai_client._working_model == "a"
+
+
+def test_motor_que_falha_passa_a_vez_e_descansa(monkeypatch):
+    from app import ia_gate
+
     def quebrado(_):
         raise RuntimeError("503 UNAVAILABLE")
 
     t = time.monotonic()
-    assert corrida(monkeypatch, [("a", quebrado), ("b", lambda _: "ok")], atraso=3.0) == "ok"
+    assert corrida(monkeypatch, [("a", quebrado), ("b", lambda _: "ok")]) == "ok"
     assert time.monotonic() - t < 1.0
+    assert ia_gate.espera_do_alvo(ia_gate.Alvo("a", "gemini", None), 100) > 0      # "a" descansa; ninguém insiste nele
 
 
 def test_todos_falham_da_mensagem_de_alta_demanda(monkeypatch):
     def quebrado(_):
-        raise RuntimeError("429 RESOURCE_EXHAUSTED")
+        raise RuntimeError("429 RESOURCE_EXHAUSTED retry in 30s")
 
-    with pytest.raises(AIIndisponivel, match="alta demanda"):
-        corrida(monkeypatch, [("a", quebrado), ("b", quebrado)])
+    with pytest.raises(AIIndisponivel, match="alta demanda|fila da IA"):
+        corrida(monkeypatch, [("a", quebrado), ("b", quebrado)], prazo_s=8)
 
 
-def test_prazo_estourado_nao_trava(monkeypatch):
-    def preso(_):
-        time.sleep(3)
-        return "tarde"
+def test_sem_vaga_agora_e_sem_tempo_falha_na_hora_dizendo_quando_tentar(monkeypatch):
+    def quebrado(_):
+        raise RuntimeError("429 RESOURCE_EXHAUSTED retry in 40s")
 
     t = time.monotonic()
-    with pytest.raises(AIIndisponivel):
-        corrida(monkeypatch, [("a", preso)], atraso=0.2, prazo_s=1)
-    assert time.monotonic() - t < 2.0
+    with pytest.raises(AIIndisponivel) as e:
+        corrida(monkeypatch, [("a", quebrado)], prazo_s=10)
+    assert time.monotonic() - t < 2.0 and e.value.espera_s >= 30   # não ficou esperando nem insistindo
 
 
-def test_provedores_com_chave_entram_na_frente_do_gemini(monkeypatch):
+def test_pedido_maior_que_o_orcamento_do_modelo_nao_vai_para_ele(monkeypatch):
+    chamados = []
+    texto = corrida(monkeypatch, [("pequeno", lambda _: chamados.append("p") or "x"), ("grande", lambda _: chamados.append("g") or "do grande")], tokens_alvo=None)
+    assert texto == "x"
+    from app import ia_gate
+    ia_gate.reiniciar()
+    alvos = [ia_gate.Alvo("pequeno", "groq", lambda _: "p", tpm=1000), ia_gate.Alvo("grande", "gemini", lambda _: "do grande", tpm=100000)]
+    monkeypatch.setattr(ai_client, "_alvos", lambda *a, **k: alvos)
+    assert ai_client.generate_hedged(None, "x" * 6000, time.monotonic() + 5, max_tokens=1500) == "do grande"   # ~3500 tokens: não cabe no de 1000
+
+
+def test_provedores_com_chave_entram_na_frente_do_gemini_um_alvo_por_modelo(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "x")
-    rotulos = [r for r, _ in ai_client._candidatos(None, "oi", None, True)]
-    assert rotulos[0] == "groq" and rotulos[1:] == list(ai_client.MODEL_CHAIN)
+    monkeypatch.setattr(ai_providers, "modelos_do_provedor", lambda p, c=None: ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b", "outro"])
+    chaves = [a.chave for a in ai_client._alvos(None, "oi", None, True)]
+    assert chaves[:3] == ["groq:openai/gpt-oss-120b", "groq:qwen/qwen3.8-27b", "groq:openai/gpt-oss-20b"]
+    assert chaves[3:] == [f"gemini:{m}" for m in ai_client.MODEL_CHAIN]
 
 
 def test_sem_chave_extra_so_o_gemini(monkeypatch):
-    rotulos = [r for r, _ in ai_client._candidatos(None, "oi", None, True)]
-    assert rotulos == list(ai_client.MODEL_CHAIN)
+    chaves = [a.chave for a in ai_client._alvos(None, "oi", None, True)]
+    assert chaves == [f"gemini:{m}" for m in ai_client.MODEL_CHAIN]

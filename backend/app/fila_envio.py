@@ -422,7 +422,7 @@ async def preparar_lote(
                     return await gerar(quem, canal)
                 except Exception as exc:
                     # pico de demanda: espera um pouco e tenta de novo, se ainda houver tempo dentro dos 55 s da requisicao
-                    if tentativa == 1 and "alta demanda" in str(exc) and time.monotonic() - inicio < 25:
+                    if tentativa == 1 and re.search(r"alta demanda|fila da IA", str(exc)) and time.monotonic() - inicio < 25:
                         await asyncio.sleep(4)
                         continue
                     return exc
@@ -435,8 +435,8 @@ async def preparar_lote(
         lid = str(lead["id"])
         nome = lead.get("company") or lead.get("name") or lid
         if isinstance(pronto, Exception):
-            saida.append({"lead_id": lid, "nome": nome, "resultado": "falhou",
-                          "motivo": f"não foi possível escrever a mensagem: {str(pronto)[:120]}"})
+            saida.append({"lead_id": lid, "nome": nome, "resultado": "falhou", "espera_s": int(getattr(pronto, "espera_s", 0) or 0),
+                          "motivo": f"não foi possível escrever a mensagem: {str(pronto)[:160]}"})
             continue
         if canal == "whatsapp":
             pronto = await _diferenciar(gerar, lead, canal, pronto, usados)

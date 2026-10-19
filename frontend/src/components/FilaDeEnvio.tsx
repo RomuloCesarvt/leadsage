@@ -23,7 +23,7 @@ import type { CanalFila, EstadoFilaWhats, ItemFila, LeadItem, ResultadoPreparo, 
 
 const SEM_CONTATO_AINDA = new Set(['', 'Novo Lead', 'Novos', 'Novo']);
 const LOTE = 4; // a IA escreve a abertura e os seguimentos de cada lead: lotes menores cabem nos 60 s do servidor
-const MAXIMO_POR_RODADA = 40;
+const MAXIMO_POR_RODADA = 15;
 const EMAIL_OK = /^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/;
 const EM_ANDAMENTO = ['rascunho', 'pendente', 'enviando', 'aguardando_limite', 'falhou'];
 
@@ -39,6 +39,13 @@ const IconeCanal: React.FC<{ canal: CanalFila; className?: string }> = ({ canal,
 };
 
 /** O canal que a fila vai escolher para o lead: o mesmo critério do servidor. */
+/** O telefone sem pais nem formatação (DDD + 8 últimos dígitos): o mesmo número escrito de jeitos diferentes cai na mesma chave. */
+const chaveDoFone = (f?: string | null): string => {
+  const d = (f || '').replace(/\D/g, '');
+  if (d.length < 10) return '';
+  return (d.length >= 11 ? d.slice(-11, -9) : d.slice(-10, -8)) + d.slice(-8);
+};
+
 const canalDe = (l: LeadItem): CanalFila | null => {
   if (EMAIL_OK.test((l.email || '').trim())) return 'email';
   if ((l.phone || '').replace(/\D/g, '').length >= 10) return 'whatsapp';
@@ -139,11 +146,13 @@ export const FilaDeEnvio: React.FC = () => {
     if (aba === 'revisar' && !rascunhos.length) setAba(naFila.length ? 'fila' : comProblema.length ? 'problema' : 'revisar');
   }, [rascunhos.length, naFila.length, comProblema.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const candidatos = useMemo(
-    () => (leads as LeadItem[]).filter(l => ehSalvo(l) && SEM_CONTATO_AINDA.has(l.pipeline_stage || '') && canalDe(l)
-      && !itens.some(i => i.lead_id === l.id && EM_ANDAMENTO.concat('enviado').includes(i.status) && i.status !== 'falhou')),
-    [leads, itens],
-  );
+  // quem já recebeu mensagem NÃO volta para a lista (nem com outro cadastro do mesmo número); só entra se a pessoa mandar de propósito (ficha do lead)
+  const candidatos = useMemo(() => {
+    const jaFalamos = new Set(itens.filter(i => ['enviado', 'enviando'].includes(i.status)).map(i => chaveDoFone(i.contato?.phone)).filter(Boolean));
+    return (leads as LeadItem[]).filter(l => ehSalvo(l) && SEM_CONTATO_AINDA.has(l.pipeline_stage || '') && canalDe(l)
+      && !itens.some(i => i.lead_id === l.id && EM_ANDAMENTO.concat('enviado').includes(i.status) && i.status !== 'falhou')
+      && !(chaveDoFone(l.phone) && jaFalamos.has(chaveDoFone(l.phone))));
+  }, [leads, itens]);
 
   const alternarLead = (id: string) => setMarcados(prev => {
     const novo = new Set(prev);
@@ -151,6 +160,21 @@ export const FilaDeEnvio: React.FC = () => {
     else if (novo.size < MAXIMO_POR_RODADA) novo.add(id);
     return novo;
   });
+
+  /** A IA gratuita tem limite por minuto: em vez de falhar, espera o tempo que o servidor mandou e tenta de novo (até `maxSegundos`). */
+  const esperarIA = async <T,>(fn: () => Promise<T>, rotulo: string, maxSegundos = 420): Promise<T> => {
+    const inicio = Date.now();
+    for (;;) {
+      try { return await fn(); } catch (e: any) {
+        const msg = String(e?.message || '');
+        const porLimite = /fila da IA|alta demanda|limite gratuito|demorou demais|muita gente/i.test(msg);
+        if (!porLimite || (Date.now() - inicio) / 1000 > maxSegundos) throw e;
+        const n = Math.min(90, Math.max(8, Number(msg.match(/em (\d+) segundos/)?.[1] || 20)) + 2);
+        for (let s = n; s > 0; s--) { setAvisoPrevias(`${rotulo}: a IA gratuita está no limite por minuto, tentando de novo em ${s}s…`); await new Promise(ok => setTimeout(ok, 1000)); }
+        setAvisoPrevias('');
+      }
+    }
+  };
 
   const gerar = async () => {
     const escolhidos = candidatos.filter(l => marcados.has(l.id));
@@ -190,10 +214,10 @@ export const FilaDeEnvio: React.FC = () => {
               // cada lead começa em um ponto diferente da lista: dois negócios do mesmo ramo não ficam com as mesmas fotos
               const giro = fotos.length ? (proximo * 2) % fotos.length : 0;
               // o texto do site é escrito pela IA para ESTE negócio (nota, avaliação, descrição e horário reais); se ela não responder, vale o do ramo
-              const copia = await Promise.race([
-                api.generateSiteCopy({ lead, empresa: lead.company || lead.name, categoria: lead.niche || lead.role, cidade: lead.city }).catch(() => null),
-                new Promise<null>(ok => setTimeout(() => ok(null), 40000)),
-              ]);
+              const copia = await esperarIA(
+                () => api.generateSiteCopy({ lead, empresa: lead.company || lead.name, categoria: lead.niche || lead.role, cidade: lead.city }),
+                `Site de ${lead.company || lead.name}`,
+              ).catch(() => null);
               await api.publishSite({ ...montarPreviaDoLead({ ...lead, copia_ia: copia || undefined }, [...fotos.slice(giro), ...fotos.slice(0, giro)]), site_id: existentes.get(lead.id) });
             } catch { falhas++; }
             feitas++; setPrevias({ feitas, total: criar.length });
@@ -220,14 +244,19 @@ export const FilaDeEnvio: React.FC = () => {
         }
       };
       await Promise.all([lote(), lote()]);
-      // quem falhou por limite da IA gratuita (muita gente gerando ao mesmo tempo) tenta de novo sozinho, até 3 vezes, esperando a cota voltar
-      const porLimite = (m?: string) => /alta demanda|limite gratuito|demorou demais/i.test(m || '');
-      for (const espera of [25, 45, 60]) {
-        const pendentes = new Set<string>();
-        setResultados(prev => { prev.filter(x => x.resultado === 'falhou' && porLimite(x.motivo)).forEach(x => pendentes.add(x.lead_id)); return prev; });
-        if (!pendentes.size) break;
-        setAvisoPrevias(`A IA gratuita está no limite por minuto. Tentando de novo ${pendentes.size} lead(s) em ${espera} segundos…`);
-        await new Promise(ok => setTimeout(ok, espera * 1000));
+      // quem falhou por limite da IA gratuita (muita gente gerando ao mesmo tempo) NÃO fica com erro: espera o tempo que o servidor mandou
+      // e tenta de novo, até acabar (no máximo 10 minutos)
+      const porLimite = (m?: string) => /alta demanda|limite gratuito|demorou demais|fila da IA/i.test(m || '');
+      const comecou = Date.now();
+      for (;;) {
+        const pendentes = new Map<string, number>();
+        setResultados(prev => { prev.filter(x => x.resultado === 'falhou' && porLimite(x.motivo)).forEach(x => pendentes.set(x.lead_id, x.espera_s || 20)); return prev; });
+        if (!pendentes.size || Date.now() - comecou > 600000) break;
+        const espera = Math.min(75, Math.max(12, ...pendentes.values()) + 2);
+        for (let seg = espera; seg > 0; seg--) {
+          setAvisoPrevias(`A IA gratuita está no limite por minuto. ${pendentes.size} mensagem(ns) na fila: tentando de novo em ${seg}s…`);
+          await new Promise(ok => setTimeout(ok, 1000));
+        }
         const de_novo = escolhidos.filter(l => pendentes.has(l.id));
         for (let i = 0; i < de_novo.length; i += 2) {
           const r = await api.filaPreparar(de_novo.slice(i, i + 2) as unknown as Record<string, unknown>[], 'Consultivo', true);
