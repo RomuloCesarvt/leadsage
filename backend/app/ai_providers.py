@@ -9,6 +9,7 @@ Cada um liga sozinho quando a chave existe no ambiente (Vercel > Environment Var
 
     GROQ_API_KEY        console.groq.com/keys          (sem cartão)
     CEREBRAS_API_KEY    cloud.cerebras.ai              (conferir as condições do plano gratuito)
+    MISTRAL_API_KEY     console.mistral.ai             (plano gratuito "Experiment"; conferir as condições)
     OPENROUTER_API_KEY  openrouter.ai/keys             (modelos ":free", limite baixo)
 
 O modelo é escolhido a partir da lista que o próprio provedor devolve (GET /models), na ordem de
@@ -37,6 +38,12 @@ PROVEDORES: List[Dict[str, Any]] = [
         "url": "https://api.cerebras.ai/v1",
         "env": "CEREBRAS_API_KEY",
         "preferidos": ["gpt-oss-120b", "llama-3.3-70b", "qwen-3.8-27b", "llama3.1-8b"],
+    },
+    {
+        "nome": "mistral",
+        "url": "https://api.mistral.ai/v1",
+        "env": "MISTRAL_API_KEY",
+        "preferidos": ["mistral-small-latest", "open-mistral-nemo", "ministral-8b-latest"],
     },
     {
         "nome": "openrouter",

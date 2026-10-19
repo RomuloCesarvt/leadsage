@@ -220,6 +220,23 @@ export const FilaDeEnvio: React.FC = () => {
         }
       };
       await Promise.all([lote(), lote()]);
+      // quem falhou por limite da IA gratuita (muita gente gerando ao mesmo tempo) tenta de novo sozinho, até 3 vezes, esperando a cota voltar
+      const porLimite = (m?: string) => /alta demanda|limite gratuito|demorou demais/i.test(m || '');
+      for (const espera of [25, 45, 60]) {
+        const pendentes = new Set<string>();
+        setResultados(prev => { prev.filter(x => x.resultado === 'falhou' && porLimite(x.motivo)).forEach(x => pendentes.add(x.lead_id)); return prev; });
+        if (!pendentes.size) break;
+        setAvisoPrevias(`A IA gratuita está no limite por minuto. Tentando de novo ${pendentes.size} lead(s) em ${espera} segundos…`);
+        await new Promise(ok => setTimeout(ok, espera * 1000));
+        const de_novo = escolhidos.filter(l => pendentes.has(l.id));
+        for (let i = 0; i < de_novo.length; i += 2) {
+          const r = await api.filaPreparar(de_novo.slice(i, i + 2) as unknown as Record<string, unknown>[], 'Consultivo', true);
+          const ids = new Set(r.resultados.map(x => x.lead_id));
+          setResultados(prev => [...prev.filter(x => !(ids.has(x.lead_id) && x.resultado === 'falhou')), ...r.resultados]);
+          setResumo(r.resumo);
+        }
+      }
+      setAvisoPrevias('');
       setMarcados(new Set());
       setAba('revisar');
       await atualizarPipeline();
