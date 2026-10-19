@@ -195,14 +195,62 @@ PodeEnviar = Callable[[], Awaitable[bool]]
 Cobrar = Callable[[], Awaitable[None]]
 
 
-async def _ja_contatado(uid: str, lead_id: str, existentes: List[Dict[str, Any]]) -> str:
-    """Motivo para não preparar de novo, ou vazio."""
+def _chave_do_telefone(bruto: Any) -> str:
+    """DDD + 8 ultimos digitos: o mesmo numero escrito com ou sem 55 e com ou sem o 9 na frente cai na mesma chave."""
+    d = re.sub(r"\D", "", str(bruto or ""))
+    if len(d) < 10:
+        return ""
+    ddd = d[-11:-9] if len(d) >= 11 else d[-10:-8]
+    return ddd + d[-8:]
+
+
+def _telefone_com_pais(bruto: Any) -> str:
+    d = re.sub(r"\D", "", str(bruto or ""))
+    return "55" + d if len(d) in (10, 11) else d
+
+
+async def historico_do_contato(uid: str, lead: Dict[str, Any], canal: str, existentes: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Ja falamos com este numero (ou e-mail)? Devolve {quando, como, respondeu, optout} ou nada.
+
+    Olha o que ja saiu pela fila (de qualquer lead com o mesmo numero), a conversa do WhatsApp e o pipeline.
+    """
+    lid = str(lead.get("id") or "")
+    telefone, email = lead.get("phone") or "", str(lead.get("email") or "").strip().lower()
+    chave = _chave_do_telefone(telefone)
+    quando, como = "", ""
     for i in existentes:
-        if i.get("lead_id") == lead_id and i.get("status") in ("rascunho", "pendente", "enviado", "aguardando_limite"):
-            return "já está na fila" if i["status"] != "enviado" else "já recebeu a abordagem"
-    item = await pipeline_store.obter(uid, lead_id)
-    if item and (pipeline_store.etapa_valida(item.get("etapa", "")) or "Novo Lead") != "Novo Lead":
-        return "já está em andamento no pipeline"
+        if i.get("status") != "enviado" or i.get("canal") != canal:
+            continue
+        contato = i.get("contato") or {}
+        mesmo = (canal == "email" and email and str(contato.get("email") or "").strip().lower() == email) or \
+                (canal == "whatsapp" and chave and _chave_do_telefone(contato.get("phone")) == chave) or \
+                (canal not in ("email", "whatsapp") and i.get("lead_id") == lid)
+        if mesmo and (i.get("enviado_em") or "") >= quando:
+            quando, como = i.get("enviado_em") or "", canal
+    respondeu = optout = False
+    if canal == "whatsapp" and telefone:
+        conversa = await robo_store.obter_conversa(uid, robo_store.id_da_conversa("whatsapp", _telefone_com_pais(telefone)))
+        if conversa and conversa.get("mensagens"):
+            optout = bool(conversa.get("optout"))
+            respondeu = any(m.get("de") == "contato" for m in conversa["mensagens"])
+            if any(m.get("de") in ("robo", "voce") for m in conversa["mensagens"]):
+                como = como or "whatsapp"
+                quando = max(quando, str(conversa.get("atualizado") or ""))
+    if not quando and not optout:
+        item = await pipeline_store.obter(uid, lid)
+        if item and (pipeline_store.etapa_valida(item.get("etapa", "")) or "Novo Lead") != "Novo Lead":
+            como, quando = canal, str(item.get("atualizado") or item.get("criado") or "") or agora()
+            respondeu = respondeu or item.get("etapa") == "Respondeu"
+    if not (quando or optout):
+        return None
+    return {"quando": quando, "como": como or canal, "respondeu": respondeu, "optout": optout}
+
+
+async def _ja_contatado(uid: str, lead_id: str, existentes: List[Dict[str, Any]]) -> str:
+    """Motivo para não preparar de novo, ou vazio. Quem JA recebeu mensagem NAO entra aqui: volta para a revisão com um aviso."""
+    for i in existentes:
+        if i.get("lead_id") == lead_id and i.get("status") in ("rascunho", "pendente", "aguardando_limite"):
+            return "já está na fila"
     return ""
 
 
@@ -338,6 +386,7 @@ async def preparar_lote(
 
     # 1) decide o canal e filtra quem não deve receber
     alvos: List[Tuple[Dict[str, Any], str]] = []
+    historicos: Dict[str, Dict[str, Any]] = {}
     for lead in leads:
         lid = str(lead.get("id") or "")
         nome = lead.get("company") or lead.get("name") or lid
@@ -352,6 +401,12 @@ async def preparar_lote(
             saida.append({"lead_id": lid, "nome": nome, "resultado": "ignorado",
                           "motivo": "sem e-mail, telefone, Instagram nem LinkedIn"})
             continue
+        antes = await historico_do_contato(uid, lead, canal, existentes)
+        if antes and antes.get("optout"):
+            saida.append({"lead_id": lid, "nome": nome, "resultado": "ignorado", "motivo": "pediu para não receber mensagens"})
+            continue
+        if antes:
+            historicos[lid] = antes
         alvos.append((lead, canal))
 
     # 2) escreve as mensagens, algumas por vez
@@ -363,7 +418,8 @@ async def preparar_lote(
         async with sem:
             for tentativa in (1, 2):
                 try:
-                    return await gerar(lead, canal)
+                    quem = {**lead, "_retomada": historicos[str(lead.get("id"))]} if str(lead.get("id")) in historicos else lead
+                    return await gerar(quem, canal)
                 except Exception as exc:
                     # pico de demanda: espera um pouco e tenta de novo, se ainda houver tempo dentro dos 55 s da requisicao
                     if tentativa == 1 and "alta demanda" in str(exc) and time.monotonic() - inicio < 25:
@@ -394,8 +450,12 @@ async def preparar_lote(
         if canal == "email":
             corpo = com_rodape_de_saida(corpo)
 
+        # mensagem nova para quem ja recebeu nao apaga o registro do que foi enviado: ganha um id proprio
+        novo_id = f"f_{lid}"
+        if any(i.get("id") == novo_id and i.get("status") in ("enviado", "enviando") for i in existentes):
+            novo_id = f"f_{lid}_r{sum(1 for i in existentes if str(i.get('id', '')).startswith(f'f_{lid}_r')) + 1}"
         item = {
-            "id": f"f_{lid}",
+            "id": novo_id,
             "lead_id": lid,
             "nome": nome,
             "canal": canal,
@@ -413,13 +473,16 @@ async def preparar_lote(
             "status": "pendente",
             "criado": agora(),
         }
+        if lid in historicos:
+            # a pessoa decide: nada sai sozinho para quem ja recebeu mensagem
+            item["ja_contatado"] = {k: historicos[lid][k] for k in ("quando", "como", "respondeu")}
         # garante que o servidor conhece o lead (o robô reconhece quem responde por ele)
         try:
             await pipeline_store.registrar(uid, {**lead, "id": lid})
         except Exception as exc:
             print(f"Fila: não registrou no pipeline: {exc}")
 
-        if revisar:
+        if revisar or lid in historicos:
             item["status"] = "rascunho"
             await _gravar(uid, item)
             saida.append({"lead_id": lid, "nome": nome, "canal": canal, "resultado": "para revisar", "motivo": ""})
@@ -568,7 +631,7 @@ async def descartar_todos(uid: str) -> int:
 
 
 async def aprovar(uid: str, ids: List[str], enviar_email: EnviarEmail, pode_enviar: PodeEnviar,
-                  cobrar_email: Cobrar, pausa: float = 0.8) -> Dict[str, Any]:
+                  cobrar_email: Cobrar, pausa: float = 0.8, confirmar_reenvio: bool = False) -> Dict[str, Any]:
     """Libera para sair as mensagens revisadas.
 
     WhatsApp vai para a fila de saida (o Conector envia com intervalo e limite do dia); e-mail sai agora, dentro
@@ -583,6 +646,10 @@ async def aprovar(uid: str, ids: List[str], enviar_email: EnviarEmail, pode_envi
         if not item or item.get("status") != "rascunho":
             continue
         nome, lid = item.get("nome", ""), item.get("lead_id", "")
+        if item.get("ja_contatado") and not confirmar_reenvio:
+            saida.append({"lead_id": lid, "nome": nome, "canal": item.get("canal"), "resultado": "ignorado",
+                          "motivo": "este contato já recebeu mensagem antes: confirme o reenvio para enviar de novo"})
+            continue
         if item.get("canal") != "email":
             item["status"] = "pendente"
             item["motivo"] = ""

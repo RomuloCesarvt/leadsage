@@ -220,8 +220,9 @@ export const FilaDeEnvio: React.FC = () => {
 
   // ------------------------------------------------------------ revisão
   const alternarSel = (id: string) => setSel(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  const todosMarcados = rascunhos.length > 0 && rascunhos.every(i => sel.has(i.id));
-  const marcarTodos = () => setSel(todosMarcados ? new Set() : new Set(rascunhos.map(i => i.id)));
+  const marcaveis = rascunhos.filter(i => !i.ja_contatado); // quem já recebeu mensagem só entra marcando um a um
+  const todosMarcados = marcaveis.length > 0 && marcaveis.every(i => sel.has(i.id));
+  const marcarTodos = () => setSel(todosMarcados ? new Set() : new Set(marcaveis.map(i => i.id)));
   const selecionados = rascunhos.filter(i => sel.has(i.id));
   const selWhats = selecionados.filter(i => i.canal === 'whatsapp').length;
   const selEmail = selecionados.filter(i => i.canal === 'email').length;
@@ -244,11 +245,13 @@ export const FilaDeEnvio: React.FC = () => {
 
   const enviarSelecionados = async () => {
     if (!selecionados.length) return;
+    const reenvios = selecionados.filter(i => i.ja_contatado);
+    if (reenvios.length && !window.confirm(`${reenvios.length} contato(s) marcado(s) JÁ RECEBERAM mensagem antes (${reenvios.slice(0, 3).map(i => i.nome).join(', ')}${reenvios.length > 3 ? '…' : ''}). Quer enviar novamente mesmo assim?`)) return;
     const emails = selEmail ? ` ${selEmail} e-mail(s) saem agora (custam 2 créditos cada).` : '';
     if (!window.confirm(`Enviar ${selecionados.length} mensagem(ns)?${emails}${selWhats ? ` ${selWhats} de WhatsApp entram na fila e saem aos poucos: de 3 a 7 minutos entre uma e outra, de segunda a sábado, das 8h às 19h (Brasília), para proteger o número.` : ''}`)) return;
     setTrabalhando('aprovar');
     try {
-      const r = await api.filaAprovar(selecionados.map(i => i.id));
+      const r = await api.filaAprovar(selecionados.map(i => i.id), selecionados.some(i => i.ja_contatado));
       setResultados(r.resultados);
       setResumo(r.resumo);
       setSel(prev => { const n = new Set(prev); selecionados.forEach(i => n.delete(i.id)); return n; });
@@ -332,6 +335,12 @@ export const FilaDeEnvio: React.FC = () => {
           )}
           {item.previa === 'oferecer' && <span className="text-amber-800 bg-amber-50 rounded-full px-2 py-0.5">Sem prévia: a mensagem oferece montar</span>}
         </p>
+        {item.ja_contatado && (
+          <div className="mb-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2 leading-snug" role="alert">
+            <b>Já enviamos mensagem para este contato</b>{item.ja_contatado.quando ? ` em ${new Date(item.ja_contatado.quando).toLocaleDateString('pt-BR')}` : ''}
+            {item.ja_contatado.respondeu ? ', e ele(a) já respondeu: o robô está cuidando da conversa' : ''}. Quer enviar novamente? Marque a caixa ao lado para confirmar.
+          </div>
+        )}
 
         {ed ? (
           <div className="space-y-2">

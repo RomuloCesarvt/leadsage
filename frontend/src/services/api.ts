@@ -403,8 +403,8 @@ export const api = {
     return await fetchWithToken(`/robo/fila/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(dados) });
   },
 
-  async filaAprovar(ids: string[]): Promise<{ resultados: ResultadoPreparo[]; resumo: ResumoFila }> {
-    return await fetchWithToken('/robo/fila/aprovar', { method: 'POST', body: JSON.stringify({ ids }) });
+  async filaAprovar(ids: string[], confirmarReenvio = false): Promise<{ resultados: ResultadoPreparo[]; resumo: ResumoFila }> {
+    return await fetchWithToken('/robo/fila/aprovar', { method: 'POST', body: JSON.stringify({ ids, confirmar_reenvio: confirmarReenvio }) });
   },
 
   async filaDescartarTodos(): Promise<{ descartadas: number; resumo: ResumoFila }> {

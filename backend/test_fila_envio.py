@@ -138,9 +138,12 @@ def test_nao_repete_quem_ja_esta_na_fila_ou_no_pipeline(com_robo, rodar):
     r = preparar(rodar, [lead("W", phone="14998003784")], p)
     assert r["resultados"][0]["resultado"] == "ignorado" and "fila" in r["resultados"][0]["motivo"]
 
+    # quem ja esta em andamento no pipeline NAO e ignorado: volta para a revisao com o aviso "ja recebeu mensagem"
     rodar(pipeline_store.registrar, UID, {"id": "P", "company": "Já em andamento", "phone": "14998003785"}, "Respondeu")
     r = preparar(rodar, [lead("P", phone="14998003785")], p)
-    assert r["resultados"][0]["resultado"] == "ignorado" and "pipeline" in r["resultados"][0]["motivo"]
+    assert r["resultados"][0]["resultado"] == "para revisar"
+    item = rodar(fila_envio.obter, UID, "f_P")
+    assert item["status"] == "rascunho" and item["ja_contatado"]["respondeu"] is True
 
 
 def test_lote_tem_tamanho_maximo(com_robo, rodar):
@@ -270,3 +273,49 @@ def test_rotas_de_revisao(client, com_robo):
     r = client.post("/api/robo/fila/aprovar", json={"ids": []})
     assert r.status_code in (200, 402, 403)
     assert client.patch("/api/robo/fila/f_x", json={"texto": "oi"}).status_code in (404, 402, 403)
+
+
+# ------------------------------------------------------------ quem ja recebeu mensagem
+def test_numero_que_ja_recebeu_volta_para_revisao_com_aviso_e_nao_sai_sozinho(com_robo, rodar):
+    p = Pontas()
+    preparar(rodar, [lead("A", phone="14998003784")], p)
+    rodar(fila_envio.marcar_enviado, UID, "f_A")                              # A saiu pelo WhatsApp
+    # outro lead com o MESMO numero (escrito com 55 e formatacao diferente) e o proprio A de novo
+    r = preparar(rodar, [lead("B", phone="+55 (14) 99800-3784"), lead("A", phone="14998003784")], p)
+    assert [x["resultado"] for x in r["resultados"]] == ["para revisar", "para revisar"]
+    assert rodar(fila_envio.obter, UID, "f_A")["status"] == "enviado"          # o registro do envio antigo nao e apagado
+    assert rodar(fila_envio.obter, UID, "f_A_r1")["status"] == "rascunho"
+    b = rodar(fila_envio.obter, UID, "f_B")
+    assert b["status"] == "rascunho" and b["ja_contatado"]["como"] == "whatsapp" and b["ja_contatado"]["quando"]
+    assert p.enviados == []                                                    # nada saiu
+
+
+def test_reenvio_so_com_confirmacao(com_robo, rodar):
+    p = Pontas()
+    preparar(rodar, [lead("A", phone="14998003784")], p)
+    rodar(fila_envio.marcar_enviado, UID, "f_A")
+    item = rodar(fila_envio.obter, UID, "f_A")
+    item.update(id="f_A2", lead_id="A2", status="rascunho", ja_contatado={"quando": "2026-10-10T10:00:00", "como": "whatsapp", "respondeu": False})
+    rodar(fila_envio._gravar, UID, item)
+    sem = rodar(fila_envio.aprovar, UID, ["f_A2"], p.enviar, p.pode, p.cobrar, 0)
+    assert sem["resultados"][0]["resultado"] == "ignorado" and "confirme o reenvio" in sem["resultados"][0]["motivo"]
+    assert rodar(fila_envio.obter, UID, "f_A2")["status"] == "rascunho"
+    com = rodar(fila_envio.aprovar, UID, ["f_A2"], p.enviar, p.pode, p.cobrar, 0, True)
+    assert com["resultados"][0]["resultado"] == "na fila"
+
+
+def test_quem_pediu_para_sair_continua_bloqueado(com_robo, rodar):
+    from app import robo_store
+    p = Pontas()
+    rodar(robo_store.salvar_conversa, UID, {"id": robo_store.id_da_conversa("whatsapp", "5514998003784"), "canal": "whatsapp",
+                                           "contato": "5514998003784", "optout": True, "mensagens": [{"de": "robo", "texto": "oi"}],
+                                           "atualizado": "2026-10-10T10:00:00"})
+    r = preparar(rodar, [lead("S", phone="14998003784")], p)
+    assert r["resultados"][0]["resultado"] == "ignorado" and "não receber" in r["resultados"][0]["motivo"]
+
+
+def test_a_ia_recebe_o_aviso_de_retomada_para_quem_ja_recebeu(com_robo, rodar):
+    from app import main
+    assert main._instrucao_de_retomada(None) == ""
+    t = main._instrucao_de_retomada({"quando": "2026-10-10T10:00:00"})
+    assert "JÁ RECEBEU" in t and "2026-10-10" in t and "retomada" in t

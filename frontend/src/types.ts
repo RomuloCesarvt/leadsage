@@ -563,6 +563,8 @@ export interface ItemFila {
   /** a prévia do site deste lead: já criada (a mensagem pede licença para mandar o link) ou a oferecer */
   previa?: 'criada' | 'oferecer' | '';
   previa_url?: string;
+  /** este contato já recebeu mensagem antes: a pessoa confirma antes de enviar de novo */
+  ja_contatado?: { quando: string; como: string; respondeu: boolean };
   criado: string;
   enviado_em?: string;
   enviado_por?: string;

@@ -1089,6 +1089,8 @@ class FilaEditarRequest(BaseModel):
 
 class FilaIdsRequest(BaseModel):
     ids: List[str] = Field(default_factory=list, max_length=100)
+    # a pessoa confirmou enviar de novo para contatos que ja receberam mensagem
+    confirmar_reenvio: bool = False
 
 
 def _lead_para_pitch(lead: Dict[str, Any]) -> LeadItem:
@@ -1099,6 +1101,15 @@ def _lead_para_pitch(lead: Dict[str, Any]) -> LeadItem:
     dados = {**base, **{k: v for k, v in lead.items() if v is not None}}
     dados["socials"] = dados.get("socials") if isinstance(dados.get("socials"), dict) else {}
     return LeadItem.model_validate(dados)
+
+
+def _instrucao_de_retomada(retomada: Optional[Dict[str, Any]]) -> str:
+    """Quem ja recebeu mensagem nao ganha de novo uma apresentacao: a nova mensagem retoma a conversa."""
+    if not retomada:
+        return ""
+    quando = str(retomada.get("quando") or "")[:10]
+    return ("ESTE CONTATO JÁ RECEBEU UMA MENSAGEM NOSSA" + (f" (em {quando})" if quando else "") + ". Não se apresente como se fosse a primeira vez "
+            "e não repita a abertura: escreva uma retomada curta e leve, lembrando que a prévia do site dele(a) segue disponível, com uma pergunta de sim.")
 
 
 async def _funcoes_da_fila(user: dict):
@@ -1120,6 +1131,8 @@ async def _funcoes_da_fila(user: dict):
         sites_do_usuario = []
 
     async def gerar(lead: Dict[str, Any], canal: str, tom: str = "Consultivo", evitar: Optional[List[str]] = None, variacao: int = 0) -> Dict[str, Any]:
+        lead = dict(lead)
+        retomada = lead.pop("_retomada", None)
         previa = await _previa_do_lead(uid, str(lead.get("id", "")), sites_do_usuario)
         if previa == "criada":
             # prévia feita por uma versão antiga do motor de sites: refeita (mesmo link) antes de o link seguir na mensagem
@@ -1131,6 +1144,7 @@ async def _funcoes_da_fila(user: dict):
                                    # o seguimento automatico (2 e 5 dias depois) sai do texto escrito agora
                                    com_seguimentos=(canal == "whatsapp"),
                                    evitar=evitar or [], variacao=variacao,
+                                   custom_instructions=_instrucao_de_retomada(retomada),
                                    service_brief=abordagem_mestra.produto(canal_robo, lead, produto)),
             api_key=settings.GEMINI_API_KEY,
         )
@@ -1208,7 +1222,7 @@ async def fila_aprovar(req: FilaIdsRequest, user: dict = Depends(get_current_use
     """Libera para sair as mensagens que a pessoa revisou e deixou marcadas."""
     await exigir_recurso(user, "ia_abordagem", "O disparo")
     _, enviar, pode_enviar, cobrar = await _funcoes_da_fila(user)
-    return await fila_envio.aprovar(user.get("uid"), req.ids, enviar, pode_enviar, cobrar)
+    return await fila_envio.aprovar(user.get("uid"), req.ids, enviar, pode_enviar, cobrar, confirmar_reenvio=req.confirmar_reenvio)
 
 
 @app.post("/api/robo/fila/descartar")
