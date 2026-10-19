@@ -143,3 +143,64 @@ def test_limites_do_gemini_sobem_pelo_ambiente_quando_a_conta_e_paga(monkeypatch
     monkeypatch.setenv("IA_TPM_GEMINI", "2000000")
     a = ia_gate.Alvo("gemini:x", "gemini", None)
     assert a.rpm == 300 and a.tpm == 2000000
+
+
+# ---------------------------------------------------- erros REAIS da biblioteca do Google (o bug que derrubou todos os disparos)
+def _cliente_que_recusa(erro):
+    class Modelos:
+        def generate_content(self, model, contents, config=None):
+            raise erro
+
+    class Cliente:
+        models = Modelos()
+    return Cliente()
+
+
+def test_recusa_real_do_gemini_429_nao_derruba_o_pedido_e_pausa_o_modelo():
+    """`status` do ClientError é TEXTO ("RESOURCE_EXHAUSTED"): converter em int() quebrava todo pedido com ValueError."""
+    from google.genai import errors
+
+    erro = errors.ClientError(429, {"error": {"code": 429, "message": "Quota exceeded. Please retry in 23.5s.", "status": "RESOURCE_EXHAUSTED"}})
+    assert ai_client._status_http(erro) == 429
+    with pytest.raises(AIIndisponivel) as e:                           # falha limpa, nunca ValueError
+        ai_client.generate_hedged(_cliente_que_recusa(erro), "oi", time.monotonic() + 6, max_tokens=100)
+    assert e.value.espera_s >= 1
+    assert all(ia_gate.espera_do_alvo(ia_gate.Alvo(f"gemini:{m}", "gemini", None), 100) > 5 for m in ai_client.MODEL_CHAIN)
+
+
+@pytest.mark.parametrize("classe,codigo,status", [("ClientError", 429, "RESOURCE_EXHAUSTED"), ("ServerError", 503, "UNAVAILABLE"),
+                                                   ("ClientError", 404, "NOT_FOUND"), ("ClientError", 400, "INVALID_ARGUMENT"),
+                                                   ("ClientError", 403, "PERMISSION_DENIED"), ("ServerError", 500, "INTERNAL")])
+def test_qualquer_erro_real_do_google_vira_falha_limpa(classe, codigo, status):
+    from google.genai import errors
+
+    erro = getattr(errors, classe)(codigo, {"error": {"code": codigo, "message": "x retry in 5s", "status": status}})
+    try:
+        ai_client.generate_hedged(_cliente_que_recusa(erro), "oi", time.monotonic() + 4, max_tokens=100)
+    except AIIndisponivel:
+        pass                                                           # o único tipo de erro que pode sair daqui
+
+
+def test_defeito_no_portao_nao_derruba_quem_pediu_o_texto(monkeypatch):
+    monkeypatch.setattr(ia_gate, "escolher", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("bug no portão")))
+    monkeypatch.setattr(ai_client, "_alvos", lambda *a, **k: [ia_gate.Alvo("x", "gemini", lambda _: "texto ok")])
+    assert ai_client.generate_hedged(None, "oi", time.monotonic() + 5) == "texto ok"
+    monkeypatch.setattr(ai_client, "_ensinar_falha", lambda *a, **k: (_ for _ in ()).throw(ValueError("bug")))
+    ai_client._falha_do_alvo(ia_gate.Alvo("x", "gemini", None), RuntimeError("429"))      # não levanta
+
+
+def test_pedido_grande_demais_ensina_o_limite_do_modelo_sem_pausar_os_outros():
+    a = alvo("groq:qwen", "groq")
+    ia_gate.recusa(a, 'Request too large for model `qwen` ... tokens per minute (TPM): Limit 6000, Requested 7100, please reduce')
+    assert ia_gate._estado(a.chave)["tpm"] == 5100
+    assert ia_gate.espera_do_alvo(a, 4000) == 0 and ia_gate.espera_do_alvo(a, 6000) >= 1e8     # o pedido pequeno ainda cabe; o grande não
+
+
+def test_marcador_de_preenchimento_nunca_chega_ao_lead():
+    from app.ai_generator import limpar_marcadores
+
+    t, av = limpar_marcadores("Boa tarde! Sou o [Seu Nome], da LeadSage.", "Júlia Silva")
+    assert t == "Boa tarde! Sou o Júlia Silva, da LeadSage." and av == []
+    t, av = limpar_marcadores("Oi! Sou [Seu Nome] e vi o [Link da prévia] aqui.", "Prospecção LeadSage")
+    assert "[" not in t and av and "campo para preencher" in av[0]
+    assert limpar_marcadores("Mensagem normal.", "X") == ("Mensagem normal.", [])

@@ -241,7 +241,7 @@ def bloco(nicho: Optional[str]) -> str:
     (gastroenterologia não é "clínica médica" genérica; ver especialista_nicho)."""
     from app import especialista_nicho
 
-    ficha = especialista_nicho.bloco(especialista_nicho.da_memoria(nicho))
+    ficha = especialista_nicho.bloco(especialista_nicho.da_memoria(nicho), para="mensagem")
     g = achar(nicho)
     if not g:
         return f"Ramo: {nicho or 'não informado'}.\n{ficha or METODO_GERAL}"

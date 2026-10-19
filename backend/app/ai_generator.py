@@ -21,14 +21,16 @@ texto e podia disparar isso para o prospect. Agora sobe como falha e a
 tela mostra o que aconteceu.
 """
 import asyncio
+import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.ai_client import (
     AIIndisponivel,
     build_client,
     gerar_json,
     generate_with_fallback,
+    prazo_maximo,
     strip_code_fence,
 )
 from app import abordagem_mestra
@@ -243,6 +245,23 @@ def _ler_seguimentos(brutos: Any, canal: str):
     return seguimentos, avisos
 
 
+_MARCADOR = re.compile(r"\[[^\]\n]{2,40}\]")
+_NOME_DE_QUEM_ESCREVE = re.compile(r"\[(seu nome|nome|meu nome|sua empresa|empresa|nome do vendedor|nome da empresa|seu nome aqui)\]", re.I)
+
+
+def limpar_marcadores(texto: str, quem_escreve: str) -> Tuple[str, List[str]]:
+    """Troca "[Seu Nome]" pelo nome de quem envia e remove qualquer outro "[...]" que o modelo deixou: nunca chega ao lead."""
+    avisos: List[str] = []
+    nome = (quem_escreve or "").strip()
+    if nome and nome.lower() not in ("prospecção leadsage", "prospeccao leadsage"):
+        texto = _NOME_DE_QUEM_ESCREVE.sub(nome, texto)
+    sobra = _MARCADOR.findall(texto)
+    if sobra:
+        texto = re.sub(r"\s{2,}", " ", _MARCADOR.sub("", texto)).replace(" ,", ",").replace(" .", ".").strip()
+        avisos.append("a IA deixou um campo para preencher (" + ", ".join(sobra[:2]) + "); ele foi removido: confira quem assina a mensagem em Configurações")
+    return texto, avisos
+
+
 def _melhor_versao(atual: Dict[str, Any], nova: Dict[str, Any], canal: str, sem_site: bool = True, previa: str = "") -> Dict[str, Any]:
     """Fica com a versão que tem menos defeitos, não com a mais recente.
 
@@ -298,11 +317,12 @@ class AIGenerator:
         # Antes eram duas chamadas (escrever e depois reescrever) com os seguimentos
         # junto: 15 a 40 s. Os seguimentos agora vem a parte, e o que a revisao local
         # acha vira aviso na tela em vez de outra ida ao modelo.
-        limite = time.monotonic() + 40
+        limite = time.monotonic() + prazo_maximo()
         com_seguimentos = bool(getattr(req, "com_seguimentos", False))
         dados = await asyncio.to_thread(gerar_json, client, prompt, ["body"], 2, limite, True, 700 if com_seguimentos else 500)
 
-        problemas = (revisar_copy(dados.get("body", ""), canal)
+        dados["body"], avisos_marcador = limpar_marcadores(str(dados.get("body") or ""), req.sender_name or "")
+        problemas = avisos_marcador + (revisar_copy(dados.get("body", ""), canal)
                      + abordagem_mestra.revisar_calor(dados.get("body", ""), canal)
                      + abordagem_mestra.revisar_roteiro(dados.get("body", ""), sem_site, req.previa or ""))
 
@@ -337,7 +357,7 @@ class AIGenerator:
         client = build_client(active_key)
         dados = await asyncio.to_thread(
             gerar_json, client, _prompt_dos_seguimentos(req, canal, primeira), ["follow_ups"], 2,
-            time.monotonic() + 40, True, 500,
+            time.monotonic() + prazo_maximo(), True, 500,
         )
         return _ler_seguimentos(dados.get("follow_ups"), canal)
 

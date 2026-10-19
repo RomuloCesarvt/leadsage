@@ -125,7 +125,7 @@ def _corpo(modelo: str, prompt: str, max_tokens: Optional[int], json_mode: bool,
     corpo: Dict[str, Any] = {
         "model": modelo,
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7,
+        "temperature": 0.4 if json_mode else 0.7,   # JSON com temperatura alta quebra no meio (vírgula faltando)
     }
     if max_tokens:
         corpo["max_tokens"] = max_tokens

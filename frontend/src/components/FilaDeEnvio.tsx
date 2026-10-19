@@ -176,6 +176,20 @@ export const FilaDeEnvio: React.FC = () => {
     }
   };
 
+  /** Prepara um pedaço dos leads. Erro do servidor (504, queda de rede, limite) não derruba a geração: os leads viram "tentar de novo". */
+  const prepararSeguro = async (parte: LeadItem[]) => {
+    try {
+      return await api.filaPreparar(parte as unknown as Record<string, unknown>[], 'Consultivo', true);
+    } catch (e: any) {
+      const msg = String(e?.message || 'sem resposta do servidor');
+      if (/402|403|401|plano|crédito|credito|autoriz/i.test(msg) && !/fila da IA|alta demanda/i.test(msg)) throw e;   // erro de verdade (plano, login): aparece
+      return {
+        resultados: parte.map(l => ({ lead_id: l.id, nome: l.company || l.name || l.id, resultado: 'falhou' as const, espera_s: 20, motivo: `não foi possível escrever a mensagem: fila da IA (${msg.slice(0, 80)})` })),
+        resumo: undefined as any,
+      };
+    }
+  };
+
   const gerar = async () => {
     const escolhidos = candidatos.filter(l => marcados.has(l.id));
     if (!escolhidos.length) return;
@@ -236,9 +250,9 @@ export const FilaDeEnvio: React.FC = () => {
       const lote = async () => {
         while (proxima < partes.length) {
           const parte = partes[proxima++];
-          const r = await api.filaPreparar(parte as unknown as Record<string, unknown>[], 'Consultivo', true);
+          const r = await prepararSeguro(parte as LeadItem[]);
           setResultados(prev => [...prev, ...r.resultados]);
-          setResumo(r.resumo);
+          if (r.resumo) setResumo(r.resumo);
           feitosLote += parte.length;
           setProgresso({ feitos: Math.min(feitosLote, escolhidos.length), total: escolhidos.length });
         }
@@ -246,7 +260,7 @@ export const FilaDeEnvio: React.FC = () => {
       await Promise.all([lote(), lote()]);
       // quem falhou por limite da IA gratuita (muita gente gerando ao mesmo tempo) NÃO fica com erro: espera o tempo que o servidor mandou
       // e tenta de novo, até acabar (no máximo 10 minutos)
-      const porLimite = (m?: string) => /alta demanda|limite gratuito|demorou demais|fila da IA/i.test(m || '');
+      const porLimite = (m?: string) => /alta demanda|limite gratuito|demorou demais|fila da IA|muita gente/i.test(m || '');
       const comecou = Date.now();
       for (;;) {
         const pendentes = new Map<string, number>();
@@ -259,10 +273,10 @@ export const FilaDeEnvio: React.FC = () => {
         }
         const de_novo = escolhidos.filter(l => pendentes.has(l.id));
         for (let i = 0; i < de_novo.length; i += 2) {
-          const r = await api.filaPreparar(de_novo.slice(i, i + 2) as unknown as Record<string, unknown>[], 'Consultivo', true);
+          const r = await prepararSeguro(de_novo.slice(i, i + 2) as LeadItem[]);
           const ids = new Set(r.resultados.map(x => x.lead_id));
           setResultados(prev => [...prev.filter(x => !(ids.has(x.lead_id) && x.resultado === 'falhou')), ...r.resultados]);
-          setResumo(r.resumo);
+          if (r.resumo) setResumo(r.resumo);
         }
       }
       setAvisoPrevias('');

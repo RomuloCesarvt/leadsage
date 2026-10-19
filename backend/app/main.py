@@ -1198,11 +1198,13 @@ async def fila_preparar(req: FilaPrepararRequest, user: dict = Depends(get_curre
     """
     await exigir_recurso(user, "ia_abordagem", "O disparo")
     gerar, enviar, pode_enviar, cobrar = await _funcoes_da_fila(user)
+    from app import ai_client
+    ai_client.PRAZO_DA_IA_S.set(20.0)   # vários textos na mesma requisição de 60 s: cada um espera no máximo 20 s por vaga na IA
     try:
         return await asyncio.wait_for(
             fila_envio.preparar_lote(user.get("uid"), req.leads,
-                                     lambda l, c: gerar(l, c, req.tom), enviar, pode_enviar, cobrar, revisar=req.revisar),
-            timeout=55,
+                                     lambda l, c: gerar(l, c, req.tom), enviar, pode_enviar, cobrar, revisar=req.revisar, orcamento_s=44),
+            timeout=56,
         )
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="O preparo demorou demais. Envie menos leads por vez.")

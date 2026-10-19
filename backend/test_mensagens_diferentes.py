@@ -48,3 +48,23 @@ def test_se_a_nova_versao_nao_melhora_fica_a_primeira(rodar):
 
     primeira = {"body": IGUAL + " Valeu!"}
     assert rodar(fila_envio._diferenciar, gerar, {"id": "L2"}, "whatsapp", primeira, [IGUAL]) is primeira
+
+
+def test_mesma_abertura_conta_como_copia_mesmo_com_o_resto_diferente(rodar):
+    chamadas = []
+
+    async def gerar(lead, canal, evitar=None, variacao=0):
+        chamadas.append(evitar)
+        return {"body": "Oi, tudo bem? A Padaria Estrela tem nota 4,8 e achei sem site. Montei uma prévia, posso mandar?"}
+
+    a = "Boa tarde! Eu sou da LeadSage, ajudo negócios locais a serem encontrados no Google. Vi a Doce Vida com nota 4,6 e sem site."
+    b = "Boa tarde! Eu sou da LeadSage, ajudo negócios locais a vender mais. A Bendita Doceria tem 82 avaliações e nenhum site."
+    novo = rodar(fila_envio._diferenciar, gerar, {"id": "L2"}, "whatsapp", {"body": b}, [a])
+    assert chamadas and novo["body"].startswith("Oi, tudo bem?")
+
+
+def test_assinatura_da_abertura_ignora_cumprimento_e_nome():
+    a = fila_envio.assinatura_da_abertura("Boa tarde! Eu sou João, ajudo negócios locais a serem encontrados no Google.")
+    b = fila_envio.assinatura_da_abertura("Boa tarde, Rafa! Eu sou a Júlia, ajudo negócios locais a serem vistos. Vi seu perfil.")
+    c = fila_envio.assinatura_da_abertura("Oi! Vi a Padaria Estrela no Google com nota 4,8 e fiquei curioso.")
+    assert a == b and a != c

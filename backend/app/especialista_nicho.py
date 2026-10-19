@@ -143,6 +143,9 @@ async def _gerar(nicho: str) -> Optional[Dict[str, Any]]:
     return limpar(bruto, nicho)
 
 
+_GERAR_REAL = _gerar      # os testes trocam _gerar por uma versão sem rede; o teste ao vivo volta a esta
+
+
 async def garantir(nicho: Optional[str]) -> Optional[Dict[str, Any]]:
     """A ficha do ramo: da memória, do banco ou escrita agora pela IA (e guardada). Nunca levanta erro."""
     k = chave(nicho)
@@ -186,7 +189,7 @@ def da_memoria(nicho: Optional[str]) -> Optional[Dict[str, Any]]:
     return _MEMORIA.get(chave(nicho))
 
 
-def bloco(ficha: Optional[Dict[str, Any]]) -> str:
+def bloco(ficha: Optional[Dict[str, Any]], para: str = "site") -> str:
     """A ficha em texto, para entrar nos pedidos à IA (site, abordagem e conversa)."""
     if not ficha:
         return ""
@@ -202,6 +205,14 @@ def bloco(ficha: Optional[Dict[str, Any]]) -> str:
         linhas.append(f"- Dores do dono que um site resolve (confirme, não afirme): {'; '.join(ficha['dores'])}")
     if ficha.get("objecoes"):
         linhas.append(f"- Objeções típicas do dono: {'; '.join(ficha['objecoes'])}")
+    if para == "mensagem":
+        # a mensagem só precisa do ramo, de como o cliente decide, da ética e do que nunca dizer
+        linhas = [l for l in linhas if not l.startswith("- Ação principal")]
+        for campo, rotulo in (("etica", "- Ética do setor (obrigatória): "), ("nunca_dizer", "- NUNCA use neste ramo: ")):
+            v = ficha.get(campo)
+            if v:
+                linhas.append(rotulo + (", ".join(v) if isinstance(v, list) else str(v)))
+        return "\n".join(l for l in linhas if not l.startswith(("- Dores do dono", "- Objeções típicas")))
     if ficha.get("o_que_o_site_precisa"):
         linhas.append(f"- Um site deste ramo precisa mostrar: {'; '.join(ficha['o_que_o_site_precisa'])}")
     linhas.append(f"- Ação principal do site: {ficha.get('acao_principal', '')}")

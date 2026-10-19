@@ -335,6 +335,28 @@ def semelhanca(a: str, b: str) -> float:
     return len(ta & tb) / max(1, min(len(ta), len(tb)))
 
 
+_FAZ = re.compile(r"\b(ajudo|ajudamos|trabalho|cuido|crio|criamos|faco|fazemos)\b")
+
+
+def assinatura_da_abertura(texto: str) -> str:
+    """Como a mensagem se apresenta, sem cumprimento nem nome: as 5 palavras a partir de "ajudo negócios locais a...".
+    Duas mensagens com a mesma assinatura têm a mesma cara, mesmo com nomes e números diferentes."""
+    import unicodedata
+
+    t = unicodedata.normalize("NFD", (texto or "").lower())
+    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+    t = re.sub(r"[^a-z0-9 ]+", " ", t)
+    m = _FAZ.search(t)
+    palavras = (t[m.start():] if m else re.sub(r"^\s*(boa tarde|bom dia|boa noite|oi|ola)\b", "", t)).split()
+    return " ".join(palavras[:5])
+
+
+def _apresentacao(texto: str) -> str:
+    """O trecho em que a mensagem diz o que faz ("ajudo negócios locais a serem encontrados..."), com 8 palavras."""
+    m = re.search(r"\b(ajudo|ajudamos|trabalho|cuido|crio|criamos|faço|faco|fazemos)\b", (texto or "").lower())
+    return " ".join((texto or "")[m.start():].split()[:8]) if m else ""
+
+
 def _abertura(texto: str, palavras: int = 9) -> str:
     return " ".join((texto or "").split()[:palavras])
 
@@ -352,15 +374,23 @@ async def _diferenciar(gerar, lead: Dict[str, Any], canal: str, pronto: Dict[str
     """Cada mensagem tem de ser diferente das outras do lote: se esta parece copia, pede de novo (ate 2 vezes) sem a mesma abertura."""
     for tentativa in (1,):  # uma nova chance basta: cada chamada a mais pesa no limite por minuto da IA gratuita
         corpo = (pronto.get("body") or "").strip()
-        parecida = [u for u in usados if semelhanca(corpo, u) >= LIMIAR_DE_SEMELHANCA]
+        # parecida = texto parecido OU a mesma abertura (as 7 primeiras palavras): "Boa tarde! Eu sou da LeadSage, ajudo..." repetida em várias mensagens
+        ini = _abertura(corpo, 7).lower()
+        parecida = [u for u in usados if semelhanca(corpo, u) >= LIMIAR_DE_SEMELHANCA or (ini and _abertura(u, 7).lower() == ini)
+                    or assinatura_da_abertura(u) == assinatura_da_abertura(corpo)]
         if not corpo or not parecida:
             break
         try:
-            nova = await _chamar_gerar(gerar, lead, canal, [_abertura(u) for u in parecida[:4]], tentativa)
+            # além das aberturas, diz qual frase de apresentação NÃO repetir ("ajudo negócios locais a serem encontrados...")
+            evitar = [_abertura(u) for u in parecida[:3]] + [f"a frase de apresentação '{_apresentacao(u)}'" for u in parecida[:2] if _apresentacao(u)]
+            nova = await _chamar_gerar(gerar, lead, canal, evitar, tentativa)
         except Exception:
             break
-        if nova and (nova.get("body") or "").strip() and max((semelhanca(nova["body"], u) for u in usados), default=0) < max((semelhanca(corpo, u) for u in usados), default=0):
-            pronto = nova
+        if nova and (nova.get("body") or "").strip():
+            melhor_semelhanca = max((semelhanca(nova["body"], u) for u in usados), default=0) < max((semelhanca(corpo, u) for u in usados), default=0)
+            assinatura_nova = all(assinatura_da_abertura(nova["body"]) != assinatura_da_abertura(u) for u in usados)
+            if melhor_semelhanca or assinatura_nova:
+                pronto = nova
     return pronto
 
 
@@ -373,6 +403,7 @@ async def preparar_lote(
     cobrar_email: Cobrar,
     pausa: float = 0.8,
     revisar: bool = False,
+    orcamento_s: float = 0.0,
 ) -> Dict[str, Any]:
     """Prepara até LOTE_MAXIMO leads. Com `revisar`, nada sai: as mensagens ficam como rascunho para a pessoa conferir. Devolve o que aconteceu com cada um.
 
@@ -427,7 +458,19 @@ async def preparar_lote(
                         continue
                     return exc
 
-    textos = await asyncio.gather(*[escrever(l, c) for l, c in alvos])
+    tarefas = [asyncio.ensure_future(escrever(l, c)) for l, c in alvos]
+    # com `orcamento_s` a requisição tem um limite de tempo: o que não terminou vira "fila da IA" (a tela tenta de novo), nunca um 504 para tudo
+    _, sobrou = await asyncio.wait(tarefas, timeout=orcamento_s or None) if tarefas else (set(), set())
+    for t in sobrou:
+        t.cancel()
+    from app.ai_client import AIIndisponivel
+
+    textos = []
+    for t in tarefas:
+        if t.done() and not t.cancelled():
+            textos.append(t.result())
+        else:
+            textos.append(AIIndisponivel("A fila da IA gratuita está cheia agora (muita gente gerando ao mesmo tempo). Tente de novo em 20 segundos.", espera_s=20))
 
     # 3) entrega cada uma no canal dela
     usados: List[str] = [i.get("texto", "") for i in existentes if i.get("canal") == "whatsapp"][:40]
@@ -438,7 +481,7 @@ async def preparar_lote(
             saida.append({"lead_id": lid, "nome": nome, "resultado": "falhou", "espera_s": int(getattr(pronto, "espera_s", 0) or 0),
                           "motivo": f"não foi possível escrever a mensagem: {str(pronto)[:160]}"})
             continue
-        if canal == "whatsapp":
+        if canal == "whatsapp" and not (orcamento_s and time.monotonic() - inicio > orcamento_s * 0.55):
             pronto = await _diferenciar(gerar, lead, canal, pronto, usados)
             usados.append((pronto.get("body") or "").strip())
 

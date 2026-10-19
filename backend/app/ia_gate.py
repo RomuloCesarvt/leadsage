@@ -152,6 +152,12 @@ def atraso_do_erro(texto: str, cabecalho_retry_after: Optional[str] = None) -> T
 
 def recusa(alvo: Alvo, texto_do_erro: str, retry_after: Optional[str] = None) -> float:
     """429: o alvo descansa pelo tempo que o provedor mandou (ou 20 s; limite diário: 30 min). Vale para todas as instâncias."""
+    grande = re.search(r"too large.*?limit\s+(\d+)", texto_do_erro or "", re.I | re.S)
+    if grande:
+        # "Request too large ... Limit 6000, Requested 6500": o modelo aguenta no máximo isso por pedido; aprende e não pausa o modelo
+        _estado(alvo.chave)["tpm"] = int(int(grande.group(1)) * 0.85)
+        print(f"IA: {alvo.chave} aguenta só {grande.group(1)} tokens por pedido; orçamento ajustado")
+        return 0.0
     espera, diario = atraso_do_erro(texto_do_erro, retry_after)
     espera = PAUSA_DIARIO_S if diario else min(max(espera, 2.0), 120.0)
     agora = time.time()

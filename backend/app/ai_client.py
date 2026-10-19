@@ -15,6 +15,7 @@ documento) e todos precisam da mesma disciplina:
   IA: 404" no campo de texto e podia disparar isso para o prospect.
   Aqui um erro é um erro, e sobe.
 """
+import contextvars
 import json
 import re
 import time
@@ -51,6 +52,15 @@ REQUEST_TIMEOUT_MS = 25_000          # abordagem: o usuario esta esperando na te
 TIMEOUT_LONGO_MS = 45_000            # site e documento: vale esperar
 
 _working_model: Optional[str] = None
+
+
+# Quanto tempo (s) um pedido de IA pode esperar por vaga nos motores gratuitos. O padrão cabe em uma requisição de 60 s; quem prepara
+# VÁRIOS textos na mesma requisição (a fila de disparos) reduz, para todos caberem antes do limite da função.
+PRAZO_DA_IA_S: "contextvars.ContextVar[float]" = contextvars.ContextVar("prazo_da_ia_s", default=40.0)
+
+
+def prazo_maximo() -> float:
+    return PRAZO_DA_IA_S.get()
 
 
 class AIIndisponivel(RuntimeError):
@@ -152,12 +162,34 @@ def _alvos(client, prompt: str, max_tokens: Optional[int], json_mode: bool) -> l
     return alvos
 
 
+def _status_http(exc: Exception) -> int:
+    """O código HTTP do erro, qualquer que seja a biblioteca: `status_code`/`code` (número) ou `status` quando for número.
+    (O Gemini devolve `status` como TEXTO, "RESOURCE_EXHAUSTED": converter isso direto em número derrubou todos os disparos.)"""
+    for atributo in ("status_code", "code", "status"):
+        v = getattr(exc, atributo, None)
+        if isinstance(v, bool):
+            continue
+        if isinstance(v, int):
+            return v
+        if isinstance(v, str) and v.strip().isdigit():
+            return int(v)
+    return 0
+
+
 def _falha_do_alvo(alvo, exc: Exception) -> None:
-    """Ensina ao portão o que a falha significa: pausa (429/503) ou fora do ar por um tempo (404, chave recusada)."""
+    """Ensina ao portão o que a falha significa. Nunca levanta erro: um defeito aqui não pode derrubar quem pediu o texto."""
+    try:
+        _ensinar_falha(alvo, exc)
+    except Exception as erro:
+        print(f"IA: não classificou a falha de {getattr(alvo, 'chave', '?')}: {type(erro).__name__}: {erro}")
+
+
+def _ensinar_falha(alvo, exc: Exception) -> None:
+    """Pausa (429/503) ou fora do ar por um tempo (404, chave recusada)."""
     from app import ia_gate
 
     texto = str(exc)
-    status = int(getattr(exc, "status", 0) or 0)
+    status = _status_http(exc)
     if status in (401, 403, 404) or " 404 " in texto or "NOT_FOUND" in texto or "PERMISSION_DENIED" in texto or "API key not valid" in texto:
         ia_gate.quebrou(alvo, texto)
     elif status == 429 or "429" in texto or "RESOURCE_EXHAUSTED" in texto:
@@ -179,12 +211,19 @@ def generate_hedged(client, prompt: str, prazo: float, atraso: float = 7.0, max_
     global _working_model
     from app import ia_gate
 
-    alvos = _alvos(client, prompt, max_tokens, json_mode)
+    try:
+        alvos = _alvos(client, prompt, max_tokens, json_mode)
+    except Exception as exc:
+        raise AIIndisponivel(f"Os motores de IA não puderam ser preparados agora ({type(exc).__name__}). Tente de novo em instantes.", espera_s=10) from exc
     tokens = _tokens_do_pedido(prompt, max_tokens)
     ultimo: Optional[Exception] = None
     for _ in range(12):
         restante = prazo - time.monotonic()
-        alvo, espera = ia_gate.escolher(alvos, tokens)
+        try:
+            alvo, espera = ia_gate.escolher(alvos, tokens)
+        except Exception as exc:                       # o portão nunca pode ser o motivo de ninguém ficar sem texto
+            print(f"IA: portão falhou ({type(exc).__name__}: {exc}); escolhendo sem ele")
+            alvo, espera = (alvos[0], 0.0) if alvos else (None, 0.0)
         if alvo is None:
             if espera >= 1e8:
                 raise AIIndisponivel("Este pedido é grande demais para os motores gratuitos disponíveis agora.")
