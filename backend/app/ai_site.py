@@ -403,6 +403,17 @@ REGRAS TÉCNICAS (o arquivo precisa abrir sozinho)
   telefone, com o link real.
 - Inclua <title> e <meta name="description"> com a cidade no texto.
 
+DIREÇÃO DE CRIAÇÃO (aja como uma agência de alto padrão)
+- A capa é memorável e específica: composição pensada (tipografia grande e bem escolhida, formas em CSS, sobreposição), não um
+  título centralizado com gradiente e botão padrão. Varie o ritmo entre as seções (largura, escala, alinhamento); não repita a
+  mesma grade de três cartões em tudo.
+- Movimento só com CSS, com propósito: revelar o conteúdo ao entrar na tela (transform e opacity, durações entre 400 e 700 ms),
+  retorno visual ao passar o mouse e ao focar. Envolva tudo em @media (prefers-reduced-motion: no-preference) e garanta que o
+  conteúdo apareça mesmo sem animação. Nada de flashes nem de efeito que atrase a leitura.
+- Semântica e acessibilidade: <header>, <main>, <section> com título, um único <h1>, links com texto claro, foco visível,
+  contraste de leitura, lang="pt-BR".
+- Nada de formulário: sem servidor ele fingiria enviar. A ação é WhatsApp, ligar ou o endereço, sempre com os dados reais.
+
 ESTRUTURA
 Capa com uma promessa concreta e dois botões (WhatsApp e ligar);
 faixa com os diferenciais; seção de serviços com 4 itens; seção sobre o

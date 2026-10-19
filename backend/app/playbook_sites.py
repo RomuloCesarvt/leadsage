@@ -33,7 +33,21 @@ PLAYBOOK_DE_SITES = """CONHECIMENTO DE UM ESPECIALISTA EM SITES (aplique sempre)
 9. ESTRUTURA DA PÁGINA. Capa (promessa + botão) -> prova -> serviços em linguagem do cliente -> como funciona (3 passos) ->
    perguntas que travam a decisão -> contato. Frases curtas: lê-se no celular, em pé.
 10. ÉTICA POR RAMO. Saúde e psicologia: nunca prometa cura ou resultado; fale de cuidado e de primeiro passo. Jurídico: não
-    prometa causa ganha. Finanças: sem garantia de aprovação."""
+    prometa causa ganha. Finanças: sem garantia de aprovação.
+11. PERSONALIZAÇÃO REAL. O site precisa parecer feito para aquele negócio e não um modelo preenchido: título, serviços e
+    diferenciais só servem a ele. Não repita a mesma estrutura, o mesmo tom nem a mesma ordem de seções de um negócio para
+    outro; cada ramo pede uma emoção (acolhimento, apetite, seriedade, energia, estilo) e a escrita acompanha.
+12. CONVERSÃO. Uma ação principal, a que o cliente desse ramo mais provavelmente quer (agendar, pedir orçamento, reservar,
+    ligar, chamar no WhatsApp), repetida com o mesmo verbo ao longo da página. Só use telefone e WhatsApp que existem nos dados.
+    Nunca formulário que finge enviar, botão sem destino, contador, "últimas vagas" ou urgência inventada.
+13. CREDIBILIDADE. Sem dado confiável, a seção não existe: nada de depoimento, número de clientes, anos de mercado, prêmio,
+    selo, parceiro, preço ou garantia inventados. Confiança vem de clareza, de um jeito de atender bem descrito e da nota real
+    do Google quando houver.
+14. MOVIMENTO E ACESSIBILIDADE (quando a peça tiver animação). Movimento tem função: revelar, guiar o olhar ou dar retorno a
+    um clique; nunca em tudo ao mesmo tempo. Respeite "prefers-reduced-motion", mantenha contraste, foco visível no teclado,
+    títulos em ordem e texto alternativo útil. O conteúdo essencial aparece mesmo sem a animação.
+15. ANTES DE ENTREGAR, CONFIRA: parece deste negócio? A capa promete algo e tem um próximo passo? Cores, texto e imagem
+    contam a mesma história? Tudo o que parece clicável funciona? Cada afirmação tem base nos dados? Se algo falhar, corrija."""
 
 
 # O que o robô de vendas pode explicar ao dono do negócio quando ele pergunta "por que esse visual?"
