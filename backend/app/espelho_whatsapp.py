@@ -25,7 +25,8 @@ from app.firebase_config import db as firestore_db
 
 CHAT_ID_RE = re.compile(r"^[0-9A-Za-z._-]{1,40}@(c\.us|g\.us|lid)$")
 TTL_OLHANDO_S = 120      # depois disso o Conector para de atualizar o espelho
-TTL_ESPELHO_S = 600      # o que o celular le: mais velho que isso e dado velho
+TTL_ESPELHO_S = 600      # mais velho que isso a tela avisa "atualizado ha X"
+TTL_ESPELHO_MAXIMO_S = 7 * 24 * 3600   # mas ainda mostra: lista velha e melhor que lista vazia (some so depois de uma semana)
 NOVA_ESCRITA_S = 20      # o celular repete o aviso a cada poucos segundos; grava no maximo a cada 20
 MAX_ABRIR = 5
 MAX_CHATS = 100
@@ -186,7 +187,7 @@ async def salvar_mensagens(uid: str, chat_id: str, mensagens: List[Dict[str, Any
 async def ler_chats(uid: str) -> Tuple[List[Dict[str, Any]], Optional[int]]:
     d = await _ler(uid, "chats")
     idade = _idade_s(d.get("em"))
-    if idade is None or idade > TTL_ESPELHO_S:
+    if idade is None or idade > TTL_ESPELHO_MAXIMO_S:
         return [], idade
     return d.get("chats") or [], idade
 
@@ -196,6 +197,6 @@ async def ler_mensagens(uid: str, chat_id: str) -> Tuple[List[Dict[str, Any]], O
         return [], None
     d = await _ler(uid, _nome_das_mensagens(chat_id))
     idade = _idade_s(d.get("em"))
-    if idade is None or idade > TTL_ESPELHO_S:
+    if idade is None or idade > TTL_ESPELHO_MAXIMO_S:
         return [], idade
     return d.get("mensagens") or [], idade

@@ -68,12 +68,14 @@ export const whats = {
     if (l) return { ...l, remoto: false, idade_s: 0 };
     if (Date.now() > semNuvemAte) {
       const d = await doWorker<{ chats: ChatWhats[] }>(`?limite=${limite}`);
-      if (d && Array.isArray(d.chats)) { direto = true; return { chats: d.chats, fonte: '', remoto: true, idade_s: 0, nuvem: true }; }
-      direto = false;
+      // o serviço respondeu mas ainda sem conversas (acabou de ligar, histórico não carregou): não mostra "vazio" se o servidor tem a lista guardada
+      if (d && Array.isArray(d.chats) && d.chats.length > 0) { direto = true; return { chats: d.chats, fonte: '', remoto: true, idade_s: 0, nuvem: true }; }
+      direto = Boolean(d && Array.isArray(d.chats));
       if (acesso) semNuvemAte = Date.now() + 15000; // worker fora do ar agora: usa o espelho um tempo
     }
     const r = await api.whatsChats();
     if (!r.conectado || r.idade_s === null) return null; // ainda sem espelho: mostra "conectando"
+    // lista guardada no servidor (o serviço da nuvem a atualiza sozinho): vale mesmo que seja de alguns minutos atrás
     return { chats: r.chats as ChatWhats[], fonte: '', remoto: true, idade_s: r.idade_s };
   },
 

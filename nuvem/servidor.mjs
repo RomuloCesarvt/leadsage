@@ -153,6 +153,23 @@ export class Sessao {
     if (d.tentar_de_novo) tentarDeNovo(this.ls, contato).catch(() => {});
   }
 
+  /** Sem ninguém olhando: manda a lista de conversas (e as últimas mensagens das mais recentes) quando ela MUDOU, no máximo a cada 60 s.
+   * Assim, quando a tela abre, ou o serviço estava dormindo, o servidor já tem tudo, e a lista nunca aparece vazia. */
+  async espelharSozinho() {
+    const v = this.historico?.versao?.() ?? 0;
+    const t = Date.now();
+    if (v === this.versaoEspelhada && t - (this.ultimoEspelhoSozinho || 0) < 10 * 60 * 1000) return;
+    if (t - (this.ultimoEspelhoSozinho || 0) < 60000) return;
+    this.ultimoEspelhoSozinho = t;
+    this.versaoEspelhada = v;
+    const chats = await this.wa.chats(80);
+    await this.ls.espelho({ chats });
+    for (const c of chats.slice(0, 12)) {
+      if (!c.id) continue;
+      await this.ls.espelho({ chat_id: c.id, mensagens: await this.wa.mensagens(c.id, 40) });
+    }
+  }
+
   async espelhar() {
     const t = Date.now();
     if (t - (this.ultimoEspelhoChats || 0) > 5000) {
@@ -212,6 +229,7 @@ export class Sessao {
           this.pedidos = r.pedidos || this.pedidos;
         }
         if (this.pronto && this.pedidos.remoto) await this.espelhar();
+        else if (this.pronto) await this.espelharSozinho();
         if (this.pronto && Date.now() - this.ultimaVarredura > 15 * 60 * 1000) { this.ultimaVarredura = Date.now(); this.ls.reprocessar('').catch(() => {}); }
         if (!this.pronto && Date.now() - this.ultimoPing > 15000) await this.empurrar();
         if (this.pronto && Date.now() - this.ultimoPing > 60000) await this.empurrar();

@@ -340,3 +340,77 @@ def test_varredura_nao_mexe_em_quem_o_dono_assumiu_nem_em_robo_de_verdade(com_ro
     envio = Envio()
     r = rodar(robo_service.responder_pendentes, cfg(), gerar=ia("não deveria"), enviar=envio)
     assert r["processadas"] == 0 and envio.enviados == []
+
+
+# ------------------------------------------------ "meu marido cria sites, nao tenho interesse": agradece e passa para o proximo lead
+@pytest.mark.parametrize("texto,esperado", [
+    ("Meu marido que cria sites, não tenho interesse", "ja_tem"),
+    ("Obrigada, mas meu marido mesmo faz os sites", "ja_tem"),
+    ("Já tenho quem faça, obrigado", "ja_tem"),
+    ("Não tenho interesse", "sem_interesse"),
+    ("Sem interesse, obrigado.", "sem_interesse"),
+])
+def test_recusa_clara_com_ou_sem_motivo_encerra(texto, esperado):
+    from app.ai_robo import desinteresse_firme
+    assert desinteresse_firme(texto) == esperado
+
+
+@pytest.mark.parametrize("texto", [
+    "Vocês fazem site? meu marido faz mas queria ver o valor",
+    "Não tenho interesse agora, mas me manda um exemplo",
+    "meu marido está viajando, depois te chamo",
+    "oi, quanto custa?", "vou pensar", "agora não posso falar",
+])
+def test_quem_ainda_quer_conversar_nao_e_encerrado(texto):
+    from app.ai_robo import desinteresse_firme
+    assert desinteresse_firme(texto) == ""
+
+
+def test_robo_agradece_e_sai_sem_tentar_agendar_nem_chamar_a_ia(com_robo, rodar):
+    chamadas = []
+    envio = Envio()
+    c = rodar(robo_service.processar, cfg(), msg("Meu marido que cria sites, não tenho interesse", 1),
+              gerar=lambda p: chamadas.append(p) or {"mensagens": ["Que tal agendar uma conversa amanhã às 10h?"]}, enviar=envio)
+    assert chamadas == []                                                   # nem consulta a IA: nada de insistir
+    assert len(envio.enviados) == 1 and "agradeço" in envio.enviados[0] and "agendar" not in envio.enviados[0].lower()
+    assert c["optout"] is True and c["robo_ativo"] is False                 # sai da lista: próximo lead
+    assert "já tem quem faça" in c["motivo"]
+
+
+def test_quem_recusou_nao_recebe_seguimento(com_robo, rodar):
+    from app import fila_envio, robo_store
+    item = {"id": "f_L1", "lead_id": "L1", "nome": "Loja", "canal": "whatsapp", "texto": "oi", "status": "enviado",
+            "contato": {"phone": "5511964623668"}, "seguimentos": [{"quando": "2 dias", "texto": "Passando para saber da prévia."}]}
+    fila_envio.agendar_seguimentos(item)
+    rodar(fila_envio._gravar, "alice", item)
+    rodar(robo_service.processar, cfg(), msg("Meu marido faz sites, não tenho interesse", 1), gerar=ia("x"), enviar=Envio())
+    from datetime import datetime, timedelta, timezone
+    assert rodar(fila_envio.promover_seguimentos, "alice", datetime.now(timezone.utc) + timedelta(days=10)) == 0
+
+
+# ------------------------------------------------ resposta de quem recebeu a abordagem: liga ao lead original (e ao site que ja existe)
+def test_resposta_de_quem_recebeu_a_abordagem_liga_ao_lead_original_mesmo_sem_card_no_pipeline(com_robo, rodar):
+    """Caso real: o card sumiu do pipeline; a resposta virava 'contato novo' sem ramo e o robô criava OUTRO site genérico."""
+    from app import fila_envio, pipeline_store, robo_store
+    rodar(fila_envio._gravar, "alice", {"id": "f_ChIJabc", "lead_id": "ChIJabc", "nome": "Padaria e Confeitaria Que seja doce", "canal": "whatsapp",
+                                        "status": "enviado", "enviado_em": "2026-10-19T17:50:00", "texto": "oi", "ramo": "Padarias", "nota": 4.9, "avaliacoes": 120,
+                                        "contato": {"phone": "(14) 99838-7268"}, "criado": "2026-10-19T17:38:00"})
+    assert rodar(pipeline_store.obter, "alice", "ChIJabc") is None             # o card não existe mais
+    envio = Envio()
+    c = rodar(robo_service.processar, cfg(), msg("Oi, boa tarde! Pode falar.", 1).__class__(canal="whatsapp", contato="5514998387268", nome="Padaria E Confeitaria Que Que seja doce",
+              texto="Oi, boa tarde! Pode falar.", meta_id="m1", momento=1), gerar=ia("Oi! Posso te mostrar a prévia?"), enviar=envio)
+    assert c["lead_id"] == "ChIJabc"                                           # o lead de verdade, não "in_whatsapp_..."
+    card = rodar(pipeline_store.obter, "alice", "ChIJabc")
+    assert card and card["lead"]["company"] == "Padaria e Confeitaria Que seja doce" and card["lead"]["niche"] == "Padarias"
+
+
+def test_conversa_ja_ligada_a_contato_novo_e_religada_ao_original(com_robo, rodar):
+    from app import fila_envio, robo_store
+    rodar(fila_envio._gravar, "alice", {"id": "f_L9", "lead_id": "L9", "nome": "Doceria Estrela", "canal": "whatsapp", "status": "enviado", "enviado_em": "2026-10-19T17:50:00",
+                                        "texto": "oi", "ramo": "Docerias", "contato": {"phone": "5511964623668"}, "criado": "x"})
+    cid = robo_store.id_da_conversa("whatsapp", "5511964623668")
+    rodar(robo_store.salvar_conversa, "alice", {"id": cid, "canal": "whatsapp", "contato": "5511964623668", "nome": "Doceria", "lead_id": "in_whatsapp_5511964623668",
+                                                 "robo_ativo": True, "optout": False, "precisa_humano": False, "motivo": "", "criado": "x",
+                                                 "mensagens": [{"de": "contato", "texto": "oi", "em": "x", "meta_id": "a"}]})
+    c = rodar(robo_service.processar, cfg(), msg("pode falar", 2), gerar=ia("Oi!"), enviar=Envio())
+    assert c["lead_id"] == "L9"

@@ -174,9 +174,29 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
     sock = s;
     s.ev.on('creds.update', saveCreds);
 
-    s.ev.on('messaging-history.set', ({ messages }) => {
+    const conversa = (c) => {
+      const jid = c?.id || '';
+      if (!jid || jid === 'status@broadcast' || jid.endsWith('@newsletter') || jid.endsWith('@broadcast')) return;
+      const ts = Number(c.conversationTimestamp?.low ?? c.conversationTimestamp) || 0;
+      historico.registrarChat?.({ chatId: paraChatId(jid), nome: c.name || c.displayName || '', grupo: jid.endsWith('@g.us'), quando: ts, naoLidas: Number(c.unreadCount) || 0 });
+    };
+    const contato = (c) => {
+      const jid = c?.id || '';
+      if (!jid || !/@(s\.whatsapp\.net|lid)$/.test(jid) || !(c.name || c.notify || c.verifiedName)) return;
+      const chatId = paraChatId(jid);
+      // só dá nome a conversa que já existe (não cria uma conversa para cada contato da agenda)
+      if (historico.nomear) historico.nomear(chatId, c.name || c.notify || c.verifiedName);
+    };
+    s.ev.on('messaging-history.set', ({ messages, chats, contacts }) => {
+      for (const c of chats || []) { try { conversa(c); } catch { /* um item estranho não derruba o resto */ } }
+      for (const c of contacts || []) { try { contato(c); } catch { /* idem */ } }
       for (const m of messages || []) { try { guardar(m); } catch { /* uma mensagem estranha não derruba o resto */ } }
+      aviso(`Histórico do WhatsApp recebido: ${(chats || []).length} conversas, ${(messages || []).length} mensagens (guardadas agora: ${historico.total?.() ?? '?'}).`);
     });
+    s.ev.on('chats.upsert', (lista) => { for (const c of lista || []) { try { conversa(c); } catch { /* idem */ } } });
+    s.ev.on('chats.update', (lista) => { for (const c of lista || []) { try { conversa(c); } catch { /* idem */ } } });
+    s.ev.on('contacts.upsert', (lista) => { for (const c of lista || []) { try { contato(c); } catch { /* idem */ } } });
+    s.ev.on('contacts.update', (lista) => { for (const c of lista || []) { try { contato(c); } catch { /* idem */ } } });
     // confirmações do WhatsApp para o que enviamos (servidor recebeu, entregue, lida)
     s.ev.on('messages.update', (lista) => { for (const u of lista || []) entregas.registrar(u?.key?.id, u?.update?.status); });
     s.ev.on('message-receipt.update', (lista) => { for (const u of lista || []) if (u?.key?.fromMe) entregas.registrar(u.key.id, u.receipt?.readTimestamp ? 4 : 3); });

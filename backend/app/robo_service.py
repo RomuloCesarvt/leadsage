@@ -96,6 +96,30 @@ def _lead_do_item(item: Dict[str, Any]) -> Dict[str, Any]:
     return foto
 
 
+async def _lead_pela_fila(uid: str, contato: str) -> Optional[Dict[str, Any]]:
+    """O lead ORIGINAL de quem respondeu, pelo que o LeadSage enviou para aquele número.
+
+    Quando o card some do pipeline (ou o telefone não casa), a resposta virava um "contato novo" sem ramo e sem site: o robô criava
+    outro site genérico para quem já tinha o seu. A fila de envios guarda quem recebeu a abordagem (lead, nome, ramo, nota).
+    """
+    from app import fila_envio
+
+    chave = fila_envio._chave_do_telefone(contato)
+    if not chave:
+        return None
+    try:
+        itens = await fila_envio.listar(uid)
+    except Exception:
+        return None
+    achados = [i for i in itens if i.get("canal") == "whatsapp" and i.get("status") in ("enviado", "enviando")
+               and fila_envio._chave_do_telefone((i.get("contato") or {}).get("phone")) == chave and i.get("lead_id")]
+    if not achados:
+        return None
+    i = sorted(achados, key=lambda x: str(x.get("enviado_em") or x.get("criado") or ""))[-1]
+    return {"id": i["lead_id"], "name": i.get("nome") or "", "company": i.get("nome") or "", "niche": i.get("ramo") or "",
+            "phone": "+" + re.sub(r"\D", "", contato), "rating": i.get("nota"), "rating_count": i.get("avaliacoes")}
+
+
 async def _achar_ou_criar_no_pipeline(
     uid: str, conversa: Dict[str, Any], msg: meta_canais.Recebida,
 ) -> Optional[Dict[str, Any]]:
@@ -103,7 +127,7 @@ async def _achar_ou_criar_no_pipeline(
     (anuncio, indicacao, quem achou o numero) ganha um card novo: ManyChat
     sem CRM nao serve para vender."""
     try:
-        if conversa.get("lead_id"):
+        if conversa.get("lead_id") and not str(conversa["lead_id"]).startswith("in_"):
             item = await pipeline_store.obter(uid, conversa["lead_id"])
             if item:
                 return item
@@ -111,6 +135,14 @@ async def _achar_ou_criar_no_pipeline(
             item = await pipeline_store.achar_por_telefone(uid, msg.contato)
             if item:
                 return item
+            # não está no pipeline (ou o telefone não casou): quem recebeu a nossa abordagem é o lead de verdade, não um "contato novo"
+            original = await _lead_pela_fila(uid, msg.contato)
+            if original:
+                existente = await pipeline_store.obter(uid, original["id"])
+                item = existente or await pipeline_store.registrar(uid, original, etapa="Respondeu", origem="fila_de_envio")
+                if item:
+                    conversa["lead_id"] = original["id"]      # também conserta a conversa que já tinha sido ligada a um "contato novo"
+                    return item
         nome = msg.nome or "Novo contato"
         novo_id = f"in_{robo_store.id_da_conversa(msg.canal, msg.contato)}"
         foto: Dict[str, Any] = {"id": novo_id, "name": nome, "company": nome}

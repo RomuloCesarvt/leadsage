@@ -59,11 +59,16 @@ def test_o_espelho_que_o_conector_manda_chega_ao_celular(client, chave):
     assert client.get(f"/api/robo/whats/chats/{LID}/mensagens").json()["mensagens"] == []
 
 
-def test_espelho_velho_nao_e_servido(client, chave, rodar):
+def test_espelho_velho_ainda_aparece_com_a_idade_e_so_some_depois_de_uma_semana(client, chave, rodar):
+    """Lista velha é melhor que lista vazia: a tela mostra as conversas e diz "atualizado há X"."""
     rodar(esp.salvar_chats, "alice", [{"id": CHAT, "nome": "Gabriel"}])
     assert len(client.get("/api/robo/whats/chats").json()["chats"]) == 1
-    velho = (datetime.now(timezone.utc) - timedelta(seconds=esp.TTL_ESPELHO_S + 60)).isoformat()
+    velho = (datetime.now(timezone.utc) - timedelta(seconds=esp.TTL_ESPELHO_S + 3600)).isoformat()
     rodar(esp._gravar, "alice", "chats", {"chats": [{"id": CHAT, "nome": "Gabriel"}], "em": velho})
+    r = client.get("/api/robo/whats/chats").json()
+    assert len(r["chats"]) == 1 and r["idade_s"] > esp.TTL_ESPELHO_S
+    antigo = (datetime.now(timezone.utc) - timedelta(seconds=esp.TTL_ESPELHO_MAXIMO_S + 3600)).isoformat()
+    rodar(esp._gravar, "alice", "chats", {"chats": [{"id": CHAT, "nome": "Gabriel"}], "em": antigo})
     assert client.get("/api/robo/whats/chats").json()["chats"] == []
 
 

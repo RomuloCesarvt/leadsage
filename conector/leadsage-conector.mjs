@@ -262,6 +262,7 @@ export function criarDigitando(sinalizar, { leituraMs = 1200, renovarMs = 8000, 
 export function criarHistorico(arquivo, { maxMensagens = 300, maxChats = 300, ler = null, gravar = null } = {}) {
   let chats = {};
   let pendente = null;
+  let versao = 0;   // sobe a cada mudança: quem espelha a lista para o servidor só manda quando ela mudou
 
   const salvar = () => {
     if ((!arquivo && !gravar) || pendente) return;
@@ -278,6 +279,28 @@ export function criarHistorico(arquivo, { maxMensagens = 300, maxChats = 300, le
       if (!arquivo && !ler) return;
       try { chats = JSON.parse(ler ? await ler() : await readFile(arquivo, 'utf8')).chats || {}; } catch { chats = {}; }
     },
+    /** Uma conversa que o WhatsApp avisou que existe (lista de conversas, contatos), mesmo sem nenhuma mensagem carregada:
+     * ela aparece na lista com o nome e o horário; as mensagens entram quando chegam ou quando a conversa é aberta. */
+    registrarChat({ chatId, nome, grupo, quando = 0, naoLidas = 0 }) {
+      if (!chatId || chatId === 'status@broadcast' || String(chatId).endsWith('@newsletter') || String(chatId).endsWith('@broadcast')) return;
+      const c = chats[chatId] || (chats[chatId] = { id: chatId, nome: '', grupo: Boolean(grupo), telefone: '', naoLidas: 0, quando: 0, ultima: null, mensagens: [] });
+      c.telefone = c.telefone || (/^(\d{10,15})@c\.us$/.exec(chatId) || [])[1] || '';
+      if (nome) c.nome = nome;
+      c.nome = c.nome || c.telefone || chatId.split('@')[0];
+      if (quando && quando > (c.quando || 0)) c.quando = quando;
+      if (Number.isFinite(naoLidas) && naoLidas >= 0 && !c.mensagens.length) c.naoLidas = naoLidas;
+      const ids = Object.keys(chats);
+      if (ids.length > maxChats) ids.sort((a, b) => chats[a].quando - chats[b].quando).slice(0, ids.length - maxChats).forEach((i) => delete chats[i]);
+      versao++; salvar();
+    },
+    nomear(chatId, nome) {
+      const c = chats[chatId];
+      if (!c || !nome) return;
+      // não troca o nome que a própria conversa trouxe; só troca o número pelo nome da pessoa
+      if (!c.nome || c.nome === c.telefone || c.nome === chatId.split('@')[0]) { c.nome = nome; versao++; salvar(); }
+    },
+    versao() { return versao; },
+    total() { return Object.keys(chats).length; },
     registrar({ chatId, nome, grupo, mensagem }) {
       if (!chatId || !mensagem || !mensagem.id) return;
       const c = chats[chatId] || (chats[chatId] = { id: chatId, nome: '', grupo: Boolean(grupo), telefone: '', naoLidas: 0, quando: 0, ultima: null, mensagens: [] });
@@ -292,6 +315,7 @@ export function criarHistorico(arquivo, { maxMensagens = 300, maxChats = 300, le
       const u = c.mensagens[c.mensagens.length - 1];
       c.quando = u.quando;
       c.ultima = { texto: u.texto, minha: u.minha };
+      versao++;
       const ids = Object.keys(chats);
       if (ids.length > maxChats) {
         ids.sort((a, b) => chats[a].quando - chats[b].quando).slice(0, ids.length - maxChats).forEach((i) => delete chats[i]);
@@ -308,7 +332,7 @@ export function criarHistorico(arquivo, { maxMensagens = 300, maxChats = 300, le
       return (chats[chatId]?.mensagens || []).slice(-limite);
     },
     lida(chatId) {
-      if (chats[chatId]) { chats[chatId].naoLidas = 0; salvar(); }
+      if (chats[chatId]) { chats[chatId].naoLidas = 0; versao++; salvar(); }
     },
   };
 }

@@ -426,3 +426,21 @@ test('sessão: chave revogada fecha o WhatsApp desta sessão (sem socket órfão
   assert.equal(fechou, 1, 'o WhatsApp da sessão que saiu foi fechado');
   assert.equal(s.parou, true);
 });
+
+test('histórico: conversa avisada pelo WhatsApp aparece na lista mesmo sem mensagem carregada; nome do contato troca o número; versão sobe', async () => {
+  const h = criarHistorico('', { maxMensagens: 25, maxChats: 120 });
+  assert.equal(h.versao(), 0);
+  h.registrarChat({ chatId: '5514990000001@c.us', nome: '', quando: 1700000100, naoLidas: 2 });      // só o número
+  h.registrarChat({ chatId: '5514990000002@c.us', nome: 'Padaria Estrela', quando: 1700000200 });
+  h.registrarChat({ chatId: 'status@broadcast', nome: 'x', quando: 1 });                              // status e canais não são conversas
+  h.registrarChat({ chatId: '123@newsletter', nome: 'x', quando: 1 });
+  assert.equal(h.total(), 2);
+  assert.deepEqual(h.chats(10).map((c) => c.nome), ['Padaria Estrela', '5514990000001']);            // mais recente primeiro
+  h.nomear('5514990000001@c.us', 'Doceria Aurora');                                                    // o contato trouxe o nome
+  h.nomear('5514990000002@c.us', 'Outro Nome');                                                        // não troca o nome que a conversa já tinha
+  assert.deepEqual(h.chats(10).map((c) => c.nome).sort(), ['Doceria Aurora', 'Padaria Estrela']);
+  const antes = h.versao();
+  h.registrar({ chatId: '5514990000001@c.us', nome: 'Doceria Aurora', mensagem: { id: 'm1', texto: 'oi', minha: false, quando: 1700000300, tipo: 'text' } });
+  assert.ok(h.versao() > antes);
+  assert.equal(h.chats(10)[0].ultima.texto, 'oi');
+});

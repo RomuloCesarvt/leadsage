@@ -52,6 +52,9 @@ OBJECOES = """
   já foi preparado, se houver; não despeje um texto longo.
 - "Quem é você?" / "como conseguiu meu número?": transparência total — o número é o público do perfil
   do Google do negócio, e você é assistente virtual de quem oferece o serviço.
+- "Já tenho quem faça" / "meu marido (ou parente, amigo, agência) cria sites" / "não tenho interesse": RECUSA CLARA. Não insista, não tente
+  agendar nem oferecer outra coisa. Uma frase de despedida educada ("Ah, entendo! De toda forma, agradeço a atenção e desejo sucesso.") e
+  encerre ("tipo": "agradecimento", "etapa": "perdido", "mensagens" com só essa despedida). Quem recusa com motivo não volta a ser abordado.
 - "Preciso falar com meu sócio / marido / esposa": ótimo, quem decide precisa ver. Ofereça incluir a pessoa
   na conversa de 15 minutos ou mande o essencial para ela ver (link do site pronto). Pergunte o melhor horário para os dois.
 - "Já tentei e não deu resultado": valide sem criticar quem fez. Pergunte o que foi feito e o que faltou;

@@ -49,6 +49,45 @@ RESPOSTA_ENCERRA = (
     "Se um dia precisar, é só chamar por aqui."
 )
 
+# "Meu marido cria sites, não tenho interesse": recusa clara COM motivo. Não é para insistir nem tentar agendar: agradece, deseja sucesso
+# e a conversa sai da lista (próximo lead). Só frases inequívocas entram aqui; "agora não" e "vou pensar" continuam com a IA.
+_SEM_INTERESSE = (
+    "nao tenho interesse", "nao temos interesse", "sem interesse", "nao me interessa", "nao nos interessa", "nao estou interessad",
+    "nao estamos interessad", "nao tenho nenhum interesse", "nao preciso de site", "nao precisamos de site", "nao quero site",
+    "ja tenho quem", "ja temos quem", "ja tenho alguem que", "ja temos alguem que", "ja tenho site", "ja temos site",
+    "ja tenho um site", "ja temos um site", "ja tenho meu site", "ja tenho quem faca", "ja tenho quem cuida",
+)
+_PARENTE_FAZ = re.compile(
+    r"\b(meu|minha|o meu|a minha)\s+(marido|esposa|mulher|namorad[oa]|noiv[oa]|filh[oa]|irmao|irma|prim[oa]|sobrinh[oa]|pai|mae|amig[oa]|socio|socia|cunhad[oa]|genro|nora)\b[^.!?]{0,50}\b(faz|cria|cuida|trabalha|fez|desenvolve|monta|mexe|toca)\b"
+)
+RESPOSTA_JA_TEM_QUEM_FACA = (
+    "Ah, entendo! Que bom que já tem alguém de confiança cuidando disso. De toda forma, agradeço a atenção "
+    "e desejo muito sucesso por aí. Se um dia precisar, é só chamar."
+)
+RESPOSTA_SEM_INTERESSE = (
+    "Entendo, sem problema! Agradeço a atenção e desejo muito sucesso. Se mudar de ideia, é só chamar por aqui."
+)
+
+
+def desinteresse_firme(texto: str) -> str:
+    """"" se a pessoa não recusou claramente; senão "ja_tem" (tem quem faça: marido, parente, agência) ou "sem_interesse"."""
+    t = _normal(texto)
+    if not t or len(t.split()) > 60:
+        return ""
+    if re.search(r"\b(mas|porem|entretanto)\b[^.!?]{0,40}\b(quero|queria|quer|gostaria|me interessa|tenho interesse|pode|manda|mostra|qual|valor|preco|quanto|ver)\b", t):
+        return ""         # "não tenho interesse agora, mas me manda o exemplo": quer ver, a IA conduz
+    if "?" in (texto or "") and not any(x in t for x in _SEM_INTERESSE):
+        return ""         # está perguntando alguma coisa: quer conversar, a IA conduz
+    ja_tem = bool(_PARENTE_FAZ.search(t)) or any(x in t for x in ("ja tenho quem", "ja temos quem", "ja tenho alguem", "ja temos alguem", "ja tenho site", "ja temos site", "ja tenho um site", "ja temos um site", "ja tenho meu site"))
+    if ja_tem:
+        return "ja_tem"
+    if any(x in t for x in _SEM_INTERESSE):
+        if any(x in t for x in ("no momento", "agora", "por enquanto", "por ora", "neste momento", "hoje")):
+            return ""     # "não tenho interesse no momento": é questão de hora, não recusa; a IA faz uma tentativa gentil
+        return "sem_interesse"
+    return ""
+
+
 RESPOSTA_SAIDA = (
     "Tudo bem, não vou mais te enviar mensagens. Obrigado pelo retorno e "
     "desculpe o incômodo!"
@@ -228,6 +267,16 @@ def decidir(
 
     if pediu_para_sair(texto):
         return Decisao(resposta=RESPOSTA_SAIDA, optout=True, motivo="pediu para não receber mais")
+
+    firme = desinteresse_firme(texto)
+    if firme:
+        # recusa clara (com ou sem motivo): agradece e encerra, sem insistir nem tentar agendar; o lead vira "perdido" e sai da lista
+        return Decisao(
+            resposta=(RESPOSTA_JA_TEM_QUEM_FACA if firme == "ja_tem"
+                      else RESPOSTA_ENCERRA if int((sdr or {}).get("recusas") or 0) >= 1 else RESPOSTA_SEM_INTERESSE), optout=True,
+            motivo="já tem quem faça o site" if firme == "ja_tem" else "disse que não tem interesse",
+            sdr={**(sdr or {}), "etapa": "perdido", "recusas": int((sdr or {}).get("recusas") or 0) + 1},
+        )
 
     if recusou(texto):
         recusas = int((sdr or {}).get("recusas") or 0)
