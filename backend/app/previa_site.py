@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Tuple
 
 import httpx
 
-from app import banco_imagens
+from app import banco_imagens, qualidade_site
 from app.config import settings
 from app.credit_system import acesso_total
 
@@ -54,6 +54,21 @@ async def copia_do_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as exc:
         print(f"Previa: texto proprio indisponivel ({type(exc).__name__}: {str(exc)[:80]}); usa o do ramo")
         return {}
+
+
+async def _montar_e_avaliar(lead: Dict[str, Any], fotos: List[str], modelo: str = "",
+                            anterior: Dict[str, Any] = None) -> Tuple[Dict[str, Any], List[str]]:
+    """Monta o site e o avalia. Se reprovar por falta de texto proprio, tenta mais uma vez pedindo o texto a IA."""
+    extra = ([modelo, anterior] if (modelo or anterior) else [])
+    copia = await copia_do_lead(lead)
+    site = await renderizar({**lead, "copia_ia": copia}, fotos, *extra)
+    bloqueios, _ = qualidade_site.avaliar(str(site.get("html") or ""), {**lead, "company": site.get("company") or lead.get("company")}, copia)
+    if bloqueios and not copia:
+        copia = await copia_do_lead(lead)
+        if copia:
+            site = await renderizar({**lead, "copia_ia": copia}, fotos, *extra)
+            bloqueios, _ = qualidade_site.avaliar(str(site.get("html") or ""), {**lead, "company": site.get("company") or lead.get("company")}, copia)
+    return site, bloqueios
 
 
 async def renderizar(lead: Dict[str, Any], fotos: List[str], modelo: str = "", anterior: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -135,7 +150,10 @@ async def atualizar_se_antigo(uid: str, email: str, lead: Dict[str, Any]) -> boo
             if _carimbo(dados) == MOTOR_VERSAO:
                 return False
             fotos = await fotos_do_ramo(str(lead.get("niche") or lead.get("role") or ""))
-            site = await renderizar({**lead, "copia_ia": await copia_do_lead(lead)}, fotos, str(s.get("template") or ""), _do_site_anterior(dados))
+            site, bloqueios = await _montar_e_avaliar(lead, fotos, str(s.get("template") or ""), _do_site_anterior(dados))
+            if bloqueios:
+                print(f"Atualizacao da previa reprovada na avaliacao ({lead_id}): {qualidade_site.resumo(bloqueios)}")
+                return False  # a versao que ja esta no ar fica como esta; a pior nunca a substitui
             await update_site(uid, s["id"], str(site.get("company") or s.get("company") or ""), site["html"],
                               str(site.get("template") or ""), _com_carimbo(str(site.get("builder_data") or "")),
                               marcar_edicao=False)
@@ -164,7 +182,11 @@ async def criar(uid: str, email: str, lead: Dict[str, Any]) -> Tuple[str, str]:
             if await contar_sites(uid) >= cota:
                 return "", "o plano não tem mais vagas de site"
         fotos = await fotos_do_ramo(str(lead.get("niche") or lead.get("role") or ""))
-        site = await renderizar({**lead, "copia_ia": await copia_do_lead(lead)}, fotos)
+        site, bloqueios = await _montar_e_avaliar(lead, fotos)
+        if bloqueios:
+            # nada sai sem passar na avaliacao: melhor chamar o dono do que mandar um link ruim
+            print(f"Previa reprovada na avaliacao ({lead_id}): {qualidade_site.resumo(bloqueios)}")
+            return "", f"o site não passou na avaliação: {qualidade_site.resumo(bloqueios)}"
         criado = await create_site(
             uid, str(site.get("company") or lead.get("company") or lead.get("name") or "Prévia"), site["html"],
             str(site.get("template") or ""), lead_id, _com_carimbo(str(site.get("builder_data") or "")),

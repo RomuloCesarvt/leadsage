@@ -227,6 +227,62 @@ def _motivo_transitorio(motivo: str) -> bool:
     return any((motivo or "").startswith(t) for t in _TRANSITORIOS)
 
 
+async def avaliar_chat(uid: str, telefone: str, nome: str, mensagens: list, ativar: Optional[bool] = None,
+                       gerar: Optional[Callable[[str], Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """O robô em QUALQUER conversa do WhatsApp, não só nas que ele começou.
+
+    Toda conversa passa a ter o seu controle (ligar/pausar). `ativar` True/False é a escolha da pessoa; None é só a avaliação:
+    a IA lê o contexto e, se o outro lado é um robô ou propaganda, o robô para ali e a conversa fica com o motivo, para a pessoa
+    reativar ou não. Conversa antiga entra com o robô PAUSADO (ele não responde por cima de papos antigos sem você pedir)."""
+    from app import ai_robo
+
+    digitos = re.sub(r"\D", "", telefone or "")
+    if len(digitos) < 10:
+        raise ValueError("Este chat não tem um número de telefone.")
+    cid = robo_store.id_da_conversa("whatsapp", digitos)
+    conversa = await robo_store.obter_conversa(uid, cid)
+    nova = conversa is None
+    if nova:
+        conversa = {"id": cid, "canal": "whatsapp", "contato": digitos, "nome": nome or "", "lead_id": "", "robo_ativo": False,
+                    "optout": False, "precisa_humano": False, "motivo": "", "mensagens": [], "criado": robo_store.agora(), "origem_chat": True}
+    if nome and not conversa.get("nome"):
+        conversa["nome"] = nome
+
+    # as falas que o WhatsApp mostra, para a conversa guardar o contexto (só quando ela ainda não tem)
+    if not conversa["mensagens"]:
+        from datetime import datetime, timezone
+        for m in (mensagens or [])[-30:]:
+            texto = str(m.get("texto") or "").strip()
+            if not texto:
+                continue
+            quando = int(m.get("quando") or 0)
+            em = datetime.fromtimestamp(quando, timezone.utc).isoformat(timespec="seconds") if quando > 0 else robo_store.agora()
+            conversa["mensagens"].append({"de": "voce" if m.get("minha") else "contato", "texto": texto[:2000], "em": em, "meta_id": str(m.get("id") or "")})
+
+    ultima = conversa["mensagens"][-1] if conversa["mensagens"] else None
+    marca = str((ultima or {}).get("meta_id") or (ultima or {}).get("em") or (ultima or {}).get("texto") or "")
+    if ativar is not None:
+        if ativar and conversa.get("optout"):
+            raise PermissionError("Esta pessoa pediu para não receber mais mensagens. O robô não pode ser religado.")
+        conversa["robo_ativo"] = bool(ativar)
+        if ativar:
+            conversa.update({"precisa_humano": False, "motivo": "", "contato_robo": False, "automaticas": 0, "falhas_ia": 0})
+            conversa.pop("silencio", None)
+            conversa.pop("classificado", None)
+            conversa["avaliado_em"] = marca      # a pessoa decidiu: a IA não discute com ela sobre esta fala
+    elif ultima and ultima.get("de") == "contato" and not conversa.get("optout") and conversa.get("avaliado_em") != marca:
+        veredito = await asyncio.to_thread(ai_robo.classificar_contato, conversa["mensagens"], gerar or _gerador_padrao())
+        if veredito is not None:       # sem veredito (IA indisponível agora): tenta de novo na próxima vez
+            conversa["avaliado_em"] = marca
+            if veredito["robo"]:
+                motivo = veredito["motivo"] or "um robô ou propaganda"
+                conversa.update({"contato_robo": True, "classificado": True, "robo_ativo": False, "precisa_humano": False, "motivo": f"Parece {motivo}",
+                                 "silencio": f"Parece {motivo}: o robô parou nesta conversa. Se for uma pessoa, reative o robô."})
+    conversa["atualizado"] = robo_store.agora() if (nova or ativar is not None) else (conversa.get("atualizado") or robo_store.agora())
+    await robo_store.salvar_conversa(uid, conversa)
+    return conversa
+
+
 def _identidade_da_fala(m: Optional[Dict[str, Any]]) -> str:
     """Quem é esta fala: o id da Meta/WhatsApp ou, na falta, o horário. Serve para contar cada mensagem uma vez só."""
     m = m or {}
@@ -372,7 +428,7 @@ async def _processar(
         conversa["motivo"] = ""
 
     # recupera quem saiu da lista do robô só por contar a mesma mensagem várias vezes (e ninguém assumiu)
-    if (conversa.get("contato_robo") and not conversa.get("optout") and not any(m.get("de") == "voce" for m in conversa["mensagens"])
+    if (conversa.get("contato_robo") and not conversa.get("classificado") and not conversa.get("optout") and not any(m.get("de") == "voce" for m in conversa["mensagens"])
             and sum(1 for m in conversa["mensagens"] if m.get("de") == "contato") < MAX_AUTOMATICAS):
         conversa.update({"contato_robo": False, "robo_ativo": True, "automaticas": 0})
         conversa.pop("automatica_id", None)
@@ -689,7 +745,8 @@ def _pausa_por_engano(c: Dict[str, Any]) -> bool:
 
     if certeza_de_robo((c.get("ultima") or {}).get("texto", "")):
         return False      # a última fala é mesmo de robô (menu, protocolo): continua fora da lista
-    return bool(c.get("contato_robo")) and not c.get("optout") and not c.get("humano") and int(c.get("contatos") or 99) < MAX_AUTOMATICAS
+    return (bool(c.get("contato_robo")) and not c.get("classificado") and not c.get("optout") and not c.get("humano")
+            and int(c.get("contatos") or 99) < MAX_AUTOMATICAS)
 
 
 def _sem_resposta(c: Dict[str, Any]) -> bool:

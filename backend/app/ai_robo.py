@@ -223,6 +223,54 @@ def pontos_de_robo(texto: str, mensagens: Optional[List[Dict[str, Any]]] = None)
     return pontos
 
 
+def _candidata_a_robo(texto: str, mensagens: List[Dict[str, Any]]) -> bool:
+    """Vale gastar a IA para olhar esta fala? Só quando há algum indício (sinal de robô, link, texto longo de divulgação)."""
+    t = texto or ""
+    return pontos_de_robo(t, mensagens) >= 1 or bool(re.search(r"https?://", t)) or len(t) >= 280
+
+
+PROMPT_CLASSIFICAR = """Você analisa uma conversa de WhatsApp de uma empresa. Decida se QUEM ESCREVE (as falas marcadas CONTATO) é um robô:
+atendimento automático, bot de empresa ou banco, mensagem em massa, propaganda, divulgação, promoção, cobrança automática,
+corrente, aviso de operadora, golpe/spam. Uma PESSOA de verdade, mesmo curta ou seca ("não tenho interesse", "quem é?"), NÃO é robô.
+Só diga que é robô quando o conteúdo deixa claro (texto padronizado, menus, links de oferta, mesma mensagem para todos, "mensagem automática").
+Na dúvida, diga que é pessoa.
+
+CONVERSA (mais recente por último):
+{conversa}
+
+Responda SOMENTE um JSON: {{"robo": true ou false, "motivo": "uma frase curta em português dizendo o que é (ex.: propaganda de uma loja, menu de atendimento automático)"}}"""
+
+
+def classificar_contato(mensagens: List[Dict[str, Any]], gerar_json: Optional[Callable[[str], Dict[str, Any]]] = None) -> Optional[Dict[str, Any]]:
+    """Quem está do outro lado é um robô ou propaganda? Devolve {"robo": bool, "motivo": str, "usou_ia": bool}, ou None se não deu para decidir.
+
+    Primeiro as regras (grátis, na hora): menu, protocolo, "mensagem automática" são robô sem dúvida. Com indício mais fraco,
+    a IA lê o contexto da conversa. Sem indício nenhum, é pessoa: a IA nem é chamada."""
+    falas = [m for m in (mensagens or []) if (m.get("texto") or "").strip()]
+    do_contato = [m for m in falas if m.get("de") == "contato"]
+    if not do_contato:
+        return {"robo": False, "motivo": "", "usou_ia": False}
+    recentes = do_contato[-3:]
+    for m in recentes:
+        if certeza_de_robo(m.get("texto", ""), falas):
+            return {"robo": True, "motivo": "mensagem automática (menu, protocolo ou aviso padronizado)", "usou_ia": False}
+    if not any(_candidata_a_robo(m.get("texto", ""), falas) for m in recentes):
+        return {"robo": False, "motivo": "", "usou_ia": False}
+    if gerar_json is None:
+        return None
+    linhas = []
+    for m in falas[-8:]:
+        quem = {"contato": "CONTATO", "voce": "VOCÊ", "robo": "VOCÊ (robô)"}.get(m.get("de"), "VOCÊ")
+        linhas.append(f"{quem}: {(m.get('texto') or '').strip()[:500]}")
+    try:
+        r = gerar_json(PROMPT_CLASSIFICAR.format(conversa="\n".join(linhas)))
+    except Exception:
+        return None
+    if not isinstance(r, dict) or "robo" not in r:
+        return None
+    return {"robo": r.get("robo") is True, "motivo": str(r.get("motivo") or "").strip()[:160], "usou_ia": True}
+
+
 def e_so_midia(texto: str) -> bool:
     return bool(re.fullmatch(r"\[[^\]]+\]", (texto or "").strip()))
 

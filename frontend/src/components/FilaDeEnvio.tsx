@@ -213,7 +213,7 @@ export const FilaDeEnvio: React.FC = () => {
         const novas = faltam.slice(0, vagas);
         const criar = [...refazer, ...novas];
         setPrevias({ feitas: 0, total: criar.length });
-        let feitas = 0; let falhas = 0; let proximo = 0;
+        let feitas = 0; let falhas = 0; let reprovados = 0; let proximo = 0;
         // as fotos do ramo (banco de imagens), uma busca por ramo: o site sai com imagens de verdade, não com gradiente
         const fotosPorRamo = new Map<string, string[]>();
         for (const ramo of new Set(criar.map(l => (l.niche || l.role || '').trim()))) {
@@ -232,15 +232,20 @@ export const FilaDeEnvio: React.FC = () => {
                 () => api.generateSiteCopy({ lead, empresa: lead.company || lead.name, categoria: lead.niche || lead.role, cidade: lead.city }),
                 `Site de ${lead.company || lead.name}`,
               ).catch(() => null);
-              await api.publishSite({ ...montarPreviaDoLead({ ...lead, copia_ia: copia || undefined }, [...fotos.slice(giro), ...fotos.slice(0, giro)]), site_id: existentes.get(lead.id) });
-            } catch { falhas++; }
+              const { id, company, name, niche, role, address, location, rating, rating_count, opening_hours, google_description, review_highlight, instagram, email } = lead as any;
+              await api.publishSite({
+                ...montarPreviaDoLead({ ...lead, copia_ia: copia || undefined }, [...fotos.slice(giro), ...fotos.slice(0, giro)]),
+                site_id: existentes.get(lead.id),
+                avaliacao: { lead: { id, company, name, niche, role, address, location, rating, rating_count, opening_hours, google_description, review_highlight, instagram, email }, copia_ia: Boolean(copia) },
+              });
+            } catch (e: any) { falhas++; if (/avalia/i.test(String(e?.message))) reprovados++; }
             feitas++; setPrevias({ feitas, total: criar.length });
           }
         };
         await Promise.all([trabalhador(), trabalhador(), trabalhador()]);
         const semVaga = faltam.length - novas.length;
         if (falhas || semVaga) {
-          setAvisoPrevias(`${criar.length - falhas} site(s) gerado(s) agora.${semVaga ? ` ${semVaga} lead(s) ficaram sem prévia por falta de vagas de site no seu plano` : ''}${falhas ? ` ${falhas} falharam` : ''}: para eles a mensagem oferece montar a prévia, em vez de dizer que já está pronta.`);
+          setAvisoPrevias(`${criar.length - falhas} site(s) gerado(s) agora.${semVaga ? ` ${semVaga} lead(s) ficaram sem prévia por falta de vagas de site no seu plano` : ''}${falhas ? ` ${falhas} falharam${reprovados ? ` (${reprovados} não passaram na avaliação de qualidade: o site sairia genérico ou com assunto de outro ramo)` : ''}` : ''}: para eles a mensagem oferece montar a prévia, em vez de dizer que já está pronta.`);
         }
       }
       // dois lotes por vez: metade do tempo de espera, sem passar do que a IA gratuita aguenta por minuto

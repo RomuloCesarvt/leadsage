@@ -678,6 +678,17 @@ async def publish_site(req: SiteCreateRequest, user: dict = Depends(get_current_
     uid = user.get("uid")
     await exigir_recurso(user, "publicar_site", "Publicar o site")
 
+    # Previa de lead: nada e guardado sem passar na avaliacao (site de molde, de outro ramo, sem contato ou sem dados reais)
+    if req.avaliacao is not None:
+        from app import qualidade_site
+        lead_av = req.avaliacao.get("lead") if isinstance(req.avaliacao.get("lead"), dict) else {}
+        bloqueios, _ = qualidade_site.avaliar(
+            req.html, {**lead_av, "id": lead_av.get("id") or req.lead_id, "company": req.company or lead_av.get("company")},
+            {"ok": True} if req.avaliacao.get("copia_ia") else None, completo=bool(lead_av),
+        )
+        if bloqueios:
+            raise HTTPException(status_code=422, detail=f"O site não passou na avaliação: {qualidade_site.resumo(bloqueios)}")
+
     # Reeditar nao gasta vaga: a vaga foi cobrada quando o site nasceu.
     if req.site_id:
         try:
@@ -951,6 +962,13 @@ class RoboTextoRequest(BaseModel):
 
 class RoboAtivoRequest(BaseModel):
     ativo: bool
+
+
+class RoboChatRequest(BaseModel):
+    telefone: str
+    nome: str = ""
+    mensagens: list = []
+    ativar: Optional[bool] = None
 
 
 class RoboTesteRequest(BaseModel):
@@ -1387,12 +1405,26 @@ async def robo_ligar_desligar(cid: str, req: RoboAtivoRequest, user: dict = Depe
         conversa["motivo"] = ""
         # religar na mao vale mais do que a suspeita de robo: recomeça a contar do zero
         conversa["contato_robo"] = False
+        conversa.pop("classificado", None)
         conversa["automaticas"] = 0
         conversa["falhas_ia"] = 0
         conversa.pop("silencio", None)
     conversa["atualizado"] = robo_store.agora()
     await robo_store.salvar_conversa(uid, conversa)
     return conversa
+
+
+@app.post("/api/robo/chat")
+async def robo_no_chat(req: RoboChatRequest, user: dict = Depends(get_current_user)):
+    """O robô em qualquer conversa do WhatsApp: liga/pausa (ativar) ou só avalia pelo contexto se o outro lado é um robô."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    try:
+        c = await robo_service.avaliar_chat(user.get("uid"), req.telefone, req.nome, req.mensagens, req.ativar)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return {k: v for k, v in c.items() if k != "mensagens"}
 
 
 @app.post("/api/robo/conversas/{cid}/responder")

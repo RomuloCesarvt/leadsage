@@ -323,6 +323,8 @@ class SiteCreateRequest(BaseModel):
     site_id: Optional[str] = ""
     # Os campos do construtor, para poder reabrir e editar depois.
     builder_data: Optional[str] = ""
+    # Quando o site e a previa de um lead, o navegador manda o lead e se houve texto da IA: o servidor avalia o site antes de guardar.
+    avaliacao: Optional[dict] = None
 
 
 class SiteItem(BaseModel):

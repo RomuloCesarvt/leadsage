@@ -243,6 +243,8 @@ export const api = {
     site_id?: string;
     /** os campos do construtor, para reabrir o site depois */
     builder_data?: string;
+    /** previa de um lead: o servidor avalia o site antes de guardar (recusa o de molde, de outro ramo ou sem dados) */
+    avaliacao?: { lead: Record<string, unknown>; copia_ia: boolean };
   }): Promise<SiteItem> {
     return await fetchWithToken('/sites', {
       method: 'POST',
@@ -280,6 +282,11 @@ export const api = {
     return await fetchWithToken(`/robo/conversas/${encodeURIComponent(id)}/robo`, {
       method: 'POST', body: JSON.stringify({ ativo }),
     });
+  },
+
+  /** O robô em qualquer conversa do WhatsApp: `ativar` liga/pausa; sem ele, só avalia (pelo contexto) se o outro lado é um robô */
+  async roboNoChat(payload: { telefone: string; nome?: string; mensagens?: { texto: string; minha: boolean; quando: number; id: string }[]; ativar?: boolean }): Promise<RoboConversaResumo> {
+    return await fetchWithToken('/robo/chat', { method: 'POST', body: JSON.stringify(payload) });
   },
 
   async roboResponder(id: string, texto: string): Promise<RoboConversa> {

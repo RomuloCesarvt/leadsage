@@ -256,14 +256,31 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
     }
   };
 
+  const paraORobo = (lista: MensagemWhats[]) => lista.filter(m => m.texto).slice(-30).map(m => ({ texto: m.texto, minha: m.minha, quando: m.quando, id: m.id }));
+
+  // Todas as conversas têm o controle do robô: ligar/pausar funciona mesmo em quem o robô nunca atendeu
   const alternarRobo = async () => {
+    if (!aberto || aberto.grupo || !aberto.telefone) return;
     const conv = conversaDoRobo(aberto);
-    if (!conv) return;
     try {
-      await api.roboLigar(conv.id, !conv.robo_ativo);
+      if (conv) await api.roboLigar(conv.id, !conv.robo_ativo);
+      else await api.roboNoChat({ telefone: aberto.telefone, nome: aberto.nome, mensagens: paraORobo(mensagens), ativar: true });
       await carregarRobo();
     } catch (e: any) { setErro(e?.message || 'Não foi possível mudar o robô.'); }
   };
+
+  // A IA lê o contexto de cada conversa que você abre: se o outro lado é propaganda ou outro robô, o robô para ali, com o motivo
+  const avaliadas = useRef(new Set<string>());
+  useEffect(() => {
+    if (!aberto || aberto.grupo || !aberto.telefone || !mensagens.length) return;
+    const ultima = mensagens[mensagens.length - 1];
+    if (ultima.minha) return;
+    const chave = `${aberto.id}|${ultima.id}`;
+    if (avaliadas.current.has(chave)) return;
+    avaliadas.current.add(chave);
+    api.roboNoChat({ telefone: aberto.telefone, nome: aberto.nome, mensagens: paraORobo(mensagens) })
+      .then(() => carregarRobo()).catch(() => { avaliadas.current.delete(chave); });
+  }, [aberto?.id, mensagens, carregarRobo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const enviar = async () => {
     if (!aberto || !texto.trim()) return;
@@ -423,11 +440,19 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
                   <div className="flex items-center gap-2">
                     <p className="text-sm md:text-xs text-slate-500 truncate flex-1">{c.ultima?.minha ? 'Você: ' : ''}{c.ultima?.texto}</p>
                     {r && r.contato_robo && (
-                      <span title="Parece outro robô: fora da lista do robô" className="shrink-0 text-[10px] font-bold text-slate-500 bg-slate-100 rounded px-1.5 py-0.5">outro robô</span>
+                      <span title={`${r.motivo || 'Parece outro robô ou propaganda'}: o robô parou. Abra a conversa para reativar.`} className="shrink-0 flex items-center gap-1 text-amber-600">
+                        <span className="text-[10px] font-bold bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">outro robô</span>
+                        <Bot className="w-4 h-4" />
+                      </span>
                     )}
                     {r && !r.contato_robo && (
                       <span title={r.precisa_humano ? 'O robô precisa de você' : r.robo_ativo ? 'O robô atende' : 'Robô pausado'}
-                        className={`shrink-0 ${r.precisa_humano ? 'text-amber-600' : r.robo_ativo ? 'text-blue-600' : 'text-slate-400'}`}>
+                        className={`shrink-0 ${r.precisa_humano ? 'text-amber-500' : r.robo_ativo ? 'text-blue-600' : 'text-slate-400'}`}>
+                        <Bot className="w-4 h-4" />
+                      </span>
+                    )}
+                    {!r && !c.grupo && c.telefone && (
+                      <span title="Robô desligado nesta conversa: abra e ligue quando quiser" className="shrink-0 text-slate-300">
                         <Bot className="w-4 h-4" />
                       </span>
                     )}
@@ -465,18 +490,20 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
                   {enviandoPrevia ? 'Enviando…' : 'Enviar prévia'}
                 </button>
               )}
-              {conv && (
+              {!aberto.grupo && aberto.telefone && (
                 <button onClick={alternarRobo}
+                  title={conv?.robo_ativo ? 'Clique para pausar o robô nesta conversa' : 'Clique para o robô responder nesta conversa'}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 ${
-                    conv.robo_ativo ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                  <Power className="w-3.5 h-3.5" /> {conv.robo_ativo ? 'Robô respondendo' : 'Robô pausado'}
+                    conv?.precisa_humano || conv?.contato_robo ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                      : conv?.robo_ativo ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                  <Power className="w-3.5 h-3.5" /> {conv?.robo_ativo ? 'Robô respondendo' : conv?.contato_robo ? 'Robô parou: reativar' : 'Robô desligado: ligar'}
                 </button>
               )}
             </div>
 
             {conv?.contato_robo && (
               <div className="px-4 py-2 bg-slate-50 border-b border-slate-200 text-xs text-slate-600">
-                Parece <b>outro robô</b> (atendimento automático): o robô parou de responder para não ficar conversando com uma máquina. Se for uma pessoa, use <b>Robô pausado</b> para religar.
+                <b>{conv.motivo || 'Parece outro robô ou propaganda'}.</b> O robô parou de responder para não ficar conversando com uma máquina. Se for uma pessoa, clique em <b>Robô parou: reativar</b>.
               </div>
             )}
             {conv?.silencio && !conv.precisa_humano && !conv.contato_robo && (

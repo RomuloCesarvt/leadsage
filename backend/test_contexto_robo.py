@@ -248,7 +248,8 @@ def motor_de_sites_falso(monkeypatch):
     async def renderizar(lead, fotos):
         chamadas.append((lead, fotos))
         nome = lead.get("company") or lead.get("name") or "Empresa"
-        return {"html": f"<!DOCTYPE html><html><body><h1>{nome}</h1><p>{lead.get('niche', '')}</p></body></html>",
+        corpo = f"Atendimento de {lead.get('niche', '')} feito com cuidado, horário combinado e resposta rápida. " * 12
+        return {"html": f'<!DOCTYPE html><html><body><h1>{nome}</h1><p>{corpo}</p><a href="https://wa.me/5514998005560">WhatsApp</a></body></html>',
                 "template": "Modelo de teste", "company": nome, "builder_data": "{}"}
 
     async def fotos(nicho, quantidade=8):

@@ -4,6 +4,7 @@ import json
 
 from app import previa_site, sites_store
 
+PAGINA = "<html><body><h1>Psicóloga Isabelly</h1>" + "<p>Atendimento acolhedor, com horário marcado e sessões no consultório. </p>" * 20 + '<a href="https://wa.me/5514999990000">WhatsApp</a></body></html>'
 LEAD = {"id": "l1", "company": "Psicóloga Isabelly", "niche": "Psicólogos", "city": "Botucatu"}
 
 
@@ -19,7 +20,7 @@ def _preparar(monkeypatch, site):
 
     async def renderizar(lead, fotos, modelo="", anterior=None):
         gravados.append(("modelo", modelo))
-        return {"html": "<html>novo</html>", "template": "Natural", "company": "Psicóloga Isabelly", "builder_data": json.dumps({"empresa": "x"})}
+        return {"html": PAGINA, "template": "Natural", "company": "Psicóloga Isabelly", "builder_data": json.dumps({"empresa": "x"})}
 
     async def fotos(nicho, quantidade=8):
         return []
@@ -41,7 +42,7 @@ def test_site_antigo_sem_edicao_e_refeito_no_mesmo_link_e_carimbado(monkeypatch)
     assert _rodar(previa_site.atualizar_se_antigo("u", "e@x.com", LEAD)) is True
     assert ("modelo", "Fintech Flutuante") in gravados  # o motor decide se o modelo ainda combina com o ramo
     update = [g for g in gravados if g[0] == "update"][0]
-    assert update[1] == "s1" and update[2] == "<html>novo</html>"
+    assert update[1] == "s1" and update[2] == PAGINA
     assert json.loads(update[4])["motor"] == previa_site.MOTOR_VERSAO
     assert update[5] is False  # refazer nao conta como edicao do dono
 
@@ -78,7 +79,7 @@ def test_previa_do_robo_leva_o_texto_proprio_da_ia_ao_motor(monkeypatch):
 
     async def renderizar(lead, fotos, modelo="", anterior=None):
         visto["lead"] = lead
-        return {"html": "<html>x</html>", "template": "Forno", "company": "Padaria", "builder_data": "{}"}
+        return {"html": PAGINA, "template": "Forno", "company": "Padaria", "builder_data": "{}"}
 
     async def fotos(nicho, quantidade=8):
         return []
