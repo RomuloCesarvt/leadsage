@@ -99,3 +99,33 @@ def test_endpoint_da_fila_escreve_whatsapp_com_seguimentos_de_ponta_a_ponta(clie
     assert res["resultado"] == "para revisar", res
     item = next(i for i in client.get("/api/robo/fila").json()["itens"] if i["lead_id"] == "L1")
     assert [s["texto"] for s in item["seguimentos"]] == ["Ana, viu a prévia?", "Ana, deixei a prévia pronta."]
+
+
+def test_todos_os_modelos_descansando_nao_gera_rajada_de_chamadas(monkeypatch):
+    ai_client._EM_DESCANSO.clear()
+    for m in ai_client.MODEL_CHAIN:
+        ai_client._EM_DESCANSO[m] = time.monotonic() + 30
+    with pytest.raises(ai_client.AIIndisponivel, match="limite gratuito"):
+        ai_client._esperar_descanso(time.monotonic() + 20)              # não dá tempo de esperar: recusa sem chamar
+    for m in ai_client.MODEL_CHAIN:
+        ai_client._EM_DESCANSO[m] = time.monotonic() + 0.2
+    inicio = time.monotonic()
+    ai_client._esperar_descanso(time.monotonic() + 20)                  # dá tempo: espera o primeiro voltar
+    assert 0.1 <= time.monotonic() - inicio < 2
+    ai_client._EM_DESCANSO.clear()
+
+
+def test_texto_do_site_do_mesmo_lead_nao_chama_a_ia_de_novo(client, com_robo, monkeypatch):
+    from app import main
+    chamadas = []
+
+    async def falso(alvo, chave, servico="", rapido=False):
+        chamadas.append(alvo.get("id"))
+        return {"categoria": "Padaria", "slogan": "Fornada nova", "sobre": "x", "servicos": [{"titulo": "Pão", "descricao": "y"}]}
+
+    monkeypatch.setattr(main, "gerar_conteudo_de_site", falso)
+    lead = _lead().model_dump()
+    for _ in range(3):
+        r = client.post("/api/generate-site-copy", json={"lead": lead})
+        assert r.status_code == 200, r.text and r.json()["slogan"] == "Fornada nova"
+    assert chamadas == ["L1"]

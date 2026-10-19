@@ -90,6 +90,26 @@ _DESCANSO_S = 20.0
 _EM_DESCANSO: Dict[str, float] = {}
 
 
+def _esperar_descanso(prazo: float) -> None:
+    """Todos os modelos acabaram de recusar (limite gratuito por minuto): espera o primeiro voltar, se der tempo.
+
+    Chamar de novo na hora so gerava outra rajada de recusas (era isso que fazia o lote inteiro falhar com "alta demanda").
+    Sem tempo para esperar, recusa logo, sem gastar chamada.
+    """
+    from app import ai_providers
+
+    if ai_providers.ativos():
+        return  # ha outro motor gratuito para atender enquanto o Gemini descansa
+    agora_m = time.monotonic()
+    livres = [m for m in MODEL_CHAIN if _EM_DESCANSO.get(m, 0.0) <= agora_m]
+    if livres:
+        return
+    espera = min(_EM_DESCANSO.get(m, 0.0) for m in MODEL_CHAIN) - agora_m
+    if prazo - agora_m - espera < 8:
+        raise AIIndisponivel("O limite gratuito da IA por minuto foi atingido. Tente gerar de novo em 1 minuto.")
+    time.sleep(max(0.0, espera))
+
+
 def _tentar_modelo(client, model: str, prompt: str, limite_ms: int, max_tokens: Optional[int]) -> str:
     try:
         return _tentar_modelo_sem_descanso(client, model, prompt, limite_ms, max_tokens)
@@ -157,6 +177,7 @@ def generate_hedged(client, prompt: str, prazo: float, atraso: float = 7.0, max_
     global _working_model
     from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
+    _esperar_descanso(prazo)
     candidatos = _candidatos(client, prompt, max_tokens, json_mode)
     executor = ThreadPoolExecutor(max_workers=len(candidatos))
     em_andamento: Dict[Any, str] = {}

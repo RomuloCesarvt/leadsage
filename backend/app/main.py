@@ -374,14 +374,24 @@ async def gerar_texto_do_site(req: SiteCopyRequest, user: dict = Depends(get_cur
     if not alvo["company"].strip():
         raise HTTPException(status_code=400, detail="Informe o nome da empresa antes de gerar os textos.")
 
+    from app import ai_site
+
+    lead_id = str(alvo.get("id") or "")
+    guardado = await ai_site.copia_guardada(user.get("uid"), lead_id) if lead_id else None
+    if guardado:
+        return guardado  # o mesmo lead de novo (Disparo refeito): o texto já escrito vale, sem gastar a IA gratuita
     try:
-        return await gerar_conteudo_de_site(
+        copia = await gerar_conteudo_de_site(
             alvo,
             settings.GEMINI_API_KEY,
             req.servico_do_usuario or perfil.product_description or "",
+            rapido=True,
         )
     except AIIndisponivel as e:
         raise HTTPException(status_code=503, detail=str(e))
+    if lead_id:
+        await ai_site.guardar_copia(user.get("uid"), lead_id, copia)
+    return copia
 
 
 @app.post("/api/generate-document", response_model=DocumentAIResponse)

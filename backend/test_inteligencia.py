@@ -337,7 +337,7 @@ def test_falha_da_ia_vira_503_e_nao_texto_no_corpo_da_mensagem(client, com_plano
 def test_texto_do_site_devolve_conteudo_e_identidade(client, com_plano, monkeypatch):
     recebido = {}
 
-    async def falso(alvo, chave, servico=""):
+    async def falso(alvo, chave, servico="", rapido=False):
         recebido.update(alvo)
         return {
             "categoria": "Padaria", "slogan": "Pão quente", "sobre": "Somos daqui.",

@@ -497,3 +497,42 @@ async def gerar_previa_de_site(lead: Any, api_key: str) -> Tuple[str, float]:
             "A IA não devolveu uma página utilizável. Tente gerar de novo."
         )
     return html, segundos
+
+
+
+# ------------------------------------------------------- texto do site guardado por lead
+COPIA_VALIDADE_S = 14 * 24 * 3600
+
+
+async def copia_guardada(uid: str, lead_id: str) -> Optional[Dict[str, Any]]:
+    """O texto que a IA já escreveu para este lead (até 14 dias): refazer o Disparo não gasta outra chamada."""
+    try:
+        from sqlalchemy import select
+
+        from app.database import AsyncSessionLocal, DBRobo
+
+        async with AsyncSessionLocal() as s:
+            row = (await s.execute(select(DBRobo).where(DBRobo.chave == f"copia:{uid}:{lead_id}"))).scalar_one_or_none()
+        if row and time.time() - float((row.data or {}).get("em") or 0) < COPIA_VALIDADE_S:
+            return (row.data or {}).get("copia") or None
+    except Exception as exc:
+        print(f"Texto do site: não leu o guardado ({type(exc).__name__})")
+    return None
+
+
+async def guardar_copia(uid: str, lead_id: str, copia: Dict[str, Any]) -> None:
+    try:
+        from sqlalchemy import select
+
+        from app.database import AsyncSessionLocal, DBRobo
+
+        dados = {"em": time.time(), "copia": copia}
+        async with AsyncSessionLocal() as s:
+            row = (await s.execute(select(DBRobo).where(DBRobo.chave == f"copia:{uid}:{lead_id}"))).scalar_one_or_none()
+            if row:
+                row.data = dados
+            else:
+                s.add(DBRobo(chave=f"copia:{uid}:{lead_id}", uid=uid, tipo="copia_site", data=dados, atualizado=str(int(time.time()))))
+            await s.commit()
+    except Exception as exc:
+        print(f"Texto do site: não guardou ({type(exc).__name__})")
