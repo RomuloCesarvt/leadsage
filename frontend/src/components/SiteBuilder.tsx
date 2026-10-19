@@ -15,8 +15,8 @@ import { FONTES } from '../templates/sites/premium-base';
 import { LAYOUTS_ANTIGOS } from '../templates/sites/layouts';
 import { semearConteudo } from '../templates/sites/semear';
 import { direcaoDeArte } from '../templates/sites/direcao-de-arte';
-import { limparSlogan } from '../templates/sites/marca';
 import { dadosDoLead, escolherTemplate, montarPrevia } from '../templates/sites/previa';
+import { aplicarCopia } from '../templates/sites/variedade';
 import { ConteudoDoSite } from './ConteudoDoSite';
 import type { DestinoFoto, FotoBanco } from './BancoImagens';
 
@@ -318,11 +318,8 @@ export const SiteBuilder: React.FC = () => {
       });
 
       setDados(d => semearConteudo({
-        ...d,
-        categoria: r.categoria || d.categoria,
-        // a capa diz o que a pessoa ganha; a cidade da busca não entra nela
-        slogan: limparSlogan(r.slogan || '', lead?.city || '') || d.slogan,
-        sobre: r.sobre || d.sobre,
+        // a capa diz o que a pessoa ganha (a cidade da busca não entra nela); serviços, diferenciais, passos e perguntas vêm da IA quando ela trouxe
+        ...aplicarCopia({ ...d, categoria: r.categoria || d.categoria }, r, lead?.city || ''),
         servicos: r.servicos?.length
           ? r.servicos.slice(0, 6).map(s => ({
               titulo: String(s.titulo || ''),

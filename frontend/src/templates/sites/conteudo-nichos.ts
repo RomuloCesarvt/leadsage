@@ -89,7 +89,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'saude-medica', nome: 'Clínica médica e consultório',
-    chaves: ['clinica medica', 'clinica geral', 'clinica popular', 'clinica de saude', 'medic', 'consultorio', 'dermato', 'pediatr', 'ortoped', 'cardio', 'oftalmo', 'ginecolog', 'urolog', 'endocrin', 'neurolog', 'psiquiatr', 'otorrino', 'geriatr', 'laboratorio', 'diagnostico'],
+    chaves: ['clinica medica', 'clinica geral', 'clinica popular', 'clinica de saude', 'medic', 'consultorio', 'dermato', 'pediatr', 'ortoped', 'cardio', 'oftalmo', 'ginecolog', 'urolog', 'endocrin', 'neurolog', 'psiquiatr', 'otorrino', 'geriatr', 'laboratorio', 'diagnostico', 'gastro', 'reumat', 'pneumo', 'oncolog', 'proctolog', 'hematolog', 'nefrolog', 'angiolog', 'alergist', 'imunolog', 'infectolog', 'mastolog', 'obstetr', 'anestesi', 'cirurg', 'hospital', 'centro medico', 'pronto atend', 'ambulatorio', 'check up', 'doutor', 'doutora', 'dr ', 'dra ', 'fisioterap', 'nutricion', 'posto de saude'],
     schema: 'MedicalClinic', layout: 'clinica', paleta: { primaria: '#0f7c8a', destaque: '#2f9e6f' },
     cta: { principal: 'Agendar consulta', secundario: 'Como chegar' },
     etiqueta: 'Atendimento com hora marcada',
@@ -466,6 +466,8 @@ export function achar(nicho?: string): ConteudoNicho {
       if (alvo.includes(padrao) && chave.length > pontos) { melhor = c; pontos = chave.length; }
     }
   }
+  // "Clínicas" sem dizer de quê: texto de clínica é melhor que o genérico (clínica odontológica, de estética etc. já casaram acima)
+  if (!melhor && / clinic/.test(alvo)) return BANCO.find(c => c.id === 'saude-medica') || GENERICO;
   return melhor || GENERICO;
 }
 

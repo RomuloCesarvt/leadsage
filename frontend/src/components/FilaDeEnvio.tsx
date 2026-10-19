@@ -189,7 +189,12 @@ export const FilaDeEnvio: React.FC = () => {
               const fotos = (fotosPorRamo.get((lead.niche || lead.role || '').trim()) || []);
               // cada lead começa em um ponto diferente da lista: dois negócios do mesmo ramo não ficam com as mesmas fotos
               const giro = fotos.length ? (proximo * 2) % fotos.length : 0;
-              await api.publishSite({ ...montarPreviaDoLead(lead, [...fotos.slice(giro), ...fotos.slice(0, giro)]), site_id: existentes.get(lead.id) });
+              // o texto do site é escrito pela IA para ESTE negócio (nota, avaliação, descrição e horário reais); se ela não responder, vale o do ramo
+              const copia = await Promise.race([
+                api.generateSiteCopy({ lead, empresa: lead.company || lead.name, categoria: lead.niche || lead.role, cidade: lead.city }).catch(() => null),
+                new Promise<null>(ok => setTimeout(() => ok(null), 40000)),
+              ]);
+              await api.publishSite({ ...montarPreviaDoLead({ ...lead, copia_ia: copia || undefined }, [...fotos.slice(giro), ...fotos.slice(0, giro)]), site_id: existentes.get(lead.id) });
             } catch { falhas++; }
             feitas++; setPrevias({ feitas, total: criar.length });
           }

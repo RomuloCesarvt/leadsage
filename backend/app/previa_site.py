@@ -19,12 +19,13 @@ from app.credit_system import acesso_total
 
 # Versao do motor de sites. Ao mudar o visual (cores, modelos, titulos), troque o valor: as previas ja criadas e
 # nunca editadas sao refeitas, com o mesmo link, na proxima vez que forem enviadas.
-MOTOR_VERSAO = "2026-10-14-marca-e-fotos"
+MOTOR_VERSAO = "2026-10-19-texto-proprio-e-variedade"
 
 # o que o motor de sites sabe usar de um lead
 CAMPOS_DO_LEAD = (
     "id", "name", "company", "niche", "role", "city", "phone", "whatsapp", "email", "address", "location",
     "rating", "rating_count", "opening_hours", "opening_hours_week", "socials", "instagram",
+    "google_description", "review_highlight", "copia_ia",
 )
 
 
@@ -39,6 +40,20 @@ async def fotos_do_ramo(nicho: str, quantidade: int = 8) -> List[str]:
         return [str(f["url"]) for f in (r.get("imagens") or []) if str(f.get("url", "")).startswith("https://")][:quantidade]
     except Exception:
         return []
+
+
+async def copia_do_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
+    """O texto do site escrito pela IA para ESTE negocio (nota, avaliacao, descricao e horario reais). Vazio se a IA nao responder:
+    o motor usa entao o texto do banco do ramo, sem derrubar a criacao."""
+    if not settings.GEMINI_API_KEY:
+        return {}
+    try:
+        from app.ai_site import gerar_conteudo_de_site
+
+        return await gerar_conteudo_de_site(lead, settings.GEMINI_API_KEY, rapido=True)
+    except Exception as exc:
+        print(f"Previa: texto proprio indisponivel ({type(exc).__name__}: {str(exc)[:80]}); usa o do ramo")
+        return {}
 
 
 async def renderizar(lead: Dict[str, Any], fotos: List[str], modelo: str = "", anterior: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -120,7 +135,7 @@ async def atualizar_se_antigo(uid: str, email: str, lead: Dict[str, Any]) -> boo
             if _carimbo(dados) == MOTOR_VERSAO:
                 return False
             fotos = await fotos_do_ramo(str(lead.get("niche") or lead.get("role") or ""))
-            site = await renderizar(lead, fotos, str(s.get("template") or ""), _do_site_anterior(dados))
+            site = await renderizar({**lead, "copia_ia": await copia_do_lead(lead)}, fotos, str(s.get("template") or ""), _do_site_anterior(dados))
             await update_site(uid, s["id"], str(site.get("company") or s.get("company") or ""), site["html"],
                               str(site.get("template") or ""), _com_carimbo(str(site.get("builder_data") or "")),
                               marcar_edicao=False)
@@ -149,7 +164,7 @@ async def criar(uid: str, email: str, lead: Dict[str, Any]) -> Tuple[str, str]:
             if await contar_sites(uid) >= cota:
                 return "", "o plano não tem mais vagas de site"
         fotos = await fotos_do_ramo(str(lead.get("niche") or lead.get("role") or ""))
-        site = await renderizar(lead, fotos)
+        site = await renderizar({**lead, "copia_ia": await copia_do_lead(lead)}, fotos)
         criado = await create_site(
             uid, str(site.get("company") or lead.get("company") or lead.get("name") or "Prévia"), site["html"],
             str(site.get("template") or ""), lead_id, _com_carimbo(str(site.get("builder_data") or "")),

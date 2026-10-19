@@ -24,7 +24,8 @@ const indiceEstavel = (texto: string, n: number): number => {
 };
 
 export function semearConteudo(d: SiteData, opcoes: { sobrescrever?: boolean; cores?: boolean } = {}): SiteData {
-  const c = achar(d.categoria);
+  // ramo genérico: o nome da empresa ("Clínica Santa Clara") costuma dizer o que ela é
+  const c = achar(d.categoria).id === 'generico' ? achar(d.empresa) : achar(d.categoria);
   const { sobrescrever = false } = opcoes;
   const sub = (t: string) => preencher(t, d.empresa, d.cidade || '');
 

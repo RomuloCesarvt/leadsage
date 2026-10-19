@@ -70,3 +70,44 @@ def test_falha_ao_renderizar_nao_derruba_o_envio(monkeypatch):
 
     monkeypatch.setattr(previa_site, "renderizar", quebra)
     assert _rodar(previa_site.atualizar_se_antigo("u", "e@x.com", LEAD)) is False
+
+
+def test_previa_do_robo_leva_o_texto_proprio_da_ia_ao_motor(monkeypatch):
+    """O site do robô é escrito com texto da IA para aquele negócio; sem IA, segue com o texto do ramo."""
+    visto = {}
+
+    async def renderizar(lead, fotos, modelo="", anterior=None):
+        visto["lead"] = lead
+        return {"html": "<html>x</html>", "template": "Forno", "company": "Padaria", "builder_data": "{}"}
+
+    async def fotos(nicho, quantidade=8):
+        return []
+
+    async def copia(lead):
+        return {"slogan": "Fornada nova a cada hora", "servicos": [{"titulo": "Pão francês", "descricao": "Crocante."}]}
+
+    monkeypatch.setattr(previa_site, "renderizar", renderizar)
+    monkeypatch.setattr(previa_site, "fotos_do_ramo", fotos)
+    monkeypatch.setattr(previa_site, "copia_do_lead", copia)
+    site = {"id": "s1", "lead_id": "l1", "slug": "padaria", "template": "Forno", "builder_data": "{}", "updated_at": ""}
+
+    async def listar(uid):
+        return [site]
+
+    async def atualizar(*a, **k):
+        return None
+
+    import app.sites_store as ss
+    monkeypatch.setattr(ss, "list_sites", listar)
+    monkeypatch.setattr(ss, "update_site", atualizar)
+    assert _rodar(previa_site.atualizar_se_antigo("u", "e@x.com", LEAD)) is True
+    assert visto["lead"]["copia_ia"]["slogan"] == "Fornada nova a cada hora"
+    # o motor recebe a descricao e a avaliacao reais do Google
+    motor = previa_site.lead_para_o_motor({"id": "1", "company": "X", "google_description": "d" * 80, "review_highlight": "ótimo", "copia_ia": {"a": 1}})
+    assert motor["google_description"] and motor["review_highlight"] == "ótimo" and motor["copia_ia"] == {"a": 1}
+
+
+def test_sem_chave_do_gemini_a_copia_e_vazia_e_nao_quebra(monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
+    assert _rodar(previa_site.copia_do_lead({"id": "1", "company": "X"})) == {}

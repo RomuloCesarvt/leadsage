@@ -39,10 +39,18 @@ CURADORIA: List[Dict[str, Any]] = [
         "ruins": {"food", "fitness", "bodybuilding", "dog", "cat"},
     },
     {   # clínica e saúde: consultório, atendimento, profissional
-        "chaves": ("clinica", "medic", "consultorio", "saude", "nutricion", "fisioterap"),
-        "termos": ["clinic doctor", "doctor patient", "medical", "healthcare"],
-        "bons": {"clinic", "clinical", "doctor", "patient", "consult", "healthcare", "care", "medical", "health", "exam", "checkup"},
-        "ruins": {"hospital", "surgery", "blood", "syringe", "injection", "elderly"},
+        "chaves": ("clinica", "medic", "consultorio", "saude", "nutricion", "fisioterap", "gastro", "ginecolog", "urolog", "endocrin", "neurolog",
+                   "otorrino", "reumat", "pneumo", "oncolog", "proctolog", "hematolog", "nefrolog", "angiolog", "alergist", "imunolog",
+                   "infectolog", "mastolog", "geriatr", "obstetr", "anestesi", "cirurg",
+                   "doutor", "doutora", "ambulatorio", "posto de saude", "check up", "reabilit", "diagnost", "ultrassom"),
+        "termos": ["doctor consultation", "doctor patient", "medical clinic", "stethoscope doctor"],
+        "bons": {"clinic", "clinical", "doctor", "doctors", "physician", "patient", "consult", "consultation", "healthcare", "medical", "stethoscope",
+                 "checkup", "reception", "nurse", "office", "appointment", "examination", "gynecologist", "cardiologist", "specialist"},
+        # embalagem de remedio, seringa e bicho nao dizem "consulta": foi o que apareceu na capa de uma clinica de gastro
+        "ruins": {"hospital", "surgery", "blood", "syringe", "syringes", "injection", "elderly", "pills", "pill", "tablet", "tablets", "capsule",
+                  "capsules", "medication", "medicine", "drug", "drugs", "pharmacy", "veterinary", "veterinarian", "vet", "dog", "cat", "animal",
+                  "pet", "ointment", "ampoule", "vial", "bottle", "cosmetic", "cosmetics"},
+        "exigir": True,
     },
 ]
 

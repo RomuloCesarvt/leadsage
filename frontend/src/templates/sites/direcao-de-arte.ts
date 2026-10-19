@@ -37,7 +37,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Verde pata', primaria: '#15803d', destaque: '#fb923c' },
       { nome: 'Turquesa feliz', primaria: '#0e7490', destaque: '#fbbf24' },
     ],
-    modelos: ['patinhas', 'vibrante', 'natural'], fonte: 'amigavel', fonteSerifa: 'artesanal', fonteSans: 'amigavel',
+    modelos: ['patinhas', 'vibrante', 'natural', 'aurora', 'agro'], fonte: 'amigavel', fonteSerifa: 'artesanal', fonteSans: 'amigavel',
   },
   {
     id: 'doces', nome: 'Padaria, doces e café', palavras: ['padaria', 'panific', 'confeit', 'doceria', 'doce', 'cafe', 'cafeteria', 'bolo', 'chocolate', 'sorvet', 'acai', 'gelato'],
@@ -48,7 +48,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Morango', primaria: '#be185d', destaque: '#fbbf77' },
       { nome: 'Baunilha', primaria: '#a16207', destaque: '#f59e0b' },
     ],
-    modelos: ['forno', 'aurora', 'editorial'], fonte: 'artesanal', fonteSerifa: 'artesanal', fonteSans: 'amigavel',
+    modelos: ['forno', 'aurora', 'editorial', 'natural', 'vibrante', 'fragrancia'], fonte: 'artesanal', fonteSerifa: 'artesanal', fonteSans: 'amigavel',
   },
   {
     id: 'comida', nome: 'Restaurante, pizza e lanche', palavras: ['restaurante', 'pizz', 'lanch', 'hamburg', 'bistro', 'churrasc', 'marmit', 'sushi', 'japones', 'comida', 'gastronom', 'bar ', 'boteco', 'petisc', 'rotisser'],
@@ -59,7 +59,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Pimenta', primaria: '#9b1c1c', destaque: '#f2b134' },
       { nome: 'Mostarda', primaria: '#b45309', destaque: '#fbbf24' },
     ],
-    modelos: ['mesa', 'editorial', 'aurora'], fonte: 'artesanal', fonteSerifa: 'editorial', fonteSans: 'forte',
+    modelos: ['mesa', 'editorial', 'aurora', 'vibrante', 'noir'], fonte: 'artesanal', fonteSerifa: 'editorial', fonteSans: 'forte',
   },
   {
     id: 'barbearia', nome: 'Barbearia e tatuagem', palavras: ['barbear', 'tatuag', 'tattoo', 'piercing'],
@@ -69,7 +69,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Navalha', primaria: '#2b0f0f', destaque: '#e11d48' },
       { nome: 'Ouro velho', primaria: '#232323', destaque: '#d4af37' },
     ],
-    modelos: ['estudio', 'portfolio', 'noir', 'neon'], fonte: 'forte', fonteSerifa: 'editorial', fonteSans: 'forte',
+    modelos: ['estudio', 'portfolio', 'noir', 'neon', 'impacto'], fonte: 'forte', fonteSerifa: 'editorial', fonteSans: 'forte',
   },
   {
     id: 'estetica', nome: 'Estética, beleza e bem-estar', palavras: ['estetica', 'harmoniz', 'spa', 'massagem', 'depila', 'sobrancelha', 'maquiag', 'salao', 'cabelei', 'beleza', 'manicure', 'unha', 'cilios', 'podolog', 'bem-estar', 'bem estar'],
@@ -80,7 +80,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Nude', primaria: '#a1695a', destaque: '#d9b99b' },
       { nome: 'Sálvia', primaria: '#5f7a6a', destaque: '#e6c79c' },
     ],
-    modelos: ['ritual', 'fragrancia', 'natural', 'noir'], fonte: 'luxo', fonteSerifa: 'luxo', fonteSans: 'moderna',
+    modelos: ['ritual', 'fragrancia', 'natural', 'noir', 'editorial', 'aurora'], fonte: 'luxo', fonteSerifa: 'luxo', fonteSans: 'moderna',
   },
   {
     id: 'odonto', nome: 'Odontologia', palavras: ['odonto', 'dentist', 'ortodont', 'implante', 'sorriso'],
@@ -90,7 +90,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Petróleo', primaria: '#0f7c8a', destaque: '#2f9e6f' },
       { nome: 'Céu', primaria: '#2563eb', destaque: '#06b6d4' },
     ],
-    modelos: ['sorriso', 'clinica', 'noir'], fonte: 'moderna', fonteSerifa: 'sobria', fonteSans: 'moderna',
+    modelos: ['sorriso', 'clinica', 'noir', 'natural', 'escritorio'], fonte: 'moderna', fonteSerifa: 'sobria', fonteSans: 'moderna',
   },
   {
     id: 'mente', nome: 'Psicologia e terapias', palavras: ['psicolog', 'psiquiat', 'psicanal', 'terapia', 'terapeut', 'neuropsic', 'constelac', 'saude mental', 'mindful', 'logoped', 'fonoaud'],
@@ -101,10 +101,10 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Lavanda', primaria: '#6b5b95', destaque: '#e6c79c' },
       { nome: 'Terracota suave', primaria: '#a1695a', destaque: '#8fb8a8' },
     ],
-    modelos: ['natural', 'escritorio', 'clinica', 'classico'], fonte: 'elegante', fonteSerifa: 'elegante', fonteSans: 'moderna',
+    modelos: ['natural', 'escritorio', 'clinica', 'classico', 'aurora', 'editorial'], fonte: 'elegante', fonteSerifa: 'elegante', fonteSans: 'moderna',
   },
   {
-    id: 'saude', nome: 'Saúde e clínicas', palavras: ['clinic', 'medic', 'saude', 'fisio', 'nutri', 'laborat', 'farmac', 'oftalm', 'ortoped', 'pediatr', 'quiropr', 'dermat', 'cardio', 'exame', 'hospital'],
+    id: 'saude', nome: 'Saúde e clínicas', palavras: ['clinic', 'medic', 'saude', 'fisio', 'nutri', 'laborat', 'farmac', 'oftalm', 'ortoped', 'pediatr', 'quiropr', 'dermat', 'cardio', 'exame', 'hospital', 'gastro', 'ginecolog', 'urolog', 'endocrin', 'neurolog', 'otorrino', 'reumat', 'pneumo', 'oncolog', 'proctolog', 'hematolog', 'nefrolog', 'angiolog', 'alergist', 'imunolog', 'infectolog', 'mastolog', 'geriatr', 'obstetr', 'anestesi', 'cirurg', 'doutor', 'doutora', 'dr ', 'dra ', 'posto de saude', 'ambulatorio', 'vacina', 'reabilit', 'ultrassom', 'diagnost', 'olhos', 'consultorio', 'centro medico', 'pronto atend', 'pronto socorro', 'check up', 'checkup', 'clinico'],
     humor: 'Azul, verde-água e branco: limpeza, calma e confiança, as cores que a pessoa espera de quem cuida da saúde.',
     paletas: [
       { nome: 'Petróleo', primaria: '#0f7c8a', destaque: '#2f9e6f' },
@@ -112,7 +112,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Menta', primaria: '#0f766e', destaque: '#84cc16' },
       { nome: 'Céu', primaria: '#2563eb', destaque: '#06b6d4' },
     ],
-    modelos: ['clinica', 'sorriso', 'natural', 'noir'], fonte: 'moderna', fonteSerifa: 'sobria', fonteSans: 'moderna',
+    modelos: ['clinica', 'sorriso', 'natural', 'noir', 'escritorio', 'aurora'], fonte: 'moderna', fonteSerifa: 'sobria', fonteSans: 'moderna',
   },
   {
     id: 'juridico', nome: 'Advocacia, contabilidade e consultoria', palavras: ['advoga', 'advoca', 'juridic', 'contab', 'contador', 'seguro', 'consult', 'despachante', 'cartorio', 'notari'],
@@ -123,7 +123,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Grafite', primaria: '#2c3340', destaque: '#c0a062' },
       { nome: 'Bordô', primaria: '#5b1a2b', destaque: '#c8a35f' },
     ],
-    modelos: ['classico', 'escritorio', 'premio'], fonte: 'sobria', fonteSerifa: 'sobria', fonteSans: 'moderna',
+    modelos: ['classico', 'escritorio', 'premio', 'noir', 'editorial'], fonte: 'sobria', fonteSerifa: 'sobria', fonteSans: 'moderna',
   },
   {
     id: 'imoveis', nome: 'Imobiliária e corretagem', palavras: ['imobili', 'corretor', 'incorpor', 'locacao', 'condominio'],
@@ -146,7 +146,7 @@ const SEGMENTOS: Segmento[] = [
     modelos: ['arquitetura', 'planta', 'noir', 'escritorio'], fonte: 'editorial', fonteSerifa: 'editorial', fonteSans: 'moderna',
   },
   {
-    id: 'oficina', nome: 'Mecânica, obras e indústria', palavras: ['mecan', 'oficina', 'auto pecas', 'autopecas', 'funilar', 'eletric', 'encanad', 'pintor', 'serralher', 'vidrac', 'material de constru', 'constru', 'reforma', 'industri', 'logist', 'transport', 'guincho', 'borrachar', 'ar condicionado', 'refrigera'],
+    id: 'oficina', nome: 'Mecânica, obras e indústria', palavras: ['mecan', 'oficina', 'auto pecas', 'autopecas', 'funilar', 'eletric', 'encanad', 'pintor', 'serralher', 'vidrac', 'material de constru', 'constru', 'reforma', 'industri', 'logistic', 'transport', 'guincho', 'borrachar', 'ar condicionado', 'refrigera'],
     humor: 'Laranja e amarelo com grafite: força, segurança e a cor de quem trabalha de capacete.',
     paletas: [
       { nome: 'Laranja obra', primaria: '#c2410c', destaque: '#facc15' },
@@ -154,7 +154,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Vermelho motor', primaria: '#b91c1c', destaque: '#fbbf24' },
       { nome: 'Grafite e amarelo', primaria: '#27272a', destaque: '#facc15' },
     ],
-    modelos: ['oficina', 'b2b', 'impacto'], fonte: 'forte', fonteSerifa: 'editorial', fonteSans: 'forte',
+    modelos: ['oficina', 'b2b', 'impacto', 'vibrante', 'showroom'], fonte: 'forte', fonteSerifa: 'editorial', fonteSans: 'forte',
   },
   {
     id: 'fitness', nome: 'Academia, esporte e dança', palavras: ['academia', 'fitness', 'crossfit', 'pilates', 'danca', 'natacao', 'esporte', 'muscula', 'luta', 'jiu', 'yoga', 'treino'],
@@ -165,7 +165,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Neon', primaria: '#6d28d9', destaque: '#22d3ee' },
       { nome: 'Fogo', primaria: '#ea580c', destaque: '#fde047' },
     ],
-    modelos: ['impacto', 'neon', 'vibrante'], fonte: 'forte', fonteSerifa: 'editorial', fonteSans: 'forte',
+    modelos: ['impacto', 'neon', 'vibrante', 'estudio', 'noir'], fonte: 'forte', fonteSerifa: 'editorial', fonteSans: 'forte',
   },
   {
     id: 'educacao', nome: 'Escola, cursos e idiomas', palavras: ['escola', 'curso', 'idioma', 'infantil', 'creche', 'coaching', 'faculdade', 'reforco', 'musica', 'ingles', 'colegio'],
@@ -305,13 +305,45 @@ const hash = (texto: string): number => {
   return h;
 };
 
-/** O segmento do ramo ("Dentistas", "Pizzaria", "Pet shop"...). */
-export const segmentoDoRamo = (ramo?: string): Segmento => {
-  const alvo = ` ${semAcento(ramo)} `;
-  if (alvo.trim()) {
-    for (const s of SEGMENTOS) if (s.palavras.some(p => alvo.includes(p))) return s;
-  }
+const normalizar = (t?: string) => semAcento(t).replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+/**
+ * Casa por INÍCIO de palavra: "logist" não pode casar com "gastroenterologistas" (era isso que mandava toda clínica de especialista
+ * para o modelo de oficina). Um espaço no fim da palavra do segmento ("bar ") exige a palavra inteira.
+ */
+const acha = (texto: string, s: Segmento): boolean => {
+  const alvo = ` ${normalizar(texto)} `;
+  if (alvo.trim() === '') return false;
+  return s.palavras.some(p => alvo.includes(` ${normalizar(p)}${p.endsWith(' ') ? ' ' : ''}`));
+};
+
+/** O segmento do ramo ("Dentistas", "Pizzaria", "Pet shop"...). Se o ramo não diz, o nome da empresa ("Clínica Santa Clara", "Dra. Ana") diz. */
+export const segmentoDoRamo = (ramo?: string, empresa = ''): Segmento => {
+  for (const s of SEGMENTOS) if (acha(ramo || '', s)) return s;
+  if (empresa) for (const s of SEGMENTOS) if (acha(empresa, s)) return s;
   return GENERICO;
+};
+
+/** Um ramo "de dicionário" para cada segmento: quando o segmento vem do nome da empresa ou da IA, o motor trabalha com este texto. */
+export const RAMO_DO_SEGMENTO: Record<string, string> = {
+  pet: 'Pet shop', doces: 'Padaria e confeitaria', comida: 'Restaurante', barbearia: 'Barbearia', estetica: 'Clínica de estética',
+  odonto: 'Clínica odontológica', mente: 'Psicologia', saude: 'Clínica médica', juridico: 'Advocacia', imoveis: 'Imobiliária',
+  arquitetura: 'Arquitetura e interiores', oficina: 'Oficina mecânica', fitness: 'Academia', educacao: 'Escola', moda: 'Loja de moda',
+  natureza: 'Floricultura', tecnologia: 'Agência de marketing', turismo: 'Hotel e pousada', eventos: 'Espaço de eventos',
+  veiculos: 'Concessionária', financeiro: 'Crédito e finanças', limpeza: 'Limpeza e serviços domésticos', mercado: 'Mercado',
+};
+
+/**
+ * O ramo com que o motor decide cor, modelo e texto. O ramo da busca vale primeiro; sem ele, o nome da empresa; sem ele, o segmento que
+ * a IA reconheceu (`segmentoIA`, um dos ids acima). Só se nada disso reconhece, segue o ramo como veio (negócio genérico).
+ */
+export const ramoEfetivo = (ramo?: string, empresa = '', segmentoIA = ''): string => {
+  const bruto = ramo || '';
+  if (acha(bruto, GENERICO) || segmentoDoRamo(bruto).id !== 'generico') return bruto;
+  const porNome = segmentoDoRamo('', empresa);
+  if (porNome.id !== 'generico') return RAMO_DO_SEGMENTO[porNome.id] || bruto;
+  const ia = String(segmentoIA || '').trim().toLowerCase();
+  return RAMO_DO_SEGMENTO[ia] || bruto;
 };
 
 export const todosOsSegmentos = (): Segmento[] => [...SEGMENTOS, GENERICO];
@@ -325,7 +357,7 @@ export type Direcao = {
 
 /** A direção de arte desta empresa: a paleta e os modelos do segmento, escolhidos de forma estável por empresa. */
 export const direcaoDeArte = (ramo?: string, empresa = ''): Direcao => {
-  const segmento = segmentoDoRamo(ramo);
+  const segmento = segmentoDoRamo(ramo, empresa);
   const paleta = segmento.paletas[hash(`${empresa}|cor`) % segmento.paletas.length];
   return { segmento, paleta, modelos: segmento.modelos, fonte: segmento.fonte };
 };

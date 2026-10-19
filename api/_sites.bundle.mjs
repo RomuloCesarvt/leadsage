@@ -536,7 +536,7 @@ var BANCO = [
   {
     id: "saude-medica",
     nome: "Cl\xEDnica m\xE9dica e consult\xF3rio",
-    chaves: ["clinica medica", "clinica geral", "clinica popular", "clinica de saude", "medic", "consultorio", "dermato", "pediatr", "ortoped", "cardio", "oftalmo", "ginecolog", "urolog", "endocrin", "neurolog", "psiquiatr", "otorrino", "geriatr", "laboratorio", "diagnostico"],
+    chaves: ["clinica medica", "clinica geral", "clinica popular", "clinica de saude", "medic", "consultorio", "dermato", "pediatr", "ortoped", "cardio", "oftalmo", "ginecolog", "urolog", "endocrin", "neurolog", "psiquiatr", "otorrino", "geriatr", "laboratorio", "diagnostico", "gastro", "reumat", "pneumo", "oncolog", "proctolog", "hematolog", "nefrolog", "angiolog", "alergist", "imunolog", "infectolog", "mastolog", "obstetr", "anestesi", "cirurg", "hospital", "centro medico", "pronto atend", "ambulatorio", "check up", "doutor", "doutora", "dr ", "dra ", "fisioterap", "nutricion", "posto de saude"],
     schema: "MedicalClinic",
     layout: "clinica",
     paleta: { primaria: "#0f7c8a", destaque: "#2f9e6f" },
@@ -1111,6 +1111,7 @@ function achar(nicho) {
       }
     }
   }
+  if (!melhor && / clinic/.test(alvo)) return BANCO.find((c) => c.id === "saude-medica") || GENERICO;
   return melhor || GENERICO;
 }
 var preencher = (texto, empresa, cidade) => texto.replace(/\{empresa\}/g, empresa || "n\xF3s").replace(/\{cidade\}/g, cidade || "sua regi\xE3o");
@@ -1153,7 +1154,7 @@ var SEGMENTOS = [
       { nome: "Verde pata", primaria: "#15803d", destaque: "#fb923c" },
       { nome: "Turquesa feliz", primaria: "#0e7490", destaque: "#fbbf24" }
     ],
-    modelos: ["patinhas", "vibrante", "natural"],
+    modelos: ["patinhas", "vibrante", "natural", "aurora", "agro"],
     fonte: "amigavel",
     fonteSerifa: "artesanal",
     fonteSans: "amigavel"
@@ -1169,7 +1170,7 @@ var SEGMENTOS = [
       { nome: "Morango", primaria: "#be185d", destaque: "#fbbf77" },
       { nome: "Baunilha", primaria: "#a16207", destaque: "#f59e0b" }
     ],
-    modelos: ["forno", "aurora", "editorial"],
+    modelos: ["forno", "aurora", "editorial", "natural", "vibrante", "fragrancia"],
     fonte: "artesanal",
     fonteSerifa: "artesanal",
     fonteSans: "amigavel"
@@ -1185,7 +1186,7 @@ var SEGMENTOS = [
       { nome: "Pimenta", primaria: "#9b1c1c", destaque: "#f2b134" },
       { nome: "Mostarda", primaria: "#b45309", destaque: "#fbbf24" }
     ],
-    modelos: ["mesa", "editorial", "aurora"],
+    modelos: ["mesa", "editorial", "aurora", "vibrante", "noir"],
     fonte: "artesanal",
     fonteSerifa: "editorial",
     fonteSans: "forte"
@@ -1200,7 +1201,7 @@ var SEGMENTOS = [
       { nome: "Navalha", primaria: "#2b0f0f", destaque: "#e11d48" },
       { nome: "Ouro velho", primaria: "#232323", destaque: "#d4af37" }
     ],
-    modelos: ["estudio", "portfolio", "noir", "neon"],
+    modelos: ["estudio", "portfolio", "noir", "neon", "impacto"],
     fonte: "forte",
     fonteSerifa: "editorial",
     fonteSans: "forte"
@@ -1216,7 +1217,7 @@ var SEGMENTOS = [
       { nome: "Nude", primaria: "#a1695a", destaque: "#d9b99b" },
       { nome: "S\xE1lvia", primaria: "#5f7a6a", destaque: "#e6c79c" }
     ],
-    modelos: ["ritual", "fragrancia", "natural", "noir"],
+    modelos: ["ritual", "fragrancia", "natural", "noir", "editorial", "aurora"],
     fonte: "luxo",
     fonteSerifa: "luxo",
     fonteSans: "moderna"
@@ -1231,7 +1232,7 @@ var SEGMENTOS = [
       { nome: "Petr\xF3leo", primaria: "#0f7c8a", destaque: "#2f9e6f" },
       { nome: "C\xE9u", primaria: "#2563eb", destaque: "#06b6d4" }
     ],
-    modelos: ["sorriso", "clinica", "noir"],
+    modelos: ["sorriso", "clinica", "noir", "natural", "escritorio"],
     fonte: "moderna",
     fonteSerifa: "sobria",
     fonteSans: "moderna"
@@ -1247,7 +1248,7 @@ var SEGMENTOS = [
       { nome: "Lavanda", primaria: "#6b5b95", destaque: "#e6c79c" },
       { nome: "Terracota suave", primaria: "#a1695a", destaque: "#8fb8a8" }
     ],
-    modelos: ["natural", "escritorio", "clinica", "classico"],
+    modelos: ["natural", "escritorio", "clinica", "classico", "aurora", "editorial"],
     fonte: "elegante",
     fonteSerifa: "elegante",
     fonteSans: "moderna"
@@ -1255,7 +1256,7 @@ var SEGMENTOS = [
   {
     id: "saude",
     nome: "Sa\xFAde e cl\xEDnicas",
-    palavras: ["clinic", "medic", "saude", "fisio", "nutri", "laborat", "farmac", "oftalm", "ortoped", "pediatr", "quiropr", "dermat", "cardio", "exame", "hospital"],
+    palavras: ["clinic", "medic", "saude", "fisio", "nutri", "laborat", "farmac", "oftalm", "ortoped", "pediatr", "quiropr", "dermat", "cardio", "exame", "hospital", "gastro", "ginecolog", "urolog", "endocrin", "neurolog", "otorrino", "reumat", "pneumo", "oncolog", "proctolog", "hematolog", "nefrolog", "angiolog", "alergist", "imunolog", "infectolog", "mastolog", "geriatr", "obstetr", "anestesi", "cirurg", "doutor", "doutora", "dr ", "dra ", "posto de saude", "ambulatorio", "vacina", "reabilit", "ultrassom", "diagnost", "olhos", "consultorio", "centro medico", "pronto atend", "pronto socorro", "check up", "checkup", "clinico"],
     humor: "Azul, verde-\xE1gua e branco: limpeza, calma e confian\xE7a, as cores que a pessoa espera de quem cuida da sa\xFAde.",
     paletas: [
       { nome: "Petr\xF3leo", primaria: "#0f7c8a", destaque: "#2f9e6f" },
@@ -1263,7 +1264,7 @@ var SEGMENTOS = [
       { nome: "Menta", primaria: "#0f766e", destaque: "#84cc16" },
       { nome: "C\xE9u", primaria: "#2563eb", destaque: "#06b6d4" }
     ],
-    modelos: ["clinica", "sorriso", "natural", "noir"],
+    modelos: ["clinica", "sorriso", "natural", "noir", "escritorio", "aurora"],
     fonte: "moderna",
     fonteSerifa: "sobria",
     fonteSans: "moderna"
@@ -1279,7 +1280,7 @@ var SEGMENTOS = [
       { nome: "Grafite", primaria: "#2c3340", destaque: "#c0a062" },
       { nome: "Bord\xF4", primaria: "#5b1a2b", destaque: "#c8a35f" }
     ],
-    modelos: ["classico", "escritorio", "premio"],
+    modelos: ["classico", "escritorio", "premio", "noir", "editorial"],
     fonte: "sobria",
     fonteSerifa: "sobria",
     fonteSans: "moderna"
@@ -1317,7 +1318,7 @@ var SEGMENTOS = [
   {
     id: "oficina",
     nome: "Mec\xE2nica, obras e ind\xFAstria",
-    palavras: ["mecan", "oficina", "auto pecas", "autopecas", "funilar", "eletric", "encanad", "pintor", "serralher", "vidrac", "material de constru", "constru", "reforma", "industri", "logist", "transport", "guincho", "borrachar", "ar condicionado", "refrigera"],
+    palavras: ["mecan", "oficina", "auto pecas", "autopecas", "funilar", "eletric", "encanad", "pintor", "serralher", "vidrac", "material de constru", "constru", "reforma", "industri", "logistic", "transport", "guincho", "borrachar", "ar condicionado", "refrigera"],
     humor: "Laranja e amarelo com grafite: for\xE7a, seguran\xE7a e a cor de quem trabalha de capacete.",
     paletas: [
       { nome: "Laranja obra", primaria: "#c2410c", destaque: "#facc15" },
@@ -1325,7 +1326,7 @@ var SEGMENTOS = [
       { nome: "Vermelho motor", primaria: "#b91c1c", destaque: "#fbbf24" },
       { nome: "Grafite e amarelo", primaria: "#27272a", destaque: "#facc15" }
     ],
-    modelos: ["oficina", "b2b", "impacto"],
+    modelos: ["oficina", "b2b", "impacto", "vibrante", "showroom"],
     fonte: "forte",
     fonteSerifa: "editorial",
     fonteSans: "forte"
@@ -1341,7 +1342,7 @@ var SEGMENTOS = [
       { nome: "Neon", primaria: "#6d28d9", destaque: "#22d3ee" },
       { nome: "Fogo", primaria: "#ea580c", destaque: "#fde047" }
     ],
-    modelos: ["impacto", "neon", "vibrante"],
+    modelos: ["impacto", "neon", "vibrante", "estudio", "noir"],
     fonte: "forte",
     fonteSerifa: "editorial",
     fonteSans: "forte"
@@ -1520,16 +1521,55 @@ var hash = (texto) => {
   for (let i = 0; i < texto.length; i++) h = h * 31 + texto.charCodeAt(i) >>> 0;
   return h;
 };
-var segmentoDoRamo = (ramo) => {
-  const alvo = ` ${semAcento2(ramo)} `;
-  if (alvo.trim()) {
-    for (const s of SEGMENTOS) if (s.palavras.some((p) => alvo.includes(p))) return s;
+var normalizar2 = (t) => semAcento2(t).replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+var acha = (texto, s) => {
+  const alvo = ` ${normalizar2(texto)} `;
+  if (alvo.trim() === "") return false;
+  return s.palavras.some((p) => alvo.includes(` ${normalizar2(p)}${p.endsWith(" ") ? " " : ""}`));
+};
+var segmentoDoRamo = (ramo, empresa = "") => {
+  for (const s of SEGMENTOS) if (acha(ramo || "", s)) return s;
+  if (empresa) {
+    for (const s of SEGMENTOS) if (acha(empresa, s)) return s;
   }
   return GENERICO2;
 };
+var RAMO_DO_SEGMENTO = {
+  pet: "Pet shop",
+  doces: "Padaria e confeitaria",
+  comida: "Restaurante",
+  barbearia: "Barbearia",
+  estetica: "Cl\xEDnica de est\xE9tica",
+  odonto: "Cl\xEDnica odontol\xF3gica",
+  mente: "Psicologia",
+  saude: "Cl\xEDnica m\xE9dica",
+  juridico: "Advocacia",
+  imoveis: "Imobili\xE1ria",
+  arquitetura: "Arquitetura e interiores",
+  oficina: "Oficina mec\xE2nica",
+  fitness: "Academia",
+  educacao: "Escola",
+  moda: "Loja de moda",
+  natureza: "Floricultura",
+  tecnologia: "Ag\xEAncia de marketing",
+  turismo: "Hotel e pousada",
+  eventos: "Espa\xE7o de eventos",
+  veiculos: "Concession\xE1ria",
+  financeiro: "Cr\xE9dito e finan\xE7as",
+  limpeza: "Limpeza e servi\xE7os dom\xE9sticos",
+  mercado: "Mercado"
+};
+var ramoEfetivo = (ramo, empresa = "", segmentoIA = "") => {
+  const bruto = ramo || "";
+  if (acha(bruto, GENERICO2) || segmentoDoRamo(bruto).id !== "generico") return bruto;
+  const porNome = segmentoDoRamo("", empresa);
+  if (porNome.id !== "generico") return RAMO_DO_SEGMENTO[porNome.id] || bruto;
+  const ia = String(segmentoIA || "").trim().toLowerCase();
+  return RAMO_DO_SEGMENTO[ia] || bruto;
+};
 var todosOsSegmentos = () => [...SEGMENTOS, GENERICO2];
 var direcaoDeArte = (ramo, empresa = "") => {
-  const segmento = segmentoDoRamo(ramo);
+  const segmento = segmentoDoRamo(ramo, empresa);
   const paleta = segmento.paletas[hash(`${empresa}|cor`) % segmento.paletas.length];
   return { segmento, paleta, modelos: segmento.modelos, fonte: segmento.fonte };
 };
@@ -1549,7 +1589,7 @@ var indiceEstavel = (texto, n) => {
   return h % Math.max(1, n);
 };
 function semearConteudo(d, opcoes = {}) {
-  const c = achar(d.categoria);
+  const c = achar(d.categoria).id === "generico" ? achar(d.empresa) : achar(d.categoria);
   const { sobrescrever = false } = opcoes;
   const sub = (t) => preencher(t, d.empresa, d.cidade || "");
   const saida = { ...d, schema: d.schema || c.schema };
@@ -1602,6 +1642,14 @@ var limparNomeDaMarca = (nome, cidade = "") => {
   marca2 = marca2.replace(/[\s|–—,:;/-]+$/, "").trim();
   if (semAcento3(marca2).length < 3) marca2 = original.replace(REGISTRO, "").replace(/\s+/g, " ").trim();
   return { marca: marca2, descritor: descritor.replace(/[\s|–—,:;/-]+$/, "").trim() };
+};
+var limparSlogan = (slogan2, cidade = "") => {
+  let t = (slogan2 || "").replace(/\s+/g, " ").trim();
+  const cid = cidade.trim();
+  if (!t || !cid) return t;
+  const c = escapar(cid);
+  t = t.replace(new RegExp(String.raw`\s*(?:,|-|–|—)?\s*(?:em|de|na|no|da|do|para)\s+${c}(?:\s*[-/,]\s*[A-Za-z]{2})?(?=[.!?]?$)`, "i"), "").trim();
+  return new RegExp(String.raw`(^|[^\p{L}])${c}($|[^\p{L}])`, "iu").test(t) ? "" : t;
 };
 
 // src/templates/sites/premium-base.ts
@@ -6293,6 +6341,81 @@ var sugerirTemplate = (nicho) => {
   return SITE_TEMPLATES.find((t) => t.id === "clinica");
 };
 
+// src/templates/sites/variedade.ts
+var hashDe = (texto) => {
+  let h = 0;
+  for (let i = 0; i < texto.length; i++) h = h * 31 + texto.charCodeAt(i) >>> 0;
+  return h;
+};
+var txt = (v, max) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+var paraHsl = (hex) => {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
+  const d = max - min;
+  if (!d) return [0, 0, l];
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const h = max === r ? (g - b) / d % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [(h * 60 + 360) % 360, s, l];
+};
+var deHsl = (h, s, l) => {
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(h / 60 % 2 - 1)), m = l - c / 2;
+  const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  const p = (v) => Math.round((v + m) * 255).toString(16).padStart(2, "0");
+  return `#${p(r)}${p(g)}${p(b)}`;
+};
+var variarCor = (hex, chave, ousadia = 1) => {
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) return hex;
+  const h = hashDe(chave);
+  const [mat, sat, luz] = paraHsl(hex);
+  const dm = (h % 29 - 14) * ousadia;
+  const ds = ((h >>> 5) % 13 - 6) / 100;
+  const dl = ((h >>> 9) % 9 - 4) / 100;
+  return deHsl((mat + dm + 360) % 360, Math.min(0.92, Math.max(0.12, sat + ds)), Math.min(0.78, Math.max(0.16, luz + dl)));
+};
+var combinar = (lista, chave, minimo, maximo = lista.length) => {
+  if (lista.length <= minimo) return lista;
+  const h = hashDe(chave);
+  const rot = h % lista.length;
+  const qtd = Math.min(lista.length, maximo, minimo + (h >>> 3) % (Math.max(maximo, minimo) - minimo + 1));
+  return [...lista.slice(rot), ...lista.slice(0, rot)].slice(0, qtd);
+};
+var util = (l, ...campos) => (l || []).filter((x) => campos.every((c) => txt(x?.[c], 400)));
+var aplicarCopia = (dados, copia, cidade) => {
+  if (!copia || typeof copia !== "object") return dados;
+  const saida = { ...dados };
+  const slogan2 = limparSlogan(txt(copia.slogan, 140), cidade);
+  if (slogan2) saida.slogan = slogan2;
+  const sobre = txt(copia.sobre, 600);
+  if (sobre) saida.sobre = sobre;
+  const servicos = util(copia.servicos, "titulo", "descricao").slice(0, 6).map((s) => ({ titulo: txt(s.titulo, 60), descricao: txt(s.descricao, 220) }));
+  if (servicos.length >= 3) saida.servicos = servicos;
+  const dif = util(copia.diferenciais_detalhe, "titulo", "texto").slice(0, 4).map((x) => ({ titulo: txt(x.titulo, 50), texto: txt(x.texto, 160) }));
+  if (dif.length >= 3) saida.diferenciais = dif;
+  const passos = util(copia.passos, "titulo", "texto").slice(0, 3).map((x) => ({ titulo: txt(x.titulo, 40), texto: txt(x.texto, 160) }));
+  if (passos.length === 3) saida.passos = passos;
+  const faq = util(copia.faq, "pergunta", "resposta").slice(0, 5).map((x) => ({ pergunta: txt(x.pergunta, 120), resposta: txt(x.resposta, 300) }));
+  if (faq.length >= 3) saida.faq = faq;
+  const cta = txt(copia.cta, 30);
+  if (cta) saida.ctaPrincipal = cta;
+  return saida;
+};
+var individualizar = (dados, lead, temCopia = false) => {
+  const chave = `${dados.empresa}|${dados.cidade || ""}`;
+  const saida = { ...dados };
+  const desc = txt(lead?.google_description, 420);
+  if (!temCopia && desc.length >= 60 && /[a-zà-ú]{4,}/i.test(desc) && !/^https?:/i.test(desc)) saida.sobre = desc;
+  const avaliacao = txt(lead?.review_highlight, 240);
+  if (avaliacao.length >= 30 && !(dados.depoimentos || []).some((d) => (d.texto || "").trim())) {
+    saida.depoimentos = [{ texto: avaliacao, autor: "Cliente, em avalia\xE7\xE3o no Google" }];
+  }
+  if (temCopia) return saida;
+  if ((saida.servicos || []).length > 4) saida.servicos = combinar(saida.servicos || [], `${chave}|serv`, 4, 6);
+  if ((saida.diferenciais || []).length > 3) saida.diferenciais = combinar(saida.diferenciais || [], `${chave}|dif`, 3, 4);
+  if ((saida.faq || []).length > 3) saida.faq = combinar(saida.faq || [], `${chave}|faq`, 3, 5);
+  return saida;
+};
+
 // src/templates/sites/previa.ts
 var dadosDoLead = (lead) => {
   const base = {
@@ -6338,7 +6461,15 @@ var escolherTemplate = (nicho, empresa) => {
 var urlHttps = (u) => /^https:\/\/[^\s"'<>()\\]+$/.test(String(u || "")) ? String(u) : "";
 var CAMPOS_DO_SITE_ANTERIOR = ["telefone", "whatsapp", "email", "endereco", "horario", "instagram", "nota", "avaliacoes", "logo", "capa", "fotoSobre"];
 var montarPrevia = (lead, fotos2 = [], preferido = "", anterior = null) => {
-  const dados = dadosDoLead(lead);
+  const ramoBruto = lead?.niche || lead?.role || "";
+  const efetivo = ramoEfetivo(ramoBruto, lead?.company || lead?.name || "", lead?.copia_ia?.segmento);
+  let dados = dadosDoLead(efetivo !== ramoBruto ? { ...lead, niche: efetivo, role: efetivo } : lead);
+  dados.categoria = String(lead?.copia_ia?.categoria || "").trim().slice(0, 60) || ramoBruto || dados.categoria;
+  const copia = lead?.copia_ia && typeof lead.copia_ia === "object" && Object.keys(lead.copia_ia).length ? lead.copia_ia : null;
+  dados = copia ? aplicarCopia(dados, copia, lead?.city || "") : dados;
+  dados = individualizar(dados, lead, !!copia);
+  dados.corPrimaria = variarCor(dados.corPrimaria, `${dados.empresa}|p`);
+  dados.corDestaque = variarCor(dados.corDestaque, `${dados.empresa}|d`, 0.6);
   if (anterior && typeof anterior === "object") {
     const d = dados;
     for (const k of CAMPOS_DO_SITE_ANTERIOR) {
@@ -6355,7 +6486,7 @@ var montarPrevia = (lead, fotos2 = [], preferido = "", anterior = null) => {
     dados.fotoSobre = dados.fotoSobre || urls[1] || urls[0];
     if (!(dados.galeria || []).length) dados.galeria = urls.slice(2, 6);
   }
-  const ramo = lead?.niche || lead?.role || "";
+  const ramo = efetivo;
   const atual = preferido ? SITE_TEMPLATES.find((t) => t.nome === preferido || t.id === preferido) : void 0;
   const template = atual && direcaoDeArte(ramo, dados.empresa).modelos.includes(atual.id) ? atual : escolherTemplate(ramo, dados.empresa);
   const html = template.render({ ...dados, selo: true });

@@ -42,7 +42,11 @@ const dados = dadosDoLead(pizza);
 assert.equal(dados.segmento, 'comida');
 assert.equal(dados.corPrimaria, direcaoDeArte('Pizzarias', 'Pizzaria Brasa Viva').paleta.primaria);
 const site = montarPrevia(pizza, []);
-assert.ok(site.html.includes(dados.corPrimaria), 'a cor do segmento está no site');
+// a cor do site é a do segmento com um desvio próprio da empresa (duas padarias não repetem o tom): continua no mesmo matiz
+const corDoSite = JSON.parse(site.builder_data).corPrimaria as string;
+assert.ok(site.html.includes(corDoSite), 'a cor do site está no HTML');
+const matiz = (h: string) => { const r = parseInt(h.slice(1, 3), 16) / 255, g = parseInt(h.slice(3, 5), 16) / 255, b = parseInt(h.slice(5, 7), 16) / 255; const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b); if (!d) return 0; return (((mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60) + 360) % 360; };
+const dist = Math.abs(matiz(corDoSite) - matiz(dados.corPrimaria)); assert.ok(Math.min(dist, 360 - dist) <= 16, `a cor do site continua no matiz do segmento (${dist}°)`);
 const tmpl = escolherTemplate('Pizzarias', 'Pizzaria Brasa Viva');
 assert.ok(direcaoDeArte('Pizzarias').modelos.includes(tmpl.id));
 const fonte = fonteDoModelo('comida', tmpl.id);

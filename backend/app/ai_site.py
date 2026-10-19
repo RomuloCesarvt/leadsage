@@ -282,13 +282,24 @@ PROJETO VISUAL JÁ DEFINIDO (não mude, só escreva dentro dele)
 
 {REGRAS_DE_CONTEUDO}
 
+ESTE SITE É ÚNICO. Outro negócio do mesmo ramo, na mesma cidade, precisa receber textos DIFERENTES: use o nome, a nota, o que
+os clientes elogiam, a descrição do Google e o horário que estão nos dados. Não escreva o texto que serviria a qualquer
+{(d.get('niche') or d.get('role') or 'negócio').lower()}: escolha um ângulo próprio (o que faz esse lugar ser procurado) e
+sustente cada frase nos dados.
+
 RETORNO
 JSON puro, sem markdown, com estas chaves:
 - "categoria": como o negócio se apresenta, 2 a 4 palavras (ex.: "Padaria e confeitaria")
 - "slogan": frase de capa, no máximo 10 palavras, impactante e específica do ramo; NUNCA cite a cidade nem o nome da região nela (a cidade só vai no título da aba)
 - "sobre": 2 frases sobre o negócio, sem autoelogio genérico
-- "servicos": 4 objetos com "titulo" (até 4 palavras) e "descricao" (uma frase do que o cliente leva)
+- "servicos": 4 a 6 objetos com "titulo" (até 4 palavras) e "descricao" (uma frase do que o cliente leva); só serviços coerentes com o ramo e com os dados
 - "diferenciais": 3 frases curtas de até 8 palavras, cada uma um motivo real de escolher esse lugar
+- "diferenciais_detalhe": 4 objetos com "titulo" (até 4 palavras) e "texto" (uma frase)
+- "passos": 3 objetos com "titulo" e "texto" (como o cliente chega até o serviço, nesse ramo)
+- "faq": 4 objetos com "pergunta" e "resposta" (dúvidas reais desse ramo; sem inventar preço, prazo nem política)
+- "segmento": o tipo de negócio, UM destes ids (pense no que o negócio FAZ, não só no nome): pet, doces, comida, barbearia, estetica, odonto, mente, saude, juridico, imoveis, arquitetura, oficina, fitness, educacao, moda, natureza, tecnologia, turismo, eventos, veiculos, financeiro, limpeza, mercado, generico.
+  Médicos de qualquer especialidade e clínicas = saude; dentista = odonto; psicólogo e terapeuta = mente; estética e salão = estetica;
+  advogado, contador e consultoria = juridico; loja de roupa e presente = moda; use generico só se nenhum servir
 - "cta": o texto do botão principal, até 4 palavras
 - "seo_titulo": título da aba, até 60 caracteres, com serviço e cidade
 - "seo_descricao": até 155 caracteres, convidativa e específica
@@ -307,8 +318,26 @@ def slogan_sem_cidade(slogan: str, cidade: str) -> str:
     return "" if re.search(rf"(?<!\w){c}(?!\w)", t, flags=re.I) else t
 
 
+# os ids de segmento do motor de sites (frontend/src/templates/sites/direcao-de-arte.ts)
+SEGMENTOS_DO_MOTOR = {
+    "pet", "doces", "comida", "barbearia", "estetica", "odonto", "mente", "saude", "juridico", "imoveis", "arquitetura", "oficina", "fitness",
+    "educacao", "moda", "natureza", "tecnologia", "turismo", "eventos", "veiculos", "financeiro", "limpeza", "mercado", "generico",
+}
+
+
+def _lista_de_objetos(brutos: Any, chaves: Tuple[str, str], limite: int, tamanho: Tuple[int, int]) -> List[Dict[str, str]]:
+    saida: List[Dict[str, str]] = []
+    for item in (brutos if isinstance(brutos, list) else [])[:limite]:
+        if not isinstance(item, dict):
+            continue
+        a, b = str(item.get(chaves[0]) or "").strip()[:tamanho[0]], str(item.get(chaves[1]) or "").strip()[:tamanho[1]]
+        if a and b:
+            saida.append({chaves[0]: a, chaves[1]: b})
+    return saida
+
+
 async def gerar_conteudo_de_site(
-    lead: Any, api_key: str, servico_do_usuario: str = ""
+    lead: Any, api_key: str, servico_do_usuario: str = "", rapido: bool = False
 ) -> Dict[str, Any]:
     """Texto do site + o projeto visual daquele negócio.
 
@@ -326,11 +355,13 @@ async def gerar_conteudo_de_site(
     )
 
     client = build_client(api_key, TIMEOUT_LONGO_MS)
-    dados = gerar_json(
-        client,
-        _prompt_do_conteudo(d, briefing, servico_do_usuario),
-        obrigatorias=["slogan", "sobre", "servicos"],
-    )
+    prompt = _prompt_do_conteudo(d, briefing, servico_do_usuario)
+    if rapido:
+        # quem espera na tela (disparo, robo): varios modelos em paralelo e prazo curto; a chamada bloqueia, entao roda em thread
+        import asyncio
+        dados = await asyncio.to_thread(gerar_json, client, prompt, ["slogan", "sobre", "servicos"], 2, time.monotonic() + 30, True, 1800)
+    else:
+        dados = gerar_json(client, prompt, obrigatorias=["slogan", "sobre", "servicos"])
 
     servicos = []
     for item in (dados.get("servicos") or [])[:6]:
@@ -346,6 +377,10 @@ async def gerar_conteudo_de_site(
         "sobre": str(dados.get("sobre") or "")[:600],
         "servicos": servicos,
         "diferenciais": [str(x)[:80] for x in (dados.get("diferenciais") or [])[:4] if str(x).strip()],
+        "diferenciais_detalhe": _lista_de_objetos(dados.get("diferenciais_detalhe"), ("titulo", "texto"), 4, (50, 160)),
+        "passos": _lista_de_objetos(dados.get("passos"), ("titulo", "texto"), 3, (40, 160)),
+        "faq": _lista_de_objetos(dados.get("faq"), ("pergunta", "resposta"), 5, (120, 300)),
+        "segmento": str(dados.get("segmento") or "").strip().lower() if str(dados.get("segmento") or "").strip().lower() in SEGMENTOS_DO_MOTOR else "",
         "cta": str(dados.get("cta") or "Falar no WhatsApp")[:30],
         "seo_titulo": str(dados.get("seo_titulo") or "")[:70],
         "seo_descricao": str(dados.get("seo_descricao") or "")[:170],

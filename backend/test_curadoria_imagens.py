@@ -65,3 +65,24 @@ def test_buscar_usa_o_filtro_de_ponta_a_ponta(monkeypatch):
     titulos = {f["titulo"] for f in r["imagens"]}
     assert "Aromatherapy Spa" not in titulos and "Wellness Cosmetics" not in titulos
     assert {"Cozy Room", "House Plant"} <= titulos
+
+
+def test_especialidade_medica_busca_consultorio_e_nunca_remedio_nem_bicho():
+    """Uma clínica de gastroenterologia saiu com embalagens de remédio veterinário na capa."""
+    from app.banco_imagens import perfil_para
+    from app.curadoria_imagens import escolher
+
+    for ramo in ("Gastroenterologistas", "Ginecologistas", "Neurologistas", "Clínicas", "Consultório médico"):
+        p = perfil_para(ramo)
+        assert "doctor" in " ".join(p["termos"]) and p["exigir"] is True, ramo
+    p = perfil_para("Gastroenterologistas")
+    fotos = [
+        {"url": "https://x/1", "titulo": "veterinary medicine pills syringes", "tags": ["medicine", "pills", "veterinary"]},
+        {"url": "https://x/2", "titulo": "doctor consulting patient in clinic", "tags": ["doctor", "patient", "clinic"]},
+        {"url": "https://x/3", "titulo": "medication bottle on table", "tags": ["bottle", "medication"]},
+        {"url": "https://x/4", "titulo": "stethoscope on desk", "tags": ["stethoscope", "doctor"]},
+    ]
+    escolhidas = [f["url"] for f in escolher(fotos, p["bons"], p["ruins"], 4, p["exigir"])]
+    assert "https://x/1" not in escolhidas and "https://x/3" not in escolhidas
+    assert escolhidas[0] == "https://x/2"
+    assert perfil_para("Clínica veterinária")["termos"][0] == "dog"           # veterinaria continua sendo pet

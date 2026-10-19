@@ -262,6 +262,12 @@ class SiteCopyResponse(BaseModel):
     sobre: str = ""
     servicos: List[Dict[str, str]] = Field(default_factory=list)
     diferenciais: List[str] = Field(default_factory=list)
+    # versoes completas, para o motor de sites montar as secoes "por que escolher", "como funciona" e perguntas
+    diferenciais_detalhe: List[Dict[str, str]] = Field(default_factory=list)
+    passos: List[Dict[str, str]] = Field(default_factory=list)
+    faq: List[Dict[str, str]] = Field(default_factory=list)
+    # o tipo de negocio que a IA reconheceu (id de segmento do motor de sites); vazio se nao reconheceu
+    segmento: str = ""
     cta: str = ""
     seo_titulo: str = ""
     seo_descricao: str = ""

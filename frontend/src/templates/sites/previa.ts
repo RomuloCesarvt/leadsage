@@ -12,9 +12,10 @@
 import type { SiteData, SiteTemplate } from './base';
 import { resumirSemana } from './profissional';
 import { semearConteudo } from './semear';
-import { direcaoDeArte } from './direcao-de-arte';
+import { direcaoDeArte, ramoEfetivo } from './direcao-de-arte';
 import { limparNomeDaMarca } from './marca';
 import { SITE_TEMPLATES, sugerirTemplate } from './layouts';
+import { aplicarCopia, individualizar, variarCor } from './variedade';
 
 /** Os dados iniciais de um site: os do lead quando há, já com o conteúdo do ramo. */
 export const dadosDoLead = (lead: any): SiteData => {
@@ -73,7 +74,18 @@ const urlHttps = (u: unknown): string => (/^https:\/\/[^\s"'<>()\\]+$/.test(Stri
 const CAMPOS_DO_SITE_ANTERIOR = ['telefone', 'whatsapp', 'email', 'endereco', 'horario', 'instagram', 'nota', 'avaliacoes', 'logo', 'capa', 'fotoSobre'] as const;
 
 export const montarPrevia = (lead: any, fotos: string[] = [], preferido = '', anterior: Partial<SiteData> | null = null) => {
-  const dados = dadosDoLead(lead);
+  // o ramo que o motor entende: o da busca, o do nome da empresa ou o que a IA reconheceu (ex.: "Gastroenterologistas" é saúde, não oficina)
+  const ramoBruto = lead?.niche || lead?.role || '';
+  const efetivo = ramoEfetivo(ramoBruto, lead?.company || lead?.name || '', lead?.copia_ia?.segmento);
+  let dados = dadosDoLead(efetivo !== ramoBruto ? { ...lead, niche: efetivo, role: efetivo } : lead);
+  dados.categoria = String(lead?.copia_ia?.categoria || '').trim().slice(0, 60) || ramoBruto || dados.categoria;
+  // o texto da IA para ESTE negócio (quando o servidor trouxe) vale mais que o do banco do ramo; sem ele, o que o Google diz do lugar
+  const copia = lead?.copia_ia && typeof lead.copia_ia === 'object' && Object.keys(lead.copia_ia).length ? lead.copia_ia : null;
+  dados = copia ? aplicarCopia(dados, copia, lead?.city || '') : dados;
+  dados = individualizar(dados, lead, !!copia);
+  // a cor do segmento, com um desvio próprio de cada empresa: duas padarias não repetem o mesmo tom
+  dados.corPrimaria = variarCor(dados.corPrimaria, `${dados.empresa}|p`);
+  dados.corDestaque = variarCor(dados.corDestaque, `${dados.empresa}|d`, 0.6);
   if (anterior && typeof anterior === 'object') {
     const d = dados as unknown as Record<string, unknown>;
     for (const k of CAMPOS_DO_SITE_ANTERIOR) {
@@ -89,7 +101,7 @@ export const montarPrevia = (lead: any, fotos: string[] = [], preferido = '', an
     dados.fotoSobre = dados.fotoSobre || urls[1] || urls[0];
     if (!(dados.galeria || []).length) dados.galeria = urls.slice(2, 6);
   }
-  const ramo = lead?.niche || lead?.role || '';
+  const ramo = efetivo;
   // ao atualizar um site que já existe, mantém o modelo dele, desde que ainda combine com o ramo
   const atual = preferido ? SITE_TEMPLATES.find(t => t.nome === preferido || t.id === preferido) : undefined;
   const template = atual && direcaoDeArte(ramo, dados.empresa).modelos.includes(atual.id) ? atual : escolherTemplate(ramo, dados.empresa);

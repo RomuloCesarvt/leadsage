@@ -159,7 +159,13 @@ export interface SiteCopyResponse {
   categoria: string;
   slogan: string;
   sobre: string;
-  servicos: { titulo: string; descricao: string }[];
+  servicos: { titulo: string; descricao: string   /** o tipo de negócio que a IA reconheceu (id de segmento do motor de sites) */
+  segmento?: string;
+  /** versões completas, para montar as seções do site */
+  diferenciais_detalhe?: { titulo: string; texto: string }[];
+  passos?: { titulo: string; texto: string }[];
+  faq?: { pergunta: string; resposta: string }[];
+}[];
   diferenciais: string[];
   cta: string;
   seo_titulo: string;
