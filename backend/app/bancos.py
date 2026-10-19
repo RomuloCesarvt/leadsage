@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
 FORA_S = 60.0  # quanto tempo um banco que falhou fica de lado
+FORA_POR_COTA_S = 1800.0  # cota esgotada ("exceeded the quota") nao volta em um minuto: nao fica tentando e derrubando requisicoes
 TEMPO_DE_CONEXAO_S = 8  # nao esperar 60 s por um banco que nao responde
 
 
@@ -103,7 +104,8 @@ class Fonte:
             self.marcar_fora(str(ctx.original_exception))
 
     def marcar_fora(self, motivo: str = "") -> None:
-        self.fora_ate = time.monotonic() + FORA_S
+        cota = any(t in (motivo or "").lower() for t in ("exceeded the quota", "upgrade your plan", "quota exceeded", "too many connections"))
+        self.fora_ate = time.monotonic() + (FORA_POR_COTA_S if cota else FORA_S)
         self.ultimo_erro = (motivo or "")[:160]
 
     @property

@@ -195,6 +195,12 @@ def _motivo_transitorio(motivo: str) -> bool:
     return any((motivo or "").startswith(t) for t in _TRANSITORIOS)
 
 
+def _identidade_da_fala(m: Optional[Dict[str, Any]]) -> str:
+    """Quem é esta fala: o id da Meta/WhatsApp ou, na falta, o horário. Serve para contar cada mensagem uma vez só."""
+    m = m or {}
+    return str(m.get("meta_id") or m.get("em") or m.get("texto") or "")
+
+
 def _falha_da_ia(conversa: Dict[str, Any], motivo: str) -> None:
     conversa["falhas_ia"] = int(conversa.get("falhas_ia") or 0) + 1
     conversa["silencio"] = f"{motivo.capitalize()}. Tenta de novo na próxima mensagem."
@@ -333,6 +339,12 @@ async def _processar(
         conversa["precisa_humano"] = False
         conversa["motivo"] = ""
 
+    # recupera quem saiu da lista do robô só por contar a mesma mensagem várias vezes (e ninguém assumiu)
+    if (conversa.get("contato_robo") and not conversa.get("optout") and not any(m.get("de") == "voce" for m in conversa["mensagens"])
+            and sum(1 for m in conversa["mensagens"] if m.get("de") == "contato") < MAX_AUTOMATICAS):
+        conversa.update({"contato_robo": False, "robo_ativo": True, "automaticas": 0})
+        conversa.pop("automatica_id", None)
+
     # 3. robo desligado. Antes isso era silencioso: a mensagem chegava, nada acontecia e ninguem
     # sabia por que. O motivo fica na conversa (sem travar: ligar o robo depois volta a responder).
     if not cfg.get("ativo"):
@@ -378,6 +390,8 @@ async def _processar(
     # 5 e 6. regras fixas, depois IA
     gerador = gerar or _gerador_padrao()
     await _carregar_especialista(lead)
+    from app import ia_gate
+    ia_gate.PRIORIDADE.set("alta")      # responder quem escreveu vem antes de gerar lote: a conversa não espera na fila da IA
     try:
         decisao: Decisao = await asyncio.wait_for(
             asyncio.to_thread(
@@ -397,7 +411,12 @@ async def _processar(
     # Do outro lado tem um robo (atendimento automatico): nao responde. A terceira seguida tira o
     # contato da lista do robo, para nao ficar gastando IA e parecendo spam para outro robo.
     if decisao.automatica:
-        conversa["automaticas"] = int(conversa.get("automaticas") or 0) + 1
+        # Cada MENSAGEM do contato conta uma vez. Antes, a varredura que volta às conversas sem resposta passava de novo pela mesma
+        # mensagem e somava de novo: uma única mensagem virava "3 mensagens automáticas" e o contato saía da lista do robô para sempre.
+        ident = _identidade_da_fala(conversa["mensagens"][-1] if conversa.get("mensagens") else None)
+        if conversa.get("automatica_id") != ident:
+            conversa["automatica_id"] = ident
+            conversa["automaticas"] = int(conversa.get("automaticas") or 0) + 1
         conversa["silencio"] = "Parece uma resposta automática (outro robô): o robô não respondeu."
         if conversa["automaticas"] >= MAX_AUTOMATICAS:
             conversa["robo_ativo"] = False
@@ -457,7 +476,8 @@ async def _processar(
             return await salvar()
 
     if decisao.passar_para_humano:
-        conversa["robo_ativo"] = False
+        if not _motivo_transitorio(decisao.motivo or ""):
+            conversa["robo_ativo"] = False      # pausa de verdade só quando o robô precisa mesmo de gente; falha da IA é passageira
         _marcar(conversa, decisao.motivo or "o robô pediu sua ajuda")
 
     return await salvar()
@@ -630,10 +650,22 @@ async def responder_sem_guardar(
 
 # ----------------------------------------------------- varrer o que ficou sem resposta
 
+def _pausa_por_engano(c: Dict[str, Any]) -> bool:
+    """Saiu da lista do robô como "outro robô", mas o contato falou menos vezes do que o necessário para isso (e ninguém assumiu).
+    Era o defeito de contar a mesma mensagem várias vezes."""
+    return bool(c.get("contato_robo")) and not c.get("optout") and not c.get("humano") and int(c.get("contatos") or 99) < MAX_AUTOMATICAS
+
+
 def _sem_resposta(c: Dict[str, Any]) -> bool:
     """A ultima fala e do contato, o robo pode e deve responder."""
     ultima = c.get("ultima") or {}
-    if ultima.get("de") != "contato" or c.get("optout") or c.get("contato_robo") or not c.get("robo_ativo", True):
+    if ultima.get("de") != "contato" or c.get("optout"):
+        return False
+    if c.get("automatica_id") and c.get("automatica_id") == _identidade_da_fala(ultima):
+        return False      # esta mensagem já foi julgada automática: só vale a pena voltar quando chegar outra
+    if _pausa_por_engano(c):
+        return True       # tirado da lista por contar a mesma mensagem várias vezes: volta a ser atendido
+    if c.get("contato_robo") or not c.get("robo_ativo", True):
         return False
     if c.get("precisa_humano") and not _motivo_transitorio(c.get("motivo", "")):
         return False

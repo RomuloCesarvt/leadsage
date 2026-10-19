@@ -227,3 +227,76 @@ def test_reprocessar_devolve_a_dica_de_tentar_de_novo(com_robo, rodar):
     rodar(robo_service.processar, cfg(), msg("oi, vocês fazem sites?", 1), gerar=quebrada, enviar=Envio(), adiar=True)
     r = rodar(robo_service.responder_pendentes, cfg(), contato="5511964623668", gerar=quebrada, enviar=Envio())
     assert r["respondidas"] == 0 and r["tentar_de_novo"] is True
+
+
+# ------------------------------------------------ a mesma mensagem nao vira "3 automaticas" (defeito que tirava o lead da lista do robo)
+def test_varias_passadas_pela_mesma_mensagem_automatica_contam_uma_vez(com_robo, rodar):
+    envio = Envio()
+    primeira = msg(AUTOMATICAS[0], 1)
+    c = rodar(robo_service.processar, cfg(), primeira, gerar=ia(), enviar=envio)
+    for _ in range(5):                                  # a varredura volta à mesma mensagem, de novo e de novo
+        c = rodar(robo_service.processar, cfg(), primeira, gerar=ia(), enviar=envio, reprocessar=True)
+    assert c["automaticas"] == 1 and c["robo_ativo"] and not c.get("contato_robo")
+
+
+def test_varredura_nao_volta_a_mensagem_ja_julgada_automatica(com_robo, rodar):
+    from app import robo_store
+    envio = Envio()
+    rodar(robo_service.processar, cfg(), msg(AUTOMATICAS[0], 1), gerar=ia(), enviar=envio)
+    chamadas = []
+    r = rodar(robo_service.responder_pendentes, cfg(), gerar=lambda p: chamadas.append(p) or {"mensagens": ["x"]}, enviar=envio)
+    assert chamadas == [] and envio.enviados == [] and r["processadas"] == 0
+    # chegou outra mensagem (agora de gente): volta a ser atendido
+    c = rodar(robo_service.processar, cfg(), msg("oi, vocês fazem sites?", 2), gerar=ia("Fazemos sim!"), enviar=envio)
+    assert envio.enviados == ["Fazemos sim!"] and c["automaticas"] == 0
+
+
+def test_quem_foi_tirado_da_lista_por_engano_volta_a_ser_atendido(com_robo, rodar):
+    """Dado real: conversas com UMA mensagem do contato apareciam pausadas por '3 mensagens automáticas'."""
+    from app import robo_store
+    cid = robo_store.id_da_conversa("whatsapp", "5511964623668")
+    rodar(robo_store.salvar_conversa, "alice", {
+        "id": cid, "canal": "whatsapp", "contato": "5511964623668", "nome": "Loja", "lead_id": "", "robo_ativo": False, "contato_robo": True,
+        "automaticas": 3, "optout": False, "precisa_humano": False, "motivo": "", "silencio": "Parece outro robô (3 mensagens automáticas)",
+        "mensagens": [{"de": "robo", "texto": "Oi!", "em": "2026-10-19T18:00:00", "meta_id": "a"},
+                      {"de": "contato", "texto": "Boa tarde! Tudo bem? Pode falar.", "em": "2026-10-19T18:05:00", "meta_id": "b"}],
+        "criado": "x", "atualizado": "2026-10-19T18:05:00+00:00"})
+    envio = Envio()
+    c = rodar(robo_service.processar, cfg(), msg("Boa tarde! Tudo bem? Pode falar.", 3).__class__(canal="whatsapp", contato="5511964623668", nome="Loja", texto="Boa tarde! Tudo bem? Pode falar.", meta_id="b", momento=3),
+              gerar=ia("Oi! Que bom. Posso te mostrar a prévia?"), enviar=envio, reprocessar=True)
+    assert c["robo_ativo"] and not c.get("contato_robo") and envio.enviados == ["Oi! Que bom. Posso te mostrar a prévia?"]
+
+
+def test_quem_o_dono_assumiu_nao_volta_para_o_robo(com_robo, rodar):
+    from app import robo_store
+    cid = robo_store.id_da_conversa("whatsapp", "5511964623668")
+    rodar(robo_store.salvar_conversa, "alice", {
+        "id": cid, "canal": "whatsapp", "contato": "5511964623668", "nome": "Loja", "lead_id": "", "robo_ativo": False, "contato_robo": True,
+        "optout": False, "precisa_humano": False, "motivo": "",
+        "mensagens": [{"de": "contato", "texto": "oi", "em": "x", "meta_id": "a"}, {"de": "voce", "texto": "Oi! Aqui é o Max", "em": "y"},
+                      {"de": "contato", "texto": "pode ser", "em": "z", "meta_id": "b"}], "criado": "x"})
+    envio = Envio()
+    c = rodar(robo_service.processar, cfg(), msg("pode ser", 9), gerar=ia("não deveria"), enviar=envio)
+    assert envio.enviados == [] and not c["robo_ativo"]
+
+
+def test_resposta_com_so_um_sinal_fraco_vai_para_a_ia_decidir():
+    """"Agradecemos pelo seu contato" sozinho pode ser gente: a IA decide (e responde automatica=true se for saudação)."""
+    from app.ai_robo import certeza_de_robo
+    assert parece_automatica("Agradecemos pela sua mensagem.\n\nClínica Alluve ✨") and not certeza_de_robo("Agradecemos pela sua mensagem.\n\nClínica Alluve ✨")
+    assert certeza_de_robo(AUTOMATICAS[3]) and certeza_de_robo(AUTOMATICAS[4]) and certeza_de_robo(AUTOMATICAS[1])
+    chamadas = []
+    d = decidir([{"de": "robo", "texto": "Oi!"}, {"de": "contato", "texto": "Agradecemos pela sua mensagem. Qual o valor do site?"}], "whatsapp", {}, {"ativo": True}, None,
+                lambda p: chamadas.append(p) or {"mensagens": ["O valor depende do escopo; posso te mostrar a prévia?"]})
+    assert chamadas and d.mensagens                                    # a IA foi consultada e respondeu
+
+
+def test_falha_passageira_da_ia_ao_decidir_nao_pausa_a_conversa(com_robo, rodar):
+    from app.ai_robo import Decisao
+    envio = Envio()
+
+    def sem_resposta(prompt):
+        return {"mensagens": [], "tipo": "outro"}
+
+    c = rodar(robo_service.processar, cfg(), msg("oi, vocês fazem sites?", 1), gerar=sem_resposta, enviar=envio)
+    assert c["robo_ativo"] is True                                     # nunca pausa de vez por falha da IA

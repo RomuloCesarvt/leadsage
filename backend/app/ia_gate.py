@@ -14,6 +14,7 @@ Agora cada pedido passa por aqui:
   4. com banco SQL, o orçamento e as pausas são COMPARTILHADOS entre todas as instâncias do servidor (a Vercel abre várias).
 """
 import asyncio
+import contextvars
 import os
 import re
 import time
@@ -26,6 +27,11 @@ TPM_PADRAO = {"groq": 6500, "cerebras": 40000, "mistral": 30000, "openrouter": 1
 RPM_PADRAO = {"groq": 25, "cerebras": 20, "mistral": 20, "openrouter": 8, "gemini": 8}
 PAUSA_APOS_RECUSA_S = 20.0
 PAUSA_DIARIO_S = 1800.0
+
+# Quem pede: "alta" (resposta do robô a quem escreveu: não pode esperar) usa o orçamento inteiro; "normal" (gerar lote de mensagens e sites)
+# deixa uma reserva, para a conversa de um lead nunca ficar sem resposta porque alguém está gerando 15 mensagens.
+PRIORIDADE: "contextvars.ContextVar[str]" = contextvars.ContextVar("prioridade_da_ia", default="normal")
+RESERVA_PARA_CONVERSA = 0.30
 
 LOOP: Optional[asyncio.AbstractEventLoop] = None   # o laço do servidor: as threads de IA usam para falar com o banco
 _LOCK = None
@@ -84,6 +90,8 @@ def espera_do_alvo(alvo: Alvo, tokens: int, agora: Optional[float] = None) -> fl
     espera = max(0.0, e["livre_em"] - agora)
     uso = e["uso"]
     usado = _podar(uso, agora)
+    if PRIORIDADE.get() != "alta" and uso:
+        tpm = int(tpm * (1 - RESERVA_PARA_CONVERSA))       # lote: só até 70% do orçamento; os 30% finais são das conversas
     if usado + tokens > tpm and uso:
         # espera o consumo mais antigo sair da janela de 60 s até caber
         soma, falta = usado, usado + tokens - tpm
@@ -95,7 +103,7 @@ def espera_do_alvo(alvo: Alvo, tokens: int, agora: Optional[float] = None) -> fl
                 break
         else:
             espera = max(espera, 60.0)
-    if len(uso) >= alvo.rpm:
+    if len(uso) >= (alvo.rpm if PRIORIDADE.get() == "alta" else max(1, int(alvo.rpm * (1 - RESERVA_PARA_CONVERSA)))):
         espera = max(espera, 60.0 - (agora - uso[0][0]))
     return espera
 

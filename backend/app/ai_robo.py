@@ -133,16 +133,16 @@ def recusou(texto: str) -> bool:
 # so conta junto com outro sinal. "Qual o horario de atendimento?" (peso 1) de um lead de verdade
 # nao pode ser tratado como robo.
 SINAIS_DE_ROBO = (
-    (2, "atendimento automatico"), (2, "mensagem automatica"), (2, "resposta automatica"),
-    (2, "assistente virtual"), (2, "este e um atendimento"), (2, "protocolo de atendimento"), (2, "seu protocolo"),
-    (2, "digite 1"), (2, "digite 2"), (2, "digite o numero"), (2, "responda com o numero"),
-    (2, "escolha uma das opcoes"), (2, "selecione uma opcao"), (2, "para continuar o atendimento"),
-    (2, "sobre qual deles"), (2, "agradece seu contato"), (2, "agradecemos o seu contato"),
+    (3, "atendimento automatico"), (3, "mensagem automatica"), (3, "resposta automatica"),
+    (3, "assistente virtual"), (3, "este e um atendimento"), (3, "protocolo de atendimento"), (3, "seu protocolo"),
+    (3, "digite 1"), (3, "digite 2"), (3, "digite o numero"), (3, "responda com o numero"),
+    (3, "escolha uma das opcoes"), (3, "selecione uma opcao"), (3, "para continuar o atendimento"),
+    (3, "sobre qual deles"), (2, "agradece seu contato"), (2, "agradecemos o seu contato"),
     (2, "agradecemos seu contato"), (2, "agradeco o seu contato"), (2, "agradeco o contato"),
     (2, "agradecemos pela sua mensagem"), (2, "agradecemos a sua mensagem"), (2, "agradecemos a mensagem"),
     (2, "agradecemos pelo seu contato"), (2, "obrigado pela sua mensagem"), (2, "obrigada pela sua mensagem"),
     (2, "nao estamos disponiveis"), (2, "no momento nao estamos"), (2, "retornaremos assim que"), (2, "responderemos em breve"),
-    (2, "sua parcela"), (2, "sua fatura"), (2, "seu boleto"),
+    (3, "sua parcela"), (3, "sua fatura"), (3, "seu boleto"),
     (1, "obrigado por entrar em contato"), (1, "obrigada por entrar em contato"), (1, "em caso de duvidas"),
     (1, "retornaremos"), (1, "responderemos assim que"), (1, "em breve"), (1, "nosso horario"),
     (1, "fora do horario"), (1, "horario de atendimento"), (1, "no momento nao estamos"),
@@ -152,10 +152,20 @@ SINAIS_DE_ROBO = (
 
 def parece_automatica(texto: str, mensagens: Optional[List[Dict[str, Any]]] = None) -> bool:
     """O outro lado e um robo? Pelo jeito da frase, e por repetir a mesma mensagem."""
+    return pontos_de_robo(texto, mensagens) >= 2
+
+
+def certeza_de_robo(texto: str, mensagens: Optional[List[Dict[str, Any]]] = None) -> bool:
+    """Robô sem dúvida (menu, protocolo, "mensagem automática"...): nem chama a IA. Com 2 pontos só (um "agradecemos o seu contato"
+    pode ser gente) quem decide é a IA, que também sabe responder "automatica": true."""
+    return pontos_de_robo(texto, mensagens) >= 3
+
+
+def pontos_de_robo(texto: str, mensagens: Optional[List[Dict[str, Any]]] = None) -> int:
     bruto = texto or ""
     t = _normal(bruto)
     if not t or e_so_midia(bruto):
-        return False
+        return 0
     # com os numeros: "digite 1" perde o 1 em _normal
     com_numeros = re.sub(r"[^a-z0-9 ]+", " ", unicodedata.normalize("NFKD", bruto).encode("ascii", "ignore").decode().lower())
     pontos = sum(peso for peso, trecho in SINAIS_DE_ROBO if trecho in t or trecho in com_numeros)
@@ -171,7 +181,7 @@ def parece_automatica(texto: str, mensagens: Optional[List[Dict[str, Any]]] = No
         iguais = sum(1 for m in mensagens if m.get("de") == "contato" and chave(m.get("texto", "")) == com_numeros.strip())
         if iguais >= 2:
             pontos += 2
-    return pontos >= 2
+    return pontos
 
 
 def e_so_midia(texto: str) -> bool:
@@ -233,7 +243,7 @@ def decidir(
 
     # outro robo do outro lado: nao responde (nem gasta IA nem credito) e a conversa nao vira um
     # papo de dois robos; o servico conta quantas vieram para tirar o contato da lista do robo
-    if parece_automatica(texto, mensagens):
+    if certeza_de_robo(texto, mensagens):
         return Decisao(automatica=True, motivo="parece uma resposta automática (outro robô)")
 
     if respostas_seguidas_do_robo(mensagens) >= MAX_RESPOSTAS_SEGUIDAS:

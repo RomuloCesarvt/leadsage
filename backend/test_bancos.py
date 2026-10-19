@@ -142,3 +142,14 @@ def test_dados_gravados_no_reserva_leem_do_reserva(com_conjunto, tmp_path):
             return (await s.execute(text("select v from t"))).scalars().all()
 
     assert _rodar(fluxo()) == ["no reserva"]
+
+
+def test_banco_com_cota_esgotada_fica_de_lado_por_muito_mais_que_um_minuto():
+    from app import bancos
+    f = bancos.Fonte.__new__(bancos.Fonte)
+    f.fora_ate, f.ultimo_erro = 0.0, ""
+    import time
+    f.marcar_fora("DBAPIError: Your account or project has exceeded the quota. Upgrade your plan to increase limits.")
+    assert f.fora_ate - time.monotonic() > 1000
+    f.marcar_fora("connection refused")
+    assert f.fora_ate - time.monotonic() <= bancos.FORA_S + 1

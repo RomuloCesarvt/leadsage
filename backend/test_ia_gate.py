@@ -27,7 +27,8 @@ def test_pedido_maior_que_o_orcamento_nunca_cabe():
     assert ia_gate.espera_do_alvo(alvo(tpm=1000), 3000) >= 1e8
 
 
-def test_escolher_reserva_e_passa_para_o_proximo_quando_o_primeiro_enche():
+def test_escolher_reserva_e_passa_para_o_proximo_quando_o_primeiro_enche(monkeypatch):
+    monkeypatch.setattr(ia_gate, "RESERVA_PARA_CONVERSA", 0.0)
     a, b = alvo("groq:a", tpm=6000), alvo("groq:b", tpm=6000)
     escolhidos = [ia_gate.escolher([a, b], 2800)[0].chave for _ in range(4)]
     assert escolhidos == ["groq:a", "groq:a", "groq:b", "groq:b"]          # 2 por modelo por minuto: nada de rajada
@@ -62,6 +63,7 @@ def test_modelo_inexistente_sai_do_rodizio_por_um_tempo():
 
 
 def test_carga_de_muitos_usuarios_nao_gera_rajada_de_chamadas_recusadas(monkeypatch):
+    monkeypatch.setattr(ia_gate, "RESERVA_PARA_CONVERSA", 0.0)
     """40 pedidos de uma vez em 3 motores com limite: ninguém é chamado além do orçamento e os que cabem terminam."""
     chamadas = {"a": [], "b": [], "c": []}
     trava = threading.Lock()
@@ -204,3 +206,20 @@ def test_marcador_de_preenchimento_nunca_chega_ao_lead():
     t, av = limpar_marcadores("Oi! Sou [Seu Nome] e vi o [Link da prévia] aqui.", "Prospecção LeadSage")
     assert "[" not in t and av and "campo para preencher" in av[0]
     assert limpar_marcadores("Mensagem normal.", "X") == ("Mensagem normal.", [])
+
+
+def test_lote_deixa_uma_reserva_para_a_resposta_do_robo():
+    """Gerar 15 mensagens nunca pode deixar a conversa de um lead sem resposta: o lote só usa 70% do orçamento."""
+    a = alvo("groq:m", tpm=10000, rpm=100)
+    ia_gate.PRIORIDADE.set("normal")
+    pedidos = 0
+    while ia_gate.escolher([a], 2000)[0] is not None:
+        pedidos += 1
+    assert pedidos == 3                                              # 3 x 2.000 = 6.000; o quarto passaria de 7.000 (70%)
+    ia_gate.PRIORIDADE.set("alta")
+    try:
+        assert ia_gate.escolher([a], 2000)[0] is not None            # a conversa ainda cabe
+        assert ia_gate.escolher([a], 2000)[0] is not None
+        assert ia_gate.escolher([a], 2000)[0] is None                # e o orçamento inteiro é o teto
+    finally:
+        ia_gate.PRIORIDADE.set("normal")
