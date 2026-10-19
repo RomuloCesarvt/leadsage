@@ -26,6 +26,7 @@ import { RoboScreen } from './components/screens/RoboScreen';
 import { ContractsScreen } from './components/screens/ContractsScreen';
 import { CalculatorScreen } from './components/screens/CalculatorScreen';
 import { SiteBuilder } from './components/SiteBuilder';
+import { AvisoDeNovaVersao } from './components/AvisoDeNovaVersao';
 import { MySitesScreen } from './components/screens/MySitesScreen';
 import { TutorialsScreen } from './components/screens/TutorialsScreen';
 import { NotificationsScreen } from './components/screens/NotificationsScreen';
@@ -108,6 +109,7 @@ const MainApp: React.FC = () => {
       <IntegrationsModal />
       <ExportModal />
       <DemoSiteModal />
+      <AvisoDeNovaVersao />
     </div>
   );
 };
