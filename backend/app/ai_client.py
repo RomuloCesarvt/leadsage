@@ -141,7 +141,7 @@ def _candidatos(client, prompt: str, max_tokens: Optional[int], json_mode: bool)
     return itens
 
 
-def generate_hedged(client, prompt: str, prazo: float, atraso: float = 3.0, max_tokens: Optional[int] = None,
+def generate_hedged(client, prompt: str, prazo: float, atraso: float = 7.0, max_tokens: Optional[int] = None,
                     json_mode: bool = True) -> str:
     """Resposta mais rapida: se o primeiro motor demora, o proximo ja comeca em paralelo.
 
@@ -149,6 +149,10 @@ def generate_hedged(client, prompt: str, prazo: float, atraso: float = 3.0, max_
     (ou estourar o tempo) para so entao tentar o segundo soma as esperas; aqui a primeira
     resposta valida vence e as outras sao descartadas. Os motores gratuitos extras (Groq,
     Cerebras, OpenRouter) entram na frente quando ha chave deles no ambiente.
+
+    `atraso` de 7 s: os modelos rapidos respondem em 3 a 7 s. Com 3 s, quase toda chamada disparava um segundo e um terceiro
+    modelo que tambem respondiam e eram jogados fora: o dobro de chamadas, o limite gratuito por minuto estourava (429) e
+    o lote inteiro ficava lento e com falhas. Recusa (429/503) continua chamando o proximo na hora.
     """
     global _working_model
     from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait

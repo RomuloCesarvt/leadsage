@@ -289,6 +289,8 @@ class AIGenerator:
             )
 
         sem_site = abordagem_mestra.lead_sem_site(lead.site_status, lead.missingDigitalAssets)
+        from app import especialista_nicho
+        await especialista_nicho.garantir(lead.niche or lead.role)  # o guia do ramo passa a trazer a ficha do especialista
         client = build_client(active_key)
         prompt = _prompt_da_abordagem(req, canal)
         # O usuario esta olhando a tela. Uma chamada so, com resposta curta e modelos em

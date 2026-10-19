@@ -1154,7 +1154,7 @@ var SEGMENTOS = [
       { nome: "Verde pata", primaria: "#15803d", destaque: "#fb923c" },
       { nome: "Turquesa feliz", primaria: "#0e7490", destaque: "#fbbf24" }
     ],
-    modelos: ["patinhas", "vibrante", "natural", "aurora", "agro"],
+    modelos: ["patinhas", "vibrante", "natural"],
     fonte: "amigavel",
     fonteSerifa: "artesanal",
     fonteSans: "amigavel"
@@ -1170,7 +1170,7 @@ var SEGMENTOS = [
       { nome: "Morango", primaria: "#be185d", destaque: "#fbbf77" },
       { nome: "Baunilha", primaria: "#a16207", destaque: "#f59e0b" }
     ],
-    modelos: ["forno", "aurora", "editorial", "natural", "vibrante", "fragrancia"],
+    modelos: ["forno", "aurora", "editorial", "noir"],
     fonte: "artesanal",
     fonteSerifa: "artesanal",
     fonteSans: "amigavel"
@@ -1186,7 +1186,7 @@ var SEGMENTOS = [
       { nome: "Pimenta", primaria: "#9b1c1c", destaque: "#f2b134" },
       { nome: "Mostarda", primaria: "#b45309", destaque: "#fbbf24" }
     ],
-    modelos: ["mesa", "editorial", "aurora", "vibrante", "noir"],
+    modelos: ["mesa", "aurora", "editorial", "noir"],
     fonte: "artesanal",
     fonteSerifa: "editorial",
     fonteSans: "forte"
@@ -1201,7 +1201,7 @@ var SEGMENTOS = [
       { nome: "Navalha", primaria: "#2b0f0f", destaque: "#e11d48" },
       { nome: "Ouro velho", primaria: "#232323", destaque: "#d4af37" }
     ],
-    modelos: ["estudio", "portfolio", "noir", "neon", "impacto"],
+    modelos: ["estudio", "portfolio", "noir", "neon"],
     fonte: "forte",
     fonteSerifa: "editorial",
     fonteSans: "forte"
@@ -1217,7 +1217,7 @@ var SEGMENTOS = [
       { nome: "Nude", primaria: "#a1695a", destaque: "#d9b99b" },
       { nome: "S\xE1lvia", primaria: "#5f7a6a", destaque: "#e6c79c" }
     ],
-    modelos: ["ritual", "fragrancia", "natural", "noir", "editorial", "aurora"],
+    modelos: ["ritual", "fragrancia", "natural", "noir", "editorial", "clinica", "estudio"],
     fonte: "luxo",
     fonteSerifa: "luxo",
     fonteSans: "moderna"
@@ -1232,7 +1232,7 @@ var SEGMENTOS = [
       { nome: "Petr\xF3leo", primaria: "#0f7c8a", destaque: "#2f9e6f" },
       { nome: "C\xE9u", primaria: "#2563eb", destaque: "#06b6d4" }
     ],
-    modelos: ["sorriso", "clinica", "noir", "natural", "escritorio"],
+    modelos: ["sorriso", "clinica", "natural", "noir"],
     fonte: "moderna",
     fonteSerifa: "sobria",
     fonteSans: "moderna"
@@ -1248,7 +1248,7 @@ var SEGMENTOS = [
       { nome: "Lavanda", primaria: "#6b5b95", destaque: "#e6c79c" },
       { nome: "Terracota suave", primaria: "#a1695a", destaque: "#8fb8a8" }
     ],
-    modelos: ["natural", "escritorio", "clinica", "classico", "aurora", "editorial"],
+    modelos: ["natural", "escritorio", "clinica", "classico", "editorial"],
     fonte: "elegante",
     fonteSerifa: "elegante",
     fonteSans: "moderna"
@@ -1264,7 +1264,7 @@ var SEGMENTOS = [
       { nome: "Menta", primaria: "#0f766e", destaque: "#84cc16" },
       { nome: "C\xE9u", primaria: "#2563eb", destaque: "#06b6d4" }
     ],
-    modelos: ["clinica", "sorriso", "natural", "noir", "escritorio", "aurora"],
+    modelos: ["clinica", "natural", "noir", "editorial"],
     fonte: "moderna",
     fonteSerifa: "sobria",
     fonteSans: "moderna"
@@ -1310,7 +1310,7 @@ var SEGMENTOS = [
       { nome: "Azul profundo", primaria: "#13405b", destaque: "#d6a03c" },
       { nome: "Musgo", primaria: "#3f4d3a", destaque: "#d2b48c" }
     ],
-    modelos: ["arquitetura", "planta", "noir", "escritorio"],
+    modelos: ["arquitetura", "planta", "noir", "escritorio", "portfolio"],
     fonte: "editorial",
     fonteSerifa: "editorial",
     fonteSans: "moderna"
@@ -1326,7 +1326,7 @@ var SEGMENTOS = [
       { nome: "Vermelho motor", primaria: "#b91c1c", destaque: "#fbbf24" },
       { nome: "Grafite e amarelo", primaria: "#27272a", destaque: "#facc15" }
     ],
-    modelos: ["oficina", "b2b", "impacto", "vibrante", "showroom"],
+    modelos: ["oficina", "b2b", "noir"],
     fonte: "forte",
     fonteSerifa: "editorial",
     fonteSans: "forte"
@@ -1374,7 +1374,7 @@ var SEGMENTOS = [
       { nome: "Esmeralda", primaria: "#0b3d2e", destaque: "#d4b062" },
       { nome: "Rosa antigo", primaria: "#6b3a4a", destaque: "#e7c9a9" }
     ],
-    modelos: ["fragrancia", "estudio", "noir", "editorial"],
+    modelos: ["fragrancia", "estudio", "noir", "editorial", "portfolio"],
     fonte: "luxo",
     fonteSerifa: "luxo",
     fonteSans: "moderna"
@@ -1389,7 +1389,7 @@ var SEGMENTOS = [
       { nome: "Oliva", primaria: "#55612a", destaque: "#e3b04b" },
       { nome: "Mata", primaria: "#166534", destaque: "#a3e635" }
     ],
-    modelos: ["agro", "natural", "fragrancia"],
+    modelos: ["agro", "fragrancia", "editorial"],
     fonte: "artesanal",
     fonteSerifa: "artesanal",
     fonteSans: "moderna"
@@ -1404,7 +1404,7 @@ var SEGMENTOS = [
       { nome: "El\xE9trico", primaria: "#2d3a8c", destaque: "#00b8a9" },
       { nome: "Violeta", primaria: "#7c3aed", destaque: "#f472b6" }
     ],
-    modelos: ["fintech", "b2b", "bento", "campus"],
+    modelos: ["fintech", "b2b", "bento", "campus", "portfolio"],
     fonte: "tecnologica",
     fonteSerifa: "editorial",
     fonteSans: "tecnologica"
@@ -1419,7 +1419,7 @@ var SEGMENTOS = [
       { nome: "Profundo", primaria: "#0c4a6e", destaque: "#fcd34d" },
       { nome: "Ilha", primaria: "#0e7490", destaque: "#fb923c" }
     ],
-    modelos: ["editorial", "natural", "noir"],
+    modelos: ["editorial", "noir"],
     fonte: "elegante",
     fonteSerifa: "elegante",
     fonteSans: "moderna"
@@ -1449,7 +1449,7 @@ var SEGMENTOS = [
       { nome: "Azul noite", primaria: "#0f1f3d", destaque: "#94a3b8" },
       { nome: "Preto e \xE2mbar", primaria: "#18181b", destaque: "#f59e0b" }
     ],
-    modelos: ["showroom", "impacto", "noir"],
+    modelos: ["showroom", "noir"],
     fonte: "forte",
     fonteSerifa: "editorial",
     fonteSans: "forte"
@@ -1491,7 +1491,7 @@ var SEGMENTOS = [
       { nome: "Feira", primaria: "#0f5132", destaque: "#f2a900" },
       { nome: "Promo\xE7\xE3o", primaria: "#b91c1c", destaque: "#facc15" }
     ],
-    modelos: ["agro", "vibrante", "forno"],
+    modelos: ["agro", "vibrante"],
     fonte: "amigavel",
     fonteSerifa: "artesanal",
     fonteSans: "forte"
@@ -1508,7 +1508,7 @@ var GENERICO2 = {
     { nome: "Grafite", primaria: "#334155", destaque: "#38bdf8" },
     { nome: "Vinho", primaria: "#9f1239", destaque: "#fbbf24" }
   ],
-  modelos: ["noir", "premio", "escritorio", "natural"],
+  modelos: ["noir", "premio", "escritorio", "editorial"],
   fonte: "moderna",
   fonteSerifa: "editorial",
   fonteSans: "moderna"
@@ -6448,6 +6448,7 @@ var dadosDoLead = (lead) => {
   };
   return lead ? semearConteudo(base, { cores: true }) : base;
 };
+var MOTOR_VERSAO = "2026-10-19b-cada-nicho-no-seu-modelo";
 var indiceEstavel2 = (texto, n) => {
   let h = 0;
   for (let i = 0; i < texto.length; i++) h = h * 31 + texto.charCodeAt(i) >>> 0;
@@ -6464,7 +6465,7 @@ var montarPrevia = (lead, fotos2 = [], preferido = "", anterior = null) => {
   const ramoBruto = lead?.niche || lead?.role || "";
   const efetivo = ramoEfetivo(ramoBruto, lead?.company || lead?.name || "", lead?.copia_ia?.segmento);
   let dados = dadosDoLead(efetivo !== ramoBruto ? { ...lead, niche: efetivo, role: efetivo } : lead);
-  dados.categoria = String(lead?.copia_ia?.categoria || "").trim().slice(0, 60) || ramoBruto || dados.categoria;
+  dados.categoria = String(lead?.copia_ia?.categoria || lead?.copia_ia?.especialidade || "").trim().slice(0, 60) || ramoBruto || dados.categoria;
   const copia = lead?.copia_ia && typeof lead.copia_ia === "object" && Object.keys(lead.copia_ia).length ? lead.copia_ia : null;
   dados = copia ? aplicarCopia(dados, copia, lead?.city || "") : dados;
   dados = individualizar(dados, lead, !!copia);
@@ -6490,7 +6491,7 @@ var montarPrevia = (lead, fotos2 = [], preferido = "", anterior = null) => {
   const atual = preferido ? SITE_TEMPLATES.find((t) => t.nome === preferido || t.id === preferido) : void 0;
   const template = atual && direcaoDeArte(ramo, dados.empresa).modelos.includes(atual.id) ? atual : escolherTemplate(ramo, dados.empresa);
   const html = template.render({ ...dados, selo: true });
-  return { company: dados.empresa, html, template: template.nome, lead_id: String(lead?.id || ""), builder_data: JSON.stringify(dados) };
+  return { company: dados.empresa, html, template: template.nome, lead_id: String(lead?.id || ""), builder_data: JSON.stringify({ ...dados, motor: MOTOR_VERSAO }) };
 };
 
 // src/templates/sites/render-entry.ts

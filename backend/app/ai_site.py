@@ -258,7 +258,17 @@ REGRAS_DE_CONTEUDO = """REGRAS DE CONTEÚDO (valem para tudo que você escrever)
 - Frases curtas. O visitante lê no celular, em pé, com pressa."""
 
 
-def _prompt_do_conteudo(d: Dict[str, Any], briefing: Dict[str, Any], servico_do_usuario: str) -> str:
+def _bloco_especialista(ficha: Optional[Dict[str, Any]]) -> str:
+    from app import especialista_nicho
+
+    b = especialista_nicho.bloco(ficha)
+    if not b:
+        return ""
+    return (b + "\nOs serviços do site DEVEM ser desta especialidade (os típicos acima, com o nome que o "
+            f"{ficha.get('publico', 'cliente')} procura). Texto de outro ramo (ex.: dente e sorriso numa clínica médica) é erro grave.")
+
+
+def _prompt_do_conteudo(d: Dict[str, Any], briefing: Dict[str, Any], servico_do_usuario: str, ficha: Optional[Dict[str, Any]] = None) -> str:
     mercado = bloco_de_mercado(d.get("niche", ""), d.get("role", ""))
     saber = conhecimento_do_nicho(d.get("niche", ""), d.get("role", ""))
     decide = saber.get("prova", "")
@@ -269,6 +279,8 @@ precisa soar como o negócio dele — não como um modelo preenchido.
 
 O NEGÓCIO (dados verificados)
 {_contexto(d)}
+
+{_bloco_especialista(ficha)}
 
 COMO ESSE MERCADO FUNCIONA
 {mercado}
@@ -354,8 +366,11 @@ async def gerar_conteudo_de_site(
         d.get("company", ""), d.get("niche", ""), d.get("role", ""), d.get("city", "")
     )
 
+    from app import especialista_nicho
+
+    ficha = await especialista_nicho.garantir(d.get("niche") or d.get("role"))
     client = build_client(api_key, TIMEOUT_LONGO_MS)
-    prompt = _prompt_do_conteudo(d, briefing, servico_do_usuario)
+    prompt = _prompt_do_conteudo(d, briefing, servico_do_usuario, ficha)
     if rapido:
         # quem espera na tela (disparo, robo): varios modelos em paralelo e prazo curto; a chamada bloqueia, entao roda em thread
         import asyncio
@@ -380,8 +395,13 @@ async def gerar_conteudo_de_site(
         "diferenciais_detalhe": _lista_de_objetos(dados.get("diferenciais_detalhe"), ("titulo", "texto"), 4, (50, 160)),
         "passos": _lista_de_objetos(dados.get("passos"), ("titulo", "texto"), 3, (40, 160)),
         "faq": _lista_de_objetos(dados.get("faq"), ("pergunta", "resposta"), 5, (120, 300)),
-        "segmento": str(dados.get("segmento") or "").strip().lower() if str(dados.get("segmento") or "").strip().lower() in SEGMENTOS_DO_MOTOR else "",
-        "cta": str(dados.get("cta") or "Falar no WhatsApp")[:30],
+        # o segmento da ficha do especialista vale mais que o palpite desta resposta
+        "segmento": (ficha or {}).get("segmento") if (ficha or {}).get("segmento") in SEGMENTOS_DO_MOTOR and (ficha or {}).get("segmento") != "generico"
+        else (str(dados.get("segmento") or "").strip().lower() if str(dados.get("segmento") or "").strip().lower() in SEGMENTOS_DO_MOTOR else ""),
+        "rotulos": dict((ficha or {}).get("titulos_de_secao") or {}),
+        "publico": str((ficha or {}).get("publico") or ""),
+        "especialidade": str((ficha or {}).get("especialidade") or ""),
+        "cta": str(dados.get("cta") or (ficha or {}).get("acao_principal") or "Falar no WhatsApp")[:30],
         "seo_titulo": str(dados.get("seo_titulo") or "")[:70],
         "seo_descricao": str(dados.get("seo_descricao") or "")[:170],
         "identidade": {

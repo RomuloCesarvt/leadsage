@@ -51,6 +51,13 @@ export const dadosDoLead = (lead: any): SiteData => {
   return lead ? semearConteudo(base, { cores: true }) : base;
 };
 
+/**
+ * Versão do motor de sites. Precisa ser IGUAL a MOTOR_VERSAO em backend/app/previa_site.py (um teste confere): o servidor só refaz
+ * uma prévia quando a versão gravada nela é outra. Sem esta marca, todo site criado pelo Disparo era refeito de novo pelo servidor
+ * ao preparar a mensagem (o dobro de tempo e de chamadas de IA).
+ */
+export const MOTOR_VERSAO = '2026-10-19b-cada-nicho-no-seu-modelo';
+
 const indiceEstavel = (texto: string, n: number): number => {
   let h = 0;
   for (let i = 0; i < texto.length; i++) h = (h * 31 + texto.charCodeAt(i)) >>> 0;
@@ -78,7 +85,7 @@ export const montarPrevia = (lead: any, fotos: string[] = [], preferido = '', an
   const ramoBruto = lead?.niche || lead?.role || '';
   const efetivo = ramoEfetivo(ramoBruto, lead?.company || lead?.name || '', lead?.copia_ia?.segmento);
   let dados = dadosDoLead(efetivo !== ramoBruto ? { ...lead, niche: efetivo, role: efetivo } : lead);
-  dados.categoria = String(lead?.copia_ia?.categoria || '').trim().slice(0, 60) || ramoBruto || dados.categoria;
+  dados.categoria = String(lead?.copia_ia?.categoria || lead?.copia_ia?.especialidade || '').trim().slice(0, 60) || ramoBruto || dados.categoria;
   // o texto da IA para ESTE negócio (quando o servidor trouxe) vale mais que o do banco do ramo; sem ele, o que o Google diz do lugar
   const copia = lead?.copia_ia && typeof lead.copia_ia === 'object' && Object.keys(lead.copia_ia).length ? lead.copia_ia : null;
   dados = copia ? aplicarCopia(dados, copia, lead?.city || '') : dados;
@@ -106,5 +113,5 @@ export const montarPrevia = (lead: any, fotos: string[] = [], preferido = '', an
   const atual = preferido ? SITE_TEMPLATES.find(t => t.nome === preferido || t.id === preferido) : undefined;
   const template = atual && direcaoDeArte(ramo, dados.empresa).modelos.includes(atual.id) ? atual : escolherTemplate(ramo, dados.empresa);
   const html = template.render({ ...dados, selo: true });
-  return { company: dados.empresa, html, template: template.nome, lead_id: String(lead?.id || ''), builder_data: JSON.stringify(dados) };
+  return { company: dados.empresa, html, template: template.nome, lead_id: String(lead?.id || ''), builder_data: JSON.stringify({ ...dados, motor: MOTOR_VERSAO }) };
 };

@@ -139,3 +139,20 @@ def _janela_do_ramo_neutra(monkeypatch):
     from app import conector_whatsapp as _cw
     monkeypatch.setattr(_cw, "janela_do_ramo", lambda ramo, agora: True)
     monkeypatch.setattr(_cw, "PROMOVER_A_CADA_S", 0)
+
+
+
+@pytest.fixture(autouse=True)
+def _especialista_sem_rede(monkeypatch):
+    """A ficha do especialista do nicho nunca chama a IA de verdade nos testes (quem testa a ficha troca _gerar)."""
+    from app import especialista_nicho
+
+    async def nada(nicho):
+        return None
+
+    monkeypatch.setattr(especialista_nicho, "_gerar", nada)
+    especialista_nicho._MEMORIA.clear()
+    especialista_nicho._FALHOU.clear()
+    yield
+    especialista_nicho._MEMORIA.clear()
+    especialista_nicho._FALHOU.clear()

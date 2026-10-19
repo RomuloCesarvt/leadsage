@@ -268,6 +268,10 @@ class SiteCopyResponse(BaseModel):
     faq: List[Dict[str, str]] = Field(default_factory=list)
     # o tipo de negocio que a IA reconheceu (id de segmento do motor de sites); vazio se nao reconheceu
     segmento: str = ""
+    # da ficha do especialista do ramo: titulos de secao, como chamar o cliente e o nome da especialidade
+    rotulos: Dict[str, str] = Field(default_factory=dict)
+    publico: str = ""
+    especialidade: str = ""
     cta: str = ""
     seo_titulo: str = ""
     seo_descricao: str = ""

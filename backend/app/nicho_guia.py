@@ -57,7 +57,9 @@ GUIA: List[Dict[str, object]] = [
     },
     {
         "nome": "Clínica médica e consultório",
-        "chaves": ("clinica medica", "clinica geral", "clinica popular", "clinica de saude", "medic", "consultorio", "dermato", "pediatr", "ortoped", "cardio", "oftalmo", "ginecolog", "fisioterap", "nutri"),
+        "chaves": ("clinica medica", "clinica geral", "clinica popular", "clinica de saude", "medic", "consultorio", "dermato", "pediatr", "ortoped", "cardio", "oftalmo", "ginecolog", "fisioterap", "nutri",
+                   "gastro", "urolog", "endocrin", "neurolog", "otorrino", "reumat", "pneumo", "oncolog", "proctolog", "hematolog", "nefrolog", "angiolog",
+                   "alergist", "imunolog", "infectolog", "mastolog", "geriatr", "obstetr"),
         "cliente": "Decide por confiança: formação, avaliações, aparência profissional e facilidade de agendar. Pesquisa o médico antes de ligar. Regras do CFM limitam promessa e propaganda.",
         "dores": "Agenda com buracos; paciente que não acha o telefone; presença que não passa autoridade; site antigo; avaliações sem resposta.",
         "evitar": "Horário de consulta (manhã e tarde úteis). Melhor: fim do expediente ou intervalo de almoço; secretária costuma filtrar, peça o responsável.",
@@ -235,13 +237,19 @@ def achar(nicho: Optional[str]) -> Optional[Dict[str, object]]:
 
 
 def bloco(nicho: Optional[str]) -> str:
+    """O que o robô sabe do ramo: o guia escrito à mão e, quando já carregada, a ficha do especialista daquele ramo exato
+    (gastroenterologia não é "clínica médica" genérica; ver especialista_nicho)."""
+    from app import especialista_nicho
+
+    ficha = especialista_nicho.bloco(especialista_nicho.da_memoria(nicho))
     g = achar(nicho)
     if not g:
-        return f"Ramo: {nicho or 'não informado'}.\n{METODO_GERAL}"
+        return f"Ramo: {nicho or 'não informado'}.\n{ficha or METODO_GERAL}"
     return (
         f"Ramo: {g['nome']}\n"
         f"- Como o cliente dele decide: {g['cliente']}\n"
         f"- Dores comuns do ramo (confirme perguntando, não afirme): {g['dores']}\n"
         f"- Evite marcar reunião: {g['evitar']}\n"
         f"- Objeções típicas: {g['objecoes']}"
+        + (f"\n{ficha}" if ficha else "")
     )

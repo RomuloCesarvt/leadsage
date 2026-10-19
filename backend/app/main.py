@@ -1431,6 +1431,7 @@ async def robo_testar(req: RoboTesteRequest, user: dict = Depends(get_current_us
     if await check_and_deduct_credits(uid, robo_service.CUSTO_RESPOSTA, email) is None:
         raise HTTPException(status_code=402, detail="Créditos insuficientes para testar o robô.")
 
+    await robo_service._carregar_especialista(lead)
     try:
         decisao = await asyncio.wait_for(
             asyncio.to_thread(

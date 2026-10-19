@@ -111,3 +111,18 @@ def test_sem_chave_do_gemini_a_copia_e_vazia_e_nao_quebra(monkeypatch):
     from app.config import settings
     monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
     assert _rodar(previa_site.copia_do_lead({"id": "1", "company": "X"})) == {}
+
+
+def test_versao_do_motor_e_a_mesma_no_navegador_e_no_servidor():
+    """Se divergirem, todo site criado pelo Disparo e refeito pelo servidor ao preparar a mensagem (lento e em dobro)."""
+    import pathlib
+    import re
+    ts = (pathlib.Path(__file__).resolve().parents[1] / "frontend" / "src" / "templates" / "sites" / "previa.ts").read_text(encoding="utf-8")
+    assert re.search(r"export const MOTOR_VERSAO = '([^']+)'", ts).group(1) == previa_site.MOTOR_VERSAO
+
+
+def test_site_feito_pelo_disparo_com_a_versao_atual_nao_e_refeito(monkeypatch):
+    site = {"id": "s1", "lead_id": "l1", "slug": "psico", "template": "Natural", "updated_at": "",
+            "builder_data": json.dumps({"empresa": "x", "motor": previa_site.MOTOR_VERSAO})}
+    gravados = _preparar(monkeypatch, site)
+    assert _rodar(previa_site.atualizar_se_antigo("u", "e@x.com", LEAD)) is False and gravados == []

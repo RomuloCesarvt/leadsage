@@ -36,6 +36,18 @@ CUSTO_RESPOSTA = 1
 Enviar = Callable[[str, str, str, Dict[str, Any]], Awaitable[str]]
 
 
+async def _carregar_especialista(lead: Optional[Dict[str, Any]]) -> None:
+    """A ficha de especialista do ramo do lead, carregada antes de o robô responder (uma vez por ramo; depois vem da memória)."""
+    nicho = (lead or {}).get("niche") or (lead or {}).get("role")
+    if not nicho:
+        return
+    from app import especialista_nicho
+    try:
+        await asyncio.wait_for(especialista_nicho.garantir(nicho), timeout=12)
+    except Exception:
+        pass  # sem a ficha, o robô usa o guia escrito à mão
+
+
 def _gerador_padrao() -> Callable[[str], Dict[str, Any]]:
     from app.ai_client import build_client, gerar_json
 
@@ -365,6 +377,7 @@ async def _processar(
 
     # 5 e 6. regras fixas, depois IA
     gerador = gerar or _gerador_padrao()
+    await _carregar_especialista(lead)
     try:
         decisao: Decisao = await asyncio.wait_for(
             asyncio.to_thread(
