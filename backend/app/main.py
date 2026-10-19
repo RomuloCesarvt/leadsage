@@ -1232,6 +1232,20 @@ async def fila_descartar(req: FilaIdsRequest, user: dict = Depends(get_current_u
     return {"descartadas": n, "resumo": fila_envio.resumo(await fila_envio.listar(user.get("uid")))}
 
 
+@app.post("/api/robo/whats/retomar")
+async def whats_retomar(user: dict = Depends(get_current_user)):
+    """Tira a pausa por falhas seguidas (o usuário conferiu que o número está normal)."""
+    await exigir_recurso(user, "ia_abordagem", "O disparo")
+    uid = user.get("uid")
+    canal = await robo_store.canal_do_usuario(uid)
+    if not canal:
+        raise HTTPException(status_code=404, detail="O WhatsApp ainda não foi conectado.")
+    canal = {**canal, "uid": uid}
+    conector_whatsapp.retomar(canal)
+    await _gravar_canal_do_conector(canal)
+    return await conector_whatsapp.estado_da_fila(canal)
+
+
 @app.post("/api/robo/fila/descartar-todos")
 async def fila_descartar_todos(user: dict = Depends(get_current_user)):
     """Esvazia a fila inteira de uma vez (rascunhos, pendentes, com falha); o que ja foi enviado fica."""

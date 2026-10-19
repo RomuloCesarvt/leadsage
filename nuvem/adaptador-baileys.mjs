@@ -135,6 +135,8 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
   const entregas = criarRastreadorDeEntrega();
   let jaPediuCodigo = false;
   let tentativas = 0;
+  let conflitos = 0;      // 440 seguidos: outra conexão usando a mesma conta
+  let abertoEm = 0;
 
   const digitando = criarDigitando(async (contato, st) => {
     const chat = destinos.get(contato);
@@ -205,7 +207,7 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
         }
       }
       if (u.connection === 'open') {
-        pronto = true; tentativas = 0;
+        pronto = true; tentativas = 0; abertoEm = Date.now();
         aoPronto(digitos(s.user?.id));
       }
       if (u.connection === 'close') {
@@ -220,7 +222,18 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
           aoCair('o WhatsApp foi desconectado pelo celular');
         }
         tentativas += 1;
-        await dormir(Math.min(30000, 2000 * tentativas)); // sem martelar o WhatsApp
+        if (codigo === 440) {
+          // outra conexão com a mesma conta: reconectar na hora só derruba a outra e vira briga sem fim (nenhum envio passa)
+          conflitos = abertoEm && Date.now() - abertoEm > 120000 ? 1 : conflitos + 1;
+          if (conflitos >= 4) {
+            parado = true;
+            aoCair('outra conexão está usando este WhatsApp (conflito); o serviço parou para não derrubar o número');
+            return;
+          }
+          await dormir(20000 * conflitos);
+        } else {
+          await dormir(Math.min(30000, 2000 * tentativas)); // sem martelar o WhatsApp
+        }
         abrir().catch((e) => { aviso('Falha ao reconectar:', e.message); });
       }
     });

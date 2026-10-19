@@ -205,13 +205,21 @@ export const FilaDeEnvio: React.FC = () => {
           setAvisoPrevias(`${criar.length - falhas} site(s) gerado(s) agora.${semVaga ? ` ${semVaga} lead(s) ficaram sem prévia por falta de vagas de site no seu plano` : ''}${falhas ? ` ${falhas} falharam` : ''}: para eles a mensagem oferece montar a prévia, em vez de dizer que já está pronta.`);
         }
       }
-      for (let i = 0; i < escolhidos.length; i += LOTE) {
-        const parte = escolhidos.slice(i, i + LOTE);
-        const r = await api.filaPreparar(parte as unknown as Record<string, unknown>[], 'Consultivo', true);
-        setResultados(prev => [...prev, ...r.resultados]);
-        setResumo(r.resumo);
-        setProgresso({ feitos: Math.min(i + LOTE, escolhidos.length), total: escolhidos.length });
-      }
+      // dois lotes por vez: metade do tempo de espera, sem passar do que a IA gratuita aguenta por minuto
+      const partes: typeof escolhidos[] = [];
+      for (let i = 0; i < escolhidos.length; i += LOTE) partes.push(escolhidos.slice(i, i + LOTE));
+      let feitosLote = 0; let proxima = 0;
+      const lote = async () => {
+        while (proxima < partes.length) {
+          const parte = partes[proxima++];
+          const r = await api.filaPreparar(parte as unknown as Record<string, unknown>[], 'Consultivo', true);
+          setResultados(prev => [...prev, ...r.resultados]);
+          setResumo(r.resumo);
+          feitosLote += parte.length;
+          setProgresso({ feitos: Math.min(feitosLote, escolhidos.length), total: escolhidos.length });
+        }
+      };
+      await Promise.all([lote(), lote()]);
       setMarcados(new Set());
       setAba('revisar');
       await atualizarPipeline();
@@ -452,6 +460,12 @@ export const FilaDeEnvio: React.FC = () => {
           <b className="flex items-center gap-1.5">{whats.online ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />} WhatsApp: {whats.online ? 'conectado' : 'desconectado'}</b>
           <span>Hoje: <b>{whats.enviadas_hoje}</b> de <b>{whats.limite_hoje}</b> abordagens (o limite sobe 5 por dia, até 60)</span>
           {whats.motivo && <span className="basis-full">{whats.motivo}</span>}
+          {/falhas seguidas/i.test(whats.motivo || '') && (
+            <button onClick={() => acao('retomar', async () => setWhats(await api.whatsRetomar()), 'Não foi possível retomar.')} disabled={!!trabalhando}
+              className="mt-1 px-3 py-1.5 rounded-lg bg-white border border-emerald-300 text-emerald-800 text-xs font-bold hover:bg-emerald-50 disabled:opacity-50">
+              Já conferi o número: retomar os envios
+            </button>
+          )}
         </div>
       )}
 

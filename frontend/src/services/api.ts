@@ -478,6 +478,11 @@ export const api = {
     return await fetchWithToken('/robo/conector/parear', { method: 'POST', body: JSON.stringify({ numero }) });
   },
 
+  /** Tira a pausa por falhas seguidas (o usuário conferiu que o número está normal). */
+  async whatsRetomar(): Promise<EstadoFilaWhats> {
+    return await fetchWithToken('/robo/whats/retomar', { method: 'POST' });
+  },
+
   async filaEnviarAgora(id: string): Promise<EstadoFilaWhats> {
     return await fetchWithToken(`/robo/fila/${encodeURIComponent(id)}/enviar-agora`, { method: 'POST' });
   },

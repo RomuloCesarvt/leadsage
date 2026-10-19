@@ -134,3 +134,30 @@ def test_teste_de_envio_vai_para_o_proprio_numero_e_mostra_o_resultado(client, c
     client.post(f"/api/conector/tarefas/{sid}/resultado", headers=cab, json={"ok": False, "erro": "o WhatsApp não confirmou o envio"})
     r = client.get(f"/api/robo/whats/teste/{sid}").json()
     assert r["status"] == "falhou" and "não confirmou" in r["erro"]
+
+
+def test_queda_de_conexao_do_servico_nao_pausa_o_numero(client, com_robo, rodar):
+    """O WhatsApp do serviço caiu (conflito, desconectado): não é sinal de número restrito, não conta para a pausa."""
+    client.post("/api/robo/conector/gerar")
+    canal = rodar(robo_store.canal_do_usuario, "alice")
+    for i in range(5):
+        rodar(fila_envio._gravar, "alice", {"id": f"c{i}", "canal": "whatsapp", "status": "enviando", "contato": {"phone": "14998003784"}, "texto": "oi", "criado": "2026-10-14"})
+        rodar(cw.registrar_resultado, canal, f"fila:c{i}", False, "O WhatsApp não está conectado agora.")
+    assert not canal.get("cw_pausa_ate") and not canal.get("cw_falhas")
+    assert cw.falha_de_conexao("Connection Closed") and cw.falha_de_conexao("Stream Errored (conflict)")
+    assert not cw.falha_de_conexao("o WhatsApp recusou a mensagem (o número pode estar restrito)")
+
+
+def test_retomar_tira_a_pausa(client, com_robo, rodar):
+    client.post("/api/robo/conector/gerar")
+    canal = rodar(robo_store.canal_do_usuario, "alice")
+    for i in range(3):
+        rodar(fila_envio._gravar, "alice", {"id": f"r{i}", "canal": "whatsapp", "status": "enviando", "contato": {"phone": "14998003784"}, "texto": "oi", "criado": "2026-10-14"})
+        rodar(cw.registrar_resultado, canal, f"fila:r{i}", False, "o WhatsApp recusou a mensagem")
+    from app import main
+    rodar(main._gravar_canal_do_conector, {**canal, "uid": "alice"})
+    assert rodar(robo_store.canal_do_usuario, "alice").get("cw_pausa_ate")
+    r = client.post("/api/robo/whats/retomar")
+    assert r.status_code == 200, r.text
+    assert not rodar(robo_store.canal_do_usuario, "alice").get("cw_pausa_ate")
+    assert "falhas seguidas" not in (r.json().get("motivo") or "")

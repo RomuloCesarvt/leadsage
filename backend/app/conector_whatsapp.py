@@ -498,6 +498,20 @@ async def enviar_agora(uid: str, item_id: str) -> bool:
     return True
 
 
+_FALHA_DE_CONEXAO = re.compile(r"n[aã]o est[aá] conectado|connection (closed|lost|failure)|conflict|stream errored|timed out|timeout", re.I)
+
+
+def falha_de_conexao(erro: str) -> bool:
+    """O envio falhou porque a conexão do serviço caiu, não porque o WhatsApp recusou a mensagem."""
+    return bool(_FALHA_DE_CONEXAO.search(erro or ""))
+
+
+def retomar(canal: Dict[str, Any]) -> None:
+    """O usuário conferiu o número e quer voltar a enviar: tira a pausa por falhas e zera a contagem."""
+    canal.pop("cw_pausa_ate", None)
+    canal["cw_falhas"] = 0
+
+
 async def registrar_resultado(canal: Dict[str, Any], tarefa_id: str, ok: bool, erro: str = "") -> bool:
     """O Conector diz se enviou. Abordagem fria move o lead no funil.
 
@@ -508,6 +522,8 @@ async def registrar_resultado(canal: Dict[str, Any], tarefa_id: str, ok: bool, e
     agora = _agora_dt()
     if ok:
         canal["cw_falhas"] = 0
+    elif falha_de_conexao(erro):
+        pass  # o WhatsApp do serviço estava desconectado: tentar de novo depois, sem pausar o número
     else:
         canal["cw_falhas"] = int(canal.get("cw_falhas") or 0) + 1
         if canal["cw_falhas"] >= FALHAS_PARA_PAUSAR:

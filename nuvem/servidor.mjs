@@ -194,6 +194,16 @@ export class Sessao {
       return;
     }
 
+    try {
+      await this.laco();
+    } finally {
+      // saiu do laço por qualquer motivo (chave revogada, erro, parar): o WhatsApp DESTA sessão fecha junto.
+      // Sem isso ficava um socket órfão conectado e a sessão nova da mesma conta brigava com ele (440 "conflict" sem fim).
+      if (!this.parou) { this.parou = true; try { await this.wa?.parar(); } catch { /* já fechou */ } }
+    }
+  }
+
+  async laco() {
     while (!this.parou) {
       try {
         if (this.pronto && Date.now() >= this.proximaSaida) {

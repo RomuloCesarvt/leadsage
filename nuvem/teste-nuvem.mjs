@@ -404,3 +404,25 @@ test('envio só vale quando o WhatsApp confirma: confirmou, recusou ou ficou sem
   r.registrar('E', 3); r.registrar('E', 2);
   assert.equal(r.nivel('E'), 3);
 });
+
+test('sessão: chave revogada fecha o WhatsApp desta sessão (sem socket órfão brigando com a nova: 440 sem fim)', async () => {
+  const antes = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    const json = (o, status = 200) => ({ ok: status === 200, status, text: async () => JSON.stringify(o) });
+    if (u.endsWith('/ping')) return json({ ok: true, robo_ativo: true, remoto: false, abrir: [], parear: '' });
+    if (u.endsWith('/tarefas')) return json({ detail: 'Chave do Conector inválida ou revogada.' }, 401);
+    return json({ ok: true });
+  };
+  let fechou = 0;
+  const fabrica = async (o) => {
+    setTimeout(() => o.aoPronto('5511900000000'), 10);
+    return { enviar: async () => ({ ok: true }), chats: async () => [], mensagens: async () => [], digitar() {}, parar: async () => { fechou++; }, sair: async () => {} };
+  };
+  const s = new Sessao({ uid: 'u2', chave: 'lsc_y', site: 'https://x.test', dados: mkdtempSync(join(tmpdir(), 'nv-')), aviso: () => {}, fabrica });
+  try {
+    await Promise.race([s.rodar(), new Promise((_, rej) => setTimeout(() => rej(new Error('a sessão não saiu do laço')), 8000))]);
+  } finally { globalThis.fetch = antes; }
+  assert.equal(fechou, 1, 'o WhatsApp da sessão que saiu foi fechado');
+  assert.equal(s.parou, true);
+});
