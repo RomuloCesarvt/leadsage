@@ -135,3 +135,11 @@ def test_codigo_sincrono_dentro_do_laco_nao_trava_o_servidor():
         assert asyncio.new_event_loop().run_until_complete(dentro()) < 0.5
     finally:
         ia_gate.LOOP = None
+
+
+def test_limites_do_gemini_sobem_pelo_ambiente_quando_a_conta_e_paga(monkeypatch):
+    assert ia_gate.Alvo("gemini:x", "gemini", None).rpm == ia_gate.RPM_PADRAO["gemini"]
+    monkeypatch.setenv("IA_RPM_GEMINI", "300")
+    monkeypatch.setenv("IA_TPM_GEMINI", "2000000")
+    a = ia_gate.Alvo("gemini:x", "gemini", None)
+    assert a.rpm == 300 and a.tpm == 2000000

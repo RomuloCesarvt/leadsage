@@ -14,6 +14,7 @@ Agora cada pedido passa por aqui:
   4. com banco SQL, o orçamento e as pausas são COMPARTILHADOS entre todas as instâncias do servidor (a Vercel abre várias).
 """
 import asyncio
+import os
 import re
 import time
 from collections import deque
@@ -32,13 +33,21 @@ _ESTADO: Dict[str, Dict[str, Any]] = {}
 _AVISADO: Dict[str, float] = {}
 
 
+def _env_int(nome: str) -> int:
+    try:
+        return int(os.getenv(nome) or 0)
+    except ValueError:
+        return 0
+
+
 class Alvo:
     """Um modelo de um provedor. `chamar(limite_s)` faz o pedido e devolve o texto."""
 
     def __init__(self, chave: str, tipo: str, chamar, tpm: Optional[int] = None, rpm: Optional[int] = None):
         self.chave, self.tipo, self.chamar = chave, tipo, chamar
-        self.tpm = tpm or TPM_PADRAO.get(tipo, 20000)
-        self.rpm = rpm or RPM_PADRAO.get(tipo, 10)
+        # com a conta paga (ex.: créditos do Google AI Ultra) os limites sobem: IA_RPM_GEMINI=300 IA_TPM_GEMINI=2000000 (e igual para os outros tipos)
+        self.tpm = tpm or _env_int(f"IA_TPM_{tipo.upper()}") or TPM_PADRAO.get(tipo, 20000)
+        self.rpm = rpm or _env_int(f"IA_RPM_{tipo.upper()}") or RPM_PADRAO.get(tipo, 10)
 
     def __repr__(self) -> str:
         return f"Alvo({self.chave})"
