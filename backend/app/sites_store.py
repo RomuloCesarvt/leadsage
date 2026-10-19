@@ -3,8 +3,8 @@
 Antes o HTML so vivia no useState da tela de criacao: ao sair, sumia, e a
 tela "Meus Sites" ficava num estado vazio permanente.
 
-Mesma estrategia do perfil: Firestore quando ha credencial (no Vercel o
-SQLite fica em /tmp e e efemero) e SQLite no dev local.
+O banco SQL (Postgres em producao, SQLite no dev) e a fonte principal; o Firestore guarda uma copia e os
+sites antigos, que passam para o SQL quando sao lidos.
 """
 import re
 import secrets
@@ -56,20 +56,6 @@ def _row_to_dict(row: DBSite, include_html: bool = True) -> Dict[str, Any]:
     return data
 
 
-async def contar_sites(uid: str) -> int:
-    """Quantos sites o usuario ja tem. Base para a cota do plano."""
-    if firestore_db is not None:
-        try:
-            docs = firestore_db.collection("users").document(uid).collection("sites").stream()
-            return sum(1 for _ in docs)
-        except Exception as exc:
-            print(f"Falha ao contar sites no Firestore: {exc}")
-
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(DBSite).where(DBSite.owner_uid == uid))
-        return len(result.scalars().all())
-
-
 def _validar(html: str, builder_data: str) -> None:
     if not html.strip():
         raise ValueError("O site não tem conteúdo para publicar.")
@@ -105,69 +91,121 @@ def _esquecer_apelido(slug: str) -> None:
         print(f"Falha ao remover apelido do site: {exc}")
 
 
+
+
+# --------------------------------------------------------------------------------------------- onde o site mora
+#
+# O banco SQL (Postgres na Vercel) é a fonte principal; o Firestore é só uma cópia e a origem dos sites antigos.
+# Antes era o contrário, e o Firestore sem cota quebrava o link: o site criado durante a falta de cota ia só para o SQL,
+# mas o link público procurava só no Firestore ("Site não encontrado"); e o site gravado no Firestore sem o índice do
+# apelido (a segunda gravação falhava) também sumia.
+
+_CAMPOS = ("id", "company", "template", "lead_id", "html", "builder_data", "slug", "created_at", "updated_at")
+
+
+def _fs_sites(uid: str):
+    return firestore_db.collection("users").document(uid).collection("sites")
+
+
+def _fs_ler(uid: str, site_id: str) -> Optional[Dict[str, Any]]:
+    if firestore_db is None:
+        return None
+    try:
+        doc = _fs_sites(uid).document(site_id).get()
+        return doc.to_dict() if doc.exists else None
+    except Exception as exc:
+        print(f"Firestore: não leu o site {site_id}: {type(exc).__name__}")
+        return None
+
+
+def _fs_listar(uid: str) -> List[Dict[str, Any]]:
+    if firestore_db is None:
+        return []
+    try:
+        return [{k: v for k, v in (d.to_dict() or {}).items() if k != "html"} for d in _fs_sites(uid).stream()]
+    except Exception as exc:
+        print(f"Firestore: não listou os sites: {type(exc).__name__}")
+        return []
+
+
+def _fs_gravar(uid: str, site: Dict[str, Any], so_mudancas: Optional[Dict[str, Any]] = None) -> None:
+    """Cópia no Firestore (melhor esforço: falhar aqui não perde nada, o SQL já tem)."""
+    if firestore_db is None:
+        return
+    try:
+        ref = _fs_sites(uid).document(site["id"])
+        if so_mudancas is not None:
+            ref.set(so_mudancas, merge=True)
+        else:
+            ref.set({k: site.get(k) for k in _CAMPOS})
+        if site.get("slug"):
+            _registrar_apelido(site["slug"], uid, site["id"])
+    except Exception as exc:
+        print(f"Firestore: cópia do site não gravada ({type(exc).__name__}); o SQL tem o site")
+
+
+async def _sql_linha(session, uid: str, site_id: str):
+    return (await session.execute(select(DBSite).where(DBSite.id == site_id, DBSite.owner_uid == uid))).scalar_one_or_none()
+
+
+async def _sql_guardar(uid: str, site: Dict[str, Any]) -> None:
+    """Grava (ou regrava) o site inteiro no SQL."""
+    async with AsyncSessionLocal() as session:
+        row = await _sql_linha(session, uid, site["id"])
+        dados = {k: (site.get(k) if site.get(k) is not None else "") for k in _CAMPOS if k != "id"}
+        if row is None:
+            session.add(DBSite(owner_uid=uid, id=site["id"], **dados))
+        else:
+            for k, v in dados.items():
+                setattr(row, k, v)
+        await session.commit()
+
+
+async def contar_sites(uid: str) -> int:
+    """Quantos sites o usuario ja tem. Base para a cota do plano."""
+    return len(await list_sites(uid))
+
+
 async def html_publico(slug: str) -> Optional[str]:
     """O HTML de um site pelo apelido, sem login.
 
-    E o que faz a venda acontecer: o dono da padaria abre o link no
-    celular e ve o site pronto. Devolve so o HTML — nada de dono, lead
-    ou data.
+    E o que faz a venda acontecer: o dono da padaria abre o link no celular e ve o site pronto. Devolve so o HTML.
+    SQL primeiro; sem ele, o indice do Firestore (sites antigos), e o site achado la passa a morar no SQL.
     """
     if not slug:
         return None
-
-    if firestore_db is not None:
-        try:
-            ponteiro = firestore_db.collection("sites_publicos").document(slug).get()
-            if not ponteiro.exists:
-                return None
-            dados = ponteiro.to_dict() or {}
-            doc = (
-                firestore_db.collection("users")
-                .document(dados.get("uid", ""))
-                .collection("sites")
-                .document(dados.get("site_id", ""))
-                .get()
-            )
-            return (doc.to_dict() or {}).get("html") if doc.exists else None
-        except Exception as exc:
-            print(f"Falha ao ler site publico no Firestore: {exc}")
-
     async with AsyncSessionLocal() as session:
-        result = await session.execute(select(DBSite).where(DBSite.slug == slug))
-        row = result.scalar_one_or_none()
-        return (row.html or "") if row else None
+        row = (await session.execute(select(DBSite).where(DBSite.slug == slug))).scalars().first()
+        if row is not None and (row.html or "").strip():
+            return row.html
+    if firestore_db is None:
+        return None
+    try:
+        ponteiro = firestore_db.collection("sites_publicos").document(slug).get()
+        if not ponteiro.exists:
+            return None
+        dados = ponteiro.to_dict() or {}
+        uid, site_id = dados.get("uid", ""), dados.get("site_id", "")
+        site = _fs_ler(uid, site_id)
+        if not site:
+            return None
+        await _sql_guardar(uid, {**site, "id": site_id})
+        return site.get("html")
+    except Exception as exc:
+        print(f"Falha ao ler site publico no Firestore: {exc}")
+        return None
 
 
 async def garantir_apelido(uid: str, site: Dict[str, Any]) -> Dict[str, Any]:
-    """Da apelido a um site criado antes desta funcionalidade existir.
-
-    Sem isso os sites que o usuario ja tinha ficariam sem link para
-    sempre, e ele teria de refazer cada um so para conseguir mandar.
-    """
+    """Da apelido a um site criado antes desta funcionalidade existir."""
     if site.get("slug"):
         return site
-
-    novo = apelido(site.get("company", ""))
+    completo = await get_site(uid, site["id"]) or site
+    novo = apelido(site.get("company", "") or completo.get("company", ""))
+    completo = {**completo, "slug": novo}
+    await _sql_guardar(uid, completo)
+    _fs_gravar(uid, completo, {"slug": novo})
     site["slug"] = novo
-
-    if firestore_db is not None:
-        try:
-            firestore_db.collection("users").document(uid).collection("sites").document(
-                site["id"]
-            ).update({"slug": novo})
-            _registrar_apelido(novo, uid, site["id"])
-            return site
-        except Exception as exc:
-            print(f"Falha ao dar apelido a site antigo: {exc}")
-
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(DBSite).where(DBSite.id == site["id"], DBSite.owner_uid == uid)
-        )
-        row = result.scalar_one_or_none()
-        if row is not None:
-            row.slug = novo
-            await session.commit()
     return site
 
 
@@ -176,7 +214,6 @@ async def create_site(
     builder_data: str = "",
 ) -> Dict[str, Any]:
     _validar(html, builder_data)
-
     site = {
         "id": f"site_{uuid.uuid4().hex[:10]}",
         "company": company or "Site sem nome",
@@ -188,20 +225,8 @@ async def create_site(
         "created_at": _now(),
         "updated_at": "",
     }
-
-    if firestore_db is not None:
-        try:
-            firestore_db.collection("users").document(uid).collection("sites").document(
-                site["id"]
-            ).set(site)
-            _registrar_apelido(site["slug"], uid, site["id"])
-            return site
-        except Exception as exc:
-            print(f"Falha ao gravar site no Firestore: {exc}")
-
-    async with AsyncSessionLocal() as session:
-        session.add(DBSite(owner_uid=uid, **site))
-        await session.commit()
+    await _sql_guardar(uid, site)      # se falhar aqui, a criação falha de verdade (nada de "criado" que não existe)
+    _fs_gravar(uid, site)
     return site
 
 
@@ -209,20 +234,11 @@ async def update_site(
     uid: str, site_id: str, company: str, html: str, template: str = "",
     builder_data: str = "", marcar_edicao: bool = True,
 ) -> Optional[Dict[str, Any]]:
-    """Regrava um site que ja existe.
-
-    Antes so havia create_site: quem ajustava um site e publicava de novo
-    ganhava um duplicado em "Meus Sites" e perdia mais uma vaga da cota.
-    Editar nao deve custar uma vaga — a vaga foi paga na criacao.
-
-    Devolve None quando o site nao e do usuario, para o endpoint responder
-    404 em vez de criar um registro solto.
-    """
+    """Regrava um site que ja existe (editar não gasta vaga). None quando o site nao e do usuario."""
     _validar(html, builder_data)
     atual = await get_site(uid, site_id)
     if atual is None:
         return None
-
     mudancas = {
         "company": company or atual.get("company") or "Site sem nome",
         "template": template or atual.get("template") or "",
@@ -230,100 +246,61 @@ async def update_site(
         "builder_data": builder_data,
         "updated_at": _now() if marcar_edicao else (atual.get("updated_at") or ""),
     }
-
-    if firestore_db is not None:
-        try:
-            firestore_db.collection("users").document(uid).collection("sites").document(
-                site_id
-            ).update(mudancas)
-            return {**atual, **mudancas}
-        except Exception as exc:
-            print(f"Falha ao atualizar site no Firestore: {exc}")
-
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(DBSite).where(DBSite.id == site_id, DBSite.owner_uid == uid)
-        )
-        row = result.scalar_one_or_none()
-        if row is None:
-            return None
-        for campo, valor in mudancas.items():
-            setattr(row, campo, valor)
-        await session.commit()
-        return _row_to_dict(row)
+    novo = {**atual, **mudancas, "id": site_id}
+    if not novo.get("slug"):
+        novo["slug"] = apelido(novo["company"])
+    await _sql_guardar(uid, novo)
+    _fs_gravar(uid, novo, {**mudancas, "slug": novo["slug"]})
+    return novo
 
 
 async def list_sites(uid: str) -> List[Dict[str, Any]]:
-    """Lista sem o HTML: a listagem nao precisa carregar cada pagina inteira."""
-    if firestore_db is not None:
-        try:
-            docs = (
-                firestore_db.collection("users").document(uid).collection("sites").stream()
-            )
-            items = [{k: v for k, v in (d.to_dict() or {}).items() if k != "html"} for d in docs]
-            items.sort(key=lambda s: s.get("created_at", ""), reverse=True)
-            return items
-        except Exception as exc:
-            print(f"Falha ao listar sites no Firestore: {exc}")
-
+    """Lista sem o HTML. Junta o SQL com os sites antigos que só existem no Firestore."""
     async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(DBSite).where(DBSite.owner_uid == uid).order_by(DBSite.created_at.desc())
-        )
-        return [_row_to_dict(r, include_html=False) for r in result.scalars().all()]
+        result = await session.execute(select(DBSite).where(DBSite.owner_uid == uid))
+        itens = {r.id: _row_to_dict(r, include_html=False) for r in result.scalars().all()}
+    for s in _fs_listar(uid):
+        if s.get("id") and s["id"] not in itens:
+            itens[s["id"]] = s
+    return sorted(itens.values(), key=lambda s: s.get("created_at") or "", reverse=True)
 
 
 async def get_site(uid: str, site_id: str) -> Optional[Dict[str, Any]]:
-    if firestore_db is not None:
-        try:
-            doc = (
-                firestore_db.collection("users")
-                .document(uid)
-                .collection("sites")
-                .document(site_id)
-                .get()
-            )
-            if doc.exists:
-                return doc.to_dict()
-        except Exception as exc:
-            print(f"Falha ao ler site no Firestore: {exc}")
-
     async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(DBSite).where(DBSite.id == site_id, DBSite.owner_uid == uid)
-        )
-        row = result.scalar_one_or_none()
-        return _row_to_dict(row) if row else None
+        row = await _sql_linha(session, uid, site_id)
+        if row is not None:
+            return _row_to_dict(row)
+    antigo = _fs_ler(uid, site_id)
+    if antigo:
+        antigo = {**antigo, "id": site_id}
+        try:
+            await _sql_guardar(uid, antigo)   # passa a morar no SQL
+        except Exception as exc:
+            print(f"Não copiou o site antigo para o SQL: {type(exc).__name__}")
+        return antigo
+    return None
 
 
 async def delete_site(uid: str, site_id: str) -> bool:
+    apagou = False
+    slug = ""
+    async with AsyncSessionLocal() as session:
+        row = await _sql_linha(session, uid, site_id)   # o filtro por owner_uid impede apagar o site de outro usuario
+        if row is not None:
+            slug = row.slug or ""
+            await session.delete(row)
+            await session.commit()
+            apagou = True
     if firestore_db is not None:
         try:
-            ref = (
-                firestore_db.collection("users")
-                .document(uid)
-                .collection("sites")
-                .document(site_id)
-            )
+            ref = _fs_sites(uid).document(site_id)
             doc = ref.get()
             if doc.exists:
-                # O apelido tem de morrer junto: um link vivo apontando
-                # para site apagado e pior do que link quebrado.
-                _esquecer_apelido((doc.to_dict() or {}).get("slug", ""))
+                slug = slug or (doc.to_dict() or {}).get("slug", "")
                 ref.delete()
-                return True
-            return False
+                apagou = True
         except Exception as exc:
-            print(f"Falha ao apagar site no Firestore: {exc}")
-
-    async with AsyncSessionLocal() as session:
-        # O filtro por owner_uid impede apagar o site de outro usuario
-        result = await session.execute(
-            select(DBSite).where(DBSite.id == site_id, DBSite.owner_uid == uid)
-        )
-        row = result.scalar_one_or_none()
-        if not row:
-            return False
-        await session.delete(row)
-        await session.commit()
-        return True
+            print(f"Firestore: não apagou a cópia do site: {type(exc).__name__}")
+    # o apelido morre junto: link vivo apontando para site apagado e pior do que link quebrado
+    _esquecer_apelido(slug)
+    return apagou
