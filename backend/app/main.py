@@ -1876,6 +1876,7 @@ async def conector_ping(req: ConectorPing, request: Request):
         canal.setdefault("cw_primeiro", canal["cw_visto"])
         if req.numero:
             canal["cw_numero"] = re.sub(r"\D", "", req.numero)[:20]
+        await conector_whatsapp.restaurar_aquecimento(canal)  # reconectar o mesmo numero nao zera o aquecimento
         canal["cw_status"] = req.status
         canal["cw_versao"] = req.versao
         await _gravar_canal_do_conector(canal)
@@ -2023,6 +2024,7 @@ async def conector_tarefas(request: Request):
     canal = await _canal_do_conector(request)
     if not canal.get("cw_primeiro"):
         canal["cw_primeiro"] = datetime.now(timezone.utc).isoformat()
+        await conector_whatsapp.restaurar_aquecimento(canal)
     antes = (canal.get("cw_ultimo_frio"), canal.get("cw_frio_n"), canal.get("cw_primeiro"))
     resposta = await conector_whatsapp.tarefas(canal)
     agora_dt = datetime.now(timezone.utc)

@@ -72,8 +72,48 @@ def chave_valida(chave: str) -> bool:
     return bool(CHAVE_RE.match(chave or ""))
 
 
+def _so_digitos(numero: Any) -> str:
+    return re.sub(r"\D", "", str(numero or ""))[:20]
+
+
+def lembrar_aquecimento(canal: Dict[str, Any]) -> None:
+    """Guarda, por número, desde quando ele está conectado. Trocar a chave ou reconectar o MESMO número não zera o aquecimento
+    (o limite do dia voltava a 10 e o número perdia dias de confiança)."""
+    numero, primeiro = _so_digitos(canal.get("cw_numero")), canal.get("cw_primeiro")
+    if numero and primeiro:
+        historico = canal.setdefault("cw_aquec", {})
+        antigo = _ler_data(historico.get(numero))
+        if not antigo or (_ler_data(primeiro) and _ler_data(primeiro) < antigo):
+            historico[numero] = primeiro
+
+
+async def restaurar_aquecimento(canal: Dict[str, Any]) -> None:
+    """Devolve ao canal a data de primeira conexão deste número, se ele já esteve conectado antes.
+
+    Na primeira vez também olha os envios antigos da fila: quem já mandava mensagens antes de existir este registro
+    (e teve o aquecimento zerado por uma reconexão) recupera os dias que já cumpriu.
+    """
+    numero = _so_digitos(canal.get("cw_numero"))
+    historico = canal.setdefault("cw_aquec", {})
+    candidatas = [d for d in (_ler_data(canal.get("cw_primeiro")), _ler_data(historico.get(numero)) if numero else None) if d]
+    if not canal.get("cw_aquec_ok") and canal.get("uid"):
+        canal["cw_aquec_ok"] = True
+        try:
+            for item in await fila_envio.listar(canal["uid"]):
+                if item.get("canal") == "whatsapp" and item.get("status") == "enviado":
+                    d = _ler_data(item.get("enviado_em"))
+                    if d:
+                        candidatas.append(d)
+        except Exception as exc:  # sem a fila, fica com o que o canal ja sabe
+            print(f"Aquecimento: não leu os envios antigos: {exc}")
+    if candidatas:
+        canal["cw_primeiro"] = min(candidatas).isoformat()
+    lembrar_aquecimento(canal)
+
+
 async def criar_chave(canal: Dict[str, Any]) -> str:
     """Gera uma chave nova (a anterior deixa de valer). Só aparece uma vez."""
+    lembrar_aquecimento(canal)
     antigo = canal.get("cw_hash")
     if antigo:
         await robo_store.esquecer_ativo("conector", antigo)
@@ -86,6 +126,7 @@ async def criar_chave(canal: Dict[str, Any]) -> str:
 
 
 async def revogar(canal: Dict[str, Any]) -> Dict[str, Any]:
+    lembrar_aquecimento(canal)
     if canal.get("cw_hash"):
         await robo_store.esquecer_ativo("conector", canal["cw_hash"])
     for campo in CAMPOS_CONECTOR:

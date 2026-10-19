@@ -183,6 +183,28 @@ def _agora_brasil(agora: Optional[datetime] = None) -> str:
     return f"{dias[t.weekday()]}, {t.strftime('%d/%m/%Y %H:%M')} (horário de Brasília)"
 
 
+_DIAS_DA_SEMANA = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
+
+
+def _proximo_dia_util(base: datetime) -> datetime:
+    d = base + timedelta(days=1)
+    while d.weekday() >= 5:   # sabado e domingo nao contam
+        d += timedelta(days=1)
+    return d
+
+
+def prazo_da_reuniao(agora: Optional[datetime] = None) -> str:
+    """O dia mais perto possivel para a conversa, ja com a data: o robo propunha 'daqui a uns dias' e o cliente esfriava."""
+    t = (agora or datetime.now(timezone.utc)) - timedelta(hours=3)
+    util_hoje = t.weekday() < 5
+    amanha = _proximo_dia_util(t)
+    nome = lambda d: f"{_DIAS_DA_SEMANA[d.weekday()]} ({d.strftime('%d/%m')})"
+    alvo = f"amanhã, {nome(amanha)}" if (amanha - t).days == 1 else nome(amanha)
+    hoje = f" Se ainda for antes das 16h de hoje ({_DIAS_DA_SEMANA[t.weekday()]}) e o cliente estiver quente, pode oferecer hoje mais tarde." if util_hoje and t.hour < 16 else ""
+    return (f"O dia mais próximo é {alvo}.{hoje} Segundo dia útil: "
+            f"{nome(_proximo_dia_util(amanha))}.")
+
+
 def montar_prompt(
     mensagens: List[Dict[str, Any]],
     canal: str,
@@ -258,8 +280,13 @@ Avance uma etapa por vez: abertura → descoberta → diagnóstico → proposta 
 2. Termine cada mensagem com UM próximo passo, no formato mais fácil de aceitar: pergunta de sim/não ou escolha entre duas opções.
 3. Regra dos 3 turnos: até a 3ª resposta do cliente já deve existir um convite concreto ({"fechar" if vender else "uma conversa de 15 minutos"} ou ver o material). Descoberta longa cansa e esfria.
 4. Sinal de compra (perguntou preço, prazo, "como funciona", "quero ver", elogiou, disse que precisa): PARE de qualificar e proponha o horário agora.
-5. Convide com dois horários concretos nos próximos dois ou três dias úteis, usando a data de hoje acima (ex.: "amanhã, quinta, às 15h ou sexta às 10h"),
-   fora do horário de pico do ramo. Se houver link de agenda, ofereça junto.
+5. URGÊNCIA DA REUNIÃO: a conversa é no PRÓXIMO DIA ÚTIL. {prazo_da_reuniao(agora)}
+   Convide com dois horários concretos NESSE MESMO dia (ex.: "amanhã, quinta, às 10h ou às 15h"), fora do horário de pico do ramo.
+   Cada dia de espera é chance de o cliente esfriar, desistir ou conhecer outro fornecedor: nunca ofereça "semana que vem" nem
+   um dia mais distante na primeira proposta. Só se ele disser que NÃO consegue nesse dia, pergunte qual o primeiro dia que ele
+   consegue e proponha o mais cedo possível (no máximo o segundo dia útil); se ele escolher mais longe, aceite, confirme e diga que
+   vai lembrá-lo no dia anterior. Se disser só "semana que vem", volte com o dia mais cedo em que dê ("consigo na terça às 10h, 15 minutos").
+   Se houver link de agenda, ofereça junto.
 6. Diminua o esforço do sim: 15 minutos, por vídeo ou ligação, "eu te mostro e você decide, sem compromisso".
 7. Quando ele confirmar: repita dia, data e hora, peça o melhor WhatsApp ou ligação e quem mais deve participar, e passe para o humano.
 8. "Vou pensar": descubra o que falta ("é o valor, o momento ou prefere ver antes?") e ofereça um passo pequeno, nunca um "fico no aguardo".
