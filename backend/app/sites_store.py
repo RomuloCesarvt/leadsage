@@ -122,7 +122,7 @@ def _fs_listar(uid: str) -> List[Dict[str, Any]]:
     if firestore_db is None:
         return []
     try:
-        return [{k: v for k, v in (d.to_dict() or {}).items() if k != "html"} for d in _fs_sites(uid).stream()]
+        return [dict(d.to_dict() or {}) for d in _fs_sites(uid).stream()]
     except Exception as exc:
         print(f"Firestore: não listou os sites: {type(exc).__name__}")
         return []
@@ -261,7 +261,13 @@ async def list_sites(uid: str) -> List[Dict[str, Any]]:
         itens = {r.id: _row_to_dict(r, include_html=False) for r in result.scalars().all()}
     for s in _fs_listar(uid):
         if s.get("id") and s["id"] not in itens:
-            itens[s["id"]] = s
+            # site que só existia no Firestore: passa a morar no SQL (assim o link público dele abre mesmo sem o índice antigo)
+            if str(s.get("html") or "").strip():
+                try:
+                    await _sql_guardar(uid, s)
+                except Exception as exc:
+                    print(f"Não copiou o site {s['id']} para o SQL: {type(exc).__name__}")
+            itens[s["id"]] = {k: v for k, v in s.items() if k not in ("html", "builder_data")}
     return sorted(itens.values(), key=lambda s: s.get("created_at") or "", reverse=True)
 
 

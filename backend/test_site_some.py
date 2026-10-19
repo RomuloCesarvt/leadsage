@@ -95,3 +95,21 @@ def test_apagar_tira_dos_dois_e_o_link_morre(fs):
     assert _rodar(ss.delete_site("u1", site["id"])) is True
     assert _rodar(ss.html_publico(site["slug"])) is None
     assert _rodar(ss.delete_site("outro", site["id"])) is False
+
+
+def test_site_antigo_sem_indice_abre_depois_que_o_dono_lista_os_sites(fs):
+    """Site gravado só no Firestore e sem o índice do apelido: ao listar (Meus sites, Disparo) ele passa para o SQL e o link abre."""
+    fs.docs["users/u7/sites/site_x"] = {"id": "site_x", "company": "Confeitaria Ana", "html": HTML, "slug": "confeitaria-ana-ab12", "created_at": "2026-10-19"}
+    assert _rodar(ss.html_publico("confeitaria-ana-ab12")) is None
+    _rodar(ss.list_sites("u7"))
+    assert _rodar(ss.html_publico("confeitaria-ana-ab12")) == HTML
+
+
+def test_fila_ve_a_previa_criada_mesmo_quando_ela_foi_gravada_so_no_sql(fs):
+    """A fila mostrava "sem prévia": a lista de sites vinha só do Firestore, e o site recém-criado estava no SQL."""
+    from app import main
+    fs.falhar = True
+    _rodar(ss.create_site("u1", "Confeitaria Ana", HTML, "Forno", "lead_ana"))
+    fs.falhar = False
+    assert _rodar(main._previa_do_lead("u1", "lead_ana")) == "criada"
+    assert _rodar(main._previa_do_lead("u1", "outro_lead")) == "oferecer"
