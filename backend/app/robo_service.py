@@ -59,7 +59,7 @@ def _gerador_padrao() -> Callable[[str], Dict[str, Any]]:
     # Resposta de vendedor no WhatsApp tem de sair em segundos: motores em paralelo, o mais rapido vence
     # (antes era um depois do outro, e a IA estourava o prazo: "a IA demorou demais").
     return lambda prompt: gerar_json(cliente, prompt, tentativas=2, prazo=time.monotonic() + PRAZO_IA - 1.5,
-                                     rapido=True, max_tokens=700)
+                                     rapido=True, max_tokens=700, qualidade=True)
 
 
 async def _lead_do_contato(uid: str, canal: str, contato: str) -> Optional[Dict[str, Any]]:

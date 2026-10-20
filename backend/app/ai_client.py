@@ -120,7 +120,7 @@ def _tokens_do_pedido(prompt: str, max_tokens: Optional[int]) -> int:
     return int(len(prompt) / 3) + int(max_tokens or 1500)
 
 
-def _alvos(client, prompt: str, max_tokens: Optional[int], json_mode: bool) -> list:
+def _alvos(client, prompt: str, max_tokens: Optional[int], json_mode: bool, qualidade: bool = False) -> list:
     """Todos os modelos que podem responder, do mais rápido ao mais lento: cada modelo de cada provedor gratuito com chave
     (respondem em ~1 s), depois os do Gemini. Cada um com o seu orçamento no portão (ia_gate)."""
     from app import ai_providers, ia_gate
@@ -128,6 +128,8 @@ def _alvos(client, prompt: str, max_tokens: Optional[int], json_mode: bool) -> l
     alvos = []
     for prov in ai_providers.ativos():
         for modelo in ai_providers.modelos_alvo(prov):
+            if qualidade and ai_providers.e_pequeno(modelo):
+                continue    # texto para cliente: modelo pequeno escreve seco e igual
             chave = f"{prov['nome']}:{modelo}"
             alvo = ia_gate.Alvo(chave, prov["nome"], None)
 
@@ -155,6 +157,8 @@ def _alvos(client, prompt: str, max_tokens: Optional[int], json_mode: bool) -> l
             alvo.chamar = chamar
             alvos.append(alvo)
     for modelo in MODEL_CHAIN:
+        if qualidade and ai_providers.e_pequeno(modelo):
+            continue
         alvos.append(ia_gate.Alvo(
             f"gemini:{modelo}", "gemini",
             lambda limite_s, modelo=modelo: _tentar_modelo(client, modelo, prompt, int(max(3.0, limite_s) * 1000), max_tokens),
@@ -201,7 +205,7 @@ def _ensinar_falha(alvo, exc: Exception) -> None:
 
 
 def generate_hedged(client, prompt: str, prazo: float, atraso: float = 7.0, max_tokens: Optional[int] = None,
-                    json_mode: bool = True) -> str:
+                    json_mode: bool = True, qualidade: bool = False) -> str:
     """Escreve o texto no primeiro motor gratuito que está livre (portão da IA: ia_gate).
 
     Um pedido por vez em cada modelo, sem rajada: o motor livre mais rápido atende; se nenhum está livre, espera o primeiro
@@ -212,7 +216,7 @@ def generate_hedged(client, prompt: str, prazo: float, atraso: float = 7.0, max_
     from app import ia_gate
 
     try:
-        alvos = _alvos(client, prompt, max_tokens, json_mode)
+        alvos = _alvos(client, prompt, max_tokens, json_mode, qualidade)
     except Exception as exc:
         raise AIIndisponivel(f"Os motores de IA não puderam ser preparados agora ({type(exc).__name__}). Tente de novo em instantes.", espera_s=10) from exc
     tokens = _tokens_do_pedido(prompt, max_tokens)
@@ -330,6 +334,7 @@ def gerar_json(
     prazo: Optional[float] = None,
     rapido: bool = False,
     max_tokens: Optional[int] = None,
+    qualidade: bool = False,
 ) -> Dict[str, Any]:
     """Pede JSON ao modelo e devolve dicionário — ou levanta AIIndisponivel.
 
@@ -344,7 +349,7 @@ def gerar_json(
 
     for tentativa in range(max(1, tentativas)):
         if rapido and prazo is not None:
-            bruto = generate_hedged(client, pedido, prazo, max_tokens=max_tokens)
+            bruto = generate_hedged(client, pedido, prazo, max_tokens=max_tokens, qualidade=qualidade)
         else:
             bruto = generate_with_fallback(client, pedido, prazo=prazo)
         try:

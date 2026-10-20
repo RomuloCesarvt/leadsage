@@ -52,10 +52,12 @@ def test_sem_identidade_o_robo_continua_como_antes():
 
 def test_a_abordagem_do_disparo_usa_o_nome_e_a_empresa_da_pessoa():
     e = abordagem_mestra.estrutura("Seometria", canal="whatsapp", lead_id="x", apresentacao="Rômulo, consultor estratégico da Seometria Marketing Digital")
-    assert "Eu sou Rômulo, consultor estratégico da Seometria Marketing Digital e ajudo" in e
+    ap = "Rômulo, consultor estratégico da Seometria Marketing Digital"
+    assert any(f.format(x=ap) in e for f in abordagem_mestra.INTROS_COM_NOME)      # o jeito de se apresentar varia, o nome e a empresa não
     assert "LeadSage" not in e
-    # sem apresentacao, o jeito de sempre
-    assert "Eu sou da Seometria e ajudo" in abordagem_mestra.estrutura("Seometria", canal="whatsapp", lead_id="x")
+    # sem apresentacao, o nome da empresa do perfil
+    sem = abordagem_mestra.estrutura("Seometria", canal="whatsapp", lead_id="x")
+    assert any(f.format(x="Seometria") in sem for f in abordagem_mestra.INTROS_DA_EMPRESA)
 
 
 def test_marcador_do_nome_vira_o_nome_da_pessoa():

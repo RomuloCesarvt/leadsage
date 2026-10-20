@@ -63,7 +63,8 @@ def test_prompt_tem_o_metodo_completo():
     p = _prompt_da_abordagem(req, "whatsapp")
     for trecho in ("COMO ESCREVER A PRIMEIRA MENSAGEM", "quem você é em UMA frase", "ESTILO DESTA MENSAGEM", "O PRODUTO", "GATILHOS", "O RAMO DESTE NEGÓCIO", "TEMPERATURA", "Agora é"):
         assert trecho in p, trecho
-    assert "Eu sou da Sites Já" in p
+    assert any(f.format(x="Sites Já") in p for f in am.INTROS_DA_EMPRESA)
+    assert "VOZ (a diferença entre gente e disparo)" in p
     assert "Nunca por saudação" not in p
 
 
@@ -96,13 +97,13 @@ def test_prompt_pede_achei_no_google_e_a_previa():
 def test_estrutura_muda_conforme_a_previa_exista():
     criada = abordagem_mestra.estrutura("LeadSage", previa="criada")
     oferecer = abordagem_mestra.estrutura("LeadSage", previa="oferecer")
-    assert "JÁ montou uma prévia" in criada and "posso te mandar o link" in criada and "10 minutinhos" not in criada
-    assert "ainda não existe" in oferecer and "posso montar essa prévia" in oferecer and "JÁ montou" not in oferecer
+    assert "JÁ montou uma prévia" in criada and any(x in criada for x in am.PEDIDOS_CRIADA) and "10 minutinhos" not in criada
+    assert "ainda não existe" in oferecer and any(x in oferecer for x in am.PEDIDOS_OFERECER) and "JÁ montou" not in oferecer
     assert "10 minutinhos" in abordagem_mestra.estrutura("LeadSage")      # sem modo: o texto antigo
 
 
 def test_roteiro_com_previa_criada_pede_licenca_para_enviar():
-    bom = "Boa tarde! Montei uma prévia do site de vocês, sem compromisso. Posso te mandar o link por aqui?"
+    bom = "Boa tarde! Montei uma prévia do site de vocês, sem compromisso. Posso te mandar por aqui?"
     assert abordagem_mestra.revisar_roteiro(bom, False, "criada") == []
     sem_pedido = "Boa tarde! Montei uma prévia do site de vocês, sem compromisso."
     assert any("licença" in p for p in abordagem_mestra.revisar_roteiro(sem_pedido, False, "criada"))
@@ -130,15 +131,15 @@ def test_whatsapp_pede_as_cinco_partes_em_45_a_65_palavras_e_email_continua_long
     req = PitchGenerationRequest(lead=lead(site_status="none"), channel="whatsapp", sender_name="Sites Já", user_product="Site", previa="criada")
     p = _prompt_da_abordagem(req, "whatsapp")
     assert "de 45 a 65 palavras" in p and "no máximo 65 palavras" in p
-    for parte in ("quem você é", "pesquisando no Google", "reputação", "NÃO encontrou o site", "criou uma prévia", "mostrar o quanto isso pode ajudar", "posso te enviar o link"):
+    for parte in ("quem você é", "pesquisando no Google", "reputação", "NÃO encontrou o site", "criou uma prévia", "mostrar o quanto isso pode ajudar", 'NUNCA use a palavra "link"'):
         assert parte in p, parte
     longo = _prompt_da_abordagem(PitchGenerationRequest(lead=lead(site_status="none"), channel="email", sender_name="X"), "email")
     assert "CUMPRIMENTO humano" in longo and "COMO ESCREVER A PRIMEIRA MENSAGEM" not in longo
 
 
 def test_cada_lead_abre_de_um_jeito_e_a_tentativa_seguinte_troca():
-    estilos = {am.estilo_da_mensagem(f"lead-{i}") for i in range(40)}
-    assert len(estilos) == len(am.ESTILOS_DE_ABERTURA)             # os seis jeitos aparecem
+    estilos = {am.estilo_da_mensagem(f"lead-{i}") for i in range(300)}
+    assert len(estilos) == len(am.ESTILOS_DE_ABERTURA)             # todos os jeitos aparecem
     assert am.estilo_da_mensagem("x", 0) != am.estilo_da_mensagem("x", 1)
     assert am.estilo_da_mensagem("x", 3) == am.estilo_da_mensagem("x", 3)   # estavel para o mesmo lead e tentativa
 

@@ -21,6 +21,7 @@ minuto, Cerebras ~1 milhão de tokens por dia nos modelos liberados, OpenRouter 
 por dia nos ":free". Por isso nenhum deles é o único: o primeiro que responder vence.
 """
 import os
+import re
 import time
 from typing import Any, Dict, List, Optional
 
@@ -55,6 +56,16 @@ PROVEDORES: List[Dict[str, Any]] = [
 
 _CACHE_MODELOS: Dict[str, Any] = {}
 _CACHE_TTL_S = 3600
+
+# Modelos pequenos: rápidos, mas escrevem mensagens curtas, secas e iguais ("simples"). Para o texto que vai a um cliente
+# (abordagem e resposta do robô) ficam de fora; servem só para tarefas internas.
+MODELOS_PEQUENOS = ("nemo", "lite", "gemma")
+
+
+def e_pequeno(modelo: str) -> bool:
+    m = (modelo or "").lower()
+    # "8b" e "20b" só valem sozinhos: "gpt-oss-120b" não é um modelo de 20 bilhões
+    return any(p in m for p in MODELOS_PEQUENOS) or bool(re.search(r"(?<![0-9])(8|20)b\b", m))
 
 
 class ProvedorFalhou(RuntimeError):

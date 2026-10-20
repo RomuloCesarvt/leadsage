@@ -12,6 +12,7 @@ real (as avaliações do próprio negócio), baixo atrito. Nunca urgência
 inventada, escassez falsa ou número que não veio dos dados.
 """
 import re
+import zlib
 from datetime import datetime
 from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo
@@ -86,11 +87,10 @@ PREVIA_CRIADA = """   c) Diga que JÁ montou uma prévia de como o site dele pod
       licença para enviar. Não mande o link neste primeiro toque."""
 PREVIA_OFERECER = """   c) Diga que pode montar, sem custo e sem compromisso, uma prévia de como o site dele poderia ficar. NÃO diga que já montou nem que
       já está pronta: ela ainda não existe. Não mande link."""
-PERGUNTA_CRIADA = """5. PERGUNTA DE BAIXO ATRITO: UMA só, no fim, que se responde com um "sim":
-   "posso te mandar o link da prévia por aqui, sem compromisso?" (adapte ao canal e ao tom). Não ofereça reunião nesta mensagem:
-   a conversa rápida vem depois que ele vir a prévia."""
-PERGUNTA_OFERECER = """5. PERGUNTA DE BAIXO ATRITO: UMA só, no fim, que se responde com um "sim":
-   "posso montar essa prévia para você dar uma olhada, sem compromisso?" (adapte ao canal e ao tom). Não ofereça reunião nesta mensagem."""
+PERGUNTA_CRIADA = """5. PERGUNTA DE BAIXO ATRITO: UMA só, no fim, que se responde com um "sim", neste jeito: "{pedido}" (adapte ao canal e ao tom;
+   nunca use a palavra "link"). Não ofereça reunião nesta mensagem: a conversa rápida vem depois que ele vir a prévia."""
+PERGUNTA_OFERECER = """5. PERGUNTA DE BAIXO ATRITO: UMA só, no fim, que se responde com um "sim", neste jeito: "{pedido}" (adapte ao canal e ao tom;
+   nunca use a palavra "link"). Não ofereça reunião nesta mensagem."""
 
 PONTO_SEM_SITE = """4. A LACUNA, O BENEFÍCIO E A PRÉVIA (é o coração da mensagem), em três frases curtas:
    a) Diga que NÃO encontrou um site do negócio e que quer confirmar se realmente não existe (como afirmação, sem ponto de
@@ -133,26 +133,87 @@ TEMPERATURA = """TEMPERATURA E MOMENTO
 - Se o ramo tem hora de pico (veja o guia do ramo), reconheça que ele deve estar ocupado e mostre que a mensagem é rápida."""
 
 
-def quem_sou(sender_name: str, apresentacao: str = "") -> str:
+# Variações. Mensagens iguais em todos os números são o caminho mais curto para o spam: cada lead recebe a sua combinação (apresentação,
+# o que faz, como chama a prévia, a pergunta final, o jeito de abrir e o tamanho). `n` é a posição no lote: números seguidos nunca repetem.
+def escolher(pool: tuple, lead_id: str = "", n: int = 0, sal: str = "", passo: int = 1):
+    base = zlib.crc32(f"{lead_id}|{sal}".encode("utf-8"))
+    return pool[(base + int(n or 0) * passo) % len(pool)]
+
+
+VALORES = (
+    "ajudo negócios locais a serem encontrados e escolhidos no Google",
+    "trabalho para que negócios como o seu apareçam mais quando o cliente pesquisa no Google",
+    "ajudo quem tem negócio local a transformar buscas no Google em conversas no WhatsApp",
+    "cuido da presença digital de negócios locais: site, Google e WhatsApp",
+    "monto sites para negócios locais que querem ser achados com mais facilidade",
+    "ajudo comércios e prestadores de serviço a aparecerem melhor na internet",
+)
+INTROS_COM_NOME = ("Eu sou {x}", "Aqui é {x}", "Me chamo {x}", "Sou {x}", "Meu nome é {x}")
+INTROS_DA_EMPRESA = ("Eu sou da {x}", "Falo da {x}", "Sou da {x}", "Aqui é da {x}")
+TERMOS_DA_PREVIA = ("a prévia", "o esboço", "uma versão de teste", "um modelo", "uma amostra", "o que montei")
+
+# A pergunta final: um "sim" fácil, em palavras diferentes de um lead para o outro. Nenhuma usa a palavra "link" (soa como spam).
+PEDIDOS_CRIADA = (
+    "posso te mostrar? É rapidinho de ver, sem compromisso.",
+    "quer dar uma olhada? Sem compromisso nenhum.",
+    "posso te enviar a prévia pra você avaliar, sem compromisso?",
+    "faz sentido eu te mostrar o que montei? Fica à vontade pra dizer não.",
+    "te mando por aqui pra você dar uma espiada com calma?",
+    "posso compartilhar com você? É só dar uma olhada, sem obrigação.",
+    "quer que eu te mostre como ficou? Sem custo nem compromisso.",
+    "posso deixar você ver? Se não curtir, sem problema nenhum.",
+    "se você topar, te envio pra ver e me contar o que achou. Sem compromisso, tá?",
+    "quer ver como ficou? Eu te mando agora, sem compromisso.",
+)
+PEDIDOS_OFERECER = (
+    "posso montar essa prévia pra você dar uma olhada, sem compromisso?",
+    "quer que eu monte um esboço pra você ver como ficaria? Sem compromisso nenhum.",
+    "se fizer sentido, preparo uma versão de teste pra você avaliar. Pode ser?",
+    "posso desenhar uma ideia de como ficaria o site de vocês, sem custo?",
+    "topa que eu monte um modelo pra você ver, sem compromisso?",
+    "te faço um esboço rápido, sem compromisso, pra você ver o que acha?",
+    "posso preparar uma amostra de como poderia ficar? É sem compromisso.",
+)
+TAMANHOS = (
+    "Entre 3 e 4 frases curtas.",
+    "4 frases curtas; a última é a pergunta.",
+    "Até 5 frases, bem enxutas.",
+    "Bem curta: 3 frases e a pergunta.",
+)
+
+VOZ_HUMANA = """VOZ (a diferença entre gente e disparo): escreva como uma pessoa de verdade no WhatsApp, não como empresa. Frases curtas,
+vocabulário de conversa ("pra", "tá", "rapidinho" são bem-vindos), sem "Prezado", "venho por meio desta", "gostaria de apresentar",
+sem lista, sem negrito. Cite UM detalhe só deste negócio (a nota, o que os clientes elogiam, o bairro). Não copie um molde de frase:
+esta mensagem tem a sua própria ordem e o seu próprio jeito. No máximo 1 emoji. {tamanho}"""
+
+
+def quem_sou(sender_name: str, apresentacao: str = "", lead_id: str = "", n: int = 0) -> str:
+    valor = escolher(VALORES, lead_id, n, "valor", 5)
     if (apresentacao or "").strip():
-        return f"Eu sou {apresentacao.strip()} e ajudo negócios locais a serem encontrados e escolhidos no Google"
+        x = apresentacao.strip()
+        pool = INTROS_COM_NOME if not x.lower().startswith("a equipe") else INTROS_COM_NOME[:2]
+        return f"{escolher(pool, lead_id, n, 'intro', 3).format(x=x)} e {valor}"
     nome = (sender_name or "").strip()
     if not nome or nome.lower() in ("prospecção leadsage", "leadsage prospecção", "prospecção"):
-        return "Eu sou <seu nome>, ajudo negócios locais a serem encontrados e escolhidos no Google"
-    return f"Eu sou da {nome} e ajudo negócios locais a serem encontrados e escolhidos no Google"
+        return f"Eu sou <seu nome>, {valor}"
+    return f"{escolher(INTROS_DA_EMPRESA, lead_id, n, 'intro', 3).format(x=nome)} e {valor}"
 
 
-ESTRUTURA_WHATSAPP = """COMO ESCREVER A PRIMEIRA MENSAGEM (prosa corrida, de 4 a 6 frases curtas, em linhas curtas, sem listas)
-1. {saudacao}, <nome da pessoa se estiver no dossiê>! + quem você é em UMA frase curta: "{apresentacao}".
+ESTRUTURA_WHATSAPP = """COMO ESCREVER A PRIMEIRA MENSAGEM (prosa corrida, em linhas curtas, sem listas)
+1. {saudacao}, <nome da pessoa se estiver no dossiê>! + quem você é em UMA frase curta, neste jeito: "{apresentacao}" (pode ajustar a ordem das palavras).
 2. COMO ACHOU E A REPUTAÇÃO: diz que encontrou o negócio pesquisando no Google e cita o dado REAL do dossiê (nota, número de
    avaliações ou o que os clientes elogiam). Elogio verdadeiro, sem exagero.
 3. {lacuna}
 4. {previa_c}
 5. {pergunta}
 ESTILO DESTA MENSAGEM (para ela ser diferente das outras do lote): {estilo}
+{voz}
 {evitar}"""
 
 ESTILOS_DE_ABERTURA = (
+    "abra com uma pergunta curta e natural sobre o negócio (algo que se responde fácil) antes de se apresentar.",
+    "abra dizendo que viu o negócio de um jeito simpático e específico, sem formalidade, e só depois se apresente.",
+    "abra com uma frase leve sobre o ramo ou o bairro, como quem puxa conversa, e então se apresente.",
     "abra pela reputação: comece citando a nota ou as avaliações e só depois se apresente.",
     "abra com o cumprimento e o nome, apresente-se e vá direto ao que achou no Google.",
     "abra com uma observação específica sobre o negócio (algo que os clientes elogiam) e depois se apresente.",
@@ -168,6 +229,20 @@ def estilo_da_mensagem(lead_id: str = "", variacao: int = 0) -> str:
     return ESTILOS_DE_ABERTURA[base % len(ESTILOS_DE_ABERTURA)]
 
 
+def sorteio_da_mensagem(lead_id: str, previa: str, n: int) -> Dict[str, str]:
+    """As variações desta mensagem: como chamar a prévia, a pergunta final e o tamanho (para não saírem iguais em todos os números)."""
+    # "o que montei" só vale quando a prévia já existe: a que ainda vai ser montada nunca é dada como pronta
+    termo = escolher(TERMOS_DA_PREVIA if previa != "oferecer" else TERMOS_DA_PREVIA[:5], lead_id, n, "termo", 5)
+    pool = PEDIDOS_OFERECER if previa == "oferecer" else PEDIDOS_CRIADA
+    pedido = escolher(pool, lead_id, n, "pedido", 3)
+    return {
+        "termo": termo,
+        "pergunta": (f'UMA pergunta de sim, no fim, neste jeito: "{pedido}" (ajuste no máximo duas palavras ao negócio; não troque por outro molde, '
+                     f'e NUNCA use a palavra "link"). Quando falar da prévia, chame de "{termo}".'),
+        "tamanho": escolher(TAMANHOS, lead_id, n, "tamanho", 1),
+    }
+
+
 def estrutura(sender_name: str, agora: Optional[datetime] = None, sem_site: bool = True, previa: str = "",
               canal: str = "", lead_id: str = "", variacao: int = 0, evitar: Optional[list] = None, apresentacao: str = "") -> str:
     if (canal or "").startswith("whatsapp"):
@@ -177,33 +252,35 @@ def estrutura(sender_name: str, agora: Optional[datetime] = None, sem_site: bool
         if previa == "oferecer":
             previa_c = ("Diz que, por isso, pode montar uma prévia do site dele(a) sem custo, para apresentar e mostrar o quanto isso pode ajudar "
                         "ainda mais o negócio (mais gente achando e chamando no WhatsApp). NÃO diga que já existe. Não mande link.")
-            pergunta = 'UMA pergunta de sim, no fim: "posso montar essa prévia para você dar uma olhada, sem compromisso?" (adapte, com suas palavras).'
         else:
             previa_c = ("Diz que, por isso, criou uma prévia do site dele(a), já pronta, para apresentar e mostrar o quanto isso pode ajudar ainda mais "
                         "o negócio (mais gente achando e chamando no WhatsApp). Não mande o link neste primeiro toque.")
-            pergunta = 'UMA pergunta de sim, no fim: "posso te enviar o link da prévia por aqui, sem compromisso?" (adapte, com suas palavras).'
+        sorteio = sorteio_da_mensagem(lead_id, previa, variacao)
+        pergunta = sorteio["pergunta"]
         passadas = [str(x).strip()[:80] for x in (evitar or []) if str(x).strip()][:6]
         return ESTRUTURA_WHATSAPP.format(
-            saudacao=saudacao_do_horario(agora), apresentacao=quem_sou(sender_name, apresentacao), lacuna=lacuna, previa_c=previa_c,
-            pergunta=pergunta, estilo=estilo_da_mensagem(lead_id, variacao),
+            saudacao=saudacao_do_horario(agora), apresentacao=quem_sou(sender_name, apresentacao, lead_id, variacao), lacuna=lacuna, previa_c=previa_c,
+            pergunta=pergunta, estilo=estilo_da_mensagem(lead_id, variacao), voz=VOZ_HUMANA.format(tamanho=sorteio["tamanho"]),
             evitar=("NÃO comece como estas mensagens já usadas neste lote: " + " | ".join(f'"{p}"' for p in passadas)) if passadas else "",
         )
-    return _estrutura_longa(sender_name, agora, sem_site, previa, apresentacao)
+    return _estrutura_longa(sender_name, agora, sem_site, previa, apresentacao, lead_id, variacao)
 
 
-def _estrutura_longa(sender_name: str, agora: Optional[datetime] = None, sem_site: bool = True, previa: str = "", apresentacao: str = "") -> str:
+def _estrutura_longa(sender_name: str, agora: Optional[datetime] = None, sem_site: bool = True, previa: str = "", apresentacao: str = "",
+                     lead_id: str = "", variacao: int = 0) -> str:
     """`previa`: "criada", "oferecer" ou vazio (comportamento antigo: montou e oferece mostrar por aqui ou em 10 minutos)."""
     ponto = PONTO_SEM_SITE if sem_site else PONTO_COM_SITE
     antigo_c = ("   c) Diga que montou uma prévia de como o site dele poderia ficar e que gostaria de apresentá-la sem obrigação nenhuma.")
     previa_c = {"criada": PREVIA_CRIADA, "oferecer": PREVIA_OFERECER}.get(previa, antigo_c)
     texto = ESTRUTURA.format(
-        saudacao=saudacao_do_horario(agora), apresentacao=quem_sou(sender_name, apresentacao),
+        saudacao=saudacao_do_horario(agora), apresentacao=quem_sou(sender_name, apresentacao, lead_id, variacao),
         ponto_do_site=ponto.format(previa_c=previa_c),
     )
     pergunta = {"criada": PERGUNTA_CRIADA, "oferecer": PERGUNTA_OFERECER}.get(previa)
     if pergunta:
         i = texto.index("5. PERGUNTA DE BAIXO ATRITO")
-        texto = texto[:i] + pergunta
+        pedido = escolher(PEDIDOS_OFERECER if previa == "oferecer" else PEDIDOS_CRIADA, lead_id, variacao, "pedido", 3)
+        texto = texto[:i] + pergunta.format(pedido=pedido)
     return texto
 
 
@@ -213,8 +290,8 @@ def bloco_do_ramo(nicho: Optional[str]) -> str:
 
 _CUMPRIMENTO = re.compile(r"\b(oi|ol[aá]|bom dia|boa tarde|boa noite|e a[ií])\b", re.I)
 _APRESENTACAO = re.compile(
-    r"\b(sou (?:a |o |da |do |d[aeo] )?\w+|me chamo|meu nome|aqui [ée]|falo da|falo do|trabalho (?:com|na|no)|"
-    r"sou d[aoe]|ajudo|ajudamos|cuido|criamos|crio|fa[cç]o sites?|fazemos)\b",
+    r"\b(sou (?:a |o |da |do |d[aeo] )?\w+|me chamo|meu nome|aqui [ée]|falo da|falo do|trabalho (?:com|na|no|para|pra)|"
+    r"sou d[aoe]|ajudo|ajudamos|cuido|criamos|crio|monto|fa[cç]o sites?|fazemos)\b",
     re.I,
 )
 
@@ -235,27 +312,30 @@ def revisar_roteiro(texto: str, sem_site: bool, previa: str = "") -> list:
     t = (texto or "").lower()
     problemas = []
     if previa in ("criada", "oferecer"):
-        montou = re.search(r"(montei|preparei|criei|fiz|deixei)[^.?!]{0,40}(pr[eé]via|esbo[çc]o)", t)
+        coisa = r"(pr[eé]via|esbo[çc]o|vers[aã]o|modelo|amostra|o que (?:eu )?(?:montei|fiz|preparei)|ideia)"
+        montou = re.search(r"\b(montei|preparei|criei|fiz|deixei|desenhei|elaborei)\b[^.?!]{0,50}" + coisa, t) or re.search(r"o que (?:eu )?(?:montei|fiz|preparei)", t)
+        if re.search(r"\blink\b", t):
+            problemas.append('usa a palavra "link" no primeiro toque (soa como spam): fale da prévia, do esboço ou do que você montou')
         if previa == "criada":
             if not montou:
                 problemas.append("não diz que você já montou a prévia do site")
-            if not re.search(r"(posso|quer|gostaria)[^.?!]{0,30}(mandar|enviar|compartilhar|te mostrar)|te (mando|envio)", t):
-                problemas.append("não pede licença para enviar o link da prévia (ex.: \"posso te mandar o link por aqui?\")")
+            if not re.search(r"(mand|envi|mostr|compartilh|dar uma (?:olhada|espiada)|\bver\b|avali|conferir)", t):
+                problemas.append("não pede licença para mostrar a prévia (uma pergunta fácil, ex.: \"quer dar uma olhada?\")")
         else:
             if montou:
                 problemas.append("diz que já montou a prévia, mas ela ainda não existe: ofereça montar")
-            if not re.search(r"(posso|quer|gostaria)[^.?!]{0,30}(montar|criar|preparar|fazer)|montar (uma |essa )?pr[eé]via|criar (uma |essa )?pr[eé]via", t):
-                problemas.append("não oferece montar a prévia (ex.: \"posso montar uma prévia para você ver?\")")
+            if not re.search(r"(posso|quer|gostaria|topa|faz sentido|se (?:fizer|quiser)|te fa[çc]o)[^.?!]{0,50}(mont|cri|prepar|fazer|desenh|esbo|ideia|amostra|versão|versao)", t):
+                problemas.append("não oferece montar a prévia (uma pergunta fácil, ex.: \"quer que eu monte um esboço pra você ver?\")")
         if sem_site and not re.search(r"confirmar|realmente|de fato|certeza|existe|n[aã]o tem|n[aã]o encontr", t):
             problemas.append("não diz que não encontrou o site e que quer confirmar se realmente não existe")
-        if not re.search(r"sem compromisso|sem obriga[çc][aã]o|sem nenhuma obriga", t):
+        if not re.search(r"sem compromisso|sem obriga|sem custo|sem press|à vontade|a vontade|dizer n[aã]o|sem problema|com calma|se (?:fizer sentido|voc[eê] topar|topar|quiser)|se n[aã]o (?:curtir|gostar|fizer)|s[óo] (?:dar|pra dar) uma (?:olhada|espiada)", t):
             problemas.append("não deixa claro que é sem compromisso")
         return problemas
     if not re.search(r"(montei|preparei|criei|fiz|deixei)[^.?!]{0,40}(pr[eé]via|esbo[çc]o)", t):
         problemas.append("não diz que você já montou uma prévia do site (use: \"montei uma prévia\") para apresentar sem compromisso")
     if sem_site and not re.search(r"confirmar|realmente|de fato|certeza|existe|n[aã]o tem", t):
         problemas.append("não diz que não encontrou o site e que quer confirmar se realmente não existe")
-    if not re.search(r"sem compromisso|sem obriga[çc][aã]o|sem nenhuma obriga", t):
+    if not re.search(r"sem compromisso|sem obriga[çc][aã]o|sem nenhuma obriga|sem custo|sem press", t):
         problemas.append("não deixa claro que apresentar a prévia é sem compromisso nem obrigação")
     if not re.search(r"10 ?min", t):
         problemas.append("não oferece o papo rápido de uns 10 minutos como alternativa")

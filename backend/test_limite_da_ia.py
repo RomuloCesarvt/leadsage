@@ -17,7 +17,7 @@ def _lead():
 def test_seguimentos_vao_na_mesma_chamada_da_abertura(monkeypatch, rodar):
     chamadas = []
 
-    def falso(client, prompt, obrigatorias=None, tentativas=2, prazo=None, rapido=False, max_tokens=None):
+    def falso(client, prompt, obrigatorias=None, tentativas=2, prazo=None, rapido=False, max_tokens=None, qualidade=False):
         chamadas.append(prompt)
         return {"body": "Oi, Ana! Achei a clínica no Google.", "follow_ups": [
             {"quando": "2 dias depois", "objetivo": "lembrar", "texto": "Ana, viu a prévia?"},
@@ -66,7 +66,7 @@ def test_pico_de_demanda_tenta_de_novo_uma_vez(monkeypatch, rodar):
 
 def test_endpoint_da_fila_escreve_whatsapp_com_seguimentos_de_ponta_a_ponta(client, com_robo, monkeypatch):
     """O caminho real: /api/robo/fila/preparar -> gerar() -> generate_pitch -> fila. Quebrava com 'dict' sem model_dump."""
-    def falso(c, prompt, obrigatorias=None, tentativas=2, prazo=None, rapido=False, max_tokens=None):
+    def falso(c, prompt, obrigatorias=None, tentativas=2, prazo=None, rapido=False, max_tokens=None, qualidade=False):
         return {"body": "Oi, Ana! Achei a clínica no Google, nota 4,9, sem site. Criei uma prévia. Posso enviar?",
                 "follow_ups": [{"quando": "2 dias depois", "objetivo": "lembrar", "texto": "Ana, viu a prévia?"},
                                {"quando": "5 dias depois", "objetivo": "fechar", "texto": "Ana, deixei a prévia pronta."}]}

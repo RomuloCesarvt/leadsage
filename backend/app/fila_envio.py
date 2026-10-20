@@ -335,7 +335,7 @@ def semelhanca(a: str, b: str) -> float:
     return len(ta & tb) / max(1, min(len(ta), len(tb)))
 
 
-_FAZ = re.compile(r"\b(ajudo|ajudamos|trabalho|cuido|crio|criamos|faco|fazemos)\b")
+_FAZ = re.compile(r"\b(ajudo|ajudamos|trabalho|cuido|crio|criamos|monto|faco|fazemos)\b")
 
 
 def assinatura_da_abertura(texto: str) -> str:
@@ -357,6 +357,16 @@ def _apresentacao(texto: str) -> str:
     return " ".join((texto or "")[m.start():].split()[:8]) if m else ""
 
 
+def _fechamento(texto: str) -> str:
+    """Como a mensagem TERMINA (a pergunta final), em 6 palavras sem acento: duas mensagens que fecham igual têm a mesma cara de disparo."""
+    import unicodedata
+
+    t = unicodedata.normalize("NFD", (texto or "").lower())
+    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+    frases = [f for f in re.split(r"[.!?\n]+", t) if re.sub(r"[^a-z]", "", f)]
+    return " ".join(re.sub(r"[^a-z0-9 ]+", " ", frases[-1]).split()[:6]) if frases else ""
+
+
 def _abertura(texto: str, palavras: int = 9) -> str:
     return " ".join((texto or "").split()[:palavras])
 
@@ -376,13 +386,15 @@ async def _diferenciar(gerar, lead: Dict[str, Any], canal: str, pronto: Dict[str
         corpo = (pronto.get("body") or "").strip()
         # parecida = texto parecido OU a mesma abertura (as 7 primeiras palavras): "Boa tarde! Eu sou da LeadSage, ajudo..." repetida em várias mensagens
         ini = _abertura(corpo, 7).lower()
+        fech = _fechamento(corpo)
         parecida = [u for u in usados if semelhanca(corpo, u) >= LIMIAR_DE_SEMELHANCA or (ini and _abertura(u, 7).lower() == ini)
-                    or assinatura_da_abertura(u) == assinatura_da_abertura(corpo)]
+                    or assinatura_da_abertura(u) == assinatura_da_abertura(corpo) or (len(fech.split()) >= 4 and _fechamento(u) == fech)]
         if not corpo or not parecida:
             break
         try:
             # além das aberturas, diz qual frase de apresentação NÃO repetir ("ajudo negócios locais a serem encontrados...")
-            evitar = [_abertura(u) for u in parecida[:3]] + [f"a frase de apresentação '{_apresentacao(u)}'" for u in parecida[:2] if _apresentacao(u)]
+            evitar = ([_abertura(u) for u in parecida[:3]] + [f"a frase de apresentação '{_apresentacao(u)}'" for u in parecida[:2] if _apresentacao(u)]
+                      + [f"a pergunta final que termina em '{_fechamento(u)}'" for u in parecida[:2] if _fechamento(u)])
             nova = await _chamar_gerar(gerar, lead, canal, evitar, tentativa)
         except Exception:
             break

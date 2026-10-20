@@ -1180,7 +1180,12 @@ async def _funcoes_da_fila(user: dict):
     except Exception:
         sites_do_usuario = []
 
+    # a posição de cada mensagem no lote: números seguidos recebem apresentação, pergunta e jeito de abrir diferentes (abordagem_mestra.escolher)
+    posicao = [0]
+
     async def gerar(lead: Dict[str, Any], canal: str, tom: str = "Consultivo", evitar: Optional[List[str]] = None, variacao: int = 0) -> Dict[str, Any]:
+        variacao = posicao[0] + int(variacao or 0) * 3
+        posicao[0] += 1
         lead = dict(lead)
         retomada = lead.pop("_retomada", None)
         previa = await _previa_do_lead(uid, str(lead.get("id", "")), sites_do_usuario)

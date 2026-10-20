@@ -319,7 +319,7 @@ class AIGenerator:
         # acha vira aviso na tela em vez de outra ida ao modelo.
         limite = time.monotonic() + prazo_maximo()
         com_seguimentos = bool(getattr(req, "com_seguimentos", False))
-        dados = await asyncio.to_thread(gerar_json, client, prompt, ["body"], 2, limite, True, 700 if com_seguimentos else 500)
+        dados = await asyncio.to_thread(gerar_json, client, prompt, ["body"], 2, limite, True, 700 if com_seguimentos else 500, qualidade=True)
 
         dados["body"], avisos_marcador = limpar_marcadores(str(dados.get("body") or ""), req.nome_de_quem_escreve or req.sender_name or "")
         problemas = avisos_marcador + (revisar_copy(dados.get("body", ""), canal)
