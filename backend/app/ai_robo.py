@@ -271,6 +271,27 @@ def classificar_contato(mensagens: List[Dict[str, Any]], gerar_json: Optional[Ca
     return {"robo": r.get("robo") is True, "motivo": str(r.get("motivo") or "").strip()[:160], "usou_ia": True}
 
 
+_PEDIU_ENVIO = re.compile(r"\b(mand[aeo]\w*|envi[aeo]\w*|pass[aeo]\w*|encaminh\w*)\b")
+_PEDIU_ALVO = re.compile(r"\b(link|site|previa|mostr\w*|repass\w*|encaminh\w*|avali\w*|olhar|ver)\b")
+
+
+def pediu_o_link(texto: str) -> bool:
+    """Quem escreveu (o dono OU a secretária/recepção) pediu ou aceitou receber a prévia: "pode mandar que eu mostro pra doutora",
+    "me envia o link", "manda aí que eu repasso". É um aceite: o link vai na hora."""
+    t = _normal(texto)
+    return bool(t and _PEDIU_ENVIO.search(t) and _PEDIU_ALVO.search(t))
+
+
+def _ja_mandou_o_link(mensagens: List[Dict[str, Any]], lead: Optional[Dict[str, Any]]) -> bool:
+    url = ((lead or {}).get("site_publicado") or "").strip()
+    return any(m.get("de") in ("robo", "voce") and ("http" in (m.get("texto") or "").lower() or (url and url in (m.get("texto") or "")))
+               for m in mensagens)
+
+
+def _tem_link(textos: List[str]) -> bool:
+    return any("http" in t.lower() or "[LINK_DA_PREVIA]" in t for t in textos)
+
+
 def e_so_midia(texto: str) -> bool:
     return bool(re.fullmatch(r"\[[^\]]+\]", (texto or "").strip()))
 
@@ -354,6 +375,25 @@ def decidir(
     # o modelo percebeu que o outro lado e um atendimento automatico ou propaganda: nao se responde
     if n.get("automatica") and not n["mensagens"]:
         return Decisao(automatica=True, usou_ia=True, sdr=n["sdr"], motivo="parece uma resposta automática (outro robô)")
+
+    # Quem atende (secretária, recepção) pediu o link para mostrar ao responsável: o link vai AGORA, e só depois se tenta chegar
+    # ao responsável. O modelo já errou isso (pediu "qual o melhor horário para enviar" em vez de enviar): a regra também é de código.
+    if pediu_o_link(texto) and not _ja_mandou_o_link(mensagens, lead) and not _tem_link(n["mensagens"]) and not n.get("automatica"):
+        sem_site = not ((lead or {}).get("site_publicado") or "").strip()
+        aviso = ("\n\n== SUA RESPOSTA ANTERIOR FOI RECUSADA ==\n- A pessoa pediu ou aceitou receber o link da prévia (talvez para mostrar ao responsável) "
+                 "e você NÃO mandou. Mande o link AGORA, nesta resposta"
+                 + (', com enviar_previa true e o marcador [LINK_DA_PREVIA] onde vai o link' if sem_site else ", escrito por inteiro")
+                 + ". Depois do link, agradeça pelo nome, peça que mostre ao responsável e pergunte em que dia ou horário ele(a) poderia "
+                   "conversar uns 15 minutos. Não pergunte horário para ENVIAR.")
+        n = normalizar(gerar_json(prompt + aviso), sdr)
+        if not _tem_link(n["mensagens"]):
+            quem = ((n["sdr"].get("dados") or {}).get("nome") or (sdr or {}).get("dados", {}).get("nome") or "").split(" ")[0]
+            url = ((lead or {}).get("site_publicado") or "").strip()
+            n["mensagens"] = [f"Perfeito{', ' + quem if quem else ''}! Aqui está a prévia: {url or '[LINK_DA_PREVIA]'}",
+                              "Obrigado pela ajuda! Pode mostrar para o responsável? Em que dia ou horário ele(a) teria uns 15 minutinhos "
+                              "para eu explicar rapidinho?"]
+        if sem_site and "[LINK_DA_PREVIA]" in " ".join(n["mensagens"]):
+            n["enviar_previa"] = True
 
     # Conferencia em codigo: preco fora do catalogo e motivo inventado nao
     # saem. Uma chance de corrigir; errou de novo, o humano assume.

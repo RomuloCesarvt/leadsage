@@ -26,7 +26,7 @@ enganosos e sao exatamente o que faz o numero ser denunciado e banido.
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from app import ai_oferta, nicho_guia
+from app import ai_oferta, identidade, nicho_guia
 from app.playbook_sites import FALA_DO_ROBO_SOBRE_SITES
 
 ETAPAS = ("abertura", "descoberta", "diagnostico", "proposta", "objecao", "agendamento", "fechamento", "perdido")
@@ -123,10 +123,10 @@ def _bloco_da_previa(lead: Optional[Dict[str, Any]]) -> str:
     url = ((lead or {}).get("site_publicado") or "").strip()
     if url:
         return (f"EXISTE uma prévia pronta: {url}\n"
-                "- Quando o cliente aceitar ver (\"pode mandar\", \"ok\", \"sim\"), envie ESTE link, escrito por inteiro na mensagem, com uma frase do que ele vai ver. "
+                "- Quando o cliente aceitar ver (\"pode mandar\", \"ok\", \"sim\", ou a secretária pedindo o link para mostrar ao responsável), envie ESTE link, escrito por inteiro na mensagem, com uma frase do que ele vai ver. "
                 "Nunca escreva marcadores entre colchetes como [LINK]: só o endereço de verdade.")
     return ("Ainda NÃO existe prévia criada para este negócio, mas o SISTEMA CRIA NA HORA quando o cliente aceita.\n"
-            "- O cliente aceitou ver ou receber a prévia (\"ok\", \"pode mandar\", \"sim\", \"quero ver\")? Marque \"enviar_previa\": true e escreva a mensagem "
+            "- O cliente aceitou ver ou receber a prévia (\"ok\", \"pode mandar\", \"sim\", \"quero ver\", ou a secretária/recepção pedindo o link para mostrar ao responsável)? Marque \"enviar_previa\": true e escreva a mensagem "
             "com o marcador [LINK_DA_PREVIA] exatamente onde vai o link: o sistema cria o site agora e troca o marcador pelo endereço de verdade. "
             "Ex.: \"Perfeito! Aqui está a prévia: [LINK_DA_PREVIA] Me conta o que achou?\". Uma mensagem curta, sem reunião agora.\n"
             "- O cliente ainda NÃO aceitou? NÃO diga que preparou, montou ou criou, que está pronta, nem que vai mandar o link; "
@@ -219,8 +219,12 @@ def montar_prompt(
     agora: Optional[datetime] = None,
 ) -> str:
     cfg = ai_oferta.aplicar(cfg)
-    quem = perfil.get("company_name") or perfil.get("name") or "a empresa"
+    ident = identidade.da_conta(cfg, perfil)
+    quem = ident["empresa"] or perfil.get("company_name") or perfil.get("name") or "a empresa"
     assistente = cfg.get("nome_assistente") or "assistente virtual"
+    # a pessoa definiu quem fala: o robô se apresenta com o nome, o cargo e a empresa DELA (nunca com o nome do sistema)
+    quem_fala = (f"{ident['apresentacao']} (você se apresenta assim, em primeira pessoa; se perguntarem se é robô, diga que é o "
+                 f"assistente virtual de {quem})") if ident["configurada"] and ident["apresentacao"] else ""
     oferta = perfil.get("product_description") or "serviços de presença digital (site, Google e redes sociais)"
     servico = ai_oferta.bloco_do_servico(cfg, lead)
     ramo = nicho_guia.bloco((lead or {}).get("niche"))
@@ -239,7 +243,8 @@ def montar_prompt(
         for m in mensagens[-30:]
     )
 
-    return f"""Você é {assistente}, SDR de {quem}, conversando pelo {canal} com o dono de um negócio local.
+    abertura = quem_fala or f"{assistente}, SDR de {quem}"
+    return f"""Você é {abertura}, conversando pelo {canal} com o dono de um negócio local.
 Agora é {_agora_brasil(agora)}.
 
 == O QUE {quem.upper()} VENDE ==
@@ -338,6 +343,14 @@ que você não sabe; reclamação; pedido explícito para falar com uma pessoa.
   responde ao que você disse?
 - Indicou outro responsável: agradeça em uma frase, diga que vai falar com ele(a), guarde o nome em "decisor" e o
   telefone em "contato_decisor". Não faça pitch para quem não decide.
+- SECRETÁRIA, RECEPÇÃO OU ASSISTENTE (quem atende mas não decide): é uma ALIADA, nunca um obstáculo. Se ela pediu, aceitou ou se ofereceu
+  para mostrar ("pode mandar que eu mostro para a doutora", "envia o link", "vou repassar"), isso é um ACEITE: o link vai AGORA, nesta
+  mesma resposta (enviar_previa true, ou o link de verdade se a prévia já existe). NUNCA segure o link para esperar a doutora/o dono
+  e NUNCA pergunte "qual o melhor horário para enviar": quem pediu o link recebe o link. Depois do link, na mesma mensagem ou na
+  segunda: agradeça a ajuda pelo nome dela, peça que mostre à responsável e dê o próximo passo COM A RESPONSÁVEL: pergunte se há um
+  dia ou horário em que ela poderia conversar uns 15 minutos (ou como prefere ser contatada), e o nome dela se você ainda não souber.
+  Crie vínculo: cordial, grato, sem pressa, sem pitch para a secretária. Guarde o nome em "decisor" (e o contato em "contato_decisor"
+  se passarem). Isto vale também para "indicou outro responsável": se ele ou ela aceita receber algo, mande o material junto.
 - Mensagem automática, de boas-vindas ou propaganda do negócio: NÃO responda ("automatica": true, "mensagens": []).
 - Responda o que ele disse, em uma frase, antes de qualquer pergunta. Nunca ignore uma pergunta dele.
 - Se responder em duas mensagens, a ordem é a de leitura: a primeira acolhe ou responde, a segunda conduz.

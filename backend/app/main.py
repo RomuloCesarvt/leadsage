@@ -31,6 +31,7 @@ from app.models import (
     DocumentCreateRequest, DocumentUpdateRequest, DocumentItem,
     SiteCopyRequest, SiteCopyResponse, DocumentAIRequest, DocumentAIResponse,
 )
+from app import identidade
 from app.leads_engine import LeadsEngine
 from app.ai_client import AIIndisponivel
 from app.ai_generator import AIGenerator
@@ -339,7 +340,13 @@ async def _preparar_pitch(user: dict, req: PitchGenerationRequest) -> None:
     perfil = await get_profile(user.get("uid"))
     if not req.user_product:
         req.user_product = perfil.product_description or ""
-    if not req.sender_name or req.sender_name == "Prospecção LeadSage":
+    ident = identidade.da_conta(canal_robo, perfil)
+    if ident["configurada"]:
+        # o que a pessoa escreveu em Robô → Como ele conversa vale sempre, acima do que a tela mandar
+        req.apresentacao = ident["apresentacao"]
+        req.nome_de_quem_escreve = ident["nome"]
+        req.sender_name = ident["empresa"] or ident["nome"] or req.sender_name
+    elif not req.sender_name or req.sender_name in ("Prospecção LeadSage", "LeadSage", "Consultor LeadSage"):
         req.sender_name = perfil.company_name or perfil.name or req.sender_name
     req.service_brief = abordagem_mestra.produto(canal_robo, req.lead.model_dump(), req.user_product or "")
     if req.previa not in ("criada", "oferecer"):
@@ -944,6 +951,10 @@ class RoboConfigRequest(BaseModel):
     instrucoes: Optional[str] = Field(default=None, max_length=3000)
     link_agenda: Optional[str] = None
     nome_assistente: Optional[str] = Field(default=None, max_length=60)
+    # quem fala nas mensagens (identidade.py): o nome, o cargo e a empresa de quem usa o sistema
+    meu_nome: Optional[str] = Field(default=None, max_length=60)
+    meu_cargo: Optional[str] = Field(default=None, max_length=60)
+    minha_empresa: Optional[str] = Field(default=None, max_length=80)
     catalogo: Optional[str] = Field(default=None, max_length=4000)
     faq: Optional[str] = Field(default=None, max_length=4000)
     desconto_maximo: Optional[int] = Field(default=None, ge=0, le=50)
@@ -1158,7 +1169,10 @@ async def _funcoes_da_fila(user: dict):
     if ai_oferta.ativa(canal_robo):
         produto = ((canal_robo.get("oferta") or {}).get("nome") or "").strip()
     produto = produto or perfil.product_description or ""
-    remetente = perfil.company_name or perfil.name or "Prospecção LeadSage"
+    ident = identidade.da_conta(canal_robo, perfil)
+    remetente = (ident["empresa"] or ident["nome"]) if ident["configurada"] else (perfil.company_name or perfil.name or "Prospecção LeadSage")
+    apresentacao = ident["apresentacao"] if ident["configurada"] else ""
+    quem_assina = ident["nome"] if ident["configurada"] else ""
 
     from app.sites_store import list_sites
     try:
@@ -1176,7 +1190,8 @@ async def _funcoes_da_fila(user: dict):
             await previa_site.atualizar_se_antigo(uid, email or "", lead)
         pitch = await AIGenerator.generate_pitch(
             PitchGenerationRequest(lead=_lead_para_pitch(lead), channel=canal, tone=tom,
-                                   sender_name=remetente, user_product=produto, previa=previa,
+                                   sender_name=remetente, apresentacao=apresentacao, nome_de_quem_escreve=quem_assina,
+                                   user_product=produto, previa=previa,
                                    # o seguimento automatico (2 e 5 dias depois) sai do texto escrito agora
                                    com_seguimentos=(canal == "whatsapp"),
                                    evitar=evitar or [], variacao=variacao,

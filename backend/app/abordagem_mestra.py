@@ -133,7 +133,9 @@ TEMPERATURA = """TEMPERATURA E MOMENTO
 - Se o ramo tem hora de pico (veja o guia do ramo), reconheça que ele deve estar ocupado e mostre que a mensagem é rápida."""
 
 
-def quem_sou(sender_name: str) -> str:
+def quem_sou(sender_name: str, apresentacao: str = "") -> str:
+    if (apresentacao or "").strip():
+        return f"Eu sou {apresentacao.strip()} e ajudo negócios locais a serem encontrados e escolhidos no Google"
     nome = (sender_name or "").strip()
     if not nome or nome.lower() in ("prospecção leadsage", "leadsage prospecção", "prospecção"):
         return "Eu sou <seu nome>, ajudo negócios locais a serem encontrados e escolhidos no Google"
@@ -167,7 +169,7 @@ def estilo_da_mensagem(lead_id: str = "", variacao: int = 0) -> str:
 
 
 def estrutura(sender_name: str, agora: Optional[datetime] = None, sem_site: bool = True, previa: str = "",
-              canal: str = "", lead_id: str = "", variacao: int = 0, evitar: Optional[list] = None) -> str:
+              canal: str = "", lead_id: str = "", variacao: int = 0, evitar: Optional[list] = None, apresentacao: str = "") -> str:
     if (canal or "").startswith("whatsapp"):
         lacuna = ("Diz que, apesar dessa reputação, NÃO encontrou o site do negócio (como afirmação, sem ponto de interrogação)."
                   if sem_site else
@@ -182,20 +184,20 @@ def estrutura(sender_name: str, agora: Optional[datetime] = None, sem_site: bool
             pergunta = 'UMA pergunta de sim, no fim: "posso te enviar o link da prévia por aqui, sem compromisso?" (adapte, com suas palavras).'
         passadas = [str(x).strip()[:80] for x in (evitar or []) if str(x).strip()][:6]
         return ESTRUTURA_WHATSAPP.format(
-            saudacao=saudacao_do_horario(agora), apresentacao=quem_sou(sender_name), lacuna=lacuna, previa_c=previa_c,
+            saudacao=saudacao_do_horario(agora), apresentacao=quem_sou(sender_name, apresentacao), lacuna=lacuna, previa_c=previa_c,
             pergunta=pergunta, estilo=estilo_da_mensagem(lead_id, variacao),
             evitar=("NÃO comece como estas mensagens já usadas neste lote: " + " | ".join(f'"{p}"' for p in passadas)) if passadas else "",
         )
-    return _estrutura_longa(sender_name, agora, sem_site, previa)
+    return _estrutura_longa(sender_name, agora, sem_site, previa, apresentacao)
 
 
-def _estrutura_longa(sender_name: str, agora: Optional[datetime] = None, sem_site: bool = True, previa: str = "") -> str:
+def _estrutura_longa(sender_name: str, agora: Optional[datetime] = None, sem_site: bool = True, previa: str = "", apresentacao: str = "") -> str:
     """`previa`: "criada", "oferecer" ou vazio (comportamento antigo: montou e oferece mostrar por aqui ou em 10 minutos)."""
     ponto = PONTO_SEM_SITE if sem_site else PONTO_COM_SITE
     antigo_c = ("   c) Diga que montou uma prévia de como o site dele poderia ficar e que gostaria de apresentá-la sem obrigação nenhuma.")
     previa_c = {"criada": PREVIA_CRIADA, "oferecer": PREVIA_OFERECER}.get(previa, antigo_c)
     texto = ESTRUTURA.format(
-        saudacao=saudacao_do_horario(agora), apresentacao=quem_sou(sender_name),
+        saudacao=saudacao_do_horario(agora), apresentacao=quem_sou(sender_name, apresentacao),
         ponto_do_site=ponto.format(previa_c=previa_c),
     )
     pergunta = {"criada": PERGUNTA_CRIADA, "oferecer": PERGUNTA_OFERECER}.get(previa)

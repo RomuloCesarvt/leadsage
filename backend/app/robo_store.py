@@ -39,6 +39,8 @@ CAMPOS_CANAL = (
     "page_id", "page_token", "ig_id",
     # comportamento do robo
     "ativo", "objetivo", "instrucoes", "link_agenda", "nome_assistente",
+    # quem fala nas mensagens (cada usuario tem o seu nome, cargo e empresa): ver identidade.py
+    "meu_nome", "meu_cargo", "minha_empresa",
     # base de conhecimento do SDR: o que existe para vender e o que pode
     # ser concedido. O que nao estiver aqui, o robo nao inventa.
     "catalogo", "faq", "desconto_maximo",

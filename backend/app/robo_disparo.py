@@ -114,8 +114,10 @@ async def disparar(
             if modelo["existe"] else "Crie o modelo de mensagem antes de disparar."
         )
 
-    quem = (cfg.get("nome_assistente") or perfil.get("name") or "a equipe").strip()
-    empresa = (perfil.get("company_name") or "nossa equipe").strip()
+    from app import identidade
+    ident = identidade.da_conta(cfg, perfil)
+    quem = (ident["nome"] or cfg.get("nome_assistente") or "a equipe").strip()
+    empresa = (ident["empresa"] or "nossa equipe").strip()
 
     enviados: List[Dict[str, str]] = []
     ignorados: List[Dict[str, str]] = []

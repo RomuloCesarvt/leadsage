@@ -222,6 +222,7 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
         setForm({
           ativo: c.ativo, objetivo: (c.objetivo || 'agendar') as any, instrucoes: c.instrucoes,
           link_agenda: c.link_agenda, nome_assistente: c.nome_assistente,
+          meu_nome: c.meu_nome, meu_cargo: c.meu_cargo, minha_empresa: c.minha_empresa,
           catalogo: c.catalogo, faq: c.faq, desconto_maximo: c.desconto_maximo || 0,
           oferta: c.oferta || {},
           wa_phone_id: c.wa_phone_id, page_id: c.page_id, ig_id: c.ig_id,
@@ -333,6 +334,29 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-5">
             <Bot className="w-5 h-5 text-blue-600" /> Como ele conversa
           </h2>
+          <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+            <p className="text-sm font-bold text-slate-800 mb-1">Quem fala nas mensagens</p>
+            <p className="text-xs text-slate-500 mb-3">Seu nome e a empresa que você representa. É assim que o robô e as mensagens do Disparo se apresentam, no lugar do nome do sistema.</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className={rotulo}>Seu nome</label>
+                <input value={form.meu_nome || ''} onChange={e => mudar('meu_nome', e.target.value)} placeholder="Ex.: Rômulo" maxLength={60} className={campo} />
+              </div>
+              <div>
+                <label className={rotulo}>Seu cargo</label>
+                <input value={form.meu_cargo || ''} onChange={e => mudar('meu_cargo', e.target.value)} placeholder="Ex.: consultor estratégico" maxLength={60} className={campo} />
+              </div>
+              <div>
+                <label className={rotulo}>Sua empresa</label>
+                <input value={form.minha_empresa || ''} onChange={e => mudar('minha_empresa', e.target.value)} placeholder="Ex.: Seometria Marketing Digital" maxLength={80} className={campo} />
+              </div>
+            </div>
+            {(form.meu_nome || form.meu_cargo || form.minha_empresa) && (
+              <p className="text-xs text-slate-600 mt-3">
+                Vai se apresentar assim: <b>“Eu sou {[form.meu_nome, form.meu_cargo].filter(Boolean).join(', ')}{form.minha_empresa ? `${form.meu_nome || form.meu_cargo ? ' ' : ''}${/^(da|do|de|na|no) /i.test(form.minha_empresa) ? '' : 'da '}${form.minha_empresa}` : ''}.”</b>
+              </p>
+            )}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label className={rotulo}>Nome do assistente</label>

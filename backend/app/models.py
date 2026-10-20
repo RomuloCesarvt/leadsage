@@ -112,6 +112,10 @@ class PitchGenerationRequest(BaseModel):
     tone: str = "Consultivo" # Consultivo, Amigável, Direto, Autoridade, Promocional
     custom_instructions: Optional[str] = ""
     sender_name: Optional[str] = "Prospecção LeadSage"
+    # Como a pessoa se apresenta ("Rômulo, consultor estratégico da Seometria Marketing Digital") e o nome que assina. O servidor
+    # preenche a partir de Robô → Como ele conversa; vazio = o jeito de sempre (nome da empresa do perfil).
+    apresentacao: Optional[str] = ""
+    nome_de_quem_escreve: Optional[str] = ""
     user_product: Optional[str] = ""
     # Fatos do servico que o dono vende (preco, prazo, o que inclui). Preenchido
     # pelo servidor a partir da oferta do robo; o cliente nao precisa enviar.

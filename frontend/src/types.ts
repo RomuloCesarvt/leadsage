@@ -355,6 +355,10 @@ export interface RoboConfigEntrada {
   instrucoes: string;
   link_agenda: string;
   nome_assistente: string;
+  /** quem fala nas mensagens: "Rômulo, consultor estratégico da Seometria Marketing Digital" */
+  meu_nome: string;
+  meu_cargo: string;
+  minha_empresa: string;
   catalogo: string;
   faq: string;
   desconto_maximo: number;

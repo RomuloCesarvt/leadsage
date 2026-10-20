@@ -148,7 +148,7 @@ para um negócio local que não pediu contato: simpática, específica sobre ele
 
 {abordagem_mestra.momento()}
 
-QUEM ESCREVE: {assina}. Vende: {vende}.
+QUEM ESCREVE: {(req.apresentacao or '').strip() or assina}. Vende: {vende}.
 
 O PRODUTO (use só estes fatos; nunca invente preço, prazo, garantia ou resultado)
 {brief}
@@ -163,7 +163,7 @@ O RAMO DESTE NEGÓCIO
 
 {abordagem_mestra.TEMPERATURA}
 
-{abordagem_mestra.estrutura(assina, sem_site=sem_site, previa=(req.previa or ''), canal=canal, lead_id=str(lead.id), variacao=req.variacao, evitar=req.evitar)}
+{abordagem_mestra.estrutura(assina, sem_site=sem_site, previa=(req.previa or ''), canal=canal, lead_id=str(lead.id), variacao=req.variacao, evitar=req.evitar, apresentacao=(req.apresentacao or ''))}
 
 {abordagem_mestra.GATILHOS}
 
@@ -321,7 +321,7 @@ class AIGenerator:
         com_seguimentos = bool(getattr(req, "com_seguimentos", False))
         dados = await asyncio.to_thread(gerar_json, client, prompt, ["body"], 2, limite, True, 700 if com_seguimentos else 500)
 
-        dados["body"], avisos_marcador = limpar_marcadores(str(dados.get("body") or ""), req.sender_name or "")
+        dados["body"], avisos_marcador = limpar_marcadores(str(dados.get("body") or ""), req.nome_de_quem_escreve or req.sender_name or "")
         problemas = avisos_marcador + (revisar_copy(dados.get("body", ""), canal)
                      + abordagem_mestra.revisar_calor(dados.get("body", ""), canal)
                      + abordagem_mestra.revisar_roteiro(dados.get("body", ""), sem_site, req.previa or ""))
