@@ -217,6 +217,27 @@ def janela_do_ramo(ramo: str, agora: datetime) -> bool:
             hora = h.hour + h.minute / 60
             return h.weekday() in dias and any(a <= hora < b for a, b in janelas)
     return janela_aberta(agora)
+
+
+def proxima_janela(ramo: str, agora: datetime, dias: int = 8) -> Optional[datetime]:
+    """Quando abre a próxima janela de envio deste ramo (de 15 em 15 minutos, até `dias` dias), ou None."""
+    t = agora.astimezone(FUSO_BRASIL).replace(second=0, microsecond=0)
+    t = t - timedelta(minutes=t.minute % 15) + timedelta(minutes=15)
+    for _ in range(dias * 96):
+        if janela_do_ramo(ramo, t):
+            return t
+        t += timedelta(minutes=15)
+    return None
+
+
+def _quando(t: datetime, agora: datetime) -> str:
+    """"hoje às 14:00", "amanhã às 09:00" ou "quarta às 09:00" (Brasília)."""
+    t, a = t.astimezone(FUSO_BRASIL), agora.astimezone(FUSO_BRASIL)
+    dias = (t.date() - a.date()).days
+    dia = "hoje" if dias == 0 else "amanhã" if dias == 1 else ("segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo")[t.weekday()]
+    return f"{dia} às {t.strftime('%H:%M')}"
+
+
 _sortear = random.randint  # trocado nos testes
 
 
@@ -468,6 +489,7 @@ async def estado_da_fila(canal: Dict[str, Any], agora: Optional[datetime] = None
     limite = limite_frio_do_dia(canal, agora)
     pendentes = [i for i in itens if i.get("status") == "pendente"]
     pode, motivo_politica, espera = politica_frio(canal, agora, bool(pendentes and pendentes[0].get("prioridade")))
+    aguardando_horario = ""
     if not canal.get("cw_hash"):
         motivo = "O WhatsApp pelo computador ainda não foi conectado."
     elif not online(canal, agora):
@@ -477,6 +499,17 @@ async def estado_da_fila(canal: Dict[str, Any], agora: Optional[datetime] = None
     elif pendentes and not pode:
         motivo = (f"Próxima abordagem em cerca de {max(1, round(espera / 60))} min (intervalo de segurança)."
                   if espera and motivo_politica.startswith("intervalo") else motivo_politica[:1].upper() + motivo_politica[1:] + ".")
+    elif pendentes and not any(i.get("prioridade") or janela_do_ramo(i.get("ramo", ""), agora) for i in pendentes):
+        # o serviço segura o envio até o melhor horário do ramo: a tela tem de dizer isso (antes dizia "a próxima sai em instantes")
+        quando = [(proxima_janela(i.get("ramo", ""), agora), i.get("ramo", "")) for i in pendentes]
+        quando = [q for q in quando if q[0]]
+        if quando:
+            t, ramo = min(quando, key=lambda q: q[0])
+            aguardando_horario = _quando(t, agora)
+            motivo = (f"Aguardando o melhor horário para o ramo{f' ({ramo})' if ramo else ''}: a próxima sai {aguardando_horario}. "
+                      "Se preferir não esperar, use “Enviar agora”: o limite do dia e o intervalo de segurança continuam valendo.")
+        else:
+            motivo = "A próxima sai em instantes."
     elif pendentes:
         motivo = "A próxima sai em instantes."
     else:
@@ -485,6 +518,7 @@ async def estado_da_fila(canal: Dict[str, Any], agora: Optional[datetime] = None
         "conectado": bool(canal.get("cw_hash")), "online": online(canal, agora),
         "pendentes": len(pendentes), "enviando": sum(1 for i in itens if i.get("status") == "enviando"),
         "enviadas_hoje": frios_hoje, "limite_hoje": limite, "espera_s": espera, "motivo": motivo,
+        "aguardando_horario": aguardando_horario,
     }
 
 
@@ -496,6 +530,17 @@ async def enviar_agora(uid: str, item_id: str) -> bool:
     item["status"], item["prioridade"], item["motivo"] = "pendente", 1, ""
     await fila_envio._gravar(uid, item)
     return True
+
+
+async def enviar_todos_agora(uid: str) -> int:
+    """Quem está esperando o horário do ramo passa a sair já (o intervalo de segurança e o limite do dia continuam valendo)."""
+    n = 0
+    for item in await _fila_whatsapp(uid):
+        if item.get("canal") == "whatsapp" and item.get("status") == "pendente" and not item.get("prioridade"):
+            item["prioridade"] = 1
+            await fila_envio._gravar(uid, item)
+            n += 1
+    return n
 
 
 _FALHA_DE_CONEXAO = re.compile(r"n[aã]o est[aá] conectado|connection (closed|lost|failure)|conflict|stream errored|timed out|timeout", re.I)

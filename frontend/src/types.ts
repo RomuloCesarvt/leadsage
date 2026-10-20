@@ -435,6 +435,8 @@ export interface EstadoFilaWhats {
   limite_hoje: number;
   espera_s: number;
   motivo: string;
+  /** a fila espera o melhor horário do ramo; ex.: "hoje às 14:00" (vazio quando não é por isso) */
+  aguardando_horario?: string;
 }
 
 export interface RoboConversaResumo {

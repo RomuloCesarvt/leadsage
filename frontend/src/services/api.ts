@@ -490,6 +490,11 @@ export const api = {
     return await fetchWithToken('/robo/whats/retomar', { method: 'POST' });
   },
 
+  /** Quem espera o horário do ramo passa a sair já (intervalo de segurança e limite do dia continuam valendo). */
+  async filaEnviarTodosAgora(): Promise<EstadoFilaWhats> {
+    return await fetchWithToken('/robo/fila/enviar-todos-agora', { method: 'POST' });
+  },
+
   async filaEnviarAgora(id: string): Promise<EstadoFilaWhats> {
     return await fetchWithToken(`/robo/fila/${encodeURIComponent(id)}/enviar-agora`, { method: 'POST' });
   },

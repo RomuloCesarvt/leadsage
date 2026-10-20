@@ -31,9 +31,24 @@ def test_escolher_reserva_e_passa_para_o_proximo_quando_o_primeiro_enche(monkeyp
     monkeypatch.setattr(ia_gate, "RESERVA_PARA_CONVERSA", 0.0)
     a, b = alvo("groq:a", tpm=6000), alvo("groq:b", tpm=6000)
     escolhidos = [ia_gate.escolher([a, b], 2800)[0].chave for _ in range(4)]
-    assert escolhidos == ["groq:a", "groq:a", "groq:b", "groq:b"]          # 2 por modelo por minuto: nada de rajada
+    assert escolhidos == ["groq:a", "groq:b", "groq:a", "groq:b"]          # os pedidos se espalham: 2 por modelo por minuto, nada de rajada
     nenhum, espera = ia_gate.escolher([a, b], 2800)
     assert nenhum is None and espera > 0
+
+
+def test_os_dois_motores_trabalham_juntos_em_vez_de_um_so_na_frente(monkeypatch):
+    monkeypatch.setattr(ia_gate, "RESERVA_PARA_CONVERSA", 0.0)
+    groq, gemini = alvo("groq:a", tpm=6500), alvo("gemini:x", "gemini")
+    escolhidos = [ia_gate.escolher([groq, gemini], 1500)[0].chave for _ in range(6)]
+    assert escolhidos.count("groq:a") >= 2 and escolhidos.count("gemini:x") >= 2     # antes: todos no primeiro até ele encher
+    assert escolhidos[:2] == ["groq:a", "gemini:x"]                                  # o segundo pedido já vai ao outro motor
+
+
+def test_motor_mais_cheio_recebe_menos(monkeypatch):
+    monkeypatch.setattr(ia_gate, "RESERVA_PARA_CONVERSA", 0.0)
+    cheio, folgado = alvo("groq:a", tpm=6500), alvo("gemini:x", "gemini")
+    ia_gate.escolher([cheio], 5000)                                         # o primeiro já gastou quase tudo
+    assert ia_gate.escolher([cheio, folgado], 1000)[0].chave == "gemini:x"
 
 
 def test_recusa_usa_o_tempo_que_o_provedor_mandou_e_o_limite_diario_pausa_por_mais():

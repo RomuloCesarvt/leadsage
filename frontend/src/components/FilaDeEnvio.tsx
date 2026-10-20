@@ -525,6 +525,12 @@ export const FilaDeEnvio: React.FC = () => {
           <b className="flex items-center gap-1.5">{whats.online ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />} WhatsApp: {whats.online ? 'conectado' : 'desconectado'}</b>
           <span>Hoje: <b>{whats.enviadas_hoje}</b> de <b>{whats.limite_hoje}</b> abordagens (o limite sobe 5 por dia, até 60)</span>
           {whats.motivo && <span className="basis-full">{whats.motivo}</span>}
+          {whats.aguardando_horario && whats.online && (
+            <button onClick={() => acao('todos-agora', async () => setWhats(await api.filaEnviarTodosAgora()), 'Não foi possível enviar agora.')} disabled={!!trabalhando}
+              className="mt-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 disabled:opacity-50">
+              <Send className="w-3.5 h-3.5" /> Enviar agora, sem esperar o horário do ramo
+            </button>
+          )}
           {/falhas seguidas/i.test(whats.motivo || '') && (
             <button onClick={() => acao('retomar', async () => setWhats(await api.whatsRetomar()), 'Não foi possível retomar.')} disabled={!!trabalhando}
               className="mt-1 px-3 py-1.5 rounded-lg bg-white border border-emerald-300 text-emerald-800 text-xs font-bold hover:bg-emerald-50 disabled:opacity-50">

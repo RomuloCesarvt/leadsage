@@ -133,3 +133,39 @@ def test_marcar_enviado_agenda_os_seguimentos(client, com_robo, rodar):
     rodar(fila_envio._gravar, "alice", _enviado({"status": "pendente"}))
     rodar(fila_envio.marcar_enviado, "alice", "f_L1")
     assert len(rodar(fila_envio.obter, "alice", "f_L1")["agenda_seguimentos"]) == 2
+
+
+# ---------------------------------------------------------------- a tela diz POR QUE a fila espera (e deixa enviar já)
+def test_proxima_janela_do_ramo():
+    ter_11h41 = brasilia(2026, 10, 20, 11, 41)
+    assert cw.proxima_janela("Clínicas", ter_11h41) == brasilia(2026, 10, 20, 14, 0)         # fora das 9-11:30: volta às 14h
+    assert cw.proxima_janela("Padaria", ter_11h41) == brasilia(2026, 10, 20, 13, 30)
+    sab = brasilia(2026, 10, 17, 10, 0)
+    assert cw.proxima_janela("Dentistas", sab) == brasilia(2026, 10, 19, 9, 0)               # fim de semana: segunda de manhã
+    assert cw._quando(brasilia(2026, 10, 20, 14, 0), ter_11h41) == "hoje às 14:00"
+    assert cw._quando(brasilia(2026, 10, 21, 9, 0), ter_11h41) == "amanhã às 09:00"
+
+
+def test_estado_da_fila_nao_diz_que_sai_em_instantes_quando_espera_o_horario_do_ramo(client, com_robo, rodar, monkeypatch):
+    client.post("/api/robo/conector/gerar")
+    canal = rodar(robo_store.canal_do_usuario, "alice")
+    for item in (_pendente("c1", "Clínicas", "14998003784", 4.5, 50), _pendente("c2", "Dentistas", "14998003785", 4.2, 40)):
+        rodar(fila_envio._gravar, "alice", item)
+    canal["cw_primeiro"] = "2026-09-01T00:00:00+00:00"
+    agora = brasilia(2026, 10, 20, 11, 41)
+    estado = rodar(cw.estado_da_fila, {**canal, "uid": "alice", "cw_visto": agora.isoformat()}, agora)
+    assert estado["aguardando_horario"] == "hoje às 14:00"
+    assert "Aguardando o melhor horário" in estado["motivo"] and "hoje às 14:00" in estado["motivo"] and "Enviar agora" in estado["motivo"]
+    # "enviar todos agora": a fila deixa de esperar o horário do ramo
+    assert rodar(cw.enviar_todos_agora, "alice") == 2
+    depois = rodar(cw.estado_da_fila, {**canal, "uid": "alice", "cw_visto": agora.isoformat()}, agora)
+    assert depois["aguardando_horario"] == "" and "Aguardando o melhor horário" not in depois["motivo"]
+    tarefas = rodar(cw.tarefas, dict(canal, cw_ultimo_frio=None, cw_proximo_frio_em=None, cw_frio_n=0), agora)
+    assert tarefas["tarefas"] and tarefas["tarefas"][0]["tipo"] == "abordagem"
+
+
+def test_rota_enviar_todos_agora(client, com_robo, rodar):
+    client.post("/api/robo/conector/gerar")
+    rodar(fila_envio._gravar, "alice", _pendente("c1", "Clínicas", "14998003784", 4.5, 50))
+    r = client.post("/api/robo/fila/enviar-todos-agora")
+    assert r.status_code == 200 and "pendentes" in r.json()

@@ -108,18 +108,35 @@ def espera_do_alvo(alvo: Alvo, tokens: int, agora: Optional[float] = None) -> fl
     return espera
 
 
+def carga_do_alvo(alvo: Alvo, agora: float) -> float:
+    """Quanto do orçamento por minuto deste alvo já está usado (0 a 1): o que vale é o mais apertado entre tokens e pedidos."""
+    e = _estado(alvo.chave)
+    uso = e["uso"]
+    usado = _podar(uso, agora)
+    return max(usado / max(1, e["tpm"] or alvo.tpm), len(uso) / max(1, alvo.rpm))
+
+
 def escolher(alvos: List[Alvo], tokens: int) -> Tuple[Optional[Alvo], float]:
-    """O primeiro alvo livre (e já reserva os tokens dele), ou (None, segundos até o primeiro liberar)."""
+    """O alvo livre MENOS CARREGADO (e já reserva os tokens dele), ou (None, segundos até o primeiro liberar).
+
+    Antes valia o primeiro livre da lista: o primeiro provedor ficava com tudo e o outro só entrava quando o primeiro enchia.
+    Agora os pedidos se espalham entre todos os motores gratuitos (Groq e Gemini juntos); no empate, vale a ordem da lista."""
     agora = time.time()
     _sincronizar(alvos, agora)
     melhor = 1e9
-    for a in alvos:
+    livres = []
+    for i, a in enumerate(alvos):
         w = espera_do_alvo(a, tokens, agora)
         if w <= 0:
-            _estado(a.chave)["uso"].append((agora, tokens))
-            _publicar(a, tokens, agora)
-            return a, 0.0
-        melhor = min(melhor, w)
+            livres.append((round(carga_do_alvo(a, agora), 2), i, a))
+        else:
+            melhor = min(melhor, w)
+    if livres:
+        livres.sort(key=lambda x: (x[0], x[1]))
+        a = livres[0][2]
+        _estado(a.chave)["uso"].append((agora, tokens))
+        _publicar(a, tokens, agora)
+        return a, 0.0
     return None, melhor
 
 
