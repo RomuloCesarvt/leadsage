@@ -453,8 +453,9 @@ async def preparar_lote(
         alvos.append((lead, canal))
 
     # 2) escreve as mensagens, algumas por vez
-    # duas por vez: o Gemini gratuito recusa (429) rajada de chamadas e o lead inteiro falhava
-    sem = asyncio.Semaphore(2)
+    # três por vez: o portão da IA (ia_gate) reparte os pedidos entre os motores (Groq e Gemini juntos, um apoiando o outro) e respeita o
+    # orçamento de cada modelo; o que passa do orçamento espera a vez em vez de virar 429
+    sem = asyncio.Semaphore(3)
     inicio = time.monotonic()
 
     async def escrever(lead: Dict[str, Any], canal: str):

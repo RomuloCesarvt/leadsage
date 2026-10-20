@@ -238,3 +238,42 @@ def test_lote_deixa_uma_reserva_para_a_resposta_do_robo():
         assert ia_gate.escolher([a], 2000)[0] is None                # e o orçamento inteiro é o teto
     finally:
         ia_gate.PRIORIDADE.set("normal")
+
+
+# ---------------------------------------------------------------- os dois motores, um apoiando o outro
+def _dois_motores(monkeypatch, groq_falha=False):
+    usos = {"groq": 0, "gemini": 0}
+    lock = threading.Lock()
+
+    def fazer(nome, falha=False):
+        def chamar(limite_s):
+            with lock:
+                usos[nome] += 1
+            if falha:
+                raise RuntimeError("429 RESOURCE_EXHAUSTED retry in 30s")
+            time.sleep(0.05)
+            return f'{{"de": "{nome}"}}'
+        return chamar
+
+    alvos = [ia_gate.Alvo("groq:m", "groq", fazer("groq", groq_falha), tpm=6500, rpm=25),
+             ia_gate.Alvo("gemini:m", "gemini", fazer("gemini"), tpm=120000, rpm=8)]
+    monkeypatch.setattr(ai_client, "_alvos", lambda *a, **k: alvos)
+    return usos
+
+
+def test_pedidos_simultaneos_usam_os_dois_motores(monkeypatch):
+    usos = _dois_motores(monkeypatch)
+    respostas = []
+    fios = [threading.Thread(target=lambda: respostas.append(ai_client.generate_hedged(None, "p", time.monotonic() + 20, max_tokens=500)))
+            for _ in range(6)]
+    [f.start() for f in fios]
+    [f.join() for f in fios]
+    assert len(respostas) == 6
+    assert usos["groq"] >= 2 and usos["gemini"] >= 2, usos          # os dois trabalharam: nenhum ficou como reserva parada
+
+
+def test_quando_um_motor_falha_o_outro_assume_sem_o_usuario_perceber(monkeypatch):
+    usos = _dois_motores(monkeypatch, groq_falha=True)
+    respostas = [ai_client.generate_hedged(None, "p", time.monotonic() + 20, max_tokens=500) for _ in range(4)]
+    assert all('"gemini"' in r for r in respostas)                  # o Groq recusou; o Gemini respondeu tudo
+    assert usos["groq"] == 1                                         # e o Groq descansa pelo tempo que mandou, sem martelar de novo
