@@ -325,7 +325,7 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
             <span>
               Isso usa o <b>WhatsApp Web</b>, e não a API oficial da Meta. O WhatsApp pode <b>restringir ou banir o número</b>.
               Use um número secundário e não aumente o ritmo: no começo o robô envia poucas abordagens por dia,
-              de 3 a 7 minutos entre elas, de segunda a sábado, no melhor horário de cada ramo. Quem pedir para parar nunca mais recebe mensagem.
+              de 1 a 2 minutos entre elas (com uma pausa maior de vez em quando), de segunda a sábado, das 8h às 19h. Quem pedir para parar nunca mais recebe mensagem.
             </span>
           </div>
           <label className="flex items-start gap-2 text-xs text-slate-700 cursor-pointer">

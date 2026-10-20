@@ -1930,16 +1930,6 @@ async def conector_saude(user: dict = Depends(get_current_user)):
     return await conector_whatsapp.saude({**canal, "uid": user.get("uid")})
 
 
-@app.post("/api/robo/fila/enviar-todos-agora")
-async def fila_enviar_todos_agora(user: dict = Depends(get_current_user)):
-    """Quem espera o horário do ramo passa a sair já (intervalo de segurança e limite do dia continuam valendo)."""
-    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    uid = user.get("uid")
-    await conector_whatsapp.enviar_todos_agora(uid)
-    canal = await robo_store.canal_do_usuario(uid) or {}
-    return await conector_whatsapp.estado_da_fila({**canal, "uid": uid})
-
-
 @app.post("/api/robo/fila/{item_id}/enviar-agora")
 async def fila_enviar_agora(item_id: str, user: dict = Depends(get_current_user)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")

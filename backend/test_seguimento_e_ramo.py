@@ -46,17 +46,38 @@ def _pendente(id_, ramo, fone, nota, avaliacoes):
             "ramo": ramo, "contato": {"phone": fone}, "nota": nota, "avaliacoes": avaliacoes}
 
 
-def test_so_sai_quem_esta_no_horario_do_ramo_e_a_melhor_reputacao_vai_primeiro(client, com_robo, rodar):
+def test_horario_do_ramo_so_ordena_a_fila_e_ninguem_fica_esperando(client, com_robo, rodar):
     client.post("/api/robo/conector/gerar")
     canal = rodar(robo_store.canal_do_usuario, "alice")
     for item in (_pendente("pizza", "Pizzarias", "14998003784", 4.9, 300), _pendente("dent1", "Dentistas", "14998003785", 4.2, 40),
                  _pendente("dent2", "Dentistas", "14998003786", 4.9, 120), _pendente("dent3", "Dentistas", "14998003787", 5.0, 3)):
         rodar(fila_envio._gravar, "alice", item)
     canal["cw_primeiro"] = "2026-09-01T00:00:00+00:00"
-    de_manha = rodar(cw.tarefas, canal, brasilia(2026, 10, 14, 10, 0))             # quarta 10h: dentista sim, pizzaria nao
-    assert [t["id"] for t in de_manha["tarefas"]] == ["fila:dent2"]                  # reputacao: 4,9 com 120 avaliacoes primeiro; 5,0 com 3 nao conta
+    de_manha = rodar(cw.tarefas, canal, brasilia(2026, 10, 14, 10, 0))             # quarta 10h: dentista esta no horario, pizzaria nao
+    assert [t["id"] for t in de_manha["tarefas"]] == ["fila:dent2"]                  # no horario primeiro; depois reputacao (4,9 com 120 avaliacoes; 5,0 com 3 nao conta)
+    # 12h40: ninguem esta no melhor horario, e mesmo assim a fila anda (so a ordem muda): sai quem tem a melhor reputacao
     fora = rodar(cw.tarefas, dict(canal, cw_ultimo_frio=None, cw_proximo_frio_em=None, cw_frio_n=0), brasilia(2026, 10, 14, 12, 40))
-    assert fora["tarefas"] == [] and "melhor horário" in fora["motivo_sem_frio"]
+    assert [t["id"] for t in fora["tarefas"]] == ["fila:pizza"] and not fora["motivo_sem_frio"]
+
+
+def test_colocou_na_fila_a_primeira_sai_na_hora_e_as_outras_uma_a_uma_com_intervalo(client, com_robo, rodar, monkeypatch):
+    monkeypatch.setattr(cw, "_sortear", lambda a, b: a)                              # intervalo minimo, para o teste ser exato
+    client.post("/api/robo/conector/gerar")
+    canal = rodar(robo_store.canal_do_usuario, "alice")
+    for i in range(3):
+        rodar(fila_envio._gravar, "alice", _pendente(f"c{i}", "Clínicas", f"1499800378{i}", 4.5, 50))
+    canal["cw_primeiro"] = "2026-09-01T00:00:00+00:00"
+    t0 = brasilia(2026, 10, 20, 11, 41)                                              # fora das 9h-11h30 das clinicas: nao importa
+    canal["cw_visto"] = t0.isoformat()
+    primeira = rodar(cw.tarefas, canal, t0)
+    assert len(primeira["tarefas"]) == 1 and primeira["tarefas"][0]["tipo"] == "abordagem"
+    # 30 s depois: ainda no intervalo (1min15); com o estado do canal atualizado pelo servico
+    espera = rodar(cw.tarefas, canal, t0 + timedelta(seconds=30))
+    assert espera["tarefas"] == [] and "intervalo" in espera["motivo_sem_frio"]
+    estado = rodar(cw.estado_da_fila, {**canal, "uid": "alice"}, t0 + timedelta(seconds=30))
+    assert "Aguardando o melhor horário" not in estado["motivo"]
+    segunda = rodar(cw.tarefas, canal, t0 + timedelta(seconds=cw.INTERVALO_MIN_S + 1))
+    assert len(segunda["tarefas"]) == 1 and segunda["tarefas"][0]["id"] != primeira["tarefas"][0]["id"]
 
 
 # ---------------------------------------------------------------- seguimento automatico
@@ -133,39 +154,3 @@ def test_marcar_enviado_agenda_os_seguimentos(client, com_robo, rodar):
     rodar(fila_envio._gravar, "alice", _enviado({"status": "pendente"}))
     rodar(fila_envio.marcar_enviado, "alice", "f_L1")
     assert len(rodar(fila_envio.obter, "alice", "f_L1")["agenda_seguimentos"]) == 2
-
-
-# ---------------------------------------------------------------- a tela diz POR QUE a fila espera (e deixa enviar já)
-def test_proxima_janela_do_ramo():
-    ter_11h41 = brasilia(2026, 10, 20, 11, 41)
-    assert cw.proxima_janela("Clínicas", ter_11h41) == brasilia(2026, 10, 20, 14, 0)         # fora das 9-11:30: volta às 14h
-    assert cw.proxima_janela("Padaria", ter_11h41) == brasilia(2026, 10, 20, 13, 30)
-    sab = brasilia(2026, 10, 17, 10, 0)
-    assert cw.proxima_janela("Dentistas", sab) == brasilia(2026, 10, 19, 9, 0)               # fim de semana: segunda de manhã
-    assert cw._quando(brasilia(2026, 10, 20, 14, 0), ter_11h41) == "hoje às 14:00"
-    assert cw._quando(brasilia(2026, 10, 21, 9, 0), ter_11h41) == "amanhã às 09:00"
-
-
-def test_estado_da_fila_nao_diz_que_sai_em_instantes_quando_espera_o_horario_do_ramo(client, com_robo, rodar, monkeypatch):
-    client.post("/api/robo/conector/gerar")
-    canal = rodar(robo_store.canal_do_usuario, "alice")
-    for item in (_pendente("c1", "Clínicas", "14998003784", 4.5, 50), _pendente("c2", "Dentistas", "14998003785", 4.2, 40)):
-        rodar(fila_envio._gravar, "alice", item)
-    canal["cw_primeiro"] = "2026-09-01T00:00:00+00:00"
-    agora = brasilia(2026, 10, 20, 11, 41)
-    estado = rodar(cw.estado_da_fila, {**canal, "uid": "alice", "cw_visto": agora.isoformat()}, agora)
-    assert estado["aguardando_horario"] == "hoje às 14:00"
-    assert "Aguardando o melhor horário" in estado["motivo"] and "hoje às 14:00" in estado["motivo"] and "Enviar agora" in estado["motivo"]
-    # "enviar todos agora": a fila deixa de esperar o horário do ramo
-    assert rodar(cw.enviar_todos_agora, "alice") == 2
-    depois = rodar(cw.estado_da_fila, {**canal, "uid": "alice", "cw_visto": agora.isoformat()}, agora)
-    assert depois["aguardando_horario"] == "" and "Aguardando o melhor horário" not in depois["motivo"]
-    tarefas = rodar(cw.tarefas, dict(canal, cw_ultimo_frio=None, cw_proximo_frio_em=None, cw_frio_n=0), agora)
-    assert tarefas["tarefas"] and tarefas["tarefas"][0]["tipo"] == "abordagem"
-
-
-def test_rota_enviar_todos_agora(client, com_robo, rodar):
-    client.post("/api/robo/conector/gerar")
-    rodar(fila_envio._gravar, "alice", _pendente("c1", "Clínicas", "14998003784", 4.5, 50))
-    r = client.post("/api/robo/fila/enviar-todos-agora")
-    assert r.status_code == 200 and "pendentes" in r.json()

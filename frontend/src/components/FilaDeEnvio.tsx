@@ -326,7 +326,7 @@ export const FilaDeEnvio: React.FC = () => {
     const reenvios = selecionados.filter(i => i.ja_contatado);
     if (reenvios.length && !window.confirm(`${reenvios.length} contato(s) marcado(s) JÁ RECEBERAM mensagem antes (${reenvios.slice(0, 3).map(i => i.nome).join(', ')}${reenvios.length > 3 ? '…' : ''}). Quer enviar novamente mesmo assim?`)) return;
     const emails = selEmail ? ` ${selEmail} e-mail(s) saem agora (custam 2 créditos cada).` : '';
-    if (!window.confirm(`Enviar ${selecionados.length} mensagem(ns)?${emails}${selWhats ? ` ${selWhats} de WhatsApp entram na fila e saem aos poucos: de 3 a 7 minutos entre uma e outra, de segunda a sábado, das 8h às 19h (Brasília), para proteger o número.` : ''}`)) return;
+    if (!window.confirm(`Enviar ${selecionados.length} mensagem(ns)?${emails}${selWhats ? ` ${selWhats} de WhatsApp entram na fila e começam a sair já, uma de cada vez: de 1 a 2 minutos entre uma e outra (com uma pausa maior de vez em quando), de segunda a sábado, das 8h às 19h (Brasília), para proteger o número.` : ''}`)) return;
     setTrabalhando('aprovar');
     try {
       const r = await api.filaAprovar(selecionados.map(i => i.id), selecionados.some(i => i.ja_contatado));
@@ -525,12 +525,6 @@ export const FilaDeEnvio: React.FC = () => {
           <b className="flex items-center gap-1.5">{whats.online ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />} WhatsApp: {whats.online ? 'conectado' : 'desconectado'}</b>
           <span>Hoje: <b>{whats.enviadas_hoje}</b> de <b>{whats.limite_hoje}</b> abordagens (o limite sobe 5 por dia, até 60)</span>
           {whats.motivo && <span className="basis-full">{whats.motivo}</span>}
-          {whats.aguardando_horario && whats.online && (
-            <button onClick={() => acao('todos-agora', async () => setWhats(await api.filaEnviarTodosAgora()), 'Não foi possível enviar agora.')} disabled={!!trabalhando}
-              className="mt-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 disabled:opacity-50">
-              <Send className="w-3.5 h-3.5" /> Enviar agora, sem esperar o horário do ramo
-            </button>
-          )}
           {/falhas seguidas/i.test(whats.motivo || '') && (
             <button onClick={() => acao('retomar', async () => setWhats(await api.whatsRetomar()), 'Não foi possível retomar.')} disabled={!!trabalhando}
               className="mt-1 px-3 py-1.5 rounded-lg bg-white border border-emerald-300 text-emerald-800 text-xs font-bold hover:bg-emerald-50 disabled:opacity-50">

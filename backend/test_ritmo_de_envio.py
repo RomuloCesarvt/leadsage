@@ -40,27 +40,27 @@ def test_so_de_segunda_a_sabado_das_8h_as_19h_de_brasilia():
     assert not pode and "8h às 19h" in motivo
 
 
-def test_intervalo_entre_abordagens_e_de_3_a_7_minutos_e_varia():
+def test_intervalo_entre_abordagens_e_de_1_a_2_minutos_e_meio_e_varia():
     agora = brasilia(2026, 10, 14, 10, 0)
     esperas = set()
     for _ in range(60):
         canal = {}
         cw.agendar_proxima_fria(canal, agora, 1)
         esperas.add(int((datetime.fromisoformat(canal["cw_proximo_frio_em"]) - agora).total_seconds()))
-    assert min(esperas) >= cw.INTERVALO_MIN_S == 180 and max(esperas) <= cw.INTERVALO_MAX_S == 420
+    assert min(esperas) >= cw.INTERVALO_MIN_S == 75 and max(esperas) <= cw.INTERVALO_MAX_S == 150
     assert len(esperas) > 10, "o intervalo precisa variar, nao ser sempre o mesmo"
 
 
-def test_a_cada_5_abordagens_uma_pausa_longa_de_15_a_25_minutos_a_mais():
+def test_a_cada_6_abordagens_uma_pausa_maior_de_4_a_8_minutos_a_mais():
     agora = brasilia(2026, 10, 14, 10, 0)
-    for n in (5, 10, 15):
+    for n in (6, 12, 18):
         canal = {}
         cw.agendar_proxima_fria(canal, agora, n)
         espera = (datetime.fromisoformat(canal["cw_proximo_frio_em"]) - agora).total_seconds()
-        assert 180 + 900 <= espera <= 420 + 1500
+        assert 75 + 240 <= espera <= 150 + 480
     canal = {}
-    cw.agendar_proxima_fria(canal, agora, 4)
-    assert (datetime.fromisoformat(canal["cw_proximo_frio_em"]) - agora).total_seconds() <= 420
+    cw.agendar_proxima_fria(canal, agora, 5)
+    assert (datetime.fromisoformat(canal["cw_proximo_frio_em"]) - agora).total_seconds() <= 150
 
 
 def test_politica_respeita_o_horario_sorteado():
