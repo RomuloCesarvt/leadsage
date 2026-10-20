@@ -117,20 +117,13 @@ def lead_sem_site(site_status: Optional[str], faltando: Any = None) -> bool:
         return False
     return "website" in (faltando or [])
 
-GATILHOS = """GATILHOS QUE VOCÊ PODE USAR (escolha no máximo dois, só se forem verdadeiros)
-- Especificidade: um detalhe que só vale para este negócio prova que você olhou.
-- Prova social dele: a nota, as avaliações e o que os clientes escrevem são a melhor abertura.
-- Reciprocidade: oferecer primeiro (um esboço, um olhar rápido no perfil) cria vontade de responder.
-- Coerência e baixo atrito: peça um sim pequeno antes de qualquer reunião.
-- Autoridade discreta: demonstre que conhece o ramo pelas perguntas que faz, não por se elogiar.
-NUNCA: urgência ou escassez inventada ("só hoje", "últimas vagas"), medo ("você está perdendo dinheiro"), número de mercado,
-comparação com concorrente nominal, promessa de resultado."""
+GATILHOS = """GATILHOS (no máximo dois, só se forem verdadeiros): especificidade (um detalhe que só vale para este negócio); prova social dele
+(nota, avaliações, o que os clientes escrevem); reciprocidade (oferecer um esboço primeiro); um sim pequeno antes de qualquer reunião.
+NUNCA: urgência ou escassez inventada, medo ("você está perdendo dinheiro"), número de mercado, comparação com concorrente nominal, promessa de resultado."""
 
-TEMPERATURA = """TEMPERATURA E MOMENTO
-- O contato é FRIO: ele não conhece você nem pediu nada. Trate como um desconhecido educado: aquecer vem antes de vender.
-- Não fale de preço e não mande link no primeiro toque. Oferecer a prévia sem compromisso, "por aqui mesmo ou numa conversa rápida",
-  é o convite certo; reunião nunca é exigência. O objetivo do toque 1 é ser respondido.
-- Se o ramo tem hora de pico (veja o guia do ramo), reconheça que ele deve estar ocupado e mostre que a mensagem é rápida."""
+TEMPERATURA = """TEMPERATURA: contato FRIO, não te conhece nem pediu nada: trate como um desconhecido educado; aquecer vem antes de vender. Sem preço e sem
+link no primeiro toque; reunião nunca é exigência; o objetivo do toque 1 é ser respondido. Se o ramo tem hora de pico (guia do ramo), reconheça que
+ele deve estar ocupado e seja breve."""
 
 
 # Variações. Mensagens iguais em todos os números são o caminho mais curto para o spam: cada lead recebe a sua combinação (apresentação,
@@ -184,7 +177,10 @@ TAMANHOS = (
 VOZ_HUMANA = """VOZ (a diferença entre gente e disparo): escreva como uma pessoa de verdade no WhatsApp, não como empresa. Frases curtas,
 vocabulário de conversa ("pra", "tá", "rapidinho" são bem-vindos), sem "Prezado", "venho por meio desta", "gostaria de apresentar",
 sem lista, sem negrito. Cite UM detalhe só deste negócio (a nota, o que os clientes elogiam, o bairro). Não copie um molde de frase:
-esta mensagem tem a sua própria ordem e o seu próprio jeito. No máximo 1 emoji. {tamanho}"""
+esta mensagem tem a sua própria ordem e o seu próprio jeito. No máximo 1 emoji. {tamanho}
+PROIBIDO abrir com pergunta solta sobre o negócio da pessoa ("como anda a agenda?", "como está o movimento?", "e as vendas?"): quem não te
+conhece estranha e a mensagem perde o sentido. A única pergunta da mensagem é a última. Cada frase tem de fazer sentido para um desconhecido
+que acabou de receber a mensagem: nada de supor o que ele está vivendo."""
 
 
 def quem_sou(sender_name: str, apresentacao: str = "", lead_id: str = "", n: int = 0) -> str:
@@ -211,9 +207,9 @@ ESTILO DESTA MENSAGEM (para ela ser diferente das outras do lote): {estilo}
 {evitar}"""
 
 ESTILOS_DE_ABERTURA = (
-    "abra com uma pergunta curta e natural sobre o negócio (algo que se responde fácil) antes de se apresentar.",
-    "abra dizendo que viu o negócio de um jeito simpático e específico, sem formalidade, e só depois se apresente.",
-    "abra com uma frase leve sobre o ramo ou o bairro, como quem puxa conversa, e então se apresente.",
+    "abra com o cumprimento e o nome, diga numa frase simpática que encontrou o negócio no Google e só depois se apresente.",
+    "abra se apresentando em uma frase e logo diga o que chamou sua atenção no perfil (um detalhe REAL do dossiê).",
+    "abra com o cumprimento, apresente-se e diga com naturalidade que ficou com uma ideia para o negócio, antes de falar da nota.",
     "abra pela reputação: comece citando a nota ou as avaliações e só depois se apresente.",
     "abra com o cumprimento e o nome, apresente-se e vá direto ao que achou no Google.",
     "abra com uma observação específica sobre o negócio (algo que os clientes elogiam) e depois se apresente.",
@@ -296,6 +292,24 @@ _APRESENTACAO = re.compile(
 )
 
 
+_PERGUNTA_SOLTA = re.compile(
+    r"\bcomo (?:anda|vai|est[aá]|est[aã]o|andam|v[aã]o)\b[^.?!]{0,25}\b(?:agenda|movimento|clientes?|neg[óo]cio|vendas|semana|dia|casa|cl[ií]nica|loja|pacientes?)\b[^.?!]{0,30}\?"
+    r"|\b(?:e as vendas|e o movimento|e a agenda|tudo certo com (?:a |o )?(?:agenda|neg[óo]cio|movimento))\b[^.?!]{0,20}\?",
+)
+
+
+def tirar_pergunta_solta(texto: str) -> str:
+    """Tira da mensagem a frase que pergunta pela vida do negócio sem sentido nenhum para um desconhecido ("Como anda a agenda em Botucatu?").
+    A única pergunta da abordagem é a última; esta nunca chega ao cliente, mesmo que o modelo a escreva."""
+    saida = []
+    for linha in (texto or "").split("\n"):
+        partes = re.split(r"(?<=[.!?])\s+", linha)
+        mantidas = [p for p in partes if not _PERGUNTA_SOLTA.search(p.lower())]
+        if mantidas or not linha.strip():
+            saida.append(" ".join(mantidas))
+    return "\n".join(saida).strip()
+
+
 def revisar_calor(texto: str, canal: str = "email") -> list:
     """Defeitos de frieza: sem cumprimento ou sem dizer quem escreve."""
     problemas = []
@@ -304,6 +318,10 @@ def revisar_calor(texto: str, canal: str = "email") -> list:
         problemas.append("não começa cumprimentando (Oi/Olá/Bom dia + o nome, se souber); está seco demais")
     if not _APRESENTACAO.search(texto or ""):
         problemas.append("não diz quem está escrevendo nem o que faz; apresente-se em uma frase curta antes do motivo do contato")
+    # pergunta solta sobre a vida do negócio logo no começo ("Como anda a agenda em Botucatu?"): não faz sentido para quem não te conhece
+    if _PERGUNTA_SOLTA.search(inicio.lower()):
+        problemas.append("abre com uma pergunta solta sobre o negócio (ex.: \"como anda a agenda?\"): quem não te conhece estranha; "
+                         "cumprimente, apresente-se e diga por que está escrevendo")
     return problemas
 
 

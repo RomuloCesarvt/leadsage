@@ -483,7 +483,7 @@ async def preparar_lote(
         if t.done() and not t.cancelled():
             textos.append(t.result())
         else:
-            textos.append(AIIndisponivel("A fila da IA gratuita está cheia agora (muita gente gerando ao mesmo tempo). Tente de novo em 20 segundos.", espera_s=20))
+            textos.append(AIIndisponivel("A fila da IA gratuita está cheia agora (muita gente gerando ao mesmo tempo). Tente de novo em 5 segundos.", espera_s=5))
 
     # 3) entrega cada uma no canal dela
     usados: List[str] = [i.get("texto", "") for i in existentes if i.get("canal") == "whatsapp"][:40]

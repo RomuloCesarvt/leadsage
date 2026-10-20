@@ -41,6 +41,8 @@ export interface LeadItem {
   pipeline_stage?: string;
   // escolhido pela pessoa para entrar em Meus Leads (ver lib/leadsSalvos)
   salvo?: boolean;
+  /** quando a pessoa o colocou em Meus Leads (ISO): a fila de envio mostra os mais novos primeiro */
+  salvo_em?: string;
   favorito?: boolean;
   pipeline_origem?: string;
   // quem moveu o card por ultimo ("robô" ou "voce") e por que

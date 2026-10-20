@@ -305,8 +305,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const salvarLeads = useCallback(async (ids: string[]) => {
     const alvo = new Set(ids);
-    setLeads(prev => prev.map(l => alvo.has(l.id) ? { ...l, salvo: true, pipeline_stage: l.pipeline_stage || 'Novo Lead' } : l));
-    leadsRef.current = leadsRef.current.map(l => alvo.has(l.id) ? { ...l, salvo: true } : l);
+    const agora = new Date().toISOString();
+    // o carimbo diz quando entrou em Meus Leads (a fila de envio mostra os mais novos primeiro); quem já tinha carimbo o mantém
+    setLeads(prev => prev.map(l => alvo.has(l.id) ? { ...l, salvo: true, salvo_em: l.salvo === true && l.salvo_em ? l.salvo_em : agora, pipeline_stage: l.pipeline_stage || 'Novo Lead' } : l));
+    leadsRef.current = leadsRef.current.map(l => alvo.has(l.id) ? { ...l, salvo: true, salvo_em: l.salvo === true && l.salvo_em ? l.salvo_em : agora } : l);
     await atualizarPipeline();
   }, [atualizarPipeline]);
 

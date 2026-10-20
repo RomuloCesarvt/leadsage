@@ -98,3 +98,34 @@ def test_texto_para_cliente_nao_usa_modelo_pequeno(monkeypatch):
 ])
 def test_quais_modelos_sao_pequenos(modelo, pequeno):
     assert ai_providers.e_pequeno(modelo) is pequeno
+
+
+# ------------------------------------------------------------------------------------------ pergunta solta no começo (caso real)
+CASO_REAL = ("Boa tarde, Renata! Como anda a agenda em Botucatu?\nSou Rômulo, da Seometria, e ajudo negócios locais a serem encontrados no Google.\n"
+             "Vi sua nota 5,0, mas notei que não há site no seu perfil.\nCriei uma versão de teste pra mostrar como isso pode ajudar.\n"
+             "Quer ver como ficou? Eu te mando agora, sem compromisso.")
+
+
+def test_pergunta_solta_no_comeco_e_pega_e_removida():
+    assert any("pergunta solta" in p for p in am.revisar_calor(CASO_REAL, "whatsapp"))
+    limpo = am.tirar_pergunta_solta(CASO_REAL)
+    assert "agenda" not in limpo and limpo.startswith("Boa tarde, Renata!")           # a saudação fica
+    assert "Quer ver como ficou?" in limpo and "Sou Rômulo" in limpo                    # o resto da mensagem fica
+    assert not any("pergunta solta" in p for p in am.revisar_calor(limpo, "whatsapp"))
+
+
+@pytest.mark.parametrize("frase", ["Como está o movimento?", "E as vendas?", "Como vai a clínica por aí?", "Tudo certo com a agenda?"])
+def test_outras_perguntas_soltas_tambem(frase):
+    assert "?" not in am.tirar_pergunta_solta(f"Oi, Ana! {frase} Sou o Rô, da X.")
+
+
+def test_pergunta_final_e_cumprimento_nao_sao_tocados():
+    ok = "Boa tarde, Renata! Tudo bem? Sou Rômulo e montei um esboço pra você. Quer dar uma olhada, sem compromisso?"
+    assert am.tirar_pergunta_solta(ok) == ok
+    assert not any("pergunta solta" in p for p in am.revisar_calor(ok, "whatsapp"))
+
+
+def test_nenhum_estilo_de_abertura_pede_pergunta_sobre_o_negocio():
+    for e in am.ESTILOS_DE_ABERTURA:
+        assert "pergunta curta" not in e and "puxa conversa" not in e
+    assert "PROIBIDO abrir com pergunta solta" in am.VOZ_HUMANA

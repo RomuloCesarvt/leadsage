@@ -16,6 +16,7 @@ import { api } from '../services/api';
 import { useApp } from '../context/AppContext';
 import { WhatsAppIcon, InstagramIcon, LinkedInIcon } from './BrandIcons';
 import { ehSalvo } from '../lib/leadsSalvos';
+import { jaDisparado, ordenarCandidatos } from '../lib/ordemDaFila';
 import { sondar } from '../lib/sondagem';
 import { montarPreviaDoLead } from './SiteBuilder';
 import { buscarFotos } from './BancoImagens';
@@ -149,9 +150,12 @@ export const FilaDeEnvio: React.FC = () => {
   // quem já recebeu mensagem NÃO volta para a lista (nem com outro cadastro do mesmo número); só entra se a pessoa mandar de propósito (ficha do lead)
   const candidatos = useMemo(() => {
     const jaFalamos = new Set(itens.filter(i => ['enviado', 'enviando'].includes(i.status)).map(i => chaveDoFone(i.contato?.phone)).filter(Boolean));
-    return (leads as LeadItem[]).filter(l => ehSalvo(l) && SEM_CONTATO_AINDA.has(l.pipeline_stage || '') && canalDe(l)
+    const lista = (leads as LeadItem[]).filter(l => ehSalvo(l) && SEM_CONTATO_AINDA.has(l.pipeline_stage || '') && canalDe(l)
+      && !jaDisparado(l)
       && !itens.some(i => i.lead_id === l.id && EM_ANDAMENTO.concat('enviado').includes(i.status) && i.status !== 'falhou')
       && !(chaveDoFone(l.phone) && jaFalamos.has(chaveDoFone(l.phone))));
+    // Os que acabaram de entrar em Meus Leads vêm primeiro; quem já foi trabalhado antes (fila descartada) vai para o fim.
+    return ordenarCandidatos(lista, new Set(itens.map(i => i.lead_id)));
   }, [leads, itens]);
 
   const alternarLead = (id: string) => setMarcados(prev => {
@@ -184,7 +188,7 @@ export const FilaDeEnvio: React.FC = () => {
       const msg = String(e?.message || 'sem resposta do servidor');
       if (/402|403|401|plano|crédito|credito|autoriz/i.test(msg) && !/fila da IA|alta demanda/i.test(msg)) throw e;   // erro de verdade (plano, login): aparece
       return {
-        resultados: parte.map(l => ({ lead_id: l.id, nome: l.company || l.name || l.id, resultado: 'falhou' as const, espera_s: 20, motivo: `não foi possível escrever a mensagem: fila da IA (${msg.slice(0, 80)})` })),
+        resultados: parte.map(l => ({ lead_id: l.id, nome: l.company || l.name || l.id, resultado: 'falhou' as const, espera_s: 6, motivo: `não foi possível escrever a mensagem: fila da IA (${msg.slice(0, 80)})` })),
         resumo: undefined as any,
       };
     }
@@ -248,41 +252,50 @@ export const FilaDeEnvio: React.FC = () => {
           setAvisoPrevias(`${criar.length - falhas} site(s) gerado(s) agora.${semVaga ? ` ${semVaga} lead(s) ficaram sem prévia por falta de vagas de site no seu plano` : ''}${falhas ? ` ${falhas} falharam${reprovados ? ` (${reprovados} não passaram na avaliação de qualidade: o site sairia genérico ou com assunto de outro ramo)` : ''}` : ''}: para eles a mensagem oferece montar a prévia, em vez de dizer que já está pronta.`);
         }
       }
-      // dois lotes por vez: metade do tempo de espera, sem passar do que a IA gratuita aguenta por minuto
-      const partes: typeof escolhidos[] = [];
-      for (let i = 0; i < escolhidos.length; i += LOTE) partes.push(escolhidos.slice(i, i + LOTE));
-      let feitosLote = 0; let proxima = 0;
-      const lote = async () => {
-        while (proxima < partes.length) {
-          const parte = partes[proxima++];
-          const r = await prepararSeguro(parte as LeadItem[]);
-          setResultados(prev => [...prev, ...r.resultados]);
-          if (r.resumo) setResumo(r.resumo);
-          feitosLote += parte.length;
-          setProgresso({ feitos: Math.min(feitosLote, escolhidos.length), total: escolhidos.length });
-        }
+      // Gera TODOS os que estão marcados. Dois pedidos por vez, de 4 leads; o que a IA gratuita não deu conta no tempo do servidor volta
+      // para a fila de tentativas e é refeito logo em seguida (sem esperar à toa), até todos ficarem prontos.
+      const porLimite = (m?: string) => /alta demanda|limite gratuito|demorou demais|fila da IA|muita gente|não foi possível escrever a mensagem|nenhum motor/i.test(m || '');
+      const prontos = new Set<string>();
+      const falhas = new Map<string, number>();            // lead -> segundos que o servidor mandou esperar
+      const tentativas = new Map<string, number>();
+      const rodarLotes = async (lista: LeadItem[]) => {
+        const partes: LeadItem[][] = [];
+        for (let i = 0; i < lista.length; i += LOTE) partes.push(lista.slice(i, i + LOTE));
+        let proxima = 0;
+        const lote = async () => {
+          while (proxima < partes.length) {
+            const parte = partes[proxima++];
+            const r = await prepararSeguro(parte);
+            const ids = new Set(r.resultados.map(x => x.lead_id));
+            setResultados(prev => [...prev.filter(x => !(ids.has(x.lead_id) && x.resultado === 'falhou')), ...r.resultados]);
+            if (r.resumo) setResumo(r.resumo);
+            for (const x of r.resultados) {
+              if (x.resultado === 'falhou' && porLimite(x.motivo)) falhas.set(x.lead_id, x.espera_s ?? 5);
+              else { falhas.delete(x.lead_id); if (x.resultado !== 'falhou') prontos.add(x.lead_id); }
+            }
+            setProgresso({ feitos: Math.min(prontos.size, escolhidos.length), total: escolhidos.length });
+          }
+        };
+        await Promise.all([lote(), lote()]);
       };
-      await Promise.all([lote(), lote()]);
-      // quem falhou por limite da IA gratuita (muita gente gerando ao mesmo tempo) NÃO fica com erro: espera o tempo que o servidor mandou
-      // e tenta de novo, até acabar (no máximo 10 minutos)
-      const porLimite = (m?: string) => /alta demanda|limite gratuito|demorou demais|fila da IA|muita gente/i.test(m || '');
+      await rodarLotes(escolhidos);
       const comecou = Date.now();
-      for (;;) {
-        const pendentes = new Map<string, number>();
-        setResultados(prev => { prev.filter(x => x.resultado === 'falhou' && porLimite(x.motivo)).forEach(x => pendentes.set(x.lead_id, x.espera_s || 20)); return prev; });
-        if (!pendentes.size || Date.now() - comecou > 600000) break;
-        const espera = Math.min(75, Math.max(12, ...pendentes.values()) + 2);
-        for (let seg = espera; seg > 0; seg--) {
-          setAvisoPrevias(`A IA gratuita está no limite por minuto. ${pendentes.size} mensagem(ns) na fila: tentando de novo em ${seg}s…`);
+      while (falhas.size && Date.now() - comecou < 600000) {
+        const espera = Math.min(45, Math.max(...falhas.values()));
+        for (let seg = espera; seg > 3; seg--) {          // só espera quando o servidor mandou esperar de verdade
+          setAvisoPrevias(`A IA gratuita está no limite por minuto. ${falhas.size} mensagem(ns) na fila: tentando de novo em ${seg}s…`);
           await new Promise(ok => setTimeout(ok, 1000));
         }
-        const de_novo = escolhidos.filter(l => pendentes.has(l.id));
-        for (let i = 0; i < de_novo.length; i += 2) {
-          const r = await prepararSeguro(de_novo.slice(i, i + 2) as LeadItem[]);
-          const ids = new Set(r.resultados.map(x => x.lead_id));
-          setResultados(prev => [...prev.filter(x => !(ids.has(x.lead_id) && x.resultado === 'falhou')), ...r.resultados]);
-          if (r.resumo) setResumo(r.resumo);
+        setAvisoPrevias(`Gerando as mensagens que faltam (${falhas.size})…`);
+        const de_novo = escolhidos.filter(l => falhas.has(l.id));
+        for (const l of de_novo) {
+          const n = (tentativas.get(l.id) || 0) + 1;
+          tentativas.set(l.id, n);
+          if (n > 8) falhas.delete(l.id);                  // 8 tentativas e nada: fica como "falhou" para a pessoa ver o motivo
         }
+        const ainda = de_novo.filter(l => falhas.has(l.id));
+        if (!ainda.length) break;
+        await rodarLotes(ainda);
       }
       setAvisoPrevias('');
       setMarcados(new Set());
@@ -326,7 +339,7 @@ export const FilaDeEnvio: React.FC = () => {
     const reenvios = selecionados.filter(i => i.ja_contatado);
     if (reenvios.length && !window.confirm(`${reenvios.length} contato(s) marcado(s) JÁ RECEBERAM mensagem antes (${reenvios.slice(0, 3).map(i => i.nome).join(', ')}${reenvios.length > 3 ? '…' : ''}). Quer enviar novamente mesmo assim?`)) return;
     const emails = selEmail ? ` ${selEmail} e-mail(s) saem agora (custam 2 créditos cada).` : '';
-    if (!window.confirm(`Enviar ${selecionados.length} mensagem(ns)?${emails}${selWhats ? ` ${selWhats} de WhatsApp entram na fila e começam a sair já, uma de cada vez: de 1 a 2 minutos entre uma e outra (com uma pausa maior de vez em quando), de segunda a sábado, das 8h às 19h (Brasília), para proteger o número.` : ''}`)) return;
+    if (!window.confirm(`Enviar ${selecionados.length} mensagem(ns)?${emails}${selWhats ? ` ${selWhats} de WhatsApp entram na fila e começam a sair já, uma de cada vez: de 3 a 7 minutos entre uma e outra (com uma pausa maior a cada 5), de segunda a sábado, das 8h às 19h (Brasília), para proteger o número.` : ''}`)) return;
     setTrabalhando('aprovar');
     try {
       const r = await api.filaAprovar(selecionados.map(i => i.id), selecionados.some(i => i.ja_contatado));

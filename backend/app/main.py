@@ -1237,7 +1237,7 @@ async def fila_preparar(req: FilaPrepararRequest, user: dict = Depends(get_curre
     await exigir_recurso(user, "ia_abordagem", "O disparo")
     gerar, enviar, pode_enviar, cobrar = await _funcoes_da_fila(user)
     from app import ai_client
-    ai_client.PRAZO_DA_IA_S.set(20.0)   # vários textos na mesma requisição de 60 s: cada um espera no máximo 20 s por vaga na IA
+    ai_client.PRAZO_DA_IA_S.set(24.0)   # vários textos na mesma requisição de 60 s: cada um espera no máximo 20 s por vaga na IA
     try:
         return await asyncio.wait_for(
             fila_envio.preparar_lote(user.get("uid"), req.leads,

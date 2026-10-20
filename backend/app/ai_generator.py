@@ -192,9 +192,8 @@ def _pedido_dos_seguimentos(req: PitchGenerationRequest) -> str:
     if not getattr(req, "com_seguimentos", False):
         return ""
     return (
-        '\nTambém inclua a chave "follow_ups": lista de exatamente 2 objetos com "quando" (ex.: "2 dias depois"), '
-        '"objetivo" (uma frase) e "texto" (a mensagem, até 40 palavras, no mesmo canal). São para quem NÃO respondeu: '
-        "não repetem o argumento da abertura e trazem algo novo tirado dos dados acima (outro gancho, outra avaliação, "
+        '\nInclua também "follow_ups": lista de 2 objetos {"quando" (ex.: "2 dias depois"), "objetivo" (uma frase), "texto" (até 40 palavras, '
+        'mesmo canal)} para quem NÃO respondeu: sem repetir o argumento da abertura, com algo novo dos dados acima (outro gancho, outra avaliação, '
         "o horário). NUNCA estatística de mercado, número de concorrente, percentual, preço ou prazo inventado."
     )
 
@@ -319,9 +318,10 @@ class AIGenerator:
         # acha vira aviso na tela em vez de outra ida ao modelo.
         limite = time.monotonic() + prazo_maximo()
         com_seguimentos = bool(getattr(req, "com_seguimentos", False))
-        dados = await asyncio.to_thread(gerar_json, client, prompt, ["body"], 2, limite, True, 700 if com_seguimentos else 500, qualidade=True)
+        dados = await asyncio.to_thread(gerar_json, client, prompt, ["body"], 2, limite, True, 560 if com_seguimentos else 400, qualidade=True)
 
         dados["body"], avisos_marcador = limpar_marcadores(str(dados.get("body") or ""), req.nome_de_quem_escreve or req.sender_name or "")
+        dados["body"] = abordagem_mestra.tirar_pergunta_solta(dados["body"])   # "Como anda a agenda?" sem sentido nenhum: nunca chega ao cliente
         problemas = avisos_marcador + (revisar_copy(dados.get("body", ""), canal)
                      + abordagem_mestra.revisar_calor(dados.get("body", ""), canal)
                      + abordagem_mestra.revisar_roteiro(dados.get("body", ""), sem_site, req.previa or ""))

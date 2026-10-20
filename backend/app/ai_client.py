@@ -117,7 +117,7 @@ def _tentar_modelo(client, model: str, prompt: str, limite_ms: int, max_tokens: 
 
 def _tokens_do_pedido(prompt: str, max_tokens: Optional[int]) -> int:
     """Quanto o pedido pesa no limite por minuto: entrada (~3 caracteres por token em português) mais a saída pedida."""
-    return int(len(prompt) / 3) + int(max_tokens or 1500)
+    return int(len(prompt) / 3.6) + int(max_tokens or 1500)
 
 
 def _alvos(client, prompt: str, max_tokens: Optional[int], json_mode: bool, qualidade: bool = False) -> list:

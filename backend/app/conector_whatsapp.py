@@ -43,10 +43,10 @@ ONLINE_SEGUNDOS = 200
 INTERVALO_FRIO_S = 90          # (antigo) so vale para contas conectadas antes do ritmo variavel
 # Ritmo de abordagem fria. Numero que dispara em ritmo de maquina e bloqueado: pessoas mandam mensagem a qualquer hora,
 # com intervalos irregulares e param para descansar.
-INTERVALO_MIN_S = 75           # entre uma abordagem fria e a seguinte: de 1min15 a 2min30, sorteado a cada envio (sai um de cada vez)
-INTERVALO_MAX_S = 150
-LOTE_ATE_PAUSA = 6             # a cada 6 abordagens, uma pausa maior (gente de verdade para um pouco)
-PAUSA_LONGA_S = (240, 480)     # de 4 a 8 minutos, somados ao intervalo
+INTERVALO_MIN_S = 180          # entre uma abordagem fria e a seguinte: de 3 a 7 minutos, sorteado a cada envio (sai um de cada vez)
+INTERVALO_MAX_S = 420
+LOTE_ATE_PAUSA = 5             # a cada 5 abordagens, uma pausa longa
+PAUSA_LONGA_S = (900, 1500)    # de 15 a 25 minutos, somados ao intervalo
 INTERVALO_PRIORIDADE_S = 60    # "Enviar agora" dispensa o intervalo, nao a prudencia: no minimo 1 minuto desde a ultima
 JANELA_HORAS = (8, 19)         # abordagem fria so de segunda a sabado, das 8h as 19h (Brasilia)
 FALHAS_PARA_PAUSAR = 3         # tres falhas seguidas: o numero pode estar restrito; para por 2 horas

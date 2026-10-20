@@ -76,6 +76,8 @@ def test_colocou_na_fila_a_primeira_sai_na_hora_e_as_outras_uma_a_uma_com_interv
     assert espera["tarefas"] == [] and "intervalo" in espera["motivo_sem_frio"]
     estado = rodar(cw.estado_da_fila, {**canal, "uid": "alice"}, t0 + timedelta(seconds=30))
     assert "Aguardando o melhor horário" not in estado["motivo"]
+    enviado = rodar(fila_envio.obter, "alice", primeira["tarefas"][0]["id"].split(":", 1)[1])
+    rodar(fila_envio._gravar, "alice", {**enviado, "status": "enviado"})             # o worker confirma o envio da primeira
     segunda = rodar(cw.tarefas, canal, t0 + timedelta(seconds=cw.INTERVALO_MIN_S + 1))
     assert len(segunda["tarefas"]) == 1 and segunda["tarefas"][0]["id"] != primeira["tarefas"][0]["id"]
 
