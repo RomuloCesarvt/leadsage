@@ -2,7 +2,8 @@ import { ehSalvo } from '../../lib/leadsSalvos';
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import type { LeadItem } from '../../types';
-import { GripVertical, Phone, MessageCircle, Bot, RefreshCw } from 'lucide-react';
+import { GripVertical, Phone, MessageCircle, Bot, RefreshCw, UserRound, Check, ChevronDown } from 'lucide-react';
+import { acoesDoCard, agenteDe, AGENTES_PADRAO, etiquetasDoCard, haQuanto, type Tom } from '../../lib/cardPipeline';
 
 const COLUMNS = [
   { key: 'Novo Lead', color: 'bg-blue-600' },
@@ -24,13 +25,12 @@ const etapaDe = (l: LeadItem) => {
   return COLUMNS.some(c => c.key === normal) ? normal : 'Novo Lead';
 };
 
-const haQuanto = (iso?: string) => {
-  if (!iso) return '';
-  const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (min < 1) return 'agora';
-  if (min < 60) return `há ${min} min`;
-  if (min < 1440) return `há ${Math.round(min / 60)} h`;
-  return `há ${Math.round(min / 1440)} d`;
+const TOM_DA_ETIQUETA: Record<Tom, string> = {
+  neutro: 'bg-slate-100 text-slate-600 border-slate-200',
+  azul: 'bg-blue-50 text-blue-700 border-blue-200',
+  verde: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  ambar: 'bg-amber-50 text-amber-700 border-amber-200',
+  roxo: 'bg-purple-50 text-purple-700 border-purple-200',
 };
 
 const getScoreLabel = (score: number | undefined) => {
@@ -41,8 +41,16 @@ const getScoreLabel = (score: number | undefined) => {
 };
 
 export const PipelineScreen: React.FC = () => {
-  const { leads, updateLeadStage, setSelectedProfileLead, atualizarPipeline } = useApp() as any;
+  const { leads, updateLeadStage, setSelectedProfileLead, atualizarPipeline, definirAgente } = useApp() as any;
   const [atualizando, setAtualizando] = React.useState(false);
+  // cartão com o seletor de agente aberto
+  const [agenteAberto, setAgenteAberto] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (!agenteAberto) return;
+    const fechar = () => setAgenteAberto(null);
+    window.addEventListener('click', fechar);
+    return () => window.removeEventListener('click', fechar);
+  }, [agenteAberto]);
 
   const onDragStart = (e: React.DragEvent, leadId: string) => {
     e.dataTransfer.setData("leadId", leadId);
@@ -108,6 +116,10 @@ export const PipelineScreen: React.FC = () => {
                 )}
                 {columnLeads.map((lead: LeadItem) => {
                   const scoreInfo = getScoreLabel(lead.opportunityScore);
+                  const etiquetas = etiquetasDoCard(lead);
+                  const acoes = acoesDoCard(lead);
+                  const agente = agenteDe(lead);
+                  const eu = agente.id === 'humano';
                   return (
                     <div
                       key={lead.id}
@@ -126,20 +138,16 @@ export const PipelineScreen: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* WhatsApp badge */}
-                      {lead.whatsapp && (
-                        <div className="flex items-center gap-1.5 mb-3">
-                          <MessageCircle className="w-3 h-3 text-emerald-500" />
-                          <span className="text-[11px] font-bold text-emerald-600">WhatsApp disponível</span>
+                      {etiquetas.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-3" data-testid="etiquetas">
+                          {etiquetas.map(t => (
+                            <span key={t.texto} title={t.dica} className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${TOM_DA_ETIQUETA[t.tom]}`}>
+                              {t.texto}
+                            </span>
+                          ))}
                         </div>
                       )}
-                      {!lead.whatsapp && lead.phone && (
-                        <div className="flex items-center gap-1.5 mb-3">
-                          <Phone className="w-3 h-3 text-slate-400" />
-                          <span className="text-[11px] text-slate-400">Telefone</span>
-                        </div>
-                      )}
-                      
+
                       <div className="flex items-center gap-2">
                         <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${scoreInfo.color}`}>
                           {scoreInfo.text}
@@ -154,6 +162,48 @@ export const PipelineScreen: React.FC = () => {
                           <span>{lead.pipeline_motivo}{lead.pipeline_em ? ` · ${haQuanto(lead.pipeline_em)}` : ''}</span>
                         </p>
                       )}
+
+                      {/* Quem atende + ações rápidas: nada aqui abre o perfil do lead */}
+                      <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                        <div className="relative">
+                          <button
+                            type="button" title="Gerenciar agente: quem atende este lead" data-testid="agente"
+                            onClick={e => { e.stopPropagation(); setAgenteAberto(agenteAberto === lead.id ? null : lead.id); }}
+                            className={`flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg border transition-colors ${eu ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'} hover:brightness-95`}
+                          >
+                            {eu ? <UserRound className="w-3 h-3" /> : <Bot className="w-3 h-3" />}
+                            {agente.rotulo}
+                            <ChevronDown className="w-3 h-3 opacity-60" />
+                          </button>
+                          {agenteAberto === lead.id && (
+                            <div className="absolute left-0 bottom-full mb-1 z-20 w-64 bg-white border border-slate-200 rounded-xl shadow-lg p-1.5" role="menu">
+                              {AGENTES_PADRAO.map(a => (
+                                <button
+                                  key={a.id} type="button" role="menuitemradio" aria-checked={a.id === agente.id}
+                                  onClick={() => { setAgenteAberto(null); if (a.id !== agente.id) void definirAgente(lead.id, a.id); }}
+                                  className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-slate-50 flex items-start gap-2"
+                                >
+                                  <Check className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${a.id === agente.id ? 'text-blue-600' : 'text-transparent'}`} />
+                                  <span>
+                                    <span className="block text-xs font-bold text-slate-800">{a.rotulo}</span>
+                                    <span className="block text-[11px] text-slate-500 leading-snug">{a.descricao}</span>
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1" />
+                        {acoes.map(a => (
+                          <a
+                            key={a.id} href={a.href} target={a.id === 'whatsapp' ? '_blank' : undefined} rel="noreferrer"
+                            title={a.id === 'whatsapp' ? 'Abrir a conversa no WhatsApp' : 'Ligar'}
+                            className={`p-1.5 rounded-lg border transition-colors ${a.id === 'whatsapp' ? 'border-emerald-200 text-emerald-600 hover:bg-emerald-50' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                          >
+                            {a.id === 'whatsapp' ? <MessageCircle className="w-3.5 h-3.5" /> : <Phone className="w-3.5 h-3.5" />}
+                          </a>
+                        ))}
+                      </div>
                     </div>
                   );
                 })}

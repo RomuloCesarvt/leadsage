@@ -19,7 +19,7 @@ from typing import Any, Awaitable, Callable, Dict, Optional
 
 from sqlalchemy import select
 
-from app import fila_envio, meta_canais, pipeline_store, robo_store
+from app import agentes, fila_envio, meta_canais, pipeline_store, robo_store
 from app.ai_robo import Decisao, decidir
 from app.config import settings
 from app.credit_system import BancoDeCreditosIndisponivel, acesso_total, check_and_deduct_credits, is_admin
@@ -93,6 +93,8 @@ def _lead_do_item(item: Dict[str, Any]) -> Dict[str, Any]:
     """O lead no formato que o SDR espera, a partir do registro do pipeline."""
     foto = dict(item.get("lead") or {})
     foto["id"] = item["id"]
+    if item.get("agente"):
+        foto["agente"] = item["agente"]   # quem atende este lead: o robô (e com qual jeito) ou o dono
     return foto
 
 
@@ -191,6 +193,7 @@ async def _lead_por_id(uid: str, lead_id: str) -> Optional[Dict[str, Any]]:
                 "diagnosis": getattr(row, "diagnosis", None), "hooks": getattr(row, "hooks", None) or [],
     }
     lead["site_publicado"] = await _site_do_lead(uid, row.id)
+    lead["previa_abertura"] = await _abertura_do_lead(uid, row.id)
     return lead
 
 
@@ -214,6 +217,16 @@ async def _site_do_lead(uid: str, lead_id: str) -> str:
     except Exception:
         pass
     return ""
+
+
+async def _abertura_do_lead(uid: str, lead_id: str) -> Optional[Dict[str, Any]]:
+    """Quantas vezes o lead abriu a prévia (None: não abriu, ou não deu para saber)."""
+    from app import previa_abertura
+
+    try:
+        return await previa_abertura.do_lead(uid, lead_id)
+    except Exception:
+        return None
 
 
 # Falhas passageiras da IA (demorou, limite, instabilidade) nao podem prender a conversa: a proxima
@@ -400,6 +413,7 @@ async def _processar(
         conversa["nome"] = conversa["nome"] or lead.get("company") or lead.get("name") or ""
         await _atualizar_previa_antiga(uid, email, lead)
         lead["site_publicado"] = await _site_do_lead(uid, lead["id"])
+        lead["previa_abertura"] = await _abertura_do_lead(uid, lead["id"])
         # primeira resposta do lead: sai de "Contato Enviado" mesmo que o
         # robo nao possa responder (desligado, sem plano, sem creditos)
         await _atualizar_pipeline(uid, conversa, {"etapa": "abertura"})
@@ -443,6 +457,9 @@ async def _processar(
         return await salvar()
     if conversa.get("precisa_humano"):
         conversa["silencio"] = conversa.get("motivo") or "O robô passou esta conversa para você."
+        return await salvar()
+    if lead and not agentes.atende_o_robo(lead.get("agente")):
+        conversa["silencio"] = "Este lead está marcado como \"Eu atendo\" no pipeline: o robô não responde."
         return await salvar()
     conversa.pop("silencio", None)
 

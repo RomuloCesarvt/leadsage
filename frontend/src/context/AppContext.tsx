@@ -49,6 +49,7 @@ const mesclarPipeline = (atuais: LeadItem[], itens: PipelineItem[]): LeadItem[] 
     return {
       ...l, pipeline_stage: i.etapa, pipeline_por: ultimo?.por, pipeline_motivo: ultimo?.motivo, pipeline_em: ultimo?.em,
       pipeline_origem: i.origem, salvo: l.salvo === true || salvoPeloServidor(i.origem, i.etapa),
+      agente: i.agente, previa_visitas: i.previa_abertura?.visitas, previa_ultima: i.previa_abertura?.ultima,
     };
   });
   for (const i of itens) {
@@ -60,6 +61,7 @@ const mesclarPipeline = (atuais: LeadItem[], itens: PipelineItem[]): LeadItem[] 
     saida.push({
       ...leadDeItem(i), pipeline_stage: i.etapa, pipeline_por: ultimo?.por, pipeline_motivo: ultimo?.motivo, pipeline_em: ultimo?.em,
       pipeline_origem: i.origem, salvo: salvoPeloServidor(i.origem, i.etapa),
+      agente: i.agente, previa_visitas: i.previa_abertura?.visitas, previa_ultima: i.previa_abertura?.ultima,
     });
   }
   return saida;
@@ -105,6 +107,8 @@ interface AppContextType {
   // Actions
   refreshUserData: () => Promise<void>;
   atualizarPipeline: () => Promise<void>;
+  /** "Gerenciar agente": quem atende o lead (robô com um jeito, ou você). */
+  definirAgente: (leadId: string, agente: string) => Promise<void>;
   performLeadSearch: (niche: string, location: string, limit?: number) => Promise<void>;
   resetWorkspace: () => void;
   /** Escolhe leads dos resultados para entrar em Meus Leads (e no pipeline). */
@@ -150,7 +154,7 @@ function lerLeadsDoDono(uid: string): LeadItem[] {
   }
 }
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
+export const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
@@ -303,6 +307,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     api.pipelineMover(leadId, stage, lead ? fotoDoLead(lead) : undefined).catch(() => {});
   };
 
+  const definirAgente = async (leadId: string, agente: string) => {
+    const lead = leadsRef.current.find(l => l.id === leadId);
+    const antes = lead?.agente;
+    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, agente } : l));
+    try {
+      await api.pipelineAgente(leadId, agente, lead ? fotoDoLead(lead) : undefined);
+    } catch {
+      // o servidor recusou ou está fora: o cartão volta ao que era, para não mostrar um agente que não vale
+      setLeads(prev => prev.map(l => l.id === leadId ? { ...l, agente: antes } : l));
+    }
+  };
+
   const salvarLeads = useCallback(async (ids: string[]) => {
     const alvo = new Set(ids);
     const agora = new Date().toISOString();
@@ -387,6 +403,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSelectedProfileLead,
         refreshUserData,
         atualizarPipeline,
+        definirAgente,
         performLeadSearch,
         resetWorkspace,
         salvarLeads,

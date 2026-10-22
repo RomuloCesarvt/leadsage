@@ -48,7 +48,7 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, acesso_total, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
-from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, abordagem_mestra, conector_whatsapp, caixa_de_entrada, ai_providers, espelho_whatsapp
+from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, abordagem_mestra, conector_whatsapp, caixa_de_entrada, ai_providers, espelho_whatsapp, previa_abertura, agentes
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote as _quote
 from app.ai_robo import decidir as robo_decidir
@@ -812,9 +812,15 @@ async def meu_plano(user: dict = Depends(get_current_user)):
     return {**plano, "plan_id": plano["id"], "admin": False}
 
 
+@app.get("/api/previa/aberturas")
+async def previa_aberturas(user: dict = Depends(get_current_user)):
+    """Quais prévias já foram abertas (visitas, primeira e última abertura), a mais recente primeiro."""
+    return {"aberturas": await previa_abertura.listar(user.get("uid"))}
+
+
 @app.get("/api/s/{slug}", include_in_schema=False)
 @app.get("/s/{slug}")
-async def site_publico(slug: str):
+async def site_publico(slug: str, request: Request):
     """Serve o site gerado para quem recebeu o link.
 
     Sem isto o site publicado nao existia para ninguem de fora: dava para
@@ -830,12 +836,14 @@ async def site_publico(slug: str):
     html = await html_publico(slug)
     if not html:
         raise HTTPException(status_code=404, detail="Site não encontrado.")
+    # quem abriu a prévia é o sinal de interesse mais forte do robô (o robô de miniatura do WhatsApp não conta)
+    await previa_abertura.registrar(slug, request.headers.get("user-agent"))
     return Response(
         content=html,
         media_type="text/html; charset=utf-8",
         headers={
             "X-Robots-Tag": "noindex, nofollow",
-            "Cache-Control": "public, max-age=300",
+            "Cache-Control": "private, max-age=60",   # "public" deixaria a CDN servir sem passar aqui, e a abertura não seria contada
             # O site publicado mora no MESMO dominio do app, e o HTML vem do
             # usuario: sem isto, um "site" com <script> rodaria com acesso a
             # sessao de qualquer usuario do LeadSage que abrisse o link. O
@@ -1075,6 +1083,11 @@ class PipelineSyncRequest(BaseModel):
     leads: List[Dict[str, Any]] = Field(default_factory=list, max_length=300)
 
 
+class PipelineAgenteRequest(BaseModel):
+    agente: str
+    lead: Optional[Dict[str, Any]] = None
+
+
 class PipelineMoverRequest(BaseModel):
     etapa: str
     # foto do lead, para o caso de o servidor ainda nao conhece-lo
@@ -1085,9 +1098,16 @@ class PipelineMoverRequest(BaseModel):
 async def pipeline_listar(user: dict = Depends(get_current_user)):
     await exigir_recurso(user, "pipeline", "O pipeline")
     itens = await pipeline_store.listar(user.get("uid"))
+    try:
+        abertas = {a.get("lead_id"): a for a in await previa_abertura.listar(user.get("uid"))}
+    except Exception:
+        abertas = {}   # sem a contagem o quadro continua igual
     for i in itens:
         i["historico"] = (i.get("historico") or [])[-5:]
-    return {"etapas": list(pipeline_store.TODAS), "itens": itens}
+        a = abertas.get(i.get("id"))
+        if a:
+            i["previa_abertura"] = {"visitas": a.get("visitas", 0), "ultima": a.get("ultima", "")}
+    return {"etapas": list(pipeline_store.TODAS), "itens": itens, "agentes": [{"id": k, **{c: v[c] for c in ("rotulo", "descricao")}} for k, v in agentes.AGENTES.items()]}
 
 
 @app.post("/api/pipeline/sync")
@@ -1118,6 +1138,21 @@ async def pipeline_mover(lead_id: str, req: PipelineMoverRequest, user: dict = D
         await pipeline_store.registrar(uid, {**req.lead, "id": lead_id})
     item = await pipeline_store.mover(uid, lead_id, req.etapa, motivo="movido por você", por="voce")
     return {"etapa": pipeline_store.etapa_valida(req.etapa), "mudou": item is not None}
+
+
+@app.put("/api/pipeline/{lead_id}/agente")
+async def pipeline_agente(lead_id: str, req: PipelineAgenteRequest, user: dict = Depends(get_current_user)):
+    """"Gerenciar agente": quem atende este lead (o robô, com um jeito de conversar, ou você)."""
+    await exigir_recurso(user, "pipeline", "O pipeline")
+    uid = user.get("uid")
+    if not agentes.valido(req.agente):
+        raise HTTPException(status_code=400, detail="Agente desconhecido.")
+    if await pipeline_store.obter(uid, lead_id) is None:
+        if not req.lead:
+            raise HTTPException(status_code=404, detail="Lead não encontrado no pipeline.")
+        await pipeline_store.registrar(uid, {**req.lead, "id": lead_id})
+    item = await pipeline_store.definir_agente(uid, lead_id, req.agente)
+    return {"agente": (item or {}).get("agente") or agentes.PADRAO, "rotulo": agentes.rotulo(req.agente)}
 
 
 # ------------------------------------------------------------- fila de envio
