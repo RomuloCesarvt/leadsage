@@ -362,7 +362,7 @@ export const api = {
 
   // ------------------------------------------------ pipeline e disparo
 
-  async pipelineListar(): Promise<{ etapas: string[]; itens: PipelineItem[] }> {
+  async pipelineListar(): Promise<{ etapas: string[]; itens: PipelineItem[]; agentes?: { id: string; rotulo: string; descricao: string }[] }> {
     return await fetchWithToken('/pipeline');
   },
 
@@ -373,6 +373,12 @@ export const api = {
   async pipelineMover(leadId: string, etapa: string, lead?: Record<string, unknown>): Promise<{ etapa: string; mudou: boolean }> {
     return await fetchWithToken(`/pipeline/${encodeURIComponent(leadId)}/etapa`, {
       method: 'PUT', body: JSON.stringify({ etapa, lead }),
+    });
+  },
+
+  async pipelineAgente(leadId: string, agente: string, lead?: Record<string, unknown>): Promise<{ agente: string; rotulo: string }> {
+    return await fetchWithToken(`/pipeline/${encodeURIComponent(leadId)}/agente`, {
+      method: 'PUT', body: JSON.stringify({ agente, lead }),
     });
   },
 

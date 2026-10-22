@@ -45,7 +45,7 @@ TERMOS_POR_NICHO: List[Tuple[Tuple[str, ...], List[str]]] = [
     (("barbearia", "barber"), ["barber", "barbershop", "beard"]),
     (("manicure", "unha"), ["manicure", "nails", "beauty salon"]),
     (("academia", "crossfit", "fitness", "pilates", "studio de treino"), ["gym", "fitness", "workout", "training"]),
-    (("advoca", "advogad", "juridic"), ["business meeting", "office desk", "contract signing", "handshake"]),
+    (("advoca", "advogad", "advogado previdenciari", "juridic"), ["business meeting", "office desk", "contract signing", "handshake"]),
     (("contab", "contador"), ["accounting", "office desk", "business finance", "laptop work"]),
     (("imobili", "corretor"), ["house", "real estate", "modern home", "living room"]),
     (("arquitet", "decora", "interiores"), ["interior design", "architecture", "modern living room"]),
@@ -69,7 +69,7 @@ TERMOS_POR_NICHO: List[Tuple[Tuple[str, ...], List[str]]] = [
     (("lavanderia",), ["laundry", "washing", "clothes"]),
     (("buffet", "evento", "festa"), ["event", "party", "catering"]),
     (("sorveteria", "acai"), ["ice cream", "dessert", "smoothie bowl"]),
-    (("doceria", "brigadeiro", "bolo"), ["cake", "dessert", "pastry"]),
+    (("doceria", "brigadeiro", "bolo", "bolo decorado"), ["cake", "dessert", "pastry"]),
     (("acougue",), ["butcher", "meat", "steak"]),
     (("tatuag", "tattoo"), ["tattoo", "tattoo artist"]),
     # --- saude e medicina
@@ -82,7 +82,7 @@ TERMOS_POR_NICHO: List[Tuple[Tuple[str, ...], List[str]]] = [
     (("otorrino",), ["ear nose throat doctor", "doctor consultation", "medical exam"]),
     (("urolog", "proctolog", "gastro", "endocrin", "reumat", "pneumolog", "neurolog", "oncolog", "geriatr", "nutrolog", "anestesi", "clinico"), ["doctor consultation", "medical clinic", "healthcare", "stethoscope"]),
     (("psiquiatr", "psicanal", "terapeut", "neuropsic", "psicopedag", "hipnoter", "constelac", "reiki", "naturopat"), ["therapy", "meditation", "calm interior", "mindfulness"]),
-    (("fonoaudi", "terapeuta ocupacional", "fisioterap", "quiropr", "osteopat", "acupunt", "massoterap", "podolog"), ["therapy", "massage", "hearing", "wellness"]),
+    (("fonoaudi", "terapeuta ocupacional", "fisioterap", "quiropr", "osteopat", "acupunt", "massoterap", "podolog", "clinica de podologia"), ["therapy", "massage", "hearing", "wellness"]),
     (("cirurgi", "plastic", "harmonizacao", "criolipolise", "emagrecimento", "fertilidade", "sono"), ["medical clinic", "aesthetic clinic", "doctor consultation", "healthcare"]),
     (("hospital", "pronto atend", "vacina", "hemodial", "oncologia", "diagnostico", "radiolog", "laborator", "analises clinicas"), ["hospital", "medical laboratory", "healthcare", "doctor"]),
     (("home care", "cuidador", "casa de repouso", "geriatri"), ["elderly care", "caregiver", "senior care", "nursing home"]),
@@ -100,7 +100,7 @@ TERMOS_POR_NICHO: List[Tuple[Tuple[str, ...], List[str]]] = [
     (("natacao", "hidroginastica"), ["swimming pool", "swimming", "pool lane"]),
     (("jiu", "boxe", "muay", "judo", "karate", "capoeira", "artes marciais", "luta"), ["martial arts", "boxing", "dojo", "training"]),
     (("danca", "ballet", "circo"), ["dance studio", "ballet", "dancers"]),
-    (("tenis", "beach tennis", "padel", "quadra", "society", "futebol", "arena", "escolinha"), ["tennis court", "soccer field", "sports court", "sports"]),
+    (("clube esportivo", "clube de tenis", "associacao esportiva", "tenis", "beach tennis", "padel", "quadra", "society", "futebol", "arena", "escolinha"), ["tennis court", "soccer field", "sports court", "sports"]),
     (("bicicleta", "ciclis"), ["bicycle shop", "cycling", "bike"]),
     (("surf", "skate", "pesca", "camping", "escalada", "artigos esportivos", "suplemento"), ["surfing", "skateboard", "fishing", "outdoor sports"]),
     (("corrida", "assessoria esportiva"), ["running", "marathon", "runner"]),
@@ -109,8 +109,8 @@ TERMOS_POR_NICHO: List[Tuple[Tuple[str, ...], List[str]]] = [
     (("churrasc", "carnes", "casa de carne"), ["barbecue", "steak", "grill", "meat"]),
     (("japones", "sushi"), ["sushi", "japanese food", "sushi bar"]),
     (("italian", "cantina", "marmit", "self service", "por quilo", "comida", "rotisser", "restaurant"), ["restaurant food", "lunch plate", "home cooked meal", "restaurant"]),
-    (("bar ", "boteco", "pub", "choperia", "cervejaria", "adega", "vinho", "vinicola", "distribuidora de bebida", "bebida", "chopp"), ["bar", "craft beer", "wine", "pub"]),
-    (("sorvet", "acai", "gelato", "sucos", "fabrica de gelo"), ["ice cream", "smoothie bowl", "juice bar", "dessert"]),
+    (("bar ", "bar com musica", "musica ao vivo", "boteco", "pub", "choperia", "cervejaria", "adega", "vinho", "vinicola", "distribuidora de bebida", "bebida", "chopp"), ["bar", "craft beer", "wine", "pub"]),
+    (("sorvet", "acai", "gelato", "sucos"), ["ice cream", "smoothie bowl", "juice bar", "dessert"]),
     (("doceria", "doceira", "chocolate", "casa de bolo", "bolos", "cafe da manha", "cesta", "padaria artesanal", "panificadora", "confeit"), ["cake", "chocolate", "pastry", "dessert"]),
     (("cafe", "cafeteria", "casa de cha"), ["coffee shop", "latte art", "coffee", "tea"]),
     (("hortifruti", "quitanda", "emporio", "mercearia", "peixaria", "acougue"), ["vegetables market", "grocery", "fresh produce", "butcher"]),
@@ -139,28 +139,28 @@ TERMOS_POR_NICHO: List[Tuple[Tuple[str, ...], List[str]]] = [
     # --- servicos
     (("diarista", "limpeza", "zeladoria", "lavagem de estofado", "higieniza", "limpeza de caixa"), ["cleaning", "maid", "washing", "clothes"]),
     (("lavanderia", "tinturaria", "costureira", "atelie de costura", "sapateiro"), ["laundry", "sewing", "tailor", "dry cleaning"]),
-    (("dedetiz", "controle de praga", "jardinagem", "poda", "manutencao de piscina"), ["pest control", "gardening", "lawn care", "garden tools"]),
+    (("dedetiz", "dedetizacao de condominio", "dedetizadora de condominio", "controle de praga", "jardinagem", "poda", "manutencao de piscina"), ["pest control", "gardening", "lawn care", "garden tools"]),
     (("chaveiro", "chave"), ["locksmith", "keys", "door lock"]),
-    (("assistencia tecnica", "conserto", "reparo", "tecnico", "antena", "instalacao de tv", "afiacao"), ["repair technician", "electronics repair", "tools", "workshop"]),
+    (("assistencia tecnica", "conserto", "conserto de eletrodomestic", "conserto de geladeira", "conserto de maquina", "reparo", "tecnico", "antena", "instalacao de tv", "afiacao"), ["repair technician", "electronics repair", "tools", "workshop"]),
     (("funeraria", "cemiterio", "cremacao"), ["flowers", "memorial", "candle"]),
     (("distribuidora de gas", "distribuidora de agua", "agua mineral", "gas"), ["water bottle", "delivery truck", "gas cylinder"]),
     (("portaria", "terceirizacao", "babas", "baba", "empresas de portaria"), ["office reception", "security guard", "nanny", "facility"]),
     (("copiadora", "grafica rapida", "impressao", "brinde", "serigrafia", "estamparia", "bordado", "adesivo", "cartoes de visita", "letreiro", "comunicacao visual", "outdoor", "midia exterior"), ["printing press", "screen printing", "signage", "graphic design"]),
-    (("despachante", "cartorio", "registro de marca", "abertura de empresa", "licenciamento", "certificacao"), ["documents", "notary", "office desk", "paperwork"]),
+    (("despachante", "despachante de veiculo", "cartorio", "registro de marca", "abertura de empresa", "licenciamento", "certificacao"), ["documents", "notary", "office desk", "paperwork"]),
     # --- automotivo
     (("pneu", "borracharia", "alinhamento", "balanceamento", "suspensao", "freio"), ["tire shop", "car tires", "wheel alignment", "garage"]),
     (("lava jato", "lavajato", "lava-jato", "estetica automotiva", "martelinho", "funilaria", "lanternagem", "pintura automotiva", "vitrificacao"), ["car wash", "car detailing", "auto body", "car polish"]),
     (("autopeca", "auto peca", "pecas para caminhao", "peca de moto", "pecas de moto", "bateria", "escapamento", "retifica", "cambio", "ar-condicionado automotivo", "injecao", "auto eletric"), ["auto parts", "car engine", "mechanic tools", "garage"]),
     (("concessionaria", "revenda", "carros usados", "veiculos novos", "locadora de veiculo", "locacao de moto", "blindagem", "customizacao", "proteção veicular", "protecao veicular", "rastreamento", "seguro auto"), ["car dealership", "used cars", "car", "automobile"]),
     (("moto", "motocicleta", "bicicletaria"), ["motorcycle", "motorbike shop", "motorcycle repair"]),
-    (("estacionamento", "guincho", "reboque", "vistoria veicular", "despachante de veiculo", "taxi", "troca de oleo", "oleo", "insulfilm", "som automotivo", "vidros automotivos", "adesivo automotivo", "capas e tapetes"), ["parking lot", "tow truck", "car service", "car interior"]),
+    (("estacionamento", "guincho", "reboque", "vistoria veicular", "cooperativa de taxi", "taxi", "troca de oleo", "oleo", "insulfilm", "som automotivo", "vidros automotivos", "adesivo automotivo", "capas e tapetes"), ["parking lot", "tow truck", "car service", "car interior"]),
     # --- juridico, contabil, financas
     (("advogad", "advocacia", "juridic", "mediacao", "arbitragem", "assessoria juridica", "perito", "pericia", "direito"), ["business meeting", "office desk", "contract signing", "law books"]),
     (("contab", "contad", "bpo", "tribut", "fiscal", "auditoria"), ["accounting", "calculator", "tax documents", "laptop work"]),
     (("crediario", "loja de credito", "lojas de credito"), ["credit card payment", "shopping store", "financial advisor", "money"]),
-    (("seguro", "seguradora", "previdencia", "consorcio", "financeira", "credito", "correspondente bancario", "cooperativa de credito", "fintech", "investimento", "planejador financeiro", "cambio", "patrimonio", "cobranca", "factoring", "penhor", "ouro", "meios de pagamento", "maquininha"), ["financial advisor", "insurance", "money", "bank"]),
+    (("seguro", "corretor de seguro", "corretora de seguro", "seguradora", "previdencia", "consorcio", "financeira", "credito", "correspondente bancario", "cooperativa de credito", "fintech", "investimento", "planejador financeiro", "cambio", "patrimonio", "cobranca", "casa de cambio", "factoring", "penhor", "ouro", "meios de pagamento", "maquininha"), ["financial advisor", "insurance", "money", "bank"]),
     # --- marketing, consultoria, tecnologia
-    (("marketing", "trafego", "publicidade", "seo", "social media", "branding", "influenciador", "criador de conteudo", "copywriter", "assessoria de imprensa", "relacoes publicas", "pesquisa de mercado", "design grafico", "designer", "embalagem"), ["creative team", "marketing meeting", "laptop work", "brainstorming"]),
+    (("marketing", "trafego", "publicidade", "seo", "social media", "branding", "influenciador", "criador de conteudo", "copywriter", "assessoria de imprensa", "relacoes publicas", "pesquisa de mercado", "design grafico", "designer", "design", "embalagem"), ["creative team", "marketing meeting", "laptop work", "brainstorming"]),
     (("produtora de video", "videomaker", "cinema", "podcast", "estudio de gravacao", "gravadora", "produtora musical", "radio", "jornal", "editora"), ["video production", "recording studio", "microphone", "camera"]),
     (("consultoria", "coach", "mentor", "treinamento corporativo", "palestrante", "rh", "recrutamento", "agencia de emprego", "trabalho temporario", "call center", "telemarketing", "franquia", "tradutor", "traducao", "interprete", "escritorio compartilhado"), ["business meeting", "consulting", "office team", "presentation"]),
     (("software", "desenvolvedor", "ti ", "startup", "saas", "erp", "aplicativo", "sites", "criacao de sites", "agencia de desenvolvimento", "hospedagem de site", "data center", "nuvem", "inteligencia artificial", "chatbot", "iot", "automacao", "sistema"), ["software developer", "coding", "laptop code", "data center"]),
@@ -169,31 +169,35 @@ TERMOS_POR_NICHO: List[Tuple[Tuple[str, ...], List[str]]] = [
     # --- educacao
     (("escola", "colegio", "creche", "bercario", "montessori", "bilingue", "infantil", "educacao"), ["classroom", "kids learning", "school", "children playing"]),
     (("idioma", "ingles", "espanhol", "language", "intercambio"), ["language class", "english lesson", "students", "learning"]),
-    (("curso", "preparatorio", "pre-vestibular", "pre vestibular", "concurso", "tecnico", "profissionalizante", "online", "reforco", "professor", "faculdade", "universidade", "pos-graduacao", "pos graduacao", "xadrez", "robotica", "oratoria"), ["students studying", "classroom", "online course", "university"]),
-    (("musica", "violao", "canto", "teatro", "desenho", "artes", "culinaria", "fotografia", "modelo", "design"), ["music lesson", "guitar", "art class", "theater"]),
+    (("curso", "curso tecnico", "preparatorio", "pre-vestibular", "pre vestibular", "concurso", "tecnico", "profissionalizante", "online", "reforco", "professor", "faculdade", "universidade", "pos-graduacao", "pos graduacao", "xadrez", "robotica", "oratoria"), ["students studying", "classroom", "online course", "university"]),
+    (("transporte escolar",), ["school bus", "children school", "kids", "bus"]),
+    (("gastronomia", "culinaria"), ["cooking class", "chef cooking", "culinary", "kitchen"]),
+    (("escola de fotografia", "curso de fotografia"), ["photography class", "photographer", "camera", "students"]),
+    (("musica", "violao", "canto", "teatro", "desenho", "artes", "fotografia", "modelo"), ["music lesson", "guitar", "art class", "theater"]),
     (("autoescola", "pilotagem", "aviacao", "nautica", "direcao defensiva", "condutores", "cfc"), ["driving lesson", "pilot training", "driving school", "road"]),
     # --- pets
     (("veterin", "pet shop", "petshop", "banho e tosa", "tosa", "hotel para pet", "creche para pet", "adestrad", "canil", "gatil", "pet sitter", "passeador", "cremacao de pet", "racao", "aquario", "aquarismo", "agropet", "exotico", "taxi dog", "plano de saude pet", "laboratorio veterin"), ["dog grooming", "veterinarian", "puppy", "pet shop"]),
     # --- eventos, turismo
-    (("buffet", "salao de festa", "espaco para evento", "casa de recepcao", "cerimonial", "assessoria de evento", "decoracao de festa", "aluguel de brinquedo", "aluguel de mesa", "aluguel de trajes", "ateliê de noiva", "atelie de noiva", "lembrancinha", "convite", "bolo decorado", "doces para festa", "recreacao", "animacao", "formatura", "evento corporativo", "fogos", "louca", "tenda", "garcom"), ["party decoration", "event venue", "wedding", "catering"]),
-    (("dj", "banda", "sonorizacao", "iluminacao", "palco", "cabine fotografica", "bartender", "chopp", "churrasqueiro", "casa de show", "casa noturna", "balada", "clube", "karaoke", "boliche", "teatro", "parque", "paintball", "escape room", "locadora de game", "pesqueiro", "hipica", "marina", "aluguel de som"), ["concert", "dj", "night club", "live music"]),
+    (("buffet", "salao de festa", "espaco para evento", "casa de recepcao", "cerimonial", "assessoria de evento", "decoracao de festa", "aluguel de brinquedo", "aluguel de mesa", "aluguel de trajes", "ateliê de noiva", "atelie de noiva", "lembrancinha", "convite", "recreacao", "animacao", "formatura", "evento corporativo", "fogos", "louca", "tenda", "garcom"), ["party decoration", "event venue", "wedding", "catering"]),
+    (("dj", "banda", "sonorizacao", "iluminacao", "palco", "cabine fotografica", "bartender", "chopp", "churrasqueiro", "casa de show", "casa noturna", "balada", "clube", "karaoke", "boliche", "teatro", "parque", "paintball", "escape room", "locadora de game", "aluguel de som"), ["concert", "dj", "night club", "live music"]),
     (("fotograf", "estudio fotografico", "casamento", "newborn", "filmagem"), ["photographer", "camera", "photo studio", "wedding photography"]),
     (("hotel", "hoteis", "pousada", "hostel", "resort", "chale", "flat", "apart-hotel", "apart hotel", "motel", "camping", "hospedagem", "casa de temporada", "airbnb", "fazenda hotel", "hotel fazenda", "spa resort", "temporada"), ["hotel room", "resort", "cabin", "vacation rental"]),
+    (("pesqueiro", "hipica", "marina"), ["fishing", "horse riding", "boat marina", "outdoor"]),
     (("agencia de viagem", "operadora de turismo", "turismo", "guia", "transfer", "receptivo", "passeio", "buggy", "mergulho", "rafting", "ecoturismo", "aventura", "parque tematico", "visto", "passaporte", "motorhome"), ["travel agency", "tourism", "adventure", "beach"]),
     # --- transporte, industria, agro
-    (("transportadora", "frete", "mudanca", "carreto", "motoboy", "entregador", "logistica", "armazem", "centro de distribuicao", "fulfillment", "courier", "correios", "guarda-movel", "guarda movel", "self storage", "cargas", "caminhao", "empilhadeira", "van", "fretamento", "onibus", "transporte"), ["delivery truck", "logistics warehouse", "moving boxes", "cargo"]),
-    (("industria", "fabrica", "metalurgica", "usinagem", "caldeiraria", "fundicao", "plastico", "embalagem", "textil", "confeccao", "faccao", "malharia", "frigorific", "laticinio", "cervejaria artesanal", "cachacaria", "quimica", "farmaceutica", "borracha", "cimento", "maquina", "automacao industrial", "manutencao industrial", "tratamento de agua", "reciclagem", "residuos", "ferro-velho", "ferro velho", "sucata", "epi", "uniforme", "tornearia", "ferramentaria"), ["factory", "industrial machinery", "metal workshop", "production line"]),
-    (("agropecuaria", "fazenda", "sitio", "produtor rural", "cooperativa agricola", "insumo", "maquina agricola", "trator", "semente", "fertilizante", "defensivo", "pecuarista", "granja", "avicultura", "suinocultura", "piscicultura", "apicultura", "horta", "viveiro", "cafeicultor", "armazem de grao", "irrigacao", "drone agricola", "agronomo", "agronomica", "leilao rural", "loja agro", "leite", "hortalica", "fruta", "mel", "haras", "silvicultura", "reflorestamento", "postos de combustivel rural", "rural"), ["farm field", "tractor", "agriculture", "cattle"]),
+    (("transportadora", "cooperativa de transporte", "frete", "mudanca", "carreto", "motoboy", "entregador", "logistica", "armazem", "centro de distribuicao", "fulfillment", "courier", "correios", "guarda-movel", "guarda movel", "self storage", "cargas", "caminhao", "empilhadeira", "van", "fretamento", "onibus", "transporte"), ["delivery truck", "logistics warehouse", "moving boxes", "cargo"]),
+    (("industria", "fabrica", "fabricante de", "fabrica de brinquedo", "metalurgica", "usinagem", "caldeiraria", "fundicao", "embalagem", "textil", "confeccao", "faccao", "malharia", "frigorific", "laticinio", "cachacaria", "quimica", "farmaceutica", "borracha", "cimento", "maquina", "automacao industrial", "manutencao industrial", "tratamento de agua", "reciclagem", "residuos", "ferro-velho", "ferro velho", "sucata", "epi", "uniforme", "tornearia", "ferramentaria"), ["factory", "industrial machinery", "metal workshop", "production line"]),
+    (("agropecuaria", "fazenda", "sitio", "produtor rural", "cooperativa agricola", "insumo", "maquina agricola", "trator", "semente", "fertilizante", "defensivo", "pecuarista", "granja", "avicultura", "suinocultura", "piscicultura", "apicultura", "horta", "viveiro", "cafeicultor", "armazem de grao", "irrigacao", "drone agricola", "engenheiro agronomo", "agronomo", "agronomica", "cooperativa de leite", "leilao rural", "loja agro", "leite", "hortalica", "fruta", "mel", "haras", "silvicultura", "reflorestamento", "postos de combustivel rural", "rural"), ["farm field", "tractor", "agriculture", "cattle"]),
     # --- arte e comunidade
-    (("estudio", "ateli", "artista", "artesao", "ilustrador", "escultor", "ceramica artistica", "vitral", "cenografia", "arte"), ["art studio", "painting", "handmade", "sculpture"]),
+    (("estudio de arte", "estudio de ceramica", "ateli", "artista plastico", "artista", "artesao", "ilustrador", "escultor", "ceramica artistica", "vitral", "cenografia", "arte"), ["art studio", "painting", "handmade", "sculpture"]),
     (("tatuador", "unissex", "produtos para cabelo", "salao unissex", "cabelo"), ["hair salon", "hairdresser", "tattoo artist", "beauty salon"]),
     (("patinacao", "pista de patina", "assessoria esportiva"), ["ice skating", "roller skating", "running", "sports training"]),
     (("pizza", "pizzas delivery", "salgado congelado", "casa de cha"), ["pizza", "pizza delivery", "frozen food", "tea house"]),
     (("ferramenta", "embalagens", "loja de embalagem", "enxoval", "loja virtual", "lojas virtuais"), ["tools store", "packaging", "baby clothes", "online shopping"]),
     (("galpao", "armazem", "centro de distribuicao", "locacao de caminho", "locacao de caminhoes", "importacao", "exportacao", "agenciamento"), ["warehouse", "logistics", "cargo truck", "shipping containers"]),
     (("assessoria empresarial", "escritorio compartilhado", "escritorio virtual", "sala comercial", "certificacoes iso", "representacoes comerciais", "traducoes juramentadas"), ["coworking space", "business meeting", "office desk", "contract signing"]),
-    (("lan house", "jornal", "escritor", "musico", "vitral", "lojas maconicas", "fundacao", "associacao"), ["gaming room", "newspaper", "writer desk", "musician"]),
-    (("gesseiro", "demolicao", "olaria", "calha", "rufo", "lavagem de carro", "centro automotivo", "locadora de veiculo", "enxovais"), ["construction worker", "demolition", "brick factory", "car wash"]),
+    (("lan house", "jornal", "escritor", "musico", "vitral"), ["gaming room", "newspaper", "writer desk", "musician"]),
+    (("gesseiro", "demolicao", "olaria", "calha", "rufo", "lavagem de carro", "centro automotivo", "locadora de veiculo"), ["construction worker", "demolition", "brick factory", "car wash"]),
     (("correspondente bancario", "planejador financeiro", "produtora de video", "criador de conteudo"), ["financial advisor", "bank", "video production", "content creator"]),
     (("hospital", "casas de repouso", "casa de repouso"), ["hospital", "healthcare", "nursing home", "medical team"]),
     (("bar", "bares"), ["bar", "pub", "cocktail", "craft beer"]),
@@ -253,8 +257,10 @@ def perfil_para(nicho: str) -> Dict[str, Any]:
     cur, pontos_c = None, 0
     for item in CURADORIA:
         for c in item["chaves"]:
-            if _chave_casa(c, n) and _tam(c) > pontos_c:
-                cur, pontos_c = item, _tam(c)
+            # a especialidade ("nutricao", "psicolog") vale mais que a palavra generica de lugar ("consultorio", "clinica", "saude")
+            valor = _tam(c) + (100 if item.get("prioritaria") else 0)
+            if _chave_casa(c, n) and valor > pontos_c:
+                cur, pontos_c = item, valor
     melhor: List[str] = []
     pontos = 0
     for chaves, termos in TERMOS_POR_NICHO:

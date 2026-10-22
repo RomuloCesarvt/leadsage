@@ -19,6 +19,7 @@ from sqlalchemy import select
 
 from app.database import AsyncSessionLocal, DBRobo
 from app.firebase_config import db as firestore_db
+from app import agentes
 from app.robo_store import agora
 
 # Ordem das colunas. "Perdido" fica fora da fila: e saida, nao progresso.
@@ -220,6 +221,22 @@ async def mover(
     item["historico"] = (item.get("historico") or [])[-(MAX_HISTORICO - 1):] + [
         {"de": atual, "para": destino, "por": por, "motivo": motivo[:200], "em": agora()}
     ]
+    await _gravar(uid, item)
+    return item
+
+
+async def definir_agente(uid: str, lead_id: str, agente: str) -> Optional[Dict[str, Any]]:
+    """Escolhe quem atende o lead (ver app/agentes.py). None quando o lead não está no pipeline."""
+    escolhido = agentes.valido(agente)
+    if not escolhido:
+        raise ValueError(f"Agente desconhecido: {agente}")
+    item = await _ler(uid, lead_id)
+    if item is None:
+        return None
+    if (item.get("agente") or agentes.PADRAO) == escolhido:
+        return item
+    item["agente"] = escolhido
+    item["agente_em"] = agora()
     await _gravar(uid, item)
     return item
 

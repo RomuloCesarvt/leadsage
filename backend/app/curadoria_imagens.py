@@ -16,6 +16,7 @@ RUINS_GERAIS = {
 CURADORIA: List[Dict[str, Any]] = [
     {   # psicologia: ambiente calmo, luz natural, plantas, conversa, caderno e chá. Nada de cosmético, spa, fruta ou academia.
         "chaves": ("psicolog", "psicanal", "psiquiat", "terapia", "terapeut", "neuropsic", "fonoaud", "saude mental", "constelac"),
+        "prioritaria": True,   # a especialidade vence a palavra genérica ("Consultório de nutrição" é nutrição, não médico)
         "termos": ["psychologist office", "therapy session", "cozy room", "house plant", "tea cup", "journal desk", "meditation", "plants indoor", "reading journal", "indoor garden"],
         "bons": {"calm", "peaceful", "serene", "cozy", "comfortable", "harmony", "plant", "plants", "indoor", "indoors", "interior", "home",
                  "minimal", "tea", "journal", "diary", "notebook", "nature", "relax", "light", "book", "reading", "couch", "chair",
@@ -27,6 +28,7 @@ CURADORIA: List[Dict[str, Any]] = [
     },
     {   # odontologia: cadeira, consultório, dentes. Sorriso de modelo sem relação com dente não entra.
         "chaves": ("dentista", "dentist", "odontolog", "odonto", "ortodont", "implante"),
+        "prioritaria": True,   # a especialidade vence a palavra genérica ("Consultório de nutrição" é nutrição, não médico)
         "termos": ["dentist", "dental clinic", "dental chair", "teeth"],
         "bons": {"dentist", "dental", "teeth", "tooth", "orthodontist", "clinic", "dentistry", "toothbrush", "braces"},
         "ruins": {"fashion", "dress", "blonde", "hip", "longhair"},
@@ -34,15 +36,40 @@ CURADORIA: List[Dict[str, Any]] = [
     },
     {   # estética e spa: pele, tratamento, calma
         "chaves": ("estetica", "harmoniza", "spa", "depila", "massagem"),
+        "prioritaria": True,   # a especialidade vence a palavra genérica ("Consultório de nutrição" é nutrição, não médico)
         "termos": ["spa", "skin care", "facial", "massage", "beauty treatment"],
         "bons": {"spa", "skin", "skincare", "facial", "massage", "beauty", "relax", "harmony", "care", "cosmetology", "wellness", "calm"},
         "ruins": {"food", "fitness", "bodybuilding", "dog", "cat"},
     },
+    {   # nutrição: comida de verdade (frutas, legumes, refeição equilibrada). Nada de médico, consultório, remédio ou fast food:
+        # uma nutricionista que recebe foto de "médico atendendo" some do próprio site.
+        "chaves": ("nutricion", "nutricao", "nutri", "dietista", "reeducacao alimentar"),
+        "prioritaria": True,   # a especialidade vence a palavra genérica ("Consultório de nutrição" é nutrição, não médico)
+        "termos": ["healthy food", "fresh vegetables", "fruit bowl", "healthy meal", "salad bowl", "meal prep", "healthy breakfast", "nutritionist"],
+        "bons": {"healthy", "food", "fruit", "fruits", "vegetable", "vegetables", "salad", "meal", "nutrition", "nutritionist", "diet", "fresh",
+                 "organic", "bowl", "breakfast", "lunch", "kitchen", "cooking", "avocado", "berries", "apple", "plate", "greens", "wellness",
+                 "balanced", "vegan", "smoothie", "oats", "seeds"},
+        "ruins": {"doctor", "doctors", "physician", "stethoscope", "hospital", "surgery", "surgeon", "nurse", "patient", "syringe", "syringes",
+                  "injection", "pills", "pill", "tablet", "tablets", "capsule", "capsules", "medication", "medicine", "drug", "drugs", "pharmacy",
+                  "burger", "pizza", "fries", "fastfood", "junkfood", "candy", "soda", "donut", "doughnut", "cake", "alcohol", "beer", "wine",
+                  "cigarette", "bodybuilding", "dumbbell", "gym"},
+        "exigir": True,
+    },
+    {   # fisioterapia e reabilitação: movimento, alongamento, tratamento manual. Não é consultório médico.
+        "chaves": ("fisioterap", "reabilit", "quiropr", "osteopat"),
+        "prioritaria": True,   # a especialidade vence a palavra genérica ("Consultório de nutrição" é nutrição, não médico)
+        "termos": ["physical therapy", "physiotherapy", "rehabilitation exercise", "stretching therapy", "back pain therapy", "physiotherapist treatment"],
+        "bons": {"physiotherapy", "physiotherapist", "physical", "therapy", "therapist", "rehabilitation", "rehab", "exercise", "exercises", "stretching",
+                 "massage", "back", "knee", "shoulder", "spine", "muscle", "recovery", "treatment", "physio", "mobility", "posture", "pilates"},
+        "ruins": {"doctor", "doctors", "stethoscope", "hospital", "surgery", "surgeon", "syringe", "syringes", "injection", "pills", "pill",
+                  "medication", "medicine", "drug", "drugs", "pharmacy", "veterinary", "dog", "cat", "cosmetic", "cosmetics", "bodybuilding"},
+        "exigir": True,
+    },
     {   # clínica e saúde: consultório, atendimento, profissional
-        "chaves": ("clinica", "medic", "consultorio", "saude", "nutricion", "fisioterap", "gastro", "ginecolog", "urolog", "endocrin", "neurolog",
+        "chaves": ("clinica", "medic", "consultorio", "saude", "gastro", "ginecolog", "urolog", "endocrin", "neurolog",
                    "otorrino", "reumat", "pneumo", "oncolog", "proctolog", "hematolog", "nefrolog", "angiolog", "alergist", "imunolog",
                    "infectolog", "mastolog", "geriatr", "obstetr", "anestesi", "cirurg",
-                   "doutor", "doutora", "ambulatorio", "posto de saude", "check up", "reabilit", "diagnost", "ultrassom"),
+                   "doutor", "doutora", "ambulatorio", "posto de saude", "check up", "diagnost", "ultrassom"),
         "termos": ["doctor consultation", "doctor patient", "medical clinic", "stethoscope doctor"],
         "bons": {"clinic", "clinical", "doctor", "doctors", "physician", "patient", "consult", "consultation", "healthcare", "medical", "stethoscope",
                  "checkup", "reception", "nurse", "office", "appointment", "examination", "gynecologist", "cardiologist", "specialist"},

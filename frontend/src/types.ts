@@ -49,6 +49,11 @@ export interface LeadItem {
   pipeline_por?: string;
   pipeline_motivo?: string;
   pipeline_em?: string;
+  /** quem atende o lead: robo | consultivo | direto | humano (vazio = robô padrão) */
+  agente?: string;
+  /** quantas vezes a prévia foi aberta e quando foi a última (ISO) */
+  previa_visitas?: number;
+  previa_ultima?: string;
   // Dados reais do Google Maps
   rating?: number;
   rating_count?: number;
@@ -537,7 +542,11 @@ export interface PipelineItem {
   lead?: Partial<LeadItem>;
   historico?: PipelineMovimento[];
   atualizado?: string;
+  agente?: string;
+  previa_abertura?: { visitas: number; ultima: string };
 }
+
+export interface AgenteDoServidor { id: string; rotulo: string; descricao: string }
 
 export interface ModeloWhatsApp {
   existe: boolean;
