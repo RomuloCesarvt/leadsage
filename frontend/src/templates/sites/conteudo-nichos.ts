@@ -26,6 +26,8 @@ export interface ConteudoNicho {
   nome: string;
   /** trechos (sem acento, minúsculos) que identificam o ramo no texto do nicho */
   chaves: string[];
+  /** especialidade: vence a palavra genérica de lugar ("consultório", "clínica"), mesmo sendo mais curta */
+  prioritario?: boolean;
   /** tipo do schema.org para os dados estruturados do Google */
   schema: string;
   /** layout que mais combina, entre os ids de sites/layouts */
@@ -54,7 +56,7 @@ const S = (titulo: string, descricao: string): Servico => ({ titulo, descricao }
 export const BANCO: ConteudoNicho[] = [
   {
     id: 'padaria', nome: 'Padaria e confeitaria',
-    chaves: ['padaria', 'panificadora', 'confeitaria', 'doceria', 'cafeteria', 'bolo', 'confeiteir', 'doceir', 'cafe '],
+    chaves: ['padaria', 'panificadora', 'confeitaria', 'doceria', 'cafeteria', 'bolo', 'confeiteir', 'doceir', 'cafe ', 'sorvet', 'acai', 'chocolate', 'casa de cha', 'casa de suco', 'bolos'],
     schema: 'Bakery', layout: 'forno', paleta: { primaria: '#8a4b1f', destaque: '#e9a23b' },
     cta: { principal: 'Fazer meu pedido', secundario: 'Ver como chegar' },
     etiqueta: 'Feito todos os dias',
@@ -72,7 +74,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'restaurante', nome: 'Restaurante, pizzaria e lanchonete',
-    chaves: ['restaurante', 'pizzaria', 'lanchonete', 'hamburgueria', 'bar ', 'churrascaria', 'cantina', 'marmitaria', 'japones', 'sushi', 'boteco', 'pub', 'choperia', 'espetaria', 'self service', 'por quilo', 'rotisseria'],
+    chaves: ['restaurante', 'pizzaria', 'lanchonete', 'hamburgueria', 'bar ', 'churrascaria', 'cantina', 'marmitaria', 'japones', 'sushi', 'boteco', 'pub ', 'pubs ', 'choperia', 'espetaria', 'self service', 'por quilo', 'rotisseria', 'salgader', 'pastelaria', 'tapioca', 'creperia', 'food truck', 'dark kitchen', 'hot dog', 'churrasc', 'casa de carne', 'marmit', 'pizza', 'cervejaria', 'chopp', 'bar com musica', 'gastronomia'],
     schema: 'Restaurant', layout: 'mesa', paleta: { primaria: '#9b2c1a', destaque: '#f0a82b' },
     cta: { principal: 'Pedir pelo WhatsApp', secundario: 'Ver o cardápio' },
     etiqueta: 'Peça sem complicação',
@@ -89,7 +91,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'saude-medica', nome: 'Clínica médica e consultório',
-    chaves: ['clinica medica', 'clinica geral', 'clinica popular', 'clinica de saude', 'medic', 'consultorio', 'dermato', 'pediatr', 'ortoped', 'cardio', 'oftalmo', 'ginecolog', 'urolog', 'endocrin', 'neurolog', 'psiquiatr', 'otorrino', 'geriatr', 'laboratorio', 'diagnostico', 'gastro', 'reumat', 'pneumo', 'oncolog', 'proctolog', 'hematolog', 'nefrolog', 'angiolog', 'alergist', 'imunolog', 'infectolog', 'mastolog', 'obstetr', 'anestesi', 'cirurg', 'hospital', 'centro medico', 'pronto atend', 'ambulatorio', 'check up', 'doutor', 'doutora', 'dr ', 'dra ', 'fisioterap', 'nutricion', 'posto de saude'],
+    chaves: ['clinica medica', 'clinica geral', 'clinica popular', 'clinica de saude', 'medic', 'consultorio', 'dermato', 'pediatr', 'ortoped', 'cardio', 'oftalmo', 'ginecolog', 'urolog', 'endocrin', 'neurolog', 'psiquiatr', 'otorrino', 'geriatr', 'laboratorio', 'diagnostico', 'gastro', 'reumat', 'pneumo', 'oncolog', 'proctolog', 'hematolog', 'nefrolog', 'angiolog', 'alergist', 'imunolog', 'infectolog', 'mastolog', 'obstetr', 'anestesi', 'cirurg', 'hospital', 'radiolog', 'nutrolog', 'casa de repouso', 'home care', 'cuidador', 'maternidade', 'centro medico', 'pronto atend', 'ambulatorio', 'check up', 'doutor', 'doutora', 'dr ', 'dra ', 'posto de saude'],
     schema: 'MedicalClinic', layout: 'clinica', paleta: { primaria: '#0f7c8a', destaque: '#2f9e6f' },
     cta: { principal: 'Agendar consulta', secundario: 'Como chegar' },
     etiqueta: 'Atendimento com hora marcada',
@@ -105,8 +107,42 @@ export const BANCO: ConteudoNicho[] = [
     imagens: ['clínica médica consultório', 'médico atendimento', 'medical clinic doctor', 'health care'],
   },
   {
-    id: 'odonto', nome: 'Dentista e odontologia',
-    chaves: ['odonto', 'dentista', 'ortodont', 'implante dent', 'endodont', 'periodont'],
+    id: 'nutricao', nome: 'Nutrição e nutricionistas', prioritario: true,
+    chaves: ['nutricion', 'nutricao', 'nutri', 'dietista', 'reeducacao alimentar'],
+    schema: 'MedicalBusiness', layout: 'natural', paleta: { primaria: '#2f6b3f', destaque: '#c9741f' },
+    cta: { principal: 'Agendar consulta', secundario: 'Como funciona' },
+    etiqueta: 'Alimentação com orientação profissional',
+    titulos: ['Comer bem pode ser simples e prazeroso', 'Tenha um plano alimentar pensado para a sua rotina', 'Cuide da sua alimentação com orientação de verdade'],
+    subtitulo: 'Atendimento individual, orientação clara e agendamento fácil pelo WhatsApp.',
+    sobre: 'Alimentação não é igual para todo mundo. Aqui a consulta olha a sua rotina, os seus objetivos e a sua saúde para montar um caminho possível de seguir.',
+    servicos: [S('Consulta nutricional', 'Avaliação da rotina, dos hábitos e dos objetivos, com tempo para ouvir você.'), S('Plano alimentar', 'Orientação individual, adaptada à sua rotina e às suas preferências.'),
+      S('Reeducação alimentar', 'Mudança de hábitos com acompanhamento, sem soluções milagrosas.'), S('Acompanhamento e retornos', 'Ajustes ao longo do caminho, conforme a sua evolução.'),
+      S('Alimentação no dia a dia', 'Dicas práticas de compras, preparo e organização das refeições.'), S('Dúvidas e mitos', 'Orientação clara para separar informação confiável de modismo.')],
+    diferenciais: [I('Plano individual', 'Nada de modelo pronto: o plano parte da sua realidade.'), I('Escuta atenta', 'Sua rotina, seus gostos e seus limites entram na conversa.'), I('Explicação clara', 'Você entende o porquê de cada orientação.'), I('Agendamento fácil', 'Marque pelo WhatsApp, sem complicação.')],
+    passos: [I('Agende', 'Chame pelo WhatsApp e escolha o melhor dia e horário.'), I('Conte sua rotina', 'Na consulta, conversamos sobre hábitos, objetivos e saúde.'), I('Siga o plano', 'Receba a orientação e combine os retornos para ajustar.')],
+    faq: [P('Como agendo uma consulta?', 'Pelo botão de WhatsApp desta página: escolha o dia e o horário que preferir.'), P('Preciso levar exames?', 'Se tiver exames recentes, leve ou envie antes da consulta. Se não tiver, confirme pelo WhatsApp como proceder.'), P('A consulta é presencial ou online?', 'Confirme pelo WhatsApp as opções de atendimento disponíveis.'), P('Vocês atendem por convênio?', 'Confirme pelo WhatsApp quais convênios são aceitos e as condições.'), P('Qual o endereço e o horário de atendimento?', 'Estão na seção de contato logo abaixo, com o caminho no mapa.')],
+    imagens: ['nutrição alimentação saudável', 'frutas legumes', 'healthy food', 'nutritionist'],
+  },
+  {
+    id: 'fisioterapia', nome: 'Fisioterapia e reabilitação', prioritario: true,
+    chaves: ['fisioterap', 'reabilit', 'quiropr', 'osteopat'],
+    schema: 'MedicalBusiness', layout: 'natural', paleta: { primaria: '#1d6b7a', destaque: '#c9672a' },
+    cta: { principal: 'Agendar avaliação', secundario: 'Como chegar' },
+    etiqueta: 'Avaliação individual antes de tratar',
+    titulos: ['Volte a se mover com mais conforto', 'Cuide da dor e recupere o seu movimento', 'Tratamento acompanhado, no seu ritmo'],
+    subtitulo: 'Avaliação individual, tratamento explicado em cada etapa e agendamento fácil pelo WhatsApp.',
+    sobre: 'Cada corpo responde de um jeito. Aqui o tratamento começa por uma avaliação e é ajustado ao longo do caminho.',
+    servicos: [S('Avaliação fisioterapêutica', 'Entendemos onde dói, o que limita o seu dia e o que você quer voltar a fazer.'), S('Tratamento da dor', 'Técnicas indicadas para o seu caso, explicadas antes de começar.'),
+      S('Reabilitação', 'Recuperação após lesão, cirurgia ou período sem movimento.'), S('Exercícios terapêuticos', 'Movimentos orientados para fortalecer e dar mais estabilidade.'),
+      S('Orientação de postura e rotina', 'Ajustes simples no dia a dia para aliviar e prevenir.'), S('Acompanhamento', 'Reavaliações para ajustar o tratamento conforme a sua evolução.')],
+    diferenciais: [I('Avaliação primeiro', 'O tratamento parte do seu caso, não de um protocolo pronto.'), I('Explicação clara', 'Você entende o que será feito e por quê.'), I('Atenção ao seu ritmo', 'O plano respeita o seu limite e a sua rotina.'), I('Agendamento fácil', 'Marque pelo WhatsApp, sem ficar preso ao telefone.')],
+    passos: [I('Agende a avaliação', 'Chame pelo WhatsApp e escolha o horário.'), I('Receba o plano', 'Explicamos o que foi encontrado e como será o tratamento.'), I('Acompanhe a evolução', 'Sessões e reavaliações para ajustar o caminho.')],
+    faq: [P('Preciso de pedido médico?', 'Confirme pelo WhatsApp se o seu caso exige pedido ou indicação médica.'), P('Quantas sessões vou precisar?', 'Depende da avaliação: o plano e a frequência são definidos individualmente.'), P('Vocês atendem por convênio?', 'Confirme pelo WhatsApp quais convênios são aceitos e as condições.'), P('Como agendo a avaliação?', 'Pelo botão de WhatsApp desta página: escolha o dia e o horário que preferir.'), P('Qual o endereço e o horário de atendimento?', 'Estão na seção de contato logo abaixo, com o caminho no mapa.')],
+    imagens: ['fisioterapia tratamento', 'alongamento reabilitação', 'physical therapy', 'physiotherapy'],
+  },
+  {
+    id: 'odonto', nome: 'Dentista e odontologia', prioritario: true,
+    chaves: ['odonto', 'dentista', 'ortodont', 'implante dent', 'implantod', 'endodont', 'periodont', 'clareamento dent', 'protetic', 'bucomaxilo', 'odontopediatr'],
     schema: 'Dentist', layout: 'sorriso', paleta: { primaria: '#1e6fd9', destaque: '#18b8a4' },
     cta: { principal: 'Agendar avaliação', secundario: 'Como chegar' },
     etiqueta: 'Sorrisos cuidados com atenção',
@@ -122,8 +158,8 @@ export const BANCO: ConteudoNicho[] = [
     imagens: ['dentista sorriso', 'consultório odontológico', 'dentist smile', 'dental clinic'],
   },
   {
-    id: 'psicologia', nome: 'Psicologia e terapias',
-    chaves: ['psicolog', 'terapeut', 'psicanal', 'neuropsic', 'psicopedag', 'fonoaudi', 'terapia'],
+    id: 'psicologia', nome: 'Psicologia e terapias', prioritario: true,
+    chaves: ['psicolog', 'terapeut', 'psicanal', 'neuropsic', 'psicopedag', 'fonoaudi', 'terapia', 'acupunt', 'massoterap', 'reiki', 'hipnoter', 'naturopat', 'constelac'],
     schema: 'MedicalBusiness', layout: 'natural', paleta: { primaria: '#5b7fa6', destaque: '#c58b6b' },
     cta: { principal: 'Marcar uma conversa', secundario: 'Saiba mais' },
     etiqueta: 'Atendimento com sigilo e acolhimento',
@@ -138,8 +174,8 @@ export const BANCO: ConteudoNicho[] = [
     imagens: ['psicologia acolhimento', 'consultório terapia', 'therapy counseling', 'calm room'],
   },
   {
-    id: 'estetica', nome: 'Estética, salão e barbearia',
-    chaves: ['estetic', 'salao', 'barbearia', 'barbeiro', 'manicure', 'cabeleir', 'beleza', 'sobrancelha', 'depila', 'spa', 'massag', 'cilios', 'unhas', 'maquiador', 'micropigment', 'podolog'],
+    id: 'estetica', nome: 'Estética, salão e barbearia', prioritario: true,
+    chaves: ['estetic', 'salao de beleza', 'salao de noiva', 'tatuador', 'salao unissex', 'salao feminino', 'salao masculino', 'barbearia', 'barbeiro', 'manicure', 'cabeleir', 'beleza', 'sobrancelha', 'depila', 'spa', 'massag', 'cilios', 'unhas', 'maquiador', 'micropigment', 'podolog', 'tatuag', 'piercing', 'bronzeamento', 'extensao capilar', 'tricolog', 'escovaria'],
     schema: 'BeautySalon', layout: 'ritual', paleta: { primaria: '#8a3f5d', destaque: '#d9a35b' },
     cta: { principal: 'Agendar horário', secundario: 'Ver serviços' },
     etiqueta: 'Horário marcado, sem espera',
@@ -155,7 +191,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'academia', nome: 'Academia e treino',
-    chaves: ['academia', 'pilates', 'crossfit', 'personal', 'fitness', 'muscula', 'yoga', 'danca', 'natacao', 'treino', 'jiu', 'boxe', 'muay', 'karate', 'judo', 'capoeira', 'funcional'],
+    chaves: ['academia', 'pilates', 'crossfit', 'personal', 'fitness', 'muscula', 'yoga', 'danca', 'natacao', 'treino', 'jiu', 'boxe', 'muay', 'karate', 'judo', 'capoeira', 'funcional', 'ginastica', 'spinning', 'hidroginastica', 'assessoria esportiva', 'assessoria de corrida', 'quadra', 'escolinha', 'beach tennis', 'padel', 'society', 'clube de tenis', 'clube de teni', 'arena esportiva', 'patinacao', 'escalada', 'clube esportivo'],
     schema: 'HealthClub', layout: 'impacto', paleta: { primaria: '#e0451f', destaque: '#facc15' },
     cta: { principal: 'Quero uma aula experimental', secundario: 'Ver modalidades' },
     etiqueta: 'Comece hoje',
@@ -171,7 +207,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'advocacia', nome: 'Advocacia',
-    chaves: ['advoca', 'advogad', 'juridic', 'direito'],
+    chaves: ['advoca', 'advogad', 'juridic', 'direito', 'mediacao', 'arbitragem', 'perito', 'pericia'],
     schema: 'LegalService', layout: 'classico', paleta: { primaria: '#1b2a4a', destaque: '#b08d57' },
     cta: { principal: 'Falar com um advogado', secundario: 'Áreas de atuação' },
     etiqueta: 'Atendimento sigiloso',
@@ -187,7 +223,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'contabilidade', nome: 'Contabilidade',
-    chaves: ['contab', 'contad', 'fiscal', 'bpo', 'abertura de empresa'],
+    chaves: ['contab', 'contad', 'fiscal', 'bpo', 'abertura de empresa', 'auditoria', 'tribut', 'consultoria tributaria', 'consultoria fiscal'],
     schema: 'AccountingService', layout: 'classico', paleta: { primaria: '#0f4c5c', destaque: '#e08e45' },
     cta: { principal: 'Pedir um orçamento', secundario: 'Nossos serviços' },
     etiqueta: 'Contabilidade sem dor de cabeça',
@@ -203,7 +239,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'imobiliaria', nome: 'Imobiliária e corretor',
-    chaves: ['imobiliaria', 'corretor', 'imoveis', 'imovel', 'incorporadora', 'loteamento', 'construtora'],
+    chaves: ['imobiliaria', 'corretor', 'imoveis', 'imovel', 'incorporadora', 'loteamento', 'loteadora', 'construtora', 'condominio', 'galpao', 'lancamento imobiliario', 'home stag', 'consultor imobiliario', 'sala comercial', 'laudo', 'vistoria tecnica'],
     schema: 'RealEstateAgent', layout: 'escritorio', paleta: { primaria: '#13405b', destaque: '#d6a03c' },
     cta: { principal: 'Falar com um corretor', secundario: 'Ver imóveis' },
     etiqueta: 'Atendimento personalizado',
@@ -219,7 +255,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'oficina', nome: 'Oficina mecânica e auto center',
-    chaves: ['oficina', 'mecanic', 'auto center', 'autocenter', 'funilaria', 'lava jato', 'lavajato', 'borracharia', 'pneus', 'auto pecas', 'autopecas', 'estetica automotiva', 'auto eletric', 'martelinho', 'retifica', 'alinhamento', 'insulfilm', 'som automotivo'],
+    chaves: ['oficina', 'mecanic', 'auto center', 'autocenter', 'funilaria', 'lava jato', 'lavajato', 'borracharia', 'pneus', 'auto pecas', 'autopecas', 'estetica automotiva', 'auto eletric', 'martelinho', 'retifica', 'alinhamento', 'insulfilm', 'som automotivo', 'autoeletric', 'cambio automatico', 'escapamento', 'suspensao', 'freio', 'lanternagem', 'vidro automotivo', 'troca de oleo', 'pecas para caminhao', 'lavagem de carro', 'centro automotivo', 'vistoria veicular', 'adesivo automotivo', 'pintura automotiva', 'bicicletaria', 'estacionamento', 'guincho', 'reboque'],
     schema: 'AutoRepair', layout: 'oficina', paleta: { primaria: '#c2410c', destaque: '#facc15' },
     cta: { principal: 'Pedir orçamento', secundario: 'Como chegar' },
     etiqueta: 'Orçamento sem compromisso',
@@ -234,8 +270,8 @@ export const BANCO: ConteudoNicho[] = [
     imagens: ['oficina mecânica', 'mecânico carro', 'car repair', 'auto mechanic'],
   },
   {
-    id: 'pet', nome: 'Pet shop e veterinária',
-    chaves: ['pet', 'veterin', 'banho e tosa', 'agropet', 'racao', 'adestr'],
+    id: 'pet', nome: 'Pet shop e veterinária', prioritario: true,
+    chaves: ['pet', 'veterin', 'banho e tosa', 'agropet', 'racao', 'adestr', 'canil', 'gatil', 'gati', 'cani', 'aquario', 'passeador', 'taxi dog', 'hotel para pet', 'creche para pet', 'pet sitter'],
     schema: 'PetStore', layout: 'patinhas', paleta: { primaria: '#2a7de1', destaque: '#f5a524' },
     cta: { principal: 'Agendar banho ou consulta', secundario: 'Ver serviços' },
     etiqueta: 'Cuidado de quem ama pets',
@@ -251,7 +287,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'loja-moda', nome: 'Loja de roupas e acessórios',
-    chaves: ['roupa', 'moda', 'boutique', 'vestuario', 'calcado', 'sapato', 'acessorio', 'lingerie', 'jeans', 'bolsa', 'brecho', 'semijoia', 'joalheria', 'otica'],
+    chaves: ['roupa', 'moda', 'boutique', 'vestuario', 'calcado', 'sapato', 'acessorio', 'lingerie', 'jeans', 'bolsa', 'brecho', 'enxoval', 'semijoia', 'joalheria', 'otica'],
     schema: 'ClothingStore', layout: 'estudio', paleta: { primaria: '#1f1f1f', destaque: '#c9a227' },
     cta: { principal: 'Ver novidades no WhatsApp', secundario: 'Como chegar' },
     etiqueta: 'Novidades toda semana',
@@ -267,7 +303,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'construcao', nome: 'Construção, reforma e arquitetura',
-    chaves: ['construc', 'reforma', 'marcenaria', 'arquitet', 'engenhar', 'pintura', 'gesso', 'moveis planejados', 'serralheria', 'vidracaria', 'pedreiro', 'empreiteira', 'paisagismo', 'piscina', 'material de construcao', 'marmoraria', 'energia solar', 'decoracao', 'interiores'],
+    chaves: ['construc', 'reforma', 'marcenaria', 'arquitet', 'engenhar', 'pintura', 'gesso', 'moveis planejados', 'serralheria', 'vidracaria', 'pedreiro', 'empreiteira', 'paisagismo', 'piscina', 'material de construcao', 'marmoraria', 'energia solar', 'decoracao', 'interiores', 'pintor', 'telhado', 'cobertura', 'esquadria', 'toldo', 'piso', 'papel de parede', 'forro', 'drywall', 'vidro temperado', 'box para banheiro', 'granito', 'revestimento', 'ceramica', 'vidraceir', 'gesseiro', 'demolicao', 'olaria', 'calha', 'concreteira', 'terraplanagem', 'poco artesiano', 'cacamba', 'container', 'casa pre', 'steel frame', 'pre moldado', 'estrutura metalica', 'topografia', 'projeto estrutural', 'mestre de obra', 'paisagista', 'portao', 'churrasqueira', 'lareira', 'elevador', 'marceneir', 'tapeceir', 'decorador', 'madeireira', 'ferragem', 'instalacao eletrica', 'instalacao hidraulica', 'projeto eletrico', 'instalador de painel', 'engenheiro', 'mestres de obra'],
     schema: 'HomeAndConstructionBusiness', layout: 'planta', paleta: { primaria: '#374151', destaque: '#f59e0b' },
     cta: { principal: 'Pedir orçamento', secundario: 'Ver serviços' },
     etiqueta: 'Projeto e obra com acompanhamento',
@@ -283,7 +319,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'servicos-residenciais', nome: 'Serviços residenciais',
-    chaves: ['eletricist', 'encanador', 'dedetiz', 'limpeza', 'ar condicionado', 'chaveiro', 'desentup', 'diarista', 'jardinagem', 'impermeabiliza', 'mudanca', 'frete', 'lavanderia', 'costureir', 'assistencia tecnica', 'manutencao'],
+    chaves: ['eletricist', 'encanador', 'dedetiz', 'limpeza', 'ar condicionado', 'chaveiro', 'desentup', 'diarista', 'jardinagem', 'impermeabiliza', 'mudanca', 'frete', 'lavanderia', 'costureir', 'assistencia tecnica', 'manutencao', 'conserto', 'reparo', 'instalacao de tv', 'instalador de antena', 'tecnico em', 'afiacao', 'lavagem de estofado', 'zeladoria', 'poda', 'controle de praga', 'dedetizacao de condominio', 'dedetizadora de condominio', 'sapateir', 'tinturaria', 'atelie de costura', 'assistencia de notebook'],
     schema: 'HomeAndConstructionBusiness', layout: 'oficina', paleta: { primaria: '#1d4ed8', destaque: '#f97316' },
     cta: { principal: 'Chamar agora', secundario: 'Ver serviços' },
     etiqueta: 'Atendimento rápido',
@@ -299,7 +335,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'educacao', nome: 'Escola, cursos e idiomas',
-    chaves: ['escola', 'curso', 'idioma', 'ingles', 'autoescola', 'cfc', 'colegio', 'creche', 'faculdade', 'treinamento', 'reforco', 'musica', 'violao', 'berçario', 'bercario', 'pre vestibular'],
+    chaves: ['escola', 'curso', 'idioma', 'ingles', 'autoescola', 'cfc', 'colegio', 'creche', 'faculdade', 'treinamento', 'reforco', 'musica', 'violao', 'berçario', 'bercario', 'pre vestibular', 'escola de fotografia', 'curso de fotografia', 'universidade', 'pos graduacao', 'professor particular', 'robotica', 'educacao especial', 'intercambio', 'curso de barbeiro'],
     schema: 'EducationalOrganization', layout: 'vibrante', paleta: { primaria: '#6d28d9', destaque: '#f59e0b' },
     cta: { principal: 'Quero saber mais', secundario: 'Conhecer a escola' },
     etiqueta: 'Matrículas abertas? Confirme pelo WhatsApp',
@@ -315,7 +351,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'eventos', nome: 'Eventos, buffet e fotografia',
-    chaves: ['evento', 'buffet', 'fotograf', 'cerimonial', 'festa', 'casamento', 'filmagem', 'som e luz', 'espaco de eventos', 'decoracao de festa', 'dj ', 'salao de festas'],
+    chaves: ['evento', 'buffet', 'fotograf', 'cerimonial', 'festa', 'casamento', 'filmagem', 'som e luz', 'espaco de eventos', 'decoracao de festa', 'dj ', 'djs ', 'salao de festa', 'banda', 'sonorizacao', 'palco', 'casa de show', 'cabine fotografica', 'bartender', 'garcom', 'recreacao', 'animacao', 'formatura', 'aluguel de brinquedo', 'aluguel de mesa', 'lembrancinha', 'fogos', 'casa noturna', 'balada', 'karaoke', 'boliche', 'parque de diversao', 'parque aquatico', 'paintball', 'escape room', 'locadora de game', 'lan house', 'aluguel de som', 'churrasqueiro', 'casa de recepcao', 'aluguel de traje', 'atelie de noiva', 'convite', 'aluguel de tenda', 'locacao de louca', 'teatro', 'musico', 'cantor'],
     schema: 'EventVenue', layout: 'estudio', paleta: { primaria: '#7a2e5c', destaque: '#d4a24c' },
     cta: { principal: 'Pedir orçamento', secundario: 'Ver trabalhos' },
     etiqueta: 'Seu evento, do seu jeito',
@@ -331,7 +367,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'turismo', nome: 'Hotel, pousada e turismo',
-    chaves: ['hotel', 'hoteis', 'pousada', 'hospedagem', 'turismo', 'agencia de viagens', 'hostel', 'chale', 'resort', 'camping', 'apart hotel', 'flat'],
+    chaves: ['hotel', 'hoteis', 'pousada', 'hospedagem', 'turismo', 'agencia de viagem', 'operadora de turismo', 'hotel fazenda', 'fazenda hotel', 'hostel', 'chale', 'resort', 'camping', 'apart hotel', 'flat', 'pesqueiro', 'hipica', 'marina', 'passeio', 'buggy', 'mergulho', 'rafting', 'ecoturismo', 'parque tematico', 'receptivo', 'transfer', 'passaporte', 'locacao de temporada', 'casa de temporada', 'motel', 'airbnb'],
     schema: 'LodgingBusiness', layout: 'aurora', paleta: { primaria: '#0b6e6e', destaque: '#e7a33e' },
     cta: { principal: 'Reservar pelo WhatsApp', secundario: 'Ver acomodações' },
     etiqueta: 'Reserve direto, sem intermediário',
@@ -347,7 +383,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'agro', nome: 'Agro e rural',
-    chaves: ['agro', 'fazenda', 'rural', 'insumo', 'sementes', 'implement', 'cooperativa', 'pecuaria', 'trator', 'fertiliz', 'defensivo', 'granja', 'viveiro'],
+    chaves: ['agro', 'fazenda', 'rural', 'insumo', 'sementes', 'implement', 'cooperativa agricola', 'cooperativa rural', 'cooperativa de leite', 'haras', 'sitio', 'pecuaria', 'pecuarista', 'avicultura', 'suinocultura', 'piscicultura', 'apicultura', 'cafeicultor', 'trator', 'fertiliz', 'defensivo', 'granja', 'viveiro', 'maquina agricola', 'horta', 'armazem de grao', 'irrigacao', 'drone agricola', 'produtor de leite', 'produtor de hortalica', 'produtor de fruta', 'produtor de mel', 'engenheiro agronomo', 'silvicultura', 'reflorestamento', 'selaria'],
     schema: 'LocalBusiness', layout: 'oficina', paleta: { primaria: '#2f6b3a', destaque: '#d97706' },
     cta: { principal: 'Pedir cotação', secundario: 'Como chegar' },
     etiqueta: 'Atendimento de quem entende do campo',
@@ -363,7 +399,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'varejo', nome: 'Comércio e varejo em geral',
-    chaves: ['loja', 'mercado', 'supermercado', 'papelaria', 'livraria', 'floricultura', 'presente', 'utilidades', 'eletro', 'moveis', 'colchoes', 'informatica', 'celular', 'material', 'distribuidora', 'atacado', 'farmac', 'drogaria'],
+    chaves: ['loja', 'mercado', 'supermercado', 'papelaria', 'livraria', 'floricultura', 'presente', 'utilidades', 'eletro', 'moveis', 'colchoes', 'informatica', 'celular', 'material', 'distribuidora', 'atacado', 'farmac', 'drogaria', 'acougue', 'hortifruti', 'emporio', 'mercearia', 'peixaria', 'quitanda', 'minimercado', 'atacarejo', 'atacadista', 'conveniencia', 'banca de jornal', 'loterica', 'sebo', 'armarinho', 'tabacaria', 'importadora', 'adega', 'cortina', 'relojoaria', 'perfumaria', 'cosmetic', 'outlet', 'showroom', 'ecommerce', 'e commerce', 'representante comercial', 'loja de decoracao', 'loja de camping', 'instrumento musical', 'surf shop', 'skate shop', 'antiquario', 'galeria de arte'],
     schema: 'Store', layout: 'estudio', paleta: { primaria: '#0f5132', destaque: '#f2a900' },
     cta: { principal: 'Falar no WhatsApp', secundario: 'Como chegar' },
     etiqueta: 'Atendimento na loja e pelo WhatsApp',
@@ -379,7 +415,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'tecnologia-marketing', nome: 'Tecnologia, marketing e serviços profissionais',
-    chaves: ['software', 'desenvolv', 'ti ', 'tecnologia', 'marketing', 'agencia', 'publicidade', 'design', 'grafica', 'consultoria', 'coach', 'treinamento corporativo', 'seguranca eletronica', 'cftv', 'provedor', 'informatica', 'rh', 'recrutamento'],
+    chaves: ['software', 'desenvolv', 'ti ', 'tecnologia', 'marketing', 'agencia', 'publicidade', 'design', 'grafica', 'hospedagem de site', 'consultoria', 'coach', 'treinamento corporativo', 'provedor', 'informatica', 'rh', 'recrutamento', 'seguranca da informacao', 'startup', 'saas', 'erp', 'automacao comercial', 'automacao residencial', 'iot', 'data center', 'criacao de site', 'inteligencia artificial', 'chatbot', 'telecom', 'cabeamento', 'redes e infra', 'telefonia', 'rastreador', 'impressora', 'trafego', 'social media', 'assessoria de imprensa', 'relacoes publicas', 'criador de conteudo', 'copywriter', 'influenciador', 'mentor', 'trabalho temporario', 'palestrante', 'call center', 'telemarketing', 'tradutor', 'traducao', 'interprete', 'franquia', 'escritorio compartilhado', 'escritorio virtual', 'coworking', 'assessoria empresarial', 'certificacoes iso', 'representacoes comerciais', 'produtora de video', 'produtora musical', 'produtora de cinema', 'videomaker', 'podcast', 'estudio de gravacao', 'gravadora', 'editora', 'radio ', 'jornal', 'cinema', 'estudio de design', 'copiadora', 'comunicacao visual', 'letreiro', 'serigrafia', 'estamparia', 'bordado', 'impressao', 'adesivo', 'cartao de visita', 'outdoor', 'midia exterior', 'despachante', 'cartorio', 'registro de marca', 'licenciamento'],
     schema: 'ProfessionalService', layout: 'bento', paleta: { primaria: '#2d3a8c', destaque: '#00b8a9' },
     cta: { principal: 'Pedir uma proposta', secundario: 'Ver serviços' },
     etiqueta: 'Resultado combinado antes de começar',
@@ -395,7 +431,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'concessionaria', nome: 'Concessionária e revenda de veículos',
-    chaves: ['concessionaria', 'revenda', 'carros usados', 'veiculos novos', 'veiculo novo', 'seminovo', 'multimarcas', 'automoveis', 'automovel', 'revendedora', 'motos novas', 'veiculos'],
+    chaves: ['concessionaria', 'revenda', 'carros usados', 'veiculos novos', 'veiculo novo', 'seminovo', 'multimarcas', 'automoveis', 'automovel', 'revendedora', 'motos novas', 'veiculos', 'blindagem', 'rastreamento veicular', 'protecao veicular', 'locacao de moto', 'locacao de motorhome'],
     schema: 'AutoDealer', layout: 'showroom', paleta: { primaria: '#b4121b', destaque: '#cbd5e1' },
     cta: { principal: 'Falar com um vendedor', secundario: 'Ver como chegar' },
     etiqueta: 'Atendimento direto pelo WhatsApp',
@@ -412,7 +448,7 @@ export const BANCO: ConteudoNicho[] = [
   },
   {
     id: 'credito', nome: 'Crediário, financeira e crédito',
-    chaves: ['crediario', 'credito', 'financeira', 'emprestimo', 'consignado', 'consorcio', 'financiamento', 'microcredito', 'cooperativa de credito', 'fintech', 'correspondente bancario', 'cobranca', 'renegociacao'],
+    chaves: ['crediario', 'credito', 'financeira', 'emprestimo', 'consignado', 'consorcio', 'financiamento', 'microcredito', 'cooperativa de credito', 'fintech', 'correspondente bancario', 'cobranca', 'renegociacao', 'factoring', 'penhor', 'compra de ouro', 'meios de pagamento', 'maquininha', 'casa de cambio'],
     schema: 'FinancialService', layout: 'credito', paleta: { primaria: '#0a6b52', destaque: '#f2b705' },
     cta: { principal: 'Simular pelo WhatsApp', secundario: 'Como funciona' },
     etiqueta: 'Atendimento direto pelo WhatsApp',
@@ -426,6 +462,91 @@ export const BANCO: ConteudoNicho[] = [
     faq: [P('Como funciona a análise de crédito?', 'Avaliamos as informações e os documentos enviados. A aprovação depende da análise.'), P('Quais documentos preciso?', 'Em geral, documento com foto, CPF e comprovantes. Confirmamos a lista pelo WhatsApp.'),
       P('Como saber os juros e as parcelas?', 'Dependem da modalidade e da análise. Informamos tudo por escrito antes da contratação.'), P('Posso pagar antes do prazo?', 'Consulte as condições de antecipação da modalidade escolhida.'), P('A aprovação é automática?', 'Não. Toda concessão passa por análise e aprovação.')],
     imagens: ['financeira crédito', 'dinheiro finanças', 'financial advisor', 'credit loan'],
+  },
+  {
+    id: 'industria', nome: 'Indústria, fábrica e produção',
+    chaves: ['industria', 'fabrica', 'fabricante', 'metalurgica', 'usinagem', 'caldeiraria', 'fundicao', 'textil', 'confeccao', 'faccao', 'malharia', 'frigorific', 'laticinio', 'cachacaria', 'quimica', 'borracha', 'cimento', 'maquinas e equipamento', 'automacao industrial', 'eletrica industrial', 'tratamento de agua', 'reciclagem', 'residuo', 'sucata', 'ferro velho', 'distribuidor industrial', 'epi ', 'uniforme industrial', 'tornearia', 'ferramentaria', 'cozinha industrial', 'grafica industrial', 'atacadista de alimento'],
+    schema: 'LocalBusiness', layout: 'oficina', paleta: { primaria: '#1f3a5f', destaque: '#e07b00' },
+    cta: { principal: 'Pedir orçamento', secundario: 'Conhecer a produção' },
+    etiqueta: 'Produção com prazo e qualidade combinados',
+    titulos: ['Produção com prazo combinado e qualidade conferida', 'Do pedido à entrega, tudo acertado antes', 'Fabricação sob medida para a sua necessidade'],
+    subtitulo: 'Envie a sua demanda, receba o orçamento com prazo e condições e acompanhe tudo pelo WhatsApp.',
+    sobre: 'Na produção, o que vale é cumprir o combinado. Aqui você informa o que precisa, recebe o orçamento com prazo e especificações e acompanha o pedido até a entrega.',
+    servicos: [S('Produção sob encomenda', 'Fabricação conforme as especificações do seu pedido.'), S('Produção em série', 'Lotes com padrão de qualidade e prazo definidos antes de começar.'),
+      S('Orçamento técnico', 'Valor, prazo e especificações apresentados por escrito.'), S('Controle de qualidade', 'Conferência do produto antes da entrega.'),
+      S('Entrega e logística', 'Combinamos prazo e forma de entrega junto com o pedido.'), S('Atendimento a empresas', 'Contato direto para pedidos recorrentes e condições comerciais.')],
+    diferenciais: [I('Prazo combinado', 'A data de entrega vai no orçamento, antes de fechar.'), I('Padrão de qualidade', 'O produto é conferido antes de sair.'), I('Orçamento claro', 'Especificação, quantidade e valor por escrito.'), I('Contato direto', 'Acompanhe o pedido pelo WhatsApp.')],
+    passos: [I('Envie a demanda', 'Conte o que precisa, com medidas, quantidade e prazo desejado.'), I('Receba o orçamento', 'Com especificações, valor e prazo de entrega.'), I('Acompanhe', 'Produção e entrega com atualização pelo WhatsApp.')],
+    faq: [P('Como peço um orçamento?', 'Pelo botão de WhatsApp desta página: informe o que precisa, a quantidade e o prazo desejado.'), P('Há pedido mínimo?', 'Depende do produto. Confirme pelo WhatsApp as quantidades e condições.'), P('Qual o prazo de entrega?', 'Varia conforme o pedido e é informado no orçamento, antes de fechar.'), P('Entregam em outras cidades?', 'Confirme pelo WhatsApp a região de entrega e o frete.'), P('Qual o endereço e o horário?', 'Estão na seção de contato logo abaixo, com o caminho no mapa.')],
+    imagens: ['indústria produção', 'fábrica máquinas', 'factory production', 'industrial machinery'],
+  },
+  {
+    id: 'logistica', nome: 'Transporte e logística',
+    chaves: ['transportadora', 'transporte', 'carreto', 'motoboy', 'entregador', 'logistica', 'armazem', 'centro de distribuicao', 'fulfillment', 'courier', 'correios', 'agenciamento de carga', 'self storage', 'guarda movel', 'fretamento', 'importacao', 'exportacao', 'locacao de caminho', 'locacao de empilhadeira', 'carga', 'taxi', 'cooperativa de taxi'],
+    schema: 'LocalBusiness', layout: 'oficina', paleta: { primaria: '#16456b', destaque: '#f28c00' },
+    cta: { principal: 'Pedir cotação', secundario: 'Como funciona' },
+    etiqueta: 'Cotação rápida pelo WhatsApp',
+    titulos: ['Transporte com prazo combinado e acompanhamento', 'Sua carga ou entrega, do começo ao fim', 'Logística simples: peça a cotação e acompanhe'],
+    subtitulo: 'Informe origem, destino e o que será transportado e receba a cotação pelo WhatsApp.',
+    sobre: 'Transportar bem é cumprir o prazo e manter você informado. Aqui você pede a cotação, combina os detalhes antes e acompanha a entrega.',
+    servicos: [S('Transporte de cargas', 'Coleta e entrega conforme o tipo e o volume da carga.'), S('Entregas locais e regionais', 'Rotas combinadas com janela de entrega.'),
+      S('Armazenagem', 'Guarda e organização, conforme a necessidade e o prazo.'), S('Fretes e mudanças', 'Orçamento conforme a distância, o volume e o acesso.'),
+      S('Atendimento a empresas', 'Contrato e rotina de entregas para operações recorrentes.'), S('Acompanhamento da entrega', 'Informações sobre o andamento pelo WhatsApp.')],
+    diferenciais: [I('Cotação antes de contratar', 'Valor e prazo informados antes de fechar.'), I('Prazo combinado', 'A janela de coleta e entrega vai por escrito.'), I('Acompanhamento', 'Você sabe em que etapa está a sua entrega.'), I('Contato direto', 'Fale pelo WhatsApp, sem fila de atendimento.')],
+    passos: [I('Peça a cotação', 'Informe origem, destino, tipo e volume.'), I('Aprove e agende', 'Combine data, horário e condições.'), I('Acompanhe', 'Receba o andamento até a entrega.')],
+    faq: [P('Como peço uma cotação?', 'Pelo botão de WhatsApp desta página: informe origem, destino e o que será transportado.'), P('Qual o prazo de entrega?', 'Depende da rota e do tipo de carga e é informado na cotação.'), P('Atendem a minha região?', 'Confirme pelo WhatsApp as cidades e rotas atendidas.'), P('Como pago?', 'As formas de pagamento são combinadas antes do serviço.'), P('Qual o horário de atendimento?', 'Está na seção de contato, logo abaixo.')],
+    imagens: ['transporte logística', 'caminhão entrega', 'delivery truck', 'logistics warehouse'],
+  },
+  {
+    id: 'seguranca', nome: 'Segurança e proteção',
+    chaves: ['seguranca', 'vigilancia', 'alarme', 'camera', 'cftv', 'cerca eletrica', 'controle de acesso', 'monitoramento', 'portaria', 'escolta', 'brigadista', 'extintor', 'incendio', 'bombeiro', 'cofre', 'interfone', 'detetive', 'terceirizacao', 'fechadura'],
+    schema: 'ProfessionalService', layout: 'impacto', paleta: { primaria: '#14324f', destaque: '#d9480f' },
+    cta: { principal: 'Pedir avaliação', secundario: 'Como funciona' },
+    etiqueta: 'Proteção com projeto sob medida',
+    titulos: ['Proteção pensada para o seu espaço', 'Segurança com projeto, instalação e suporte', 'Mais tranquilidade para o seu dia a dia'],
+    subtitulo: 'Peça uma avaliação, conheça as opções e receba a proposta pelo WhatsApp.',
+    sobre: 'Cada espaço tem um risco diferente. Aqui a avaliação vem primeiro, e a solução é combinada de acordo com a sua necessidade.',
+    servicos: [S('Avaliação do local', 'Visita para entender o espaço e indicar o que faz sentido.'), S('Projeto sob medida', 'Solução conforme o tamanho e o uso do ambiente.'),
+      S('Instalação', 'Equipamentos instalados com orientação de uso.'), S('Monitoramento e suporte', 'Acompanhamento e assistência quando precisar.'),
+      S('Manutenção', 'Revisão e ajustes para manter tudo funcionando.'), S('Atendimento a empresas e condomínios', 'Proposta conforme a rotina e o porte do local.')],
+    diferenciais: [I('Avaliação antes da proposta', 'A solução parte do que o seu espaço precisa.'), I('Orientação clara', 'Você entende como cada item funciona.'), I('Suporte', 'Assistência para dúvidas e manutenção.'), I('Contato direto', 'Peça a avaliação pelo WhatsApp.')],
+    passos: [I('Peça a avaliação', 'Conte onde e o que precisa proteger.'), I('Receba a proposta', 'Com a solução indicada, o valor e o prazo.'), I('Instale e use', 'Instalação feita e orientação de uso.')],
+    faq: [P('Como peço uma avaliação?', 'Pelo botão de WhatsApp desta página: informe o tipo de local e o que quer proteger.'), P('A avaliação tem custo?', 'Confirme pelo WhatsApp as condições da avaliação.'), P('Quanto tempo leva a instalação?', 'Depende do projeto e é informado na proposta.'), P('Há suporte depois da instalação?', 'Confirme pelo WhatsApp as condições de suporte e manutenção.'), P('Qual o horário de atendimento?', 'Está na seção de contato, logo abaixo.')],
+    imagens: ['segurança câmeras', 'alarme monitoramento', 'security camera', 'surveillance'],
+  },
+  {
+    id: 'comunidade', nome: 'Igrejas, associações e entidades',
+    chaves: ['igreja', 'templo', 'centro espirita', 'ong', 'sindicato', 'clube de servico', 'caridade', 'entidade', 'escoteiro', 'associacao', 'camara de comercio', 'fundacao', 'ensino religioso', 'sociedade beneficente'],
+    schema: 'Organization', layout: 'classico', paleta: { primaria: '#2c4a6e', destaque: '#c78a1b' },
+    cta: { principal: 'Falar com a gente', secundario: 'Como participar' },
+    etiqueta: 'Todos são bem-vindos',
+    titulos: ['Uma comunidade de braços abertos', 'Venha conhecer e participar', 'Juntos, fazemos mais'],
+    subtitulo: 'Conheça as atividades, os horários e como participar. Fale com a gente pelo WhatsApp.',
+    sobre: 'Somos uma comunidade que se encontra para cuidar das pessoas e fazer o bem. Aqui você vê as atividades, os horários e como participar.',
+    servicos: [S('Encontros e atividades', 'Programação regular aberta a quem quiser conhecer.'), S('Ações sociais', 'Iniciativas de apoio a quem precisa.'),
+      S('Voluntariado', 'Venha ajudar nas atividades e nos projetos.'), S('Eventos', 'Datas e programação divulgadas aqui e pelo WhatsApp.'),
+      S('Acolhimento', 'Atendimento a quem chega pela primeira vez.'), S('Contribuições', 'Informe-se pelo WhatsApp sobre as formas de apoiar.')],
+    diferenciais: [I('Acolhimento', 'Quem chega pela primeira vez é bem recebido.'), I('Transparência', 'Atividades e informações claras, sem rodeios.'), I('Participação', 'Há espaço para quem quer ajudar.'), I('Contato direto', 'Tire dúvidas pelo WhatsApp.')],
+    passos: [I('Conheça', 'Veja as atividades e os horários.'), I('Participe', 'Venha a um encontro ou fale com a gente.'), I('Fique por perto', 'Receba as novidades pelo WhatsApp.')],
+    faq: [P('Preciso confirmar presença?', 'Em geral não. Para eventos específicos, confirme pelo WhatsApp.'), P('Como posso ajudar?', 'Fale com a gente pelo WhatsApp e conte como gostaria de participar.'), P('Onde fica e quais os horários?', 'Estão na seção de contato logo abaixo, com o caminho no mapa.'), P('Como recebo as novidades?', 'Pelo WhatsApp. Chame e peça para ser avisado.'), P('Posso levar a família?', 'Sim, todos são bem-vindos. Confirme pelo WhatsApp se houver atividade específica.')],
+    imagens: ['comunidade pessoas', 'voluntários', 'community', 'people together'],
+  },
+  {
+    id: 'seguros', nome: 'Seguros, investimentos e planejamento financeiro',
+    chaves: ['seguro', 'seguradora', 'corretor de seguro', 'corretora de seguro', 'previdencia', 'investimento', 'planejador financeiro', 'gestao de patrimonio', 'consultor financeiro'],
+    schema: 'InsuranceAgency', layout: 'escritorio', paleta: { primaria: '#12446b', destaque: '#c9951a' },
+    cta: { principal: 'Pedir cotação', secundario: 'Como funciona' },
+    etiqueta: 'Atendimento direto pelo WhatsApp',
+    titulos: ['Proteção e planejamento explicados com clareza', 'Compare, entenda e escolha com segurança', 'Cuide do que importa com uma orientação de confiança'],
+    subtitulo: 'Peça a cotação, tire as dúvidas e entenda as condições antes de contratar.',
+    sobre: 'Seguro e planejamento financeiro precisam ser entendidos antes de contratados. Aqui você recebe a explicação clara e compara as opções, sem pressa.',
+    servicos: [S('Cotação de seguros', 'Compare coberturas e condições antes de decidir.'), S('Seguro de vida', 'Proteção para você e para a sua família, conforme a necessidade.'),
+      S('Seguro residencial e empresarial', 'Coberturas para o imóvel e para o negócio.'), S('Seguro de veículos', 'Opções de cobertura conforme o veículo e o perfil.'),
+      S('Planejamento financeiro', 'Organização de objetivos, reservas e investimentos.'), S('Orientação sobre sinistros', 'Apoio para entender os passos quando precisar acionar.')],
+    diferenciais: [I('Explicação clara', 'Coberturas, limites e carências em linguagem simples.'), I('Comparação de opções', 'Você vê alternativas antes de decidir.'), I('Atendimento próximo', 'Tire dúvidas pelo WhatsApp com quem conhece o seu caso.'), I('Apoio no uso', 'Orientação quando for preciso acionar o seguro.')],
+    passos: [I('Conte o que precisa', 'Informe o que deseja proteger ou planejar.'), I('Compare', 'Receba as opções com coberturas e valores.'), I('Contrate com segurança', 'Com tudo explicado antes de assinar.')],
+    faq: [P('Como peço uma cotação?', 'Pelo botão de WhatsApp desta página: informe o que quer proteger e os dados básicos.'), P('A cotação tem custo?', 'Confirme pelo WhatsApp as condições da cotação.'), P('Quais documentos preciso?', 'Depende do tipo de seguro. Orientamos a lista pelo WhatsApp.'), P('Como aciono o seguro?', 'Orientamos os passos conforme a apólice e a seguradora.'), P('Qual o horário de atendimento?', 'Está na seção de contato, logo abaixo.')],
+    imagens: ['seguros proteção', 'consultoria financeira', 'financial advisor', 'insurance'],
   },
 ];
 
@@ -449,13 +570,27 @@ export const GENERICO: ConteudoNicho = {
 const normalizar = (t: string): string =>
   t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 
+/** Singular aproximado, palavra a palavra. Só serve para casar radicais (mesma regra do banco de imagens do backend). */
+const singular = (texto: string): string => texto.split(' ').map(p => {
+  if (p.length <= 3) return p;
+  for (const [fim, troca] of [['oes', 'ao'], ['aes', 'ao'], ['ais', 'al'], ['eis', 'el'], ['ois', 'ol'], ['ens', 'em'], ['ns', 'm']]) {
+    if (p.endsWith(fim)) return p.slice(0, -fim.length) + troca;
+  }
+  if (/(res|zes|ses)$/.test(p) && p.length > 4) return p.slice(0, -2);
+  return p.endsWith('s') ? p.slice(0, -1) : p;
+}).join(' ');
+
 /**
  * O conteúdo do ramo. Casa por início de palavra, como o guia do SDR: "spa"
  * não pode casar com "espaço". Empate: a chave mais longa vence.
  */
 export function achar(nicho?: string): ConteudoNicho {
-  const alvo = ` ${normalizar(nicho || '')} `;
-  if (!alvo.trim()) return GENERICO;
+  const base = normalizar(nicho || '');
+  if (!base) return GENERICO;
+  // "Escola de dança", "Curso de barbeiro", "Faculdade de direito": quem ensina é escola, seja qual for a matéria
+  if (/^(escolas?|cursos?|faculdades?|universidades?|aulas?) /.test(base)) return BANCO.find(c => c.id === 'educacao') || GENERICO;
+  // o catálogo é quase todo plural ("Agências de viagens", "Hospitais"): casa pelas duas formas, como o banco de imagens
+  const alvo = ` ${base} ${singular(base)} `;
   let melhor: ConteudoNicho | null = null;
   let pontos = 0;
   for (const c of BANCO) {
@@ -463,7 +598,8 @@ export function achar(nicho?: string): ConteudoNicho {
       const chave = normalizar(k);
       if (!chave) continue;
       const padrao = k.endsWith(' ') ? ` ${chave} ` : ` ${chave}`;
-      if (alvo.includes(padrao) && chave.length > pontos) { melhor = c; pontos = chave.length; }
+      const valor = chave.length + (c.prioritario ? 100 : 0);
+      if (alvo.includes(padrao) && valor > pontos) { melhor = c; pontos = valor; }
     }
   }
   // "Clínicas" sem dizer de quê: texto de clínica é melhor que o genérico (clínica odontológica, de estética etc. já casaram acima)
@@ -483,6 +619,8 @@ export const SOBRE_COMPLEMENTO: Record<string, string> = {
   padaria: 'Do pão de todo dia à encomenda especial, é só chegar ou chamar no WhatsApp.',
   restaurante: 'Peça pelo WhatsApp ou venha comer com a gente.',
   'saude-medica': 'O agendamento é simples e o contato é direto, pelo WhatsApp.',
+  nutricao: 'Agende uma consulta e conte a sua rotina para montarmos o caminho juntos.',
+  fisioterapia: 'Agende uma avaliação e conte onde dói e o que você quer voltar a fazer.',
   odonto: 'Agende uma avaliação e tire todas as dúvidas antes de começar.',
   psicologia: 'O ritmo é o seu. Se fizer sentido, mande uma mensagem e conversamos sem compromisso.',
   estetica: 'Escolha o serviço, marque o horário e venha relaxar.',
@@ -502,6 +640,11 @@ export const SOBRE_COMPLEMENTO: Record<string, string> = {
   varejo: 'Venha conhecer ou peça pelo WhatsApp.',
   concessionaria: 'Peça a avaliação do seu usado e tire as dúvidas pelo WhatsApp.',
   credito: 'Chame no WhatsApp e faça a sua simulação.',
+  industria: 'Envie a sua demanda e receba o orçamento com prazo e condições.',
+  logistica: 'Peça a cotação pelo WhatsApp e combine coleta e entrega.',
+  seguranca: 'Peça uma avaliação do local e receba a proposta pelo WhatsApp.',
+  comunidade: 'Venha conhecer ou fale com a gente pelo WhatsApp.',
+  seguros: 'Peça a sua cotação e tire as dúvidas pelo WhatsApp antes de decidir.',
   'tecnologia-marketing': 'Combinamos escopo, prazo e investimento antes de iniciar. Peça uma proposta.',
   generico: 'Fale com a gente pelo WhatsApp e conte o que você precisa.',
 };

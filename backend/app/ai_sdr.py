@@ -26,7 +26,7 @@ enganosos e sao exatamente o que faz o numero ser denunciado e banido.
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from app import ai_oferta, identidade, nicho_guia
+from app import agentes, ai_oferta, identidade, nicho_guia, previa_honesta, quem_fala
 from app.playbook_sites import FALA_DO_ROBO_SOBRE_SITES
 
 ETAPAS = ("abertura", "descoberta", "diagnostico", "proposta", "objecao", "agendamento", "fechamento", "perdido")
@@ -92,6 +92,17 @@ def _formatar_dossie(lead: Optional[Dict[str, Any]], raio: Optional[Dict[str, An
         linhas.append(f"Gancho verificado: {g}")
     if lead.get("site_publicado"):
         linhas.append(f"Site que JÁ foi preparado para ele (pode mandar o link): {lead['site_publicado']}")
+        ab = lead.get("previa_abertura") or {}
+        if ab.get("visitas"):
+            linhas.append(f"A prévia JÁ FOI ABERTA por ele(a): {ab['visitas']} visita(s), a última em {str(ab.get('ultima') or '')[:16].replace('T', ' ')} (UTC). "
+                          "É sinal de interesse: pergunte o que achou em vez de reenviar o link ou explicar de novo o que ela é")
+        else:
+            linhas.append("Ainda não registramos abertura da prévia (o link pode não ter sido aberto, ou aberto por quem não conseguimos identificar): "
+                          "não afirme que ele(a) viu")
+
+    jeito = agentes.instrucao(lead.get("agente"))
+    if jeito:
+        linhas.append(f"Jeito de atender ESCOLHIDO PELO DONO para este lead: {jeito}")
 
     if raio:
         g = raio.get("gmn") or {}
@@ -117,6 +128,37 @@ def _formatar_dossie(lead: Optional[Dict[str, Any]], raio: Optional[Dict[str, An
                 f"{ig.get('posts_90_dias')} posts em 90 dias, último há {ig.get('dias_desde_ultimo_post')} dias"
             )
     return "\n".join(linhas)
+
+
+# O que o link realmente é. O site da prévia é montado para atrair: foto de banco, texto de exemplo, dados do Google. Chamar isso de
+# "site profissional" ou "seu site pronto" promete o que não existe (e o dono vê a foto errada e perde a confiança).
+REGRA_DA_PREVIA = """O QUE É A PRÉVIA (leia com atenção):
+- É uma PRIMEIRA IDEIA, um esboço visual feito para mostrar como o site poderia ficar. NÃO é o site final e NÃO está pronto para publicar.
+- As fotos são de banco de imagens e os textos são de exemplo: no site de verdade entram as fotos, os serviços, os preços e as informações REAIS do negócio,
+  depois que o dono aprova e envia o material.
+- Chame SEMPRE de "prévia", "esboço", "modelo" ou "ideia de como poderia ficar". PROIBIDO dizer que preparou/montou/criou "um site profissional",
+  "o seu site", "o site pronto", "site finalizado" ou "no ar". Você montou uma PRÉVIA, não o site.
+- Ao enviar o link, diga com uma frase simples que é uma prévia: o definitivo é feito depois, com as fotos e informações dele.
+- Se o dono estranhar uma foto ou um texto da prévia (ex.: "essa foto não é minha"), concorde: é de exemplo, será trocada pelas reais."""
+
+
+# Quem responde nem sempre é o profissional. O robô já tratou a pessoa AUSENTE como interlocutora ("Entendo, Ana Teresa. Desejo uma ótima licença...")
+# quando a recepção avisou que ela entrou em licença maternidade.
+QUEM_ESCREVE = """QUEM ESTÁ ESCREVENDO (leia a fala do cliente com exatidão ANTES de responder):
+- O nome do dossiê ou da abordagem é do negócio ou do profissional. Quem responde pode ser OUTRA PESSOA: recepção, secretária, funcionário,
+  familiar, sócio. NUNCA chame quem escreve pelo nome do profissional. Só use um nome para quem escreve se ELA disse ou assinou
+  ("aqui é a Marcelly"). Sem nome dito, não use nome nenhum.
+- Quem fala de alguém em TERCEIRA PESSOA ("a Ana Teresa entrou em licença", "o doutor não está", "ela saiu") está falando DE outra pessoa,
+  que NÃO está na conversa. Responda a QUEM ESCREVEU. Nunca fale com a pessoa de quem se fala: nada de "Entendo, Ana Teresa", "sua licença",
+  "boa recuperação para você".
+- Releia a fala palavra por palavra: quem escreveu? de quem falou? o que isso muda para a venda? Escreva isso em "entendi".
+- Profissional AFASTADO (licença, maternidade, férias, doença, viagem) ou que NÃO ATENDE MAIS ali (saiu, mudou, aposentou, fechou):
+  1) agradeça a quem avisou, em uma frase, e, se quiser, deseje bem ao profissional EM TERCEIRA PESSOA ("desejo uma ótima licença à Dra. Ana Teresa");
+  2) faça UMA pergunta curta: quem responde pela clínica ou pela divulgação enquanto isso (sócio, outro profissional, administração), ou quando ela volta;
+  3) sem pitch para quem só avisou e sem insistir.
+  Saiu ou fechou de vez e ninguém decide por lá: agradeça, despeça-se e use "etapa": "perdido". Licença ou férias (ela volta): agradeça, pergunte pelo
+  outro responsável e, sem ninguém, despeça-se dizendo que retoma o contato quando ela voltar, com "passar_para_humano": true e o motivo
+  (ex.: "Dra. Ana Teresa em licença maternidade: retomar depois")."""
 
 
 def _bloco_da_previa(lead: Optional[Dict[str, Any]]) -> str:
@@ -231,7 +273,7 @@ def montar_prompt(
     vender = cfg.get("objetivo") == "vender"
     meta = {
         "agendar": "marcar uma conversa de 15 minutos com o responsável (ligação ou vídeo)",
-        "site": "fazer a pessoa abrir o site que já foi preparado para o negócio dela e ouvir a opinião",
+        "site": "fazer a pessoa abrir a prévia (uma primeira ideia do site, não o site final) feita para o negócio dela e ouvir a opinião",
         "qualificar": "entender se há interesse, quem decide, a dor e o momento — e só então propor a conversa",
         "vender": "fechar a venda pela conversa, dentro do catálogo e das condições autorizadas",
     }.get(cfg.get("objetivo") or "agendar", "marcar uma conversa com o responsável")
@@ -267,6 +309,11 @@ Instruções do dono: {cfg.get('instrucoes') or '(nenhuma)'}
 
 == A PRÉVIA DO SITE DESTE NEGÓCIO ==
 {_bloco_da_previa(lead)}
+
+{REGRA_DA_PREVIA}
+
+== QUEM ESTÁ ESCREVENDO ==
+{QUEM_ESCREVE}
 
 == SITES: O QUE UM ESPECIALISTA SABE ==
 {FALA_DO_ROBO_SOBRE_SITES}
@@ -360,7 +407,7 @@ que você não sabe; reclamação; pedido explícito para falar com uma pessoa.
 {historico}
 
 == RESPONDA SÓ COM ESTE JSON ==
-{{"entendi": "uma frase: o que o cliente disse ou quer",
+{{"entendi": "uma frase: QUEM escreveu (o profissional ou outra pessoa), DE QUEM falou e o que o cliente disse ou quer",
  "tipo": "pergunta|interesse|objecao|agradecimento|indicou_contato|automatica|outro",
  "automatica": false,
  "enviar_previa": false,
@@ -374,7 +421,7 @@ que você não sabe; reclamação; pedido explícito para falar com uma pessoa.
  "motivo": "por que passar (só se passar)",
  "reuniao": "SÓ quando o CLIENTE confirmou um dia e horário exatos que você ofereceu; se você propôs e ele ainda não respondeu, vazio"}}
 
-Regras dos dados: "orcamento" é quanto o CLIENTE disse que pode investir (nunca o preço do catálogo);
+Regras dos dados: "nome" é SÓ o nome de quem está escrevendo (se ela disse), nunca o de alguém de quem ela fala; "orcamento" é quanto o CLIENTE disse que pode investir (nunca o preço do catálogo);
 "decisor" é quem decide a compra; deixe vazio o que ele não disse.
 """
 
@@ -547,6 +594,14 @@ def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: Lis
                           criando_previa: bool = False) -> List[str]:
     """`criando_previa`: o sistema vai criar o site agora e trocar [LINK_DA_PREVIA] pelo link; o marcador e a promessa do link valem."""
     erros: List[str] = []
+    # 0) a prévia nunca é "o site pronto" nem "o site profissional que preparei"
+    falso = previa_honesta.erro_de_site_pronto(textos)
+    if falso:
+        erros.append(falso)
+    # 0b) quem avisa que o profissional está ausente (licença, saiu) é outra pessoa: a resposta não pode falar COM a ausente
+    errada = quem_fala.erro_de_pessoa_errada(textos, mensagens)
+    if errada:
+        erros.append(errada)
     # 1) marcador de modelo nunca vai para o cliente
     for t in ([] if criando_previa else textos):
         m = _MARCADOR.search(t)

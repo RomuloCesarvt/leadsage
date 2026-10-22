@@ -159,10 +159,17 @@ const CASOS: [string, string][] = [
   ['Hotéis', 'turismo'], ['Pousadas', 'turismo'], ['Escolas de idiomas', 'educacao'], ['Eletricistas', 'servicos-residenciais'],
   ['Buffets', 'eventos'], ['Agropecuárias', 'agro'], ['Lojas de roupas', 'loja-moda'], ['Médicos', 'saude-medica'], ['Marcenarias', 'construcao'],
   ['Fotógrafos', 'eventos'], ['Espaço Spa', 'estetica'],
+  // achados da varredura de todos os ramos (backend/scripts/auditar_ramos.py): palavra genérica ou radical curto levava o ramo para o conteúdo errado
+  ['Relações públicas', 'tecnologia-marketing'], ['Pubs', 'restaurante'], ['Agências de viagens', 'turismo'], ['Hotéis fazenda', 'turismo'],
+  ['Cirurgiões plásticos', 'saude-medica'], ['Laboratórios veterinários', 'pet'], ['Creches para pets', 'pet'], ['Corretoras de seguros auto', 'seguros'],
+  ['Cooperativas de táxi', 'logistica'], ['Cooperativas de leite', 'agro'], ['Escolas de dança', 'educacao'], ['Cursos de barbeiro', 'educacao'],
+  ['Hospedagem de sites', 'tecnologia-marketing'], ['Implantodontistas', 'odonto'], ['Engenheiros agrônomos', 'agro'], ['Salões de festas', 'eventos'],
+  ['Dedetização de condomínios', 'servicos-residenciais'], ['Lojas de camping', 'varejo'], ['Cursos de gastronomia', 'educacao'], ['Nutricionistas', 'nutricao'],
+  ['Fábricas', 'industria'], ['Transportadoras', 'logistica'], ['Empresas de segurança', 'seguranca'], ['Igrejas', 'comunidade'], ['Seguradoras', 'seguros'],
 ];
 for (const [nicho, id] of CASOS) ok(`"${nicho}" → ${id}`, achar(nicho).id === id, achar(nicho).id);
 ok('"spa" não casa com "espaço" (início de palavra)', achar('Espaço de convivência').id === 'generico');
-ok('ramo desconhecido cai no genérico', achar('Fábrica de rapadura').id === 'generico' && achar('').id === 'generico' && achar(undefined).id === 'generico');
+ok('ramo desconhecido cai no genérico', achar('Observatório astronômico').id === 'generico' && achar('').id === 'generico' && achar(undefined).id === 'generico');
 ok('preencher troca {empresa} e {cidade}', preencher('Oi {cidade}, {empresa}', 'X', 'Bauru') === 'Oi Bauru, X');
 ok('preencher sem cidade não deixa lacuna', !/\{|undefined/.test(preencher('Em {cidade}', 'X', '')));
 

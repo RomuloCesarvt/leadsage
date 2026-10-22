@@ -86,3 +86,51 @@ def test_especialidade_medica_busca_consultorio_e_nunca_remedio_nem_bicho():
     assert "https://x/1" not in escolhidas and "https://x/3" not in escolhidas
     assert escolhidas[0] == "https://x/2"
     assert perfil_para("Clínica veterinária")["termos"][0] == "dog"           # veterinaria continua sendo pet
+
+
+def test_nutricionista_nunca_recebe_foto_de_medico_atendendo():
+    """Uma nutricionista recebeu site com foto de médico atendendo: nutrição estava dentro da curadoria de clínica médica."""
+    from app.banco_imagens import perfil_para
+
+    for ramo in ("Nutricionistas", "Nutricionista esportivo", "Clínicas de nutrição", "Consultório de nutrição", "Nutrição", "Nutricionistas esportivos"):
+        p = perfil_para(ramo)
+        assert "doctor" not in " ".join(p["termos"]), ramo
+        assert {"healthy food", "healthy meal"} <= set(p["termos"]) and p["exigir"] is True, ramo
+        assert "doctor" in p["ruins"] and "stethoscope" in p["ruins"], ramo
+    p = perfil_para("Nutricionistas")
+    fotos = [
+        _foto("Doctor consulting patient", ["doctor", "patient", "clinic", "medical"], n=1),
+        _foto("Stethoscope on desk", ["stethoscope", "doctor"], n=2),
+        _foto("Fresh vegetables salad bowl", ["healthy", "food", "salad", "vegetables"], n=3),
+        _foto("Fruit bowl healthy breakfast", ["fruit", "healthy", "breakfast"], n=4),
+        _foto("Healthy meal prep", ["healthy", "meal", "food"], n=5),
+        _foto("Avocado toast", ["avocado", "healthy", "food", "breakfast"], n=6),
+        _foto("Burger and fries", ["burger", "fries", "food"], n=7),
+    ]
+    titulos = {f["titulo"] for f in escolher(fotos, p["bons"], p["ruins"], 8, p["exigir"])}
+    assert not {"Doctor consulting patient", "Stethoscope on desk", "Burger and fries"} & titulos
+    assert {"Fresh vegetables salad bowl", "Fruit bowl healthy breakfast"} <= titulos
+
+
+def test_fisioterapia_tem_curadoria_propria_e_nao_e_consultorio_medico():
+    from app.banco_imagens import perfil_para
+
+    for ramo in ("Fisioterapeutas", "Clínica de fisioterapia", "Fisioterapia", "Reabilitação"):
+        p = perfil_para(ramo)
+        assert "doctor" not in " ".join(p["termos"]) and "physical therapy" in p["termos"] and p["exigir"] is True, ramo
+        assert "stethoscope" in p["ruins"], ramo
+    # o médico continua com consultório
+    assert "doctor consultation" in perfil_para("Clínicas médicas")["termos"]
+    assert "doctor consultation" in perfil_para("Gastroenterologistas")["termos"]
+
+
+def test_especialidade_vence_a_palavra_generica_de_lugar():
+    """"Consultório de psicologia / odontológico / de nutrição" é a especialidade, não consultório médico."""
+    from app.banco_imagens import perfil_para
+
+    assert "therapy session" in perfil_para("Consultório de psicologia")["termos"]
+    assert perfil_para("Consultório odontológico")["termos"][0] == "dentist"
+    assert "healthy food" in perfil_para("Consultório de nutrição")["termos"]
+    assert "physical therapy" in perfil_para("Clínica de fisioterapia e reabilitação")["termos"]
+    assert "doctor consultation" in perfil_para("Consultório médico")["termos"]
+    assert "doctor consultation" in perfil_para("Clínica de saúde")["termos"]

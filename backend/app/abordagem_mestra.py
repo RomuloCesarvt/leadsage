@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo
 
-from app import ai_oferta, nicho_guia
+from app import ai_oferta, nicho_guia, previa_honesta
 
 FUSO = ZoneInfo("America/Sao_Paulo")
 DIAS = ("segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo")
@@ -83,8 +83,9 @@ ESTRUTURA = """COMO UMA BOA PRIMEIRA MENSAGEM É CONSTRUÍDA (nesta ordem, em pr
    Deixe claro que a prévia é para apresentar SEM OBRIGAÇÃO nenhuma da parte dele. A conversa é opção, nunca exigência."""
 
 # A previa existe ou nao: a mensagem nunca pode dizer que "montou" algo que ainda nao existe.
-PREVIA_CRIADA = """   c) Diga que JÁ montou uma prévia de como o site dele poderia ficar (está pronta, feita com os dados reais do negócio) e peça
-      licença para enviar. Não mande o link neste primeiro toque."""
+PREVIA_CRIADA = """   c) Diga que JÁ montou uma prévia de como o site dele poderia ficar (uma primeira ideia, feita a partir dos dados reais do negócio; NÃO é o
+      site final nem "um site profissional pronto") e peça licença para enviar. Nunca diga que preparou "um site" ou "o seu site": você
+      montou uma prévia. Não mande o link neste primeiro toque."""
 PREVIA_OFERECER = """   c) Diga que pode montar, sem custo e sem compromisso, uma prévia de como o site dele poderia ficar. NÃO diga que já montou nem que
       já está pronta: ela ainda não existe. Não mande link."""
 PERGUNTA_CRIADA = """5. PERGUNTA DE BAIXO ATRITO: UMA só, no fim, que se responde com um "sim", neste jeito: "{pedido}" (adapte ao canal e ao tom;
@@ -249,8 +250,9 @@ def estrutura(sender_name: str, agora: Optional[datetime] = None, sem_site: bool
             previa_c = ("Diz que, por isso, pode montar uma prévia do site dele(a) sem custo, para apresentar e mostrar o quanto isso pode ajudar "
                         "ainda mais o negócio (mais gente achando e chamando no WhatsApp). NÃO diga que já existe. Não mande link.")
         else:
-            previa_c = ("Diz que, por isso, criou uma prévia do site dele(a), já pronta, para apresentar e mostrar o quanto isso pode ajudar ainda mais "
-                        "o negócio (mais gente achando e chamando no WhatsApp). Não mande o link neste primeiro toque.")
+            previa_c = ("Diz que, por isso, criou uma PRÉVIA de como o site dele(a) poderia ficar (uma primeira ideia, não o site final), para apresentar "
+                        "e mostrar o quanto isso pode ajudar ainda mais o negócio (mais gente achando e chamando no WhatsApp). Nunca diga que preparou "
+                        "\"um site\", \"o seu site\" ou \"um site profissional\". Não mande o link neste primeiro toque.")
         sorteio = sorteio_da_mensagem(lead_id, previa, variacao)
         pergunta = sorteio["pergunta"]
         passadas = [str(x).strip()[:80] for x in (evitar or []) if str(x).strip()][:6]
@@ -329,6 +331,9 @@ def revisar_roteiro(texto: str, sem_site: bool, previa: str = "") -> list:
     """A mensagem precisa trazer o que o dono pediu: a prévia e, sem site, a confirmação."""
     t = (texto or "").lower()
     problemas = []
+    falso = previa_honesta.erro_de_site_pronto([texto])
+    if falso:
+        problemas.append(falso)
     if previa in ("criada", "oferecer"):
         coisa = r"(pr[eé]via|esbo[çc]o|vers[aã]o|modelo|amostra|o que (?:eu )?(?:montei|fiz|preparei)|ideia)"
         montou = re.search(r"\b(montei|preparei|criei|fiz|deixei|desenhei|elaborei)\b[^.?!]{0,50}" + coisa, t) or re.search(r"o que (?:eu )?(?:montei|fiz|preparei)", t)
