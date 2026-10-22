@@ -61,3 +61,32 @@
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: #cbd5e1;
 }
+
+/* Quadros largos (Pipeline): barra de baixo grossa e fácil de pegar com o cursor, e rolagem segurando o fundo e puxando */
+.barra-grande::-webkit-scrollbar {
+  height: 18px;
+  width: 12px;
+}
+.barra-grande::-webkit-scrollbar-track {
+  background: #e2e8f0;
+  border-radius: 9999px;
+}
+.barra-grande::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 9999px;
+  border: 3px solid #e2e8f0;          /* a faixa pintada é um pouco menor que a área de clique: fácil de acertar com o cursor */
+}
+.barra-grande::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+.quadro-arrastavel {
+  cursor: grab;
+}
+.quadro-arrastavel.arrastando-quadro {
+  cursor: grabbing;
+  user-select: none;
+}
+/* o que está dentro do quadro mantém o próprio cursor */
+.quadro-arrastavel button, .quadro-arrastavel a, .quadro-arrastavel input, .quadro-arrastavel select, .quadro-arrastavel textarea {
+  cursor: pointer;
+}

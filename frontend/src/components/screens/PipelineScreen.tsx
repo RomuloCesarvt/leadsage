@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 import type { LeadItem } from '../../types';
 import { GripVertical, Phone, MessageCircle, Bot, RefreshCw, UserRound, Check, ChevronDown } from 'lucide-react';
 import { acoesDoCard, agenteDe, AGENTES_PADRAO, etiquetasDoCard, haQuanto, type Tom } from '../../lib/cardPipeline';
+import { rolarNasBordas, useArrastarParaRolar } from '../../lib/arrastarParaRolar';
 
 const COLUMNS = [
   { key: 'Novo Lead', color: 'bg-blue-600' },
@@ -60,6 +61,10 @@ export const PipelineScreen: React.FC = () => {
     e.preventDefault();
   };
 
+  // o quadro é largo: dá para segurar o fundo e puxar para os lados, e a barra de baixo é grossa; arrastando um cartão, as bordas rolam sozinhas
+  const quadro = React.useRef<HTMLDivElement>(null);
+  useArrastarParaRolar(quadro);
+
   const onDrop = (e: React.DragEvent, stage: string) => {
     e.preventDefault();
     const leadId = e.dataTransfer.getData("leadId");
@@ -69,7 +74,8 @@ export const PipelineScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 overflow-x-auto overflow-y-hidden pb-2 h-full custom-scrollbar">
+    <div ref={quadro} onDragOver={(e) => rolarNasBordas(quadro.current, e.clientX)}
+      className="quadro-arrastavel flex-1 overflow-x-auto overflow-y-hidden pb-2 h-full barra-grande" title="Segure o fundo e puxe para os lados">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-800">Pipeline de Vendas</h1>
