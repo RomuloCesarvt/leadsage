@@ -112,6 +112,7 @@ export class Sessao {
       auth: this.authFabrica ? await this.authFabrica(this.uid) : null,
       historico: this.historico,
       aviso: this.aviso,
+      transcrever: (audio, mimetype) => this.ls.transcrever(audio, mimetype),   // o robô entende áudio: o LeadSage transcreve de graça
       aoQr: async (qr) => {
         this.aviso('QR code gerado, aguardando leitura.');
         this.estado = { ...this.estado, fase: 'qr', codigo: '', qr: await qrParaTexto(qr) };

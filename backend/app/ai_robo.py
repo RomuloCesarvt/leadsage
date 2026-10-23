@@ -357,6 +357,8 @@ def decidir(
         sdr = {**(sdr or {}), "recusas": recusas + 1}
 
     if e_so_midia(texto):
+        if texto.strip().lower() == "[áudio]":
+            return Decisao(passar_para_humano=True, motivo="mandou um áudio que não deu para transcrever agora — ouça e responda você")
         return Decisao(passar_para_humano=True, motivo=f"mandou {texto} — o robô não interpreta mídia")
 
     # outro robo do outro lado: nao responde (nem gasta IA nem credito) e a conversa nao vira um

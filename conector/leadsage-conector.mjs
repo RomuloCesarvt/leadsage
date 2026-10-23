@@ -81,6 +81,15 @@ export function clienteLeadsage({ site, chave }) {
     resultado: (id, ok, erro = '') => http_(`${base}/tarefas/${encodeURIComponent(id)}/resultado`, { metodo: 'POST', cabecalhos: h, corpo: { ok, erro } }),
     mensagem: (m) => http_(`${base}/mensagem`, { metodo: 'POST', cabecalhos: h, corpo: m, tempoMs: 60000 }),
     reprocessar: (contato = '') => http_(`${base}/reprocessar`, { metodo: 'POST', cabecalhos: h, corpo: { contato }, tempoMs: 60000 }),
+    /** O texto falado de um áudio (o LeadSage transcreve de graça). '' quando não deu para ouvir ou não havia fala. */
+    transcrever: async (audio, mimetype = 'audio/ogg') => {
+      try {
+        const r = await fetch(`${base}/audio`, { method: 'POST', headers: { ...h, 'content-type': String(mimetype || 'audio/ogg') }, body: audio, signal: AbortSignal.timeout(50000) });
+        if (!r.ok) return '';
+        const d = await r.json().catch(() => null);
+        return String(d?.texto || '').trim();
+      } catch { return ''; }
+    },
   };
 }
 
@@ -298,6 +307,16 @@ export function criarHistorico(arquivo, { maxMensagens = 300, maxChats = 300, le
       if (!c || !nome) return;
       // não troca o nome que a própria conversa trouxe; só troca o número pelo nome da pessoa
       if (!c.nome || c.nome === c.telefone || c.nome === chatId.split('@')[0]) { c.nome = nome; versao++; salvar(); }
+    },
+    /** Troca o texto de uma mensagem já guardada (o áudio ganha a transcrição). */
+    atualizarTexto(chatId, id, texto) {
+      const c = chats[chatId];
+      const m = c?.mensagens.find((x) => x.id === id);
+      if (!m || !texto) return false;
+      m.texto = texto;
+      if (c.mensagens[c.mensagens.length - 1]?.id === id) c.ultima = { texto, minha: m.minha };
+      versao++; salvar();
+      return true;
     },
     versao() { return versao; },
     total() { return Object.keys(chats).length; },

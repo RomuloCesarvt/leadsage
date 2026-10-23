@@ -31,7 +31,7 @@ from app.models import (
     DocumentCreateRequest, DocumentUpdateRequest, DocumentItem,
     SiteCopyRequest, SiteCopyResponse, DocumentAIRequest, DocumentAIResponse,
 )
-from app import identidade
+from app import identidade, transcricao
 from app.leads_engine import LeadsEngine
 from app.ai_client import AIIndisponivel
 from app.ai_generator import AIGenerator
@@ -2224,6 +2224,26 @@ async def conector_reprocessar(req: ConectorReprocessar, request: Request):
     except Exception as exc:
         print(f"Robo: falha ao reprocessar pendentes: {exc}")
         return {"processadas": 0, "respondidas": 0, "motivo": "erro"}
+
+
+@app.post("/api/conector/audio")
+async def conector_audio(request: Request):
+    """Um lead mandou ÁUDIO no WhatsApp: o serviço da nuvem envia os bytes e recebe o texto falado, de graça (Groq Whisper, Gemini de reserva).
+    O corpo é o áudio puro (Content-Type: audio/ogg...). Devolve {"texto", "motor"}; texto vazio quando não havia fala."""
+    await _canal_do_conector(request)
+    audio = await request.body()
+    if not audio:
+        raise HTTPException(status_code=422, detail="Áudio vazio.")
+    if len(audio) > transcricao.LIMITE_BYTES:
+        raise HTTPException(status_code=413, detail="Áudio grande demais para transcrever.")
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(transcricao.transcrever, audio, request.headers.get("content-type", "audio/ogg")), timeout=45)
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="A transcrição demorou demais.")
+    except transcricao.TranscricaoIndisponivel as exc:
+        print(f"Áudio: sem transcrição agora ({exc})")
+        raise HTTPException(status_code=503, detail="Nenhum motor conseguiu ouvir o áudio agora.")
 
 
 @app.post("/api/conector/mensagem")

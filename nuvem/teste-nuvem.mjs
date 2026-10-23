@@ -3,7 +3,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   paraChatId, paraJid, lerConteudo, resumoBaileys, telefoneDoRemetente, desembrulhar, criarRastreadorDeEntrega,
+  infoDoAudio, podeTranscrever, textoDeAudio, LIMITE_AUDIO,
 } from './adaptador-baileys.mjs';
+import { clienteLeadsage } from '../conector/leadsage-conector.mjs';
 import { createHmac } from 'node:crypto';
 import http from 'node:http';
 import { criarGerente, criarApiChat, uidDoToken } from './servidor.mjs';
@@ -443,4 +445,61 @@ test('histórico: conversa avisada pelo WhatsApp aparece na lista mesmo sem mens
   h.registrar({ chatId: '5514990000001@c.us', nome: 'Doceria Aurora', mensagem: { id: 'm1', texto: 'oi', minha: false, quando: 1700000300, tipo: 'text' } });
   assert.ok(h.versao() > antes);
   assert.equal(h.chats(10)[0].ultima.texto, 'oi');
+});
+
+// ------------------------------------------------------------------ o robô entende áudio
+
+test('áudio: lê duração, tamanho e tipo; respeita os limites; marca o texto com 🎤', () => {
+  const ptt = { audioMessage: { ptt: true, seconds: 42, fileLength: { low: 90000 }, mimetype: 'audio/ogg; codecs=opus' } };
+  assert.deepEqual(infoDoAudio(ptt), { ptt: true, segundos: 42, bytes: 90000, mimetype: 'audio/ogg; codecs=opus' });
+  assert.deepEqual(infoDoAudio({ ephemeralMessage: { message: ptt } }).segundos, 42);          // dentro de mensagem temporária
+  assert.equal(infoDoAudio({ conversation: 'oi' }), null);
+  assert.equal(podeTranscrever(infoDoAudio(ptt)), true);
+  assert.equal(podeTranscrever({ ptt: true, segundos: LIMITE_AUDIO.segundos + 1, bytes: 1000, mimetype: 'audio/ogg' }), false);   // áudio de mais de 4 min
+  assert.equal(podeTranscrever({ ptt: true, segundos: 30, bytes: LIMITE_AUDIO.bytes + 1, mimetype: 'audio/ogg' }), false);        // pesado demais para a função
+  assert.equal(podeTranscrever({ ptt: true, segundos: 30, bytes: 0, mimetype: 'audio/ogg' }), true);                            // tamanho desconhecido: tenta
+  assert.equal(podeTranscrever(null), false);
+  assert.equal(textoDeAudio('  oi, pode mandar sim  '), '🎤 oi, pode mandar sim');
+  assert.equal(textoDeAudio(''), '');
+  assert.equal(textoDeAudio(null), '');
+});
+
+test('áudio: a transcrição aparece na conversa guardada (aba WhatsApp) e na última mensagem', () => {
+  const h = criarHistorico('', { maxMensagens: 25, maxChats: 60 });
+  const chatId = '5514990000001@c.us';
+  h.registrar({ chatId, nome: 'Marcelly', mensagem: { id: 'a1', texto: '[áudio]', minha: false, quando: 100, tipo: 'ptt', midia: true, status: 0 } });
+  const antes = h.versao();
+  assert.equal(h.atualizarTexto(chatId, 'a1', '🎤 pode mandar o link que eu mostro para a doutora'), true);
+  assert.equal(h.chats(5)[0].ultima.texto, '🎤 pode mandar o link que eu mostro para a doutora');
+  assert.equal(h.mensagens(chatId, 5)[0].texto, '🎤 pode mandar o link que eu mostro para a doutora');
+  assert.ok(h.versao() > antes);                                                                // o espelho para o servidor é refeito
+  assert.equal(h.atualizarTexto(chatId, 'nao-existe', 'x'), false);
+  assert.equal(h.atualizarTexto('outro@c.us', 'a1', 'x'), false);
+  assert.equal(h.atualizarTexto(chatId, 'a1', ''), false);                                      // sem texto não apaga o que existe
+});
+
+test('áudio: o cliente do LeadSage manda os bytes puros e devolve só o texto (vazio se falhar)', async () => {
+  const recebidos = [];
+  const srv = http.createServer((req, res) => {
+    const partes = [];
+    req.on('data', (c) => partes.push(c));
+    req.on('end', () => {
+      recebidos.push({ url: req.url, tipo: req.headers['content-type'], chave: req.headers['x-conector-key'], corpo: Buffer.concat(partes) });
+      if (req.headers['x-conector-key'] === 'ruim') { res.statusCode = 503; res.end('{"detail":"sem motor"}'); return; }
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ texto: '  oi, tudo bem?  ', motor: 'groq' }));
+    });
+  });
+  await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+  const site = `http://127.0.0.1:${srv.address().port}`;
+  try {
+    const audio = Buffer.from([1, 2, 3, 4, 5]);
+    assert.equal(await clienteLeadsage({ site, chave: 'lsc_boa' }).transcrever(audio, 'audio/ogg; codecs=opus'), 'oi, tudo bem?');
+    assert.equal(recebidos[0].url, '/api/conector/audio');
+    assert.equal(recebidos[0].tipo, 'audio/ogg; codecs=opus');
+    assert.equal(recebidos[0].chave, 'lsc_boa');
+    assert.deepEqual([...recebidos[0].corpo], [1, 2, 3, 4, 5]);
+    assert.equal(await clienteLeadsage({ site, chave: 'ruim' }).transcrever(audio), '');                       // o servidor recusou: sem texto, sem erro
+    assert.equal(await clienteLeadsage({ site: 'http://127.0.0.1:1', chave: 'x' }).transcrever(audio), '');     // sem rede: idem
+  } finally { srv.close(); }
 });

@@ -97,6 +97,24 @@ export function lerConteudo(message) {
   return { tipo: 'unknown', texto: '' };
 }
 
+// ------------------------------------------------------------------ áudio
+
+/** Áudio que vale transcrever: até 4 minutos e 3,5 MB (a função do LeadSage aceita ~4,5 MB por pedido). */
+export const LIMITE_AUDIO = { segundos: 240, bytes: 3_500_000 };
+
+/** { ptt, segundos, bytes, mimetype } de uma mensagem de áudio, ou null se não for áudio. */
+export function infoDoAudio(message) {
+  const a = desembrulhar(message).audioMessage;
+  if (!a) return null;
+  const bytes = a.fileLength && typeof a.fileLength === 'object' ? (a.fileLength.toNumber?.() ?? a.fileLength.low) : a.fileLength;
+  return { ptt: Boolean(a.ptt), segundos: Number(a.seconds) || 0, bytes: Number(bytes) || 0, mimetype: String(a.mimetype || 'audio/ogg') };
+}
+
+export const podeTranscrever = (info) => Boolean(info) && info.segundos <= LIMITE_AUDIO.segundos && (!info.bytes || info.bytes <= LIMITE_AUDIO.bytes);
+
+/** O texto que o robô recebe de um áudio transcrito: marcado com 🎤 para ele saber que veio falado. */
+export const textoDeAudio = (transcricao) => (String(transcricao || '').trim() ? `🎤 ${String(transcricao).trim()}` : '');
+
 // 0 erro, 1 pendente, 2 no servidor, 3 entregue, 4 lida, 5 ouvida  ->  0 pendente, 1 enviada, 2 entregue, 3 lida
 const STATUS = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 3 };
 
@@ -126,7 +144,7 @@ export function telefoneDoRemetente(key) {
 
 // ------------------------------------------------------------------ o adaptador
 
-export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPronto, aoCair, aoReceber, historico, aviso = () => {}, auth = null }) {
+export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPronto, aoCair, aoReceber, historico, aviso = () => {}, auth = null, transcrever = null }) {
   const authDir = join(dir, 'auth');
   const destinos = new Map(); // telefone -> id da conversa de verdade
   let sock = null;
@@ -200,11 +218,32 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
     // confirmações do WhatsApp para o que enviamos (servidor recebeu, entregue, lida)
     s.ev.on('messages.update', (lista) => { for (const u of lista || []) entregas.registrar(u?.key?.id, u?.update?.status); });
     s.ev.on('message-receipt.update', (lista) => { for (const u of lista || []) if (u?.key?.fromMe) entregas.registrar(u.key.id, u.receipt?.readTimestamp ? 4 : 3); });
+    /** Baixa o áudio, pede a transcrição e só então entrega a mensagem ao robô (com o texto falado). Sem transcrição, entrega como antes ("[áudio]"). */
+    const transcreverEEntregar = async (m, nova, info) => {
+      try {
+        const buffer = await Promise.race([
+          B.downloadMediaMessage(m, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: s.updateMediaMessage }),
+          dormir(30000).then(() => { throw new Error('o download do áudio demorou demais'); }),
+        ]);
+        const texto = textoDeAudio(await transcrever(buffer, info.mimetype));
+        if (texto) {
+          nova.texto = texto;
+          historico.atualizarTexto?.(paraChatId(m.key.remoteJid), nova.id, texto);   // a aba WhatsApp mostra o que o áudio disse
+        } else aviso(`Áudio de ${nova.de} sem transcrição (sem fala ou motores no limite): vai como [áudio].`);
+      } catch (e) {
+        aviso('Não consegui transcrever o áudio:', e.message);
+      }
+      aoReceber(nova);
+    };
+
     s.ev.on('messages.upsert', ({ messages, type }) => {
       for (const m of messages || []) {
         try {
           const nova = guardar(m, { novo: type === 'notify' });
-          if (nova) aoReceber(nova);
+          if (!nova) continue;
+          const info = transcrever && (nova.tipo === 'ptt' || nova.tipo === 'audio') ? infoDoAudio(m.message) : null;
+          if (info && podeTranscrever(info)) { transcreverEEntregar(m, nova, info).catch((e) => aviso('Aviso no áudio:', e.message)); continue; }
+          aoReceber(nova);
         } catch (e) { aviso('Aviso ao ler mensagem:', e.message); }
       }
     });
