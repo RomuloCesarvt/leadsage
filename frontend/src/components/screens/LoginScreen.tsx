@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { entrarComGoogle } from '../../lib/autenticacao';
+import { useApp } from '../../context/AppContext';
 import { Logo } from '../Logo';
 import { auth, db } from '../../lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -12,6 +13,7 @@ export const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { sessaoPerdida } = useApp() as any;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,6 +132,13 @@ export const LoginScreen: React.FC = () => {
           <span className="text-xs text-zinc-600 uppercase tracking-wider">ou</span>
           <div className="flex-1 h-px bg-zinc-800"></div>
         </div>
+
+        {sessaoPerdida && !error && (
+          <div className="mb-6 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm text-center">
+            Você estava logado{sessaoPerdida.email ? ` como ${sessaoPerdida.email}` : ''}, mas o navegador não devolveu a sessão ao recarregar a página.
+            Entre de novo; se isso se repetir a cada F5, me conte qual navegador você usa.
+          </div>
+        )}
 
         {error && (
           <div className="mb-6 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">

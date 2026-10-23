@@ -14,6 +14,7 @@ import { X, User, Building2, Mail, Briefcase, Check, Sparkles, AlertCircle } fro
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
 import { signOut } from 'firebase/auth';
+import { esquecerSessao } from '../lib/sessao';
 import { auth } from '../lib/firebase';
 
 const rotulo = 'block text-sm font-bold text-slate-700 mb-1.5 flex items-center gap-1.5';
@@ -157,6 +158,7 @@ export const ProfileModal: React.FC = () => {
           <button
             type="button"
             onClick={async () => {
+              esquecerSessao();   // saída de propósito: o app não estranha a falta de login no próximo F5
               await signOut(auth);
               fechar();
             }}

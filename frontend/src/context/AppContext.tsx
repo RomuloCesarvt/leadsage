@@ -3,6 +3,7 @@ import { api } from '../services/api';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { ESPERA_DA_SESSAO_MS, lembrarSessao, pedirArmazenamentoDurável, sessaoLembrada } from '../lib/sessao';
 import { rodandoNativo } from '../lib/pwa';
 import { colherRedirecionamento } from '../lib/autenticacao';
 import { sondar } from '../lib/sondagem';
@@ -72,6 +73,8 @@ interface AppContextType {
   firebaseUser: FirebaseUser | null;
   setUser: React.Dispatch<React.SetStateAction<UserProfile | null>>;
   authLoading: boolean;
+  /** Havia login neste navegador e o F5 não o devolveu: a tela de entrada explica em vez de parecer um deslogamento sem motivo. */
+  sessaoPerdida: { email: string } | null;
   leads: LeadItem[];
   setLeads: React.Dispatch<React.SetStateAction<LeadItem[]>>;
   history: SearchHistoryItem[];
@@ -160,6 +163,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [sessaoPerdida, setSessaoPerdida] = useState<{ email: string } | null>(null);
 
   // Os leads ficam no navegador, mas separados por conta: quem entra com
   // outro login no mesmo aparelho nao pode ver (nem misturar) os do anterior.
@@ -197,11 +201,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // login em branco, como se nada tivesse acontecido. Na web nao roda.
     if (rodandoNativo()) void colherRedirecionamento();
 
+    let primeiraResposta = true;
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      const eraPrimeira = primeiraResposta;
+      primeiraResposta = false;
+      if (!currentUser && eraPrimeira) {
+        // F5: o Firebase respondeu "ninguém logado". Se este navegador tinha um login, a sessão pode estar chegando (ou o navegador não a devolveu):
+        // espera um instante antes de mostrar a tela de entrada, que nunca deve aparecer só porque a leitura demorou.
+        const lembrada = sessaoLembrada();
+        if (lembrada) {
+          await new Promise(ok => setTimeout(ok, ESPERA_DA_SESSAO_MS));
+          if (auth.currentUser) return;   // a sessão chegou: o Firebase avisa de novo e o app entra (authLoading segue ligado até lá)
+          console.warn('LeadSage: havia um login neste navegador, mas o Firebase não o devolveu ao recarregar.', { conta: lembrada.email });
+          setSessaoPerdida({ email: lembrada.email });
+        }
+      }
       setFirebaseUser(currentUser);
       if (currentUser) {
+        setSessaoPerdida(null);
+        lembrarSessao(currentUser.uid, currentUser.email);
+        void pedirArmazenamentoDurável();   // o navegador não apaga o login quando faltar espaço
         setLeads(lerLeadsDoDono(currentUser.uid));
         setDonoDosLeads(currentUser.uid);
+        // O app abre assim que o Firebase diz quem é (F5 não espera o servidor acordar); o perfil verdadeiro chega logo em seguida.
+        setUser(prev => (prev && prev.id === currentUser.uid ? prev : api.perfilProvisorio()));
+        setAuthLoading(false);
         // Obter dados do perfil e créditos da API backend
         try {
           const profile = await api.getProfile();
@@ -373,6 +397,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         user,
         firebaseUser,
+        sessaoPerdida,
+        authLoading,
         setUser,
         leads,
         setLeads,

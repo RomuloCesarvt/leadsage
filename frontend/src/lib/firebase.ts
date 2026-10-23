@@ -1,5 +1,7 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import {
+  getAuth, initializeAuth, browserLocalPersistence, indexedDBLocalPersistence, browserSessionPersistence, browserPopupRedirectResolver,
+} from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -12,5 +14,23 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+
+/**
+ * A sessão fica guardada no navegador. O padrão do Firebase tenta o IndexedDB primeiro, e o IndexedDB é justamente o que falha em silêncio em
+ * alguns navegadores (conexão perdida depois de hibernar, perfil corrompido, extensões): a pessoa recarrega com F5 e volta para o login.
+ * O localStorage é simples e não tem essa falha, então vai primeiro; quem já tinha sessão no IndexedDB continua logado (o Firebase procura
+ * a sessão em todos os lugares, na ordem, e a leva para o primeiro). Sem nenhum dos dois, cai para a sessão da aba.
+ */
+function criarAuth() {
+  try {
+    return initializeAuth(app, {
+      persistence: [browserLocalPersistence, indexedDBLocalPersistence, browserSessionPersistence],
+      popupRedirectResolver: browserPopupRedirectResolver,
+    });
+  } catch {
+    return getAuth(app);   // já inicializado, ou ambiente sem navegador (testes)
+  }
+}
+
+export const auth = criarAuth();
 export const db = getFirestore(app);

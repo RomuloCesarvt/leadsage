@@ -87,24 +87,31 @@ async function fetchWithToken(endpoint: string, options: RequestInit = {}) {
   return response.json();
 }
 
+/** Só o que é verdadeiro (quem entrou), sem nome de empresa, plano ou saldo inventados: um saldo falso já apareceu aqui para outra pessoa. */
+function perfilSemDados(): UserProfile {
+  return {
+    id: auth.currentUser?.uid || '',
+    name: auth.currentUser?.displayName || '',
+    email: auth.currentUser?.email || '',
+    company_name: '',
+    niche_focus: '',
+    credits: 0,
+    plan: '',
+    avatar: auth.currentUser?.photoURL || '',
+    semDados: true,
+  };
+}
+
 export const api = {
+  /** O perfil provisório de quem acabou de ser reconhecido pelo Firebase: o app abre na hora e o perfil verdadeiro chega em seguida. */
+  perfilProvisorio: perfilSemDados,
+
   async getProfile(): Promise<UserProfile> {
     try {
       return await fetchWithToken('/profile');
     } catch {
-      // Sem resposta do servidor: mostra só o que é verdadeiro (quem entrou). Nada de nome, plano ou saldo inventados:
-      // um saldo falso já apareceu aqui para outra pessoa.
-      return {
-        id: auth.currentUser?.uid || '',
-        name: auth.currentUser?.displayName || '',
-        email: auth.currentUser?.email || '',
-        company_name: '',
-        niche_focus: '',
-        credits: 0,
-        plan: '',
-        avatar: auth.currentUser?.photoURL || '',
-        semDados: true,
-      };
+      // Sem resposta do servidor: mostra só o que é verdadeiro (quem entrou).
+      return perfilSemDados();
     }
   },
 
