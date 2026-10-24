@@ -3,6 +3,7 @@ import { api } from '../services/api';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { nomesDosQueSairam, saiuPelaRegua } from '../lib/regua';
 import { ESPERA_DA_SESSAO_MS, lembrarSessao, pedirArmazenamentoDurável, sessaoLembrada } from '../lib/sessao';
 import { rodandoNativo } from '../lib/pwa';
 import { colherRedirecionamento } from '../lib/autenticacao';
@@ -42,7 +43,8 @@ const leadDeItem = (i: PipelineItem): LeadItem => {
 const mesclarPipeline = (atuais: LeadItem[], itens: PipelineItem[]): LeadItem[] => {
   const porId = new Map(itens.map(i => [i.id, i]));
   const vistos = new Set<string>();
-  const saida = atuais.map(l => {
+  // quem a régua de abordagens encerrou (sem resposta) sai de Meus Leads e do pipeline
+  const saida = atuais.filter(l => !saiuPelaRegua(l, porId.get(l.id))).map(l => {
     vistos.add(l.id);
     const i = porId.get(l.id);
     if (!i) return l;
@@ -54,7 +56,7 @@ const mesclarPipeline = (atuais: LeadItem[], itens: PipelineItem[]): LeadItem[] 
     };
   });
   for (const i of itens) {
-    if (vistos.has(i.id)) continue;
+    if (vistos.has(i.id) || i.encerrado) continue;
     // sobra de busca no servidor ("Novo Lead" que ninguém escolheu) não é lead e não é resultado desta busca:
     // trazer isso de volta misturava pesquisas antigas nos resultados de uma pesquisa nova
     if (!salvoPeloServidor(i.origem, i.etapa)) continue;
@@ -75,6 +77,9 @@ interface AppContextType {
   authLoading: boolean;
   /** Havia login neste navegador e o F5 não o devolveu: a tela de entrada explica em vez de parecer um deslogamento sem motivo. */
   sessaoPerdida: { email: string } | null;
+  /** Leads que saíram sozinhos porque a régua de abordagens terminou sem resposta (para avisar). */
+  saidasDaRegua: string[];
+  limparSaidasDaRegua: () => void;
   leads: LeadItem[];
   setLeads: React.Dispatch<React.SetStateAction<LeadItem[]>>;
   history: SearchHistoryItem[];
@@ -164,6 +169,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [sessaoPerdida, setSessaoPerdida] = useState<{ email: string } | null>(null);
+  const [saidasDaRegua, setSaidasDaRegua] = useState<string[]>([]);
 
   // Os leads ficam no navegador, mas separados por conta: quem entra com
   // outro login no mesmo aparelho nao pode ver (nem misturar) os do anterior.
@@ -317,6 +323,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         novos.forEach(l => sincronizados.current.add(l.id));
       }
       const { itens } = await api.pipelineListar();
+      const sairam = nomesDosQueSairam(leadsRef.current, itens);
+      if (sairam.length) setSaidasDaRegua(prev => Array.from(new Set([...prev, ...sairam])));
+      leadsRef.current = leadsRef.current.filter(l => !saiuPelaRegua(l, itens.find(i => i.id === l.id)));
       setLeads(prev => mesclarPipeline(prev, itens));
     } catch {
       // plano sem pipeline ou servidor fora: o quadro local continua valendo
@@ -398,6 +407,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         user,
         firebaseUser,
         sessaoPerdida,
+        saidasDaRegua,
+        limparSaidasDaRegua: () => setSaidasDaRegua([]),
         authLoading,
         setUser,
         leads,

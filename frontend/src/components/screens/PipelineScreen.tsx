@@ -2,7 +2,8 @@ import { ehSalvo } from '../../lib/leadsSalvos';
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import type { LeadItem } from '../../types';
-import { GripVertical, Phone, MessageCircle, Bot, RefreshCw, UserRound, Check, ChevronDown } from 'lucide-react';
+import { GripVertical, Phone, MessageCircle, Bot, RefreshCw, UserRound, Check, ChevronDown, Trash2 } from 'lucide-react';
+import { AvisoReguaConcluida } from '../AvisoReguaConcluida';
 import { acoesDoCard, agenteDe, AGENTES_PADRAO, etiquetasDoCard, haQuanto, type Tom } from '../../lib/cardPipeline';
 import { rolarNasBordas, useArrastarParaRolar } from '../../lib/arrastarParaRolar';
 
@@ -42,7 +43,12 @@ const getScoreLabel = (score: number | undefined) => {
 };
 
 export const PipelineScreen: React.FC = () => {
-  const { leads, updateLeadStage, setSelectedProfileLead, atualizarPipeline, definirAgente } = useApp() as any;
+  const { leads, updateLeadStage, setSelectedProfileLead, atualizarPipeline, definirAgente, removerLeads } = useApp() as any;
+  // Excluir o lead: ele sai de Meus Leads e do pipeline, e o servidor cancela o que ainda ia sair para ele (fila e seguimentos)
+  const excluirLead = async (lead: LeadItem) => {
+    if (!window.confirm(`Excluir ${lead.company || lead.name}? O lead sai de Meus Leads e do pipeline, e nada mais será enviado para ele (mensagens na fila e seguimentos agendados são cancelados).`)) return;
+    await removerLeads([lead.id]);
+  };
   const [atualizando, setAtualizando] = React.useState(false);
   // cartão com o seletor de agente aberto
   const [agenteAberto, setAgenteAberto] = React.useState<string | null>(null);
@@ -91,6 +97,8 @@ export const PipelineScreen: React.FC = () => {
           <RefreshCw className={`w-4 h-4 ${atualizando ? 'animate-spin' : ''}`} /> Atualizar
         </button>
       </div>
+
+      <AvisoReguaConcluida />
 
       <div className="flex gap-4 items-start min-w-max pb-8 h-[calc(100vh-200px)]">
         {COLUMNS.map(column => {
@@ -209,6 +217,13 @@ export const PipelineScreen: React.FC = () => {
                             {a.id === 'whatsapp' ? <MessageCircle className="w-3.5 h-3.5" /> : <Phone className="w-3.5 h-3.5" />}
                           </a>
                         ))}
+                        <button
+                          type="button" data-testid="excluir-lead" title="Excluir este lead: ele sai e nada mais é enviado para ele"
+                          onClick={e => { e.stopPropagation(); void excluirLead(lead); }}
+                          className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   );

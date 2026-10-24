@@ -1122,8 +1122,15 @@ async def pipeline_sincronizar(req: PipelineSyncRequest, user: dict = Depends(ge
 async def pipeline_remover(lead_id: str, user: dict = Depends(get_current_user)):
     """Tira um lead de Meus Leads (e do pipeline). So apaga o da propria conta."""
     await exigir_recurso(user, "pipeline", "O pipeline")
-    await pipeline_store.apagar(user.get("uid"), lead_id)
-    return {"status": "removed", "id": lead_id}
+    uid = user.get("uid")
+    # excluir o lead cancela o que ainda ia sair para ele (fila, rascunhos, seguimentos agendados): "aquele lead saiu" de verdade
+    try:
+        cancelados = await fila_envio.cancelar_do_lead(uid, lead_id)
+    except Exception as exc:
+        print(f"Pipeline: não cancelou as mensagens do lead excluído: {exc}")
+        cancelados = 0
+    await pipeline_store.apagar(uid, lead_id)
+    return {"status": "removed", "id": lead_id, "mensagens_canceladas": cancelados}
 
 
 @app.put("/api/pipeline/{lead_id}/etapa")

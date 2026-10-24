@@ -407,6 +407,9 @@ async def _processar(
     conversa["atualizado"] = robo_store.agora()
 
     item = await _achar_ou_criar_no_pipeline(uid, conversa, msg)
+    if item and item.get("encerrado"):
+        # o lead tinha saído (régua concluída sem resposta) e agora respondeu: volta para Meus Leads e para o pipeline
+        item = await pipeline_store.reabrir(uid, item["id"]) or item
     lead = _lead_do_item(item) if item else await _lead_do_contato(uid, msg.canal, msg.contato)
     if lead:
         conversa["lead_id"] = lead["id"]

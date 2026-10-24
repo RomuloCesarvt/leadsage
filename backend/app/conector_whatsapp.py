@@ -393,6 +393,9 @@ async def _promover_seguimentos_vencidos(uid: str) -> None:
     _ULTIMA_PROMOCAO[uid] = agora_m
     try:
         await fila_envio.promover_seguimentos(uid)
+        saidos = await fila_envio.encerrar_reguas_concluidas(uid)   # régua inteira sem resposta: o lead sai das listas
+        if saidos:
+            print(f"Conector: {len(saidos)} lead(s) saíram de Meus Leads (régua de abordagens concluída sem resposta)")
     except Exception as exc:  # reforco: nunca derruba a entrega de tarefas
         print(f"Conector: falha ao promover seguimentos: {exc}")
 

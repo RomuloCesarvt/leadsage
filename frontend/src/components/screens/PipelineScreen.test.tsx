@@ -41,5 +41,10 @@ ok('agente padrão é o robô', b.includes('Robô padrão'));
 ok('sem telefone, sem ações rápidas', !b.includes('wa.me') && !b.includes('tel:'));
 ok('sem abertura, sem etiqueta de prévia', !b.includes('Prévia aberta'));
 
+console.log('\n--- excluir o lead ---');
+ok('todo cartão tem o botão de excluir (com ou sem telefone)', a.includes('data-testid="excluir-lead"') && b.includes('data-testid="excluir-lead"'));
+ok('o botão explica o que acontece', b.includes('Excluir este lead: ele sai e nada mais é enviado para ele'));
+ok('o aviso da régua concluída não aparece sem leads que saíram', !html.includes('data-testid="aviso-regua"'));
+
 if (falhas) { console.log(`\n=========== ${falhas} FALHARAM ===========`); process.exit(1); }
 console.log('\n=========== TUDO PASSOU ===========');

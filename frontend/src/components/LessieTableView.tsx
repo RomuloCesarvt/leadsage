@@ -99,7 +99,7 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
   const remover = async (ids: string[]) => {
     if (!ids.length) return;
     const quais = ids.length > 1 ? `${ids.length} leads` : 'este lead';
-    if (!window.confirm(modo === 'meus' ? `Tirar ${quais} de Meus Leads?` : `Descartar ${quais} dos resultados?`)) return;
+    if (!window.confirm(modo === 'meus' ? `Excluir ${quais} de Meus Leads? Sai também do pipeline e nada mais é enviado (mensagens na fila e seguimentos são cancelados).` : `Descartar ${quais} dos resultados?`)) return;
     await removerLeads(ids);
     setMarcados(new Set());
   };
@@ -297,7 +297,7 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
                       <button
                         onClick={() => remover([lead.id])}
                         className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                        title={modo === 'meus' ? 'Tirar de Meus Leads' : 'Descartar'}
+                        title={modo === 'meus' ? 'Excluir este lead (sai de Meus Leads e do pipeline)' : 'Descartar'}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -334,7 +334,7 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
           <button
             onClick={() => remover([...marcados])}
             className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-semibold flex items-center gap-2"
-          ><Trash2 className="w-4 h-4" /> {modo === 'meus' ? 'Tirar da lista' : 'Descartar'}</button>
+          ><Trash2 className="w-4 h-4" /> {modo === 'meus' ? 'Excluir leads' : 'Descartar'}</button>
           <button onClick={() => setMarcados(new Set())} className="ml-auto text-sm text-slate-300 hover:text-white">Limpar seleção</button>
         </div>
       )}

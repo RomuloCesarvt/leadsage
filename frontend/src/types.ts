@@ -544,6 +544,8 @@ export interface PipelineItem {
   atualizado?: string;
   agente?: string;
   previa_abertura?: { visitas: number; ultima: string };
+  /** a régua de abordagens terminou sem resposta: o lead saiu de Meus Leads e do pipeline (o registro fica no servidor) */
+  encerrado?: { em: string; motivo: string };
 }
 
 export interface AgenteDoServidor { id: string; rotulo: string; descricao: string }

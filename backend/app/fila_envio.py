@@ -321,6 +321,66 @@ async def promover_seguimentos(uid: str, agora: Optional[datetime] = None) -> in
     return promovidos
 
 
+CARENCIA_DA_REGUA_S = 3 * 24 * 3600   # depois do último seguimento enviado, espera 3 dias por uma resposta tardia antes de o lead sair
+
+
+async def cancelar_do_lead(uid: str, lead_id: str, motivo: str = "lead excluído") -> int:
+    """O lead foi excluído: nada mais sai para ele (mensagens na fila, rascunhos e seguimentos ainda agendados). Devolve quantos itens mudaram."""
+    n = 0
+    for item in await listar(uid):
+        if item.get("lead_id") != lead_id:
+            continue
+        mudou = False
+        if item.get("status") in ("rascunho", "pendente", "aguardando_limite", "falhou"):
+            item["status"], item["motivo"], mudou = "pulado", motivo, True
+        for a in item.get("agenda_seguimentos") or []:
+            if a.get("estado") == "agendado":
+                a["estado"], mudou = "cancelado", True
+        if mudou:
+            await _gravar(uid, item)
+            n += 1
+    return n
+
+
+def _quando(valor: Any) -> Optional[datetime]:
+    try:
+        d = datetime.fromisoformat(str(valor))
+    except (TypeError, ValueError):
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
+async def encerrar_reguas_concluidas(uid: str, agora: Optional[datetime] = None) -> List[str]:
+    """Depois da abordagem e dos dois seguimentos, sem nenhuma resposta, o lead não precisa mais ficar: ele sai de Meus Leads e do pipeline.
+
+    Só sai quem (1) teve TODOS os seguimentos enviados, o último há mais de 3 dias, (2) nunca escreveu de volta e (3) ainda está em "Novo Lead"
+    ou "Contato Enviado" (quem a pessoa moveu para frente fica). Devolve os ids que saíram."""
+    agora = agora or datetime.now(timezone.utc)
+    itens = await listar(uid)
+    por_id = {i.get("id"): i for i in itens}
+    saidos: List[str] = []
+    for item in itens:
+        agenda = item.get("agenda_seguimentos") or []
+        if not agenda or item.get("canal") != "whatsapp" or item.get("tipo") == "seguimento" or not item.get("lead_id"):
+            continue
+        if any(a.get("estado") != "na_fila" for a in agenda):
+            continue   # ainda há seguimento agendado, ou algum foi cancelado (a pessoa respondeu)
+        ultimo = por_id.get(f"{item['id']}_s{max(int(a.get('n') or 0) for a in agenda)}")
+        enviado = _quando((ultimo or {}).get("enviado_em"))
+        if not ultimo or ultimo.get("status") != "enviado" or not enviado or (agora - enviado).total_seconds() < CARENCIA_DA_REGUA_S:
+            continue
+        telefone = re.sub(r"\D", "", (item.get("contato") or {}).get("phone", ""))
+        conversa = await robo_store.obter_conversa(uid, robo_store.id_da_conversa("whatsapp", telefone)) if telefone else None
+        if conversa and any(m.get("de") == "contato" for m in conversa.get("mensagens") or []):
+            continue   # respondeu: o robô atende, o lead fica
+        pi = await pipeline_store.obter(uid, item["lead_id"])
+        if not pi or pi.get("encerrado") or pi.get("etapa") not in ("Novo Lead", "Contato Enviado"):
+            continue
+        await pipeline_store.encerrar(uid, item["lead_id"], "régua de abordagens concluída sem resposta")
+        saidos.append(item["lead_id"])
+    return saidos
+
+
 LIMIAR_DE_SEMELHANCA = 0.35   # trechos de 3 palavras em comum: acima disso a mensagem parece copia da outra
 
 

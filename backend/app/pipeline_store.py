@@ -241,6 +241,27 @@ async def definir_agente(uid: str, lead_id: str, agente: str) -> Optional[Dict[s
     return item
 
 
+async def encerrar(uid: str, lead_id: str, motivo: str) -> Optional[Dict[str, Any]]:
+    """O lead SAI de Meus Leads e do pipeline (a tela esconde o que está encerrado), mas o registro fica: é ele que evita contatar de novo
+    quem já recebeu a régua inteira. Se a pessoa voltar a falar, `reabrir` o traz de volta."""
+    item = await _ler(uid, lead_id)
+    if item is None or item.get("encerrado"):
+        return item
+    item["encerrado"] = {"em": agora(), "motivo": motivo[:200]}
+    await _gravar(uid, item)
+    return item
+
+
+async def reabrir(uid: str, lead_id: str) -> Optional[Dict[str, Any]]:
+    """Desfaz o encerramento (o lead respondeu depois de a régua acabar)."""
+    item = await _ler(uid, lead_id)
+    if item is None or not item.get("encerrado"):
+        return item
+    item.pop("encerrado", None)
+    await _gravar(uid, item)
+    return item
+
+
 async def achar_por_telefone(uid: str, telefone: str) -> Optional[Dict[str, Any]]:
     if len(so_digitos(telefone)) < 10:
         return None
