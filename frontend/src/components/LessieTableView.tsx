@@ -14,6 +14,7 @@ import { useApp } from '../context/AppContext';
 import { DigitalPresence } from './DigitalPresence';
 import { WhatsAppIcon, InstagramIcon } from './BrandIcons';
 import { ehSalvo, nichosDe } from '../lib/leadsSalvos';
+import { FILTROS, alternarFiltro, aplicarFiltros, contarFiltro, type ChaveFiltro } from '../lib/filtrosDeLeads';
 
 /**
  * A mesma tabela serve às duas listas:
@@ -32,10 +33,8 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
     setLeadsParaContato, setViewState,
   } = useApp() as any;
 
-  const [filterSemSite, setFilterSemSite] = useState(false);
-  const [filterSemIG, setFilterSemIG] = useState(false);
-  const [filterWhatsApp, setFilterWhatsApp] = useState(false);
-  const [activeTag, setActiveTag] = useState<string | null>(null);
+  // botões que se combinam (Com site + Sem WhatsApp mostra só quem é os dois): servem para descartar rápido
+  const [filtros, setFiltros] = useState<Set<ChaveFiltro>>(new Set());
   const [empresa, setEmpresa] = useState('');
   const [nicho, setNicho] = useState('');
   const [cidade, setCidade] = useState('');
@@ -53,21 +52,15 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
     [base],
   );
 
-  let filteredLeads = base;
+  let universo = base;
   if (empresa.trim()) {
     const q = normaliza(empresa);
-    filteredLeads = filteredLeads.filter(l => normaliza(`${l.company} ${l.name}`).includes(q));
+    universo = universo.filter(l => normaliza(`${l.company} ${l.name}`).includes(q));
   }
-  if (nicho) filteredLeads = filteredLeads.filter(l => (l.niche || '').trim() === nicho);
-  if (cidade) filteredLeads = filteredLeads.filter(l => (l.city || l.location?.split(',')[0] || '').trim() === cidade);
-  if (filterSemSite) filteredLeads = filteredLeads.filter(l => l.missingDigitalAssets && l.missingDigitalAssets.includes('website'));
-  if (filterSemIG) filteredLeads = filteredLeads.filter(l => !l.socials?.instagram);
-  if (filterWhatsApp) filteredLeads = filteredLeads.filter(l => l.whatsapp);
-  if (activeTag === 'favoritos') filteredLeads = filteredLeads.filter(l => l.favorito);
-  else if (activeTag === 'sem-site') filteredLeads = filteredLeads.filter(l => l.missingDigitalAssets && l.missingDigitalAssets.includes('website'));
-  else if (activeTag === 'com-whatsapp') filteredLeads = filteredLeads.filter(l => l.whatsapp);
-  else if (activeTag === 'sem-instagram') filteredLeads = filteredLeads.filter(l => !l.socials?.instagram);
-  else if (activeTag === 'alta-oportunidade') filteredLeads = filteredLeads.filter(l => (l.opportunityScore || 0) >= 70);
+  if (nicho) universo = universo.filter(l => (l.niche || '').trim() === nicho);
+  if (cidade) universo = universo.filter(l => (l.city || l.location?.split(',')[0] || '').trim() === cidade);
+  const filteredLeads = aplicarFiltros(universo, filtros);
+  const botoes = FILTROS.filter(f => modo === 'meus' || !f.soEmMeusLeads);
 
   // quem sai da lista (adicionado, removido, filtrado) sai também da seleção
   useEffect(() => {
@@ -77,7 +70,7 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
       return mantidos.length === prev.size ? prev : new Set(mantidos);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leads, empresa, nicho, cidade, filterSemSite, filterSemIG, filterWhatsApp, activeTag, modo]);
+  }, [leads, empresa, nicho, cidade, filtros, modo]);
 
   useEffect(() => { setMarcados(new Set()); setAviso(''); }, [modo]);
 
@@ -167,48 +160,36 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
             <option value="">Todas as cidades</option>
             {cidades.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-          {(empresa || nicho || cidade || filterSemSite || filterSemIG || filterWhatsApp || activeTag) && (
+          {(empresa || nicho || cidade || filtros.size > 0) && (
             <button
-              onClick={() => { setEmpresa(''); setNicho(''); setCidade(''); setFilterSemSite(false); setFilterSemIG(false); setFilterWhatsApp(false); setActiveTag(null); }}
+              onClick={() => { setEmpresa(''); setNicho(''); setCidade(''); setFiltros(new Set()); }}
               className="text-xs font-bold text-blue-700 hover:underline flex items-center gap-1"
             ><X className="w-3 h-3" /> Limpar filtros</button>
           )}
           <span className="text-xs text-slate-500 ml-auto">{filteredLeads.length} de {base.length}</span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 cursor-pointer">
-            <input type="checkbox" checked={filterSemSite} onChange={() => setFilterSemSite(!filterSemSite)} className="rounded border-slate-300" />
-            Sem Site
-          </label>
-          <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 cursor-pointer">
-            <input type="checkbox" checked={filterSemIG} onChange={() => setFilterSemIG(!filterSemIG)} className="rounded border-slate-300" />
-            Sem Instagram
-          </label>
-          <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 cursor-pointer">
-            <input type="checkbox" checked={filterWhatsApp} onChange={() => setFilterWhatsApp(!filterWhatsApp)} className="rounded border-slate-300" />
-            Com WhatsApp
-          </label>
-          <div className="hidden lg:block flex-1"></div>
-          {[
-            ...(modo === 'meus' ? [{ key: 'favoritos', icon: <Star className="w-3 h-3" />, label: 'Favoritos' }] : []),
-            { key: 'sem-site', icon: <Globe className="w-3 h-3" />, label: 'Sem Site' },
-            { key: 'com-whatsapp', icon: <WhatsAppIcon className="w-3 h-3" />, label: 'Com WhatsApp' },
-            { key: 'sem-instagram', icon: <InstagramIcon className="w-3 h-3" />, label: 'Sem Instagram' },
-            { key: 'alta-oportunidade', icon: <Star className="w-3 h-3" />, label: 'Alta Oportunidade' },
-          ].map(tag => (
-            <button
-              key={tag.key}
-              onClick={() => setActiveTag(activeTag === tag.key ? null : tag.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 border whitespace-nowrap ${
-                activeTag === tag.key
-                  ? 'bg-blue-50 border-blue-200 text-blue-700'
-                  : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-              }`}
-            >
-              {tag.icon} {tag.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2" data-testid="filtros-de-leads">
+          {botoes.map(f => {
+            const ligado = filtros.has(f.key);
+            const n = contarFiltro(universo, f.key);
+            return (
+              <button
+                key={f.key} type="button" aria-pressed={ligado} data-filtro={f.key}
+                onClick={() => setFiltros(prev => alternarFiltro(prev, f.key))}
+                title={ligado ? 'Clique para tirar este filtro' : `Mostrar só: ${f.rotulo.toLowerCase()}. Os filtros se combinam.`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 border whitespace-nowrap ${
+                  ligado ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                {f.key === 'com-whatsapp' || f.key === 'sem-whatsapp' ? <WhatsAppIcon className="w-3 h-3" />
+                  : f.key === 'sem-instagram' ? <InstagramIcon className="w-3 h-3" />
+                  : f.key === 'sem-site' || f.key === 'com-site' ? <Globe className="w-3 h-3" /> : <Star className="w-3 h-3" />}
+                {f.rotulo}
+                <span className={`px-1.5 rounded-md text-[10px] ${ligado ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>{n}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
