@@ -224,7 +224,9 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
   const celular = noCelular();
   // na nuvem, o número fica conectado mesmo que a tela perca o contato por um momento: vale o que o serviço guardou
   const conectado = nuvem ? remoto?.fase === 'pronto' : cfg.conector_online && (!remoto?.fase || remoto.fase === 'pronto');
-  const nuvemSemResposta = nuvem && conectado && !cfg.conector_online;
+  // o Render suspendeu o serviço (cota mensal do plano grátis): nada é enviado nem respondido, e o número NÃO está conectado
+  const nuvemSuspensa = nuvem && Boolean((cfg as any).nuvem_suspensa);
+  const nuvemSemResposta = nuvem && conectado && !cfg.conector_online && !nuvemSuspensa;
   // o QR/código que aparece aqui vem do computador (local) ou, no celular, do servidor
   const qr = local?.fase === 'qr' && local.qr ? local.qr : remoto?.fase === 'qr' && remoto.qr ? remoto.qr : '';
   const codigo = remoto?.fase === 'codigo' ? remoto.codigo || '' : '';
@@ -354,6 +356,14 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
 
       {ativo && (
         <div className="space-y-3">
+          {nuvemSuspensa && (
+            <div role="alert" data-testid="nuvem-suspensa" className="text-xs text-red-900 bg-red-50 border border-red-200 rounded-lg p-3 space-y-1.5 leading-relaxed">
+              <p><b>O serviço do WhatsApp na nuvem está suspenso.</b> O Render parou o serviço porque a cota mensal de horas do plano grátis acabou. Enquanto ele estiver parado,
+                <b> nenhuma mensagem é enviada e o robô não responde</b>: quem escrever fica esperando.</p>
+              <p>Volta sozinho quando a cota renova (no início do mês) ou na hora, se o plano do serviço for trocado por um pago no Render. Depois que voltar, a conexão do número é retomada;
+                se pedir, é só escanear o QR de novo. Mensagens que chegaram nesse período podem não ser recebidas.</p>
+            </div>
+          )}
           {nuvemSemResposta && (
             <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
               O serviço da nuvem está sem responder à tela há alguns minutos. O número continua conectado e volta a atualizar sozinho. Nada precisa ser feito.

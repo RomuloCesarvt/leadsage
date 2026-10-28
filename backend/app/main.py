@@ -31,7 +31,7 @@ from app.models import (
     DocumentCreateRequest, DocumentUpdateRequest, DocumentItem,
     SiteCopyRequest, SiteCopyResponse, DocumentAIRequest, DocumentAIResponse,
 )
-from app import identidade, transcricao
+from app import identidade, nuvem_saude, transcricao
 from app.leads_engine import LeadsEngine
 from app.ai_client import AIIndisponivel
 from app.ai_generator import AIGenerator
@@ -1003,7 +1003,11 @@ class RoboTesteRequest(BaseModel):
 async def robo_config(user: dict = Depends(get_current_user)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     canal = await robo_store.canal_do_usuario(user.get("uid"))
-    return robo_store.visao_publica(canal, settings.APP_URL)
+    visao = robo_store.visao_publica(canal, settings.APP_URL)
+    # WhatsApp na nuvem sem sinal: confere se o Render suspendeu o serviço (cota mensal do plano grátis), para a tela dizer a verdade
+    if visao.get("nuvem") and not visao.get("conector_online"):
+        visao["nuvem_suspensa"] = await nuvem_saude.suspenso()
+    return visao
 
 
 @app.put("/api/robo/config")
