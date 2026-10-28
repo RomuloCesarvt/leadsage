@@ -17,7 +17,7 @@ import {
   clienteLeadsage, criarAgrupador, criarHistorico, enviarPendentes, entregarMensagem, tentarDeNovo, tratarChat,
 } from '../conector/leadsage-conector.mjs';
 import { iniciarBaileys } from './adaptador-baileys.mjs';
-import { authRemoto, guardaRemota } from './auth-remoto.mjs';
+import { authRemoto, guardaRemota, ESPERA_HISTORICO_MS } from './auth-remoto.mjs';
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const agora = () => new Date().toISOString().slice(11, 19);
@@ -160,13 +160,18 @@ export class Sessao {
     const v = this.historico?.versao?.() ?? 0;
     const t = Date.now();
     if (v === this.versaoEspelhada && t - (this.ultimoEspelhoSozinho || 0) < 10 * 60 * 1000) return;
-    if (t - (this.ultimoEspelhoSozinho || 0) < 60000) return;
+    if (t - (this.ultimoEspelhoSozinho || 0) < 180000) return; // a hospedagem grátis limita o tráfego de saída: no máximo a cada 3 min
     this.ultimoEspelhoSozinho = t;
     this.versaoEspelhada = v;
     const chats = await this.wa.chats(80);
     await this.ls.espelho({ chats });
+    // só as conversas que mudaram desde o último envio (antes: as 12 mais recentes, sempre)
+    this.assinaturasEspelhadas = this.assinaturasEspelhadas || new Map();
     for (const c of chats.slice(0, 12)) {
       if (!c.id) continue;
+      const assinatura = `${c.quando}|${c.naoLidas}|${c.ultima?.texto?.length ?? 0}`;
+      if (this.assinaturasEspelhadas.get(c.id) === assinatura) continue;
+      this.assinaturasEspelhadas.set(c.id, assinatura);
       await this.ls.espelho({ chat_id: c.id, mensagens: await this.wa.mensagens(c.id, 40) });
     }
   }
@@ -190,7 +195,7 @@ export class Sessao {
     mkdirSync(this.dir, { recursive: true });
     // sem disco (hospedagem gratuita), as conversas ficam no banco do LeadSage, cifradas: sobrevivem a reinícios
     this.historico = this.authFabrica && this.segredo
-      ? criarHistorico('', { maxMensagens: 25, maxChats: 120, ...guardaRemota({ site: this.site, segredo: this.segredo, uid: this.uid, aviso: this.aviso }) })
+      ? criarHistorico('', { maxMensagens: 25, maxChats: 120, esperaMs: ESPERA_HISTORICO_MS, ...guardaRemota({ site: this.site, segredo: this.segredo, uid: this.uid, aviso: this.aviso }) })
       : criarHistorico(join(this.dir, 'historico.json'));
     await this.historico.carregar();
     this.inicioS = Math.floor(Date.now() / 1000);
@@ -257,6 +262,7 @@ export class Sessao {
   async parar({ sair = false } = {}) {
     this.parou = true;
     if (sair) await this.wa?.sair(); else await this.wa?.parar();
+    if (!sair) await this.historico?.descarregar?.(); // as gravações são agrupadas: guarda o que estiver pendente antes de soltar o número
   }
 }
 

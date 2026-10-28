@@ -268,22 +268,29 @@ export function criarDigitando(sinalizar, { leituraMs = 1200, renovarMs = 8000, 
  * tempos em tempos), a lista de conversas e as mensagens saem daqui, em vez de a tela ficar
  * vazia. Só tem o que aconteceu depois que o Conector foi ligado.
  */
-export function criarHistorico(arquivo, { maxMensagens = 300, maxChats = 300, ler = null, gravar = null } = {}) {
+export function criarHistorico(arquivo, { maxMensagens = 300, maxChats = 300, ler = null, gravar = null, esperaMs = 0 } = {}) {
   let chats = {};
   let pendente = null;
   let versao = 0;   // sobe a cada mudança: quem espelha a lista para o servidor só manda quando ela mudou
 
+  const gravarAgora = async () => {
+    // `gravar`: guarda fora do disco (servidor sem arquivos); sem ele, o arquivo de sempre
+    try { if (gravar) await gravar(JSON.stringify({ chats })); else await writeFile(arquivo, JSON.stringify({ chats }), 'utf8'); } catch { /* disco cheio ou sem permissão: segue em memória */ }
+  };
   const salvar = () => {
     if ((!arquivo && !gravar) || pendente) return;
-    pendente = setTimeout(async () => {
-      pendente = null;
-      // `gravar`: guarda fora do disco (servidor sem arquivos); sem ele, o arquivo de sempre
-      try { if (gravar) await gravar(JSON.stringify({ chats })); else await writeFile(arquivo, JSON.stringify({ chats }), 'utf8'); } catch { /* disco cheio ou sem permissão: segue em memória */ }
-    }, gravar ? 6000 : 2000);
+    // `esperaMs`: quem paga por tráfego (hospedagem grátis) agrupa mais mudanças por gravação
+    pendente = setTimeout(() => { pendente = null; gravarAgora(); }, esperaMs || (gravar ? 6000 : 2000));
     pendente.unref?.();
   };
 
   return {
+    /** Grava agora o que estiver pendente (antes de o serviço parar). */
+    async descarregar() {
+      if (!pendente) return;
+      clearTimeout(pendente); pendente = null;
+      await gravarAgora();
+    },
     async carregar() {
       if (!arquivo && !ler) return;
       try { chats = JSON.parse(ler ? await ler() : await readFile(arquivo, 'utf8')).chats || {}; } catch { chats = {}; }

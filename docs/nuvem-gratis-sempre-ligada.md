@@ -6,6 +6,12 @@ O Render suspendeu o `leadsage-nuvem` por **"Monthly Quota Exceeded"**: o plano 
 3 serviços grátis ligados (`leadsage-nuvem`, `sentinela-backend`, `engenhariadedados-engine`). Um serviço 24 h já gasta ~744 h num mês de 31 dias, então
 três estouram a cota no meio do mês. Enquanto está suspenso, **o WhatsApp da nuvem não envia e o robô não responde**.
 
+**Atualização (28/10):** o painel do Render mostra que o bloqueio da conta foi por **banda**: *"You've used the 5 GB of free bandwidth in your Hobby workspace"*.
+O plano grátis dá só 5 GB de tráfego por mês por conta. O worker regravava a sessão inteira do WhatsApp (a cada 4 s) e o histórico (a cada 6 s) no banco,
+e espelhava 12 conversas por minuto. Agora: sessão agrupada a cada 45 s, histórico a cada 60 s, tudo **compactado** antes de cifrar, **nada é regravado se não mudou**,
+espelho ocioso a cada 3 min só das conversas que mudaram, e o que estiver pendente é gravado ao desligar. Blobs antigos (sem compactar) continuam legíveis.
+Segunda conta do Render (`leadsage-nuvem-b`, mesmo `WORKER_SECRET`): como o repositório é público, o Render **não** faz deploy automático; depois de um `git push`, use **Manual Deploy → Deploy latest commit**.
+
 Regra: **nunca deixar o WhatsApp dependendo de um único lugar grátis.** O LeadSage já sabe se revezar: cada serviço pega uma "concessão" do número
 (renovada a cada 30 s); se um some, outro assume em até 2 minutos, **sem pedir QR de novo**, porque a sessão fica no banco (cifrada).
 

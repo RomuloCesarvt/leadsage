@@ -239,7 +239,56 @@ test('sessão guardada: depois de apagar, nada ressuscita a sessão', async () =
   assert.equal(b.deletes, 1); assert.equal(b.puts, 0); assert.equal(b.blob, '');
 });
 
+test('tráfego: compactado encolhe, e blob antigo (sem compactar) continua legível', () => {
+  const seg = 'segredo-1234567890123456';
+  const texto = JSON.stringify({ chats: Array.from({ length: 200 }, (_, i) => ({ id: `55119${i}@c.us`, nome: 'Contato de teste', mensagens: ['boa tarde, tudo bem?', 'quero saber o preço'] })) });
+  const puro = cifrar(texto, seg);
+  const zip = cifrar(texto, seg, true);
+  assert.equal(decifrar(zip, seg), texto);
+  assert.equal(decifrar(puro, seg), texto);                 // formato antigo
+  assert.ok(zip.length < puro.length / 3, `compactado ${zip.length} vs ${puro.length}`);
+});
+
+test('tráfego: a sessão só vai ao banco quando mudou de verdade, e vem compactada', async () => {
+  const b = bancoFalso('');
+  const seg = 'segredo-1234567890123456';
+  const a = await authRemoto({ site: 'https://x.test', segredo: seg, uid: 'u1', esperaMs: 10, buscar: b.buscar });
+  a.state.creds.account = { details: 'x' };
+  await a.saveCreds();
+  await new Promise((r) => setTimeout(r, 60));
+  assert.equal(b.puts, 1);
+  await a.saveCreds();                                      // o Baileys avisa sem ter mudado nada
+  await new Promise((r) => setTimeout(r, 60));
+  assert.equal(b.puts, 1);
+  await a.state.keys.set({ 'pre-key': { 9: { public: Buffer.from('a'), private: Buffer.from('b') } } });
+  await new Promise((r) => setTimeout(r, 60));
+  assert.equal(b.puts, 2);
+  const lida = await authRemoto({ site: 'https://x.test', segredo: seg, uid: 'u1', buscar: b.buscar });
+  assert.ok((await lida.state.keys.get('pre-key', ['9']))['9']);
+});
+
+test('tráfego: várias mudanças seguidas viram uma gravação só; descarregar grava o pendente', async () => {
+  const b = bancoFalso('');
+  const a = await authRemoto({ site: 'https://x.test', segredo: 'segredo-1234567890123456', uid: 'u1', esperaMs: 200, buscar: b.buscar });
+  a.state.creds.account = { details: 'x' };
+  for (let i = 0; i < 20; i++) await a.state.keys.set({ 'pre-key': { [i]: { public: Buffer.from('a'), private: Buffer.from('b') } } });
+  assert.equal(b.puts, 0);
+  await a.descarregar();                                    // o serviço vai parar
+  assert.equal(b.puts, 1);
+});
+
 // ------------------------------------------------------------------ o historico das conversas sobrevive a reinicios
+
+test('historico: descarregar grava o que estava agendado, sem esperar', async () => {
+  const gravados = [];
+  const h = criarHistorico('', { esperaMs: 60000, ler: async () => '{"chats":{}}', gravar: async (t) => { gravados.push(t); } });
+  await h.carregar();
+  h.registrar({ chatId: '5511999990000@c.us', nome: 'Gabriel', mensagem: { id: 'a1', texto: 'oi', minha: false, quando: 100, tipo: 'text', midia: false, status: 0 } });
+  assert.equal(gravados.length, 0);
+  await h.descarregar();
+  assert.equal(gravados.length, 1);
+  assert.ok(gravados[0].includes('Gabriel'));
+});
 
 import { criarHistorico } from '../conector/leadsage-conector.mjs';
 import { guardaRemota } from './auth-remoto.mjs';
