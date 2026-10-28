@@ -358,9 +358,9 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
         <div className="space-y-3">
           {nuvemSuspensa && (
             <div role="alert" data-testid="nuvem-suspensa" className="text-xs text-red-900 bg-red-50 border border-red-200 rounded-lg p-3 space-y-1.5 leading-relaxed">
-              <p><b>O serviço do WhatsApp na nuvem está suspenso.</b> O Render parou o serviço porque a cota mensal de horas do plano grátis acabou. Enquanto ele estiver parado,
+              <p><b>O serviço do WhatsApp na nuvem está suspenso.</b> O Render parou o serviço porque uma cota mensal do plano grátis (horas ligado ou tráfego de dados) acabou. Enquanto ele estiver parado,
                 <b> nenhuma mensagem é enviada e o robô não responde</b>: quem escrever fica esperando.</p>
-              <p>Volta sozinho quando a cota renova (no início do mês) ou na hora, se o plano do serviço for trocado por um pago no Render. Depois que voltar, a conexão do número é retomada;
+              <p>Volta sozinho quando a cota renova (no início do mês) ou na hora, se outro serviço assumir o número ou o plano for trocado por um pago no Render. Depois que voltar, a conexão do número é retomada;
                 se pedir, é só escanear o QR de novo. Mensagens que chegaram nesse período podem não ser recebidas.</p>
             </div>
           )}
