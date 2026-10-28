@@ -266,12 +266,18 @@ export class Sessao {
  * Concessão do WhatsApp de cada usuário: com vários serviços da nuvem rodando (hospedagens gratuitas diferentes), só um atende
  * cada número por vez. `tomar` devolve true (é nosso), false (é de outro) ou null (não deu para perguntar: não mexe em nada).
  */
-export function criarConcessao({ site, segredo, quem }) {
+/** O endereço público deste serviço (cada hospedagem informa o seu): a tela fala direto com quem atende o número. */
+export function enderecoPublico(env = process.env) {
+  const e = String(env.PUBLIC_URL || env.RENDER_EXTERNAL_URL || (env.SPACE_HOST ? `https://${env.SPACE_HOST}` : '') || '').trim().replace(/\/+$/, '');
+  return /^https:\/\/[^\s]+$/.test(e) ? e : '';
+}
+
+export function criarConcessao({ site, segredo, quem, url = '' }) {
   const chamar = async (caminho) => {
     try {
       const r = await fetch(`${site}/api/worker/lease/${caminho}`, {
         method: 'POST', headers: { 'x-worker-secret': segredo, 'content-type': 'application/json' },
-        body: JSON.stringify({ quem, ttl_s: 120 }), signal: AbortSignal.timeout(20000),
+        body: JSON.stringify({ quem, ttl_s: 120, url }), signal: AbortSignal.timeout(20000),
       });
       if (!r.ok) return null;
       return (await r.json()).ok === true;
@@ -407,7 +413,7 @@ async function principal() {
     });
   };
   const quem = `${process.env.RENDER_SERVICE_NAME || process.env.HOSTNAME || 'servico'}-${process.pid}-${Math.random().toString(36).slice(2, 7)}`;
-  const gerente = criarGerente({ site, segredo, dados, aviso, sessaoNoBanco, desconectar, concessao: criarConcessao({ site, segredo, quem }) });
+  const gerente = criarGerente({ site, segredo, dados, aviso, sessaoNoBanco, desconectar, concessao: criarConcessao({ site, segredo, quem, url: enderecoPublico() }) });
   setInterval(() => { gerente.renovar().catch(() => {}); }, 30000).unref();
   const sair = async () => { aviso('Desligando: devolvendo os números para outro serviço assumir.'); await Promise.race([gerente.liberarTodas(), dormir(8000)]); process.exit(0); };
   process.on('SIGTERM', sair);

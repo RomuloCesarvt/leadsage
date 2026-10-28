@@ -153,7 +153,12 @@ test('sessão: conecta, avisa o LeadSage, envia a tarefa e atende pedido de cód
   };
   const s = new Sessao({ uid: 'u1', chave: 'lsc_x', site: 'https://x.test', dados: mkdtempSync(join(tmpdir(), 'nv-')), aviso: () => {}, fabrica });
   const rodando = s.rodar();
-  await new Promise((r) => setTimeout(r, 2500));
+  // espera o que o teste confere acontecer (e não um tempo fixo: com a máquina ocupada 2,5 s não bastava), com limite de 15 s
+  const limiteMs = Date.now() + 15000;
+  while (Date.now() < limiteMs && !(enviados.length && chamadas.some(([rota]) => rota === '/tarefas/t1/resultado') && ciclos.length >= 1)) {
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  await new Promise((r) => setTimeout(r, 300));   // dá a vez a qualquer pedido de código ainda em curso
   await s.parar();
   await rodando;
   globalThis.fetch = antes;
@@ -501,5 +506,32 @@ test('áudio: o cliente do LeadSage manda os bytes puros e devolve só o texto (
     assert.deepEqual([...recebidos[0].corpo], [1, 2, 3, 4, 5]);
     assert.equal(await clienteLeadsage({ site, chave: 'ruim' }).transcrever(audio), '');                       // o servidor recusou: sem texto, sem erro
     assert.equal(await clienteLeadsage({ site: 'http://127.0.0.1:1', chave: 'x' }).transcrever(audio), '');     // sem rede: idem
+  } finally { srv.close(); }
+});
+
+// ------------------------------------------------------------------ vários serviços: cada um diz o seu endereço
+import { enderecoPublico, criarConcessao } from './servidor.mjs';
+
+test('endereço público: cada hospedagem informa o seu; sem https nada é enviado', () => {
+  assert.equal(enderecoPublico({ PUBLIC_URL: 'https://meu.exemplo.com/' }), 'https://meu.exemplo.com');
+  assert.equal(enderecoPublico({ RENDER_EXTERNAL_URL: 'https://leadsage-nuvem.onrender.com' }), 'https://leadsage-nuvem.onrender.com');
+  assert.equal(enderecoPublico({ SPACE_HOST: 'usuario-reserva.hf.space' }), 'https://usuario-reserva.hf.space');
+  assert.equal(enderecoPublico({ PUBLIC_URL: 'http://inseguro.com' }), '');
+  assert.equal(enderecoPublico({}), '');
+});
+
+test('a concessão leva o endereço do serviço para o LeadSage', async () => {
+  const corpos = [];
+  const srv = http.createServer((req, res) => {
+    const p = []; req.on('data', (c) => p.push(c));
+    req.on('end', () => { corpos.push({ url: req.url, corpo: JSON.parse(Buffer.concat(p).toString()), seg: req.headers['x-worker-secret'] }); res.setHeader('content-type', 'application/json'); res.end('{"ok":true}'); });
+  });
+  await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+  try {
+    const c = criarConcessao({ site: `http://127.0.0.1:${srv.address().port}`, segredo: 'segredo-bem-longo-123', quem: 'hf-1', url: 'https://usuario-reserva.hf.space' });
+    assert.equal(await c.tomar('uid1'), true);
+    assert.deepEqual(corpos[0].corpo, { quem: 'hf-1', ttl_s: 120, url: 'https://usuario-reserva.hf.space' });
+    assert.equal(corpos[0].url, '/api/worker/lease/uid1');
+    assert.equal(corpos[0].seg, 'segredo-bem-longo-123');
   } finally { srv.close(); }
 });

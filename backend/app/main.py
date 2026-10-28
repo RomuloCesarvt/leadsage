@@ -1006,7 +1006,9 @@ async def robo_config(user: dict = Depends(get_current_user)):
     visao = robo_store.visao_publica(canal, settings.APP_URL)
     # WhatsApp na nuvem sem sinal: confere se o Render suspendeu o serviço (cota mensal do plano grátis), para a tela dizer a verdade
     if visao.get("nuvem") and not visao.get("conector_online"):
-        visao["nuvem_suspensa"] = await nuvem_saude.suspenso()
+        atende = await worker_lease_mod.endereco_de_quem_atende(user.get("uid"))
+        # se outro serviço tem o número agora, a nuvem está funcionando; senão, confere o endereço principal
+        visao["nuvem_suspensa"] = False if atende else await nuvem_saude.suspenso()
     return visao
 
 
@@ -1832,6 +1834,7 @@ class SessaoGuardada(BaseModel):
 class LeaseCorpo(BaseModel):
     quem: str = Field(min_length=4, max_length=120)
     ttl_s: int = Field(default=120, ge=15, le=600)
+    url: str = Field(default="", max_length=200)       # endereço público de quem pede (o navegador fala direto com quem atende)
 
 
 @app.post("/api/worker/lease/{uid}")
@@ -1840,7 +1843,7 @@ async def worker_lease(uid: str, corpo: LeaseCorpo, request: Request):
     _exigir_worker(request)
     if not nuvem_auth.uid_valido(uid):
         raise HTTPException(status_code=400, detail="Usuário inválido.")
-    return await worker_lease_mod.tomar(uid, corpo.quem, corpo.ttl_s)
+    return await worker_lease_mod.tomar(uid, corpo.quem, corpo.ttl_s, url=corpo.url)
 
 
 @app.post("/api/worker/lease/{uid}/liberar")
@@ -2107,7 +2110,9 @@ async def whats_acesso(user: dict = Depends(get_current_user)):
     canal = await robo_store.canal_do_usuario(uid) or {}
     if not settings.WORKER_SECRET or not canal.get("nuvem_chave"):
         return {"nuvem": False}
-    return {"nuvem": True, "url": settings.NUVEM_URL.rstrip("/"), "token": token_do_chat_nuvem(uid, settings.WORKER_SECRET)}
+    # quem atende o número agora (pode ser outro serviço, em outra hospedagem, quando o principal está fora); sem isso, o endereço padrão
+    url = await worker_lease_mod.endereco_de_quem_atende(uid) or settings.NUVEM_URL.rstrip("/")
+    return {"nuvem": True, "url": url, "token": token_do_chat_nuvem(uid, settings.WORKER_SECRET)}
 
 
 @app.post("/api/robo/conector/parear")

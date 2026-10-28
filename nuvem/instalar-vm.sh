@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Instala (ou atualiza) o LeadSage Nuvem numa VM Linux (Ubuntu/Debian), como servico que liga sozinho.
 # Uso, na VM:
-#   WORKER_SECRET="seu-segredo" bash instalar-vm.sh
+#   WORKER_SECRET="o-mesmo-segredo-do-Render" bash instalar-vm.sh
+# O WORKER_SECRET precisa ser IGUAL ao dos outros servicos e ao da Vercel: as sessoes do WhatsApp ficam cifradas com ele.
 # Para atualizar depois: rode o mesmo comando de novo (o segredo anterior e mantido se voce omitir WORKER_SECRET).
 set -euo pipefail
 
@@ -41,7 +42,9 @@ if [ -d "$PASTA/.git" ]; then git -C "$PASTA" pull --ff-only; else git clone --d
 echo "== Servico"
 mkdir -p "$DADOS"
 umask 077
-printf 'WORKER_SECRET=%s\nLEADSAGE_URL=%s\nDADOS_DIR=%s\nPORT=8080\nAUTH=disco\n' "$WORKER_SECRET" "$SITE" "$DADOS" > "$ENV_ARQ"
+# AUTH=banco (padrao): a sessao do WhatsApp fica no banco do LeadSage, cifrada com o WORKER_SECRET. Assim esta VM assume os numeros dos outros
+# servicos (Render, Hugging Face) sem pedir QR de novo, e vice-versa. So use AUTH=disco se esta for a UNICA hospedagem.
+printf 'WORKER_SECRET=%s\nLEADSAGE_URL=%s\nDADOS_DIR=%s\nPORT=8080\nAUTH=%s\n' "$WORKER_SECRET" "$SITE" "$DADOS" "${AUTH:-banco}" > "$ENV_ARQ"
 cat > /etc/systemd/system/leadsage-nuvem.service <<UNIT
 [Unit]
 Description=LeadSage Nuvem (WhatsApp de cada usuario)
