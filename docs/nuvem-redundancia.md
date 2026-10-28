@@ -12,7 +12,7 @@ Isso também acaba com o erro 440 ("conflict") que aparecia quando dois serviço
 ## Serviços
 
 1. **Render** (principal, já no ar). Dorme após 15 min sem visita; um agendador no Supabase (pg_cron) visita a cada 4 minutos.
-2. **Reserva gratuita (recomendado): Hugging Face Spaces**, sem cartão. Passo a passo:
+2. **Reserva: Hugging Face Spaces** (⚠ desde 2026 **exige plano PRO** para Docker; conta grátis só cria Space estático. Prefira uma segunda VM grátis: veja `docs/nuvem-gratis-sempre-ligada.md`). Passo a passo, se tiver PRO:
    1. Crie uma conta em huggingface.co.
    2. *New Space* → nome `leadsage-nuvem-reserva`, SDK **Docker**, hardware **CPU basic (free)**, visibilidade **Public** ou Private.
    3. Em *Files*, envie os dois arquivos de `nuvem/hospedagens/huggingface/` (`Dockerfile` e `README.md`).

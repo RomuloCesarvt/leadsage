@@ -13,11 +13,13 @@ Regra: **nunca deixar o WhatsApp dependendo de um único lugar grátis.** O Lead
 
 | Camada | Onde | Cartão? | Dorme? |
 |---|---|---|---|
-| 1. Principal, sempre ligado | **VM grátis do Google Cloud** (e2-micro) ou Oracle Always Free | só para confirmar a conta (sem cobrança dentro do limite) | não |
-| 2. Reserva | **Hugging Face Spaces** (Docker, CPU grátis) | não | sim: precisa de visita a cada 2 dias |
+| 1. Principal, sempre ligado | **VM grátis do Google Cloud** (e2-micro, região dos EUA) | só para ativar a conta (sem cobrança dentro do limite) | não |
+| 2. Reserva, sempre ligada | **Segunda VM grátis em outro provedor** (Oracle Always Free). O Koyeb tem um serviço grátis, mas não confirmei se dorme: verificar antes de contar com ele | cartão para confirmar a conta | não (Oracle) |
 | 3. Extra | Render (quando a cota renova), **só com o `leadsage-nuvem` na conta** | não | sim (15 min sem visita) |
 
-Com as 3 camadas, qualquer uma pode cair e o número continua atendido.
+**Hugging Face deixou de servir** (conferido em 2026-10-28): conta grátis só cria Space *estático*; Space com Docker pede plano PRO. O kit em `nuvem/hospedagens/huggingface/` só vale para quem já tem PRO.
+
+Com mais de uma camada de pé, qualquer uma pode cair e o número continua atendido.
 
 ## Regra de ouro: o mesmo `WORKER_SECRET` em todos
 
@@ -38,10 +40,14 @@ Pegue o valor no painel do Render: `leadsage-nuvem` → **Environment** → `WOR
 
 (Oracle Always Free serve igual e tem mais memória, mas o cadastro costuma recusar cartões e a conta ociosa pode ser recolhida. A do Google é mais simples.)
 
-## Camada 2: reserva no Hugging Face
+## Camada 2: segunda VM grátis (Oracle Always Free)
 
-Passo a passo em `docs/nuvem-redundancia.md` (item 2). Segredos do Space: `WORKER_SECRET` (o mesmo) e `LEADSAGE_URL=https://leadsageofc.vercel.app`.
-Free Spaces dormem depois de 48 h sem visita: um monitor grátis (UptimeRobot, a cada 5 min) abrindo a URL do Space resolve.
+Mesmo comando da camada 1, em outra VM de outro provedor (assim uma queda de provedor não derruba as duas). Oracle Cloud → *Compute → Create instance*, forma
+**Ampere (VM.Standard.A1.Flex)** com 1 OCPU e 6 GB, Ubuntu, região em que houver vaga. Depois rode o mesmo `instalar.sh` com o **mesmo** `WORKER_SECRET`.
+A conta ociosa pode ser recolhida pela Oracle; manter o serviço ligado (ele usa CPU a cada poucos segundos) ajuda.
+
+**Conta nova no Google Cloud:** ela começa em "modo expresso", sem Compute Engine. Para criar a VM é preciso concluir a **avaliação gratuita** (2 etapas, com cartão).
+Ao fim dos 90 dias, confirme no console se é preciso "ativar conta completa" para manter a VM do nível Always Free, e crie um **alerta de orçamento** de R$ 1.
 
 ## Camada 3: Render
 
@@ -57,5 +63,5 @@ Para o Render não estourar de novo, deixe **só o `leadsage-nuvem`** na conta g
 ## Limites honestos
 
 - Conexão **não oficial** do WhatsApp (como o WhatsApp Web): use número secundário, poucas abordagens frias por dia e sempre com opção de sair.
-- Os planos grátis mudam. Se um deles acabar, os outros seguram; por isso são três camadas.
+- Os planos grátis mudam. Se um deles acabar, os outros seguram; por isso mais de uma camada.
 - Enquanto nenhuma camada estiver de pé, nada é enviado e o robô não responde.
