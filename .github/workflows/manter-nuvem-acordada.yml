@@ -1,15 +1,20 @@
-# O plano gratuito do Render dorme depois de 15 minutos sem visita. Este agendamento visita a cada 5 minutos.
-# O GitHub pode atrasar agendamentos em horas de pico; se atrasar, o servico acorda na proxima visita e
-# as sessoes do WhatsApp voltam sozinhas (ficam guardadas no banco).
-name: Manter a nuvem acordada
+# O plano gratis do Render adormece o servico depois de 15 min sem visita, e adormecido ele nao envia nem responde no WhatsApp.
+# Este agendamento visita os servicos a cada 10 min (repositorio publico: minutos do GitHub Actions sao gratis).
+# Servico fora do ar ou suspenso so gera aviso; nunca derruba nada.
+name: manter-nuvem-acordada
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch:
+permissions: {}
 jobs:
-  ping:
+  visitar:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Visitar o servico
-        run: curl -fsS --retry 3 --retry-delay 10 -m 60 https://leadsage-nuvem.onrender.com/
+      - name: Visitar os servicos da nuvem
+        run: |
+          for url in https://leadsage-nuvem-b.onrender.com/ https://leadsage-nuvem.onrender.com/; do
+            code=$(curl -s -o /dev/null -m 60 -w '%{http_code}' "$url" || echo "sem resposta")
+            echo "$url -> $code"
+          done
