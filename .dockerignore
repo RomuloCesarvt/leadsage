@@ -1,0 +1,12 @@
+**/node_modules
+**/__pycache__
+**/*.pyc
+.git
+.venv
+dist
+frontend/dist
+frontend/qa/saida
+backend/leadsage.db
+backend/.env
+**/.env
+.vercel

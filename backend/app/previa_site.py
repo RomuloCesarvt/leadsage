@@ -77,7 +77,7 @@ async def renderizar(lead: Dict[str, Any], fotos: List[str], modelo: str = "", a
         raise RuntimeError("o motor de sites não está configurado")
     async with httpx.AsyncClient(timeout=25) as cliente:
         r = await cliente.post(
-            f"{settings.APP_URL.rstrip('/')}/api/render-site",
+            settings.RENDER_SITE_URL.strip() or f"{settings.APP_URL.rstrip('/')}/api/render-site",
             json={"lead": lead_para_o_motor(lead), "fotos": fotos, "modelo": modelo, "anterior": anterior or None},
             headers={"x-render-secret": settings.WORKER_SECRET},
         )

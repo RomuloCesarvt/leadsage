@@ -148,7 +148,6 @@ async def _banco_fora(request: Request, exc: BancoDeCreditosIndisponivel):
 # Na Vercel so /api/* chega ate a funcao, entao a raiz e inalcancavel
 # em producao. O mesmo corpo responde nos dois caminhos.
 @app.get("/api/status")
-@app.get("/")
 def read_root():
     """Estado do servico.
 
@@ -2630,3 +2629,20 @@ def get_suggested_niches():
 
 from app import admin_painel, nuvem_auth  # noqa: E402
 app.include_router(admin_painel.router)
+
+
+from app import spa  # noqa: E402
+
+
+@app.get("/", include_in_schema=False)
+def raiz():
+    """Com o app compilado (Render) a raiz e a tela; sem ele (dev, testes), o estado do servico."""
+    from fastapi.responses import FileResponse
+    pasta = spa.pasta_do_app()
+    if pasta is not None:
+        return FileResponse(pasta / "index.html", headers={"Cache-Control": "no-cache"})
+    return read_root()
+
+
+# o app compilado (so liga quando LEADSAGE_DIST existe: hospedagem de servico unico, ex. Render). Tem de ser a ULTIMA rota.
+spa.montar(app)

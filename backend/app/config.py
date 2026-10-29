@@ -56,6 +56,8 @@ class Settings(BaseModel):
     MERCADOPAGO_TOKEN: str = os.getenv("MERCADOPAGO_TOKEN", "")
     # Para onde o comprador volta e onde o MP avisa o pagamento
     APP_URL: str = os.getenv("APP_URL", "https://leadsageofc.vercel.app")
+    # Onde roda o motor de sites (Node). Vazio: a funcao /api/render-site do proprio APP_URL (Vercel). No Render e o Node ao lado, na mesma maquina.
+    RENDER_SITE_URL: str = os.getenv("RENDER_SITE_URL", "")
 
     # App da Meta do LeadSage. Com ele, o cliente conecta pagina,
     # Instagram e WhatsApp com um clique ("Conectar com Facebook"), sem
