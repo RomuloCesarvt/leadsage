@@ -111,7 +111,7 @@ def test_resposta_do_robo_sai_pelo_conector(client, chave, rodar):
     tarefa = t["tarefas"][0]
     assert tarefa["tipo"] == "resposta" and tarefa["contato"] == "5514998003784" and "10h" in tarefa["texto"]
     assert 1200 <= tarefa["digitando_ms"] <= 9000
-    assert t["proxima_em"] == 4
+    assert t["proxima_em"] == 8
 
     # entregue e sem resultado: nao volta antes do prazo (evita enviar em dobro)
     assert client.get("/api/conector/tarefas", headers=cabecalho(chave)).json()["tarefas"] == []

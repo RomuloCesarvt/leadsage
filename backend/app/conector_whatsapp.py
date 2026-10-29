@@ -449,14 +449,14 @@ async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Di
                           "digitando_ms": _digitando_ms(texto)})
 
     ativo_recente = _ler_data(canal.get("cw_atividade"))
-    quente = bool(ativo_recente and (agora - ativo_recente).total_seconds() < 600)
+    quente = bool(ativo_recente and (agora - ativo_recente).total_seconds() < 180)
     # o celular esta olhando: o Conector precisa perguntar depressa e mandar o espelho
     from app import espelho_whatsapp
     pedidos = await espelho_whatsapp.pedidos_para_o_conector(uid, agora)
     return {
         "tarefas": saida, "frios_hoje": frios_hoje, "limite_frio": limite, "motivo_sem_frio": motivo_sem_frio,
         # quanto o Conector espera antes de perguntar de novo: depressa só com conversa em andamento
-        "proxima_em": 3 if pedidos["remoto"] else (4 if (saida or quente) else 45),
+        "proxima_em": 3 if pedidos["remoto"] else (8 if (saida or quente) else 90),
         **pedidos,
     }
 

@@ -31,7 +31,7 @@ def chave(client, com_robo):
 
 def test_sem_ninguem_olhando_o_conector_nao_manda_nada(client, chave):
     t = client.get("/api/conector/tarefas", headers=cabecalho(chave)).json()
-    assert t["remoto"] is False and t["abrir"] == [] and t["proxima_em"] == 45
+    assert t["remoto"] is False and t["abrir"] == [] and t["proxima_em"] == 90
     p = client.post("/api/conector/ping", headers=cabecalho(chave), json={"numero": "5514999990000", "status": "ready"}).json()
     assert p["remoto"] is False
 
