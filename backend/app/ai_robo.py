@@ -56,6 +56,8 @@ _SEM_INTERESSE = (
     "nao estamos interessad", "nao tenho nenhum interesse", "nao preciso de site", "nao precisamos de site", "nao quero site",
     "ja tenho quem", "ja temos quem", "ja tenho alguem que", "ja temos alguem que", "ja tenho site", "ja temos site",
     "ja tenho um site", "ja temos um site", "ja tenho meu site", "ja tenho quem faca", "ja tenho quem cuida",
+    "ja tenho agencia", "ja temos agencia", "ja tenho uma agencia", "ja temos uma agencia", "ja trabalho com agencia", "ja tenho um profissional",
+    "ja tenho uma empresa que", "ja temos uma empresa que", "ja tenho um designer", "ja tenho um programador", "ja tenho um freelancer",
 )
 _PARENTE_FAZ = re.compile(
     r"\b(meu|minha|o meu|a minha)\s+(marido|esposa|mulher|namorad[oa]|noiv[oa]|filh[oa]|irmao|irma|prim[oa]|sobrinh[oa]|pai|mae|amig[oa]|socio|socia|cunhad[oa]|genro|nora)\b[^.!?]{0,50}\b(faz|cria|cuida|trabalha|fez|desenvolve|monta|mexe|toca)\b"
@@ -78,7 +80,9 @@ def desinteresse_firme(texto: str) -> str:
         return ""         # "não tenho interesse agora, mas me manda o exemplo": quer ver, a IA conduz
     if "?" in (texto or "") and not any(x in t for x in _SEM_INTERESSE):
         return ""         # está perguntando alguma coisa: quer conversar, a IA conduz
-    ja_tem = bool(_PARENTE_FAZ.search(t)) or any(x in t for x in ("ja tenho quem", "ja temos quem", "ja tenho alguem", "ja temos alguem", "ja tenho site", "ja temos site", "ja tenho um site", "ja temos um site", "ja tenho meu site"))
+    ja_tem = bool(_PARENTE_FAZ.search(t)) or any(x in t for x in ("ja tenho quem", "ja temos quem", "ja tenho alguem", "ja temos alguem", "ja tenho site", "ja temos site", "ja tenho um site", "ja temos um site", "ja tenho meu site",
+                                                                   "ja tenho agencia", "ja temos agencia", "ja tenho uma agencia", "ja temos uma agencia", "ja trabalho com agencia", "ja tenho um profissional",
+                                                                   "ja tenho um designer", "ja tenho um programador", "ja tenho um freelancer"))
     if ja_tem:
         return "ja_tem"
     if any(x in t for x in _SEM_INTERESSE):
@@ -307,8 +311,8 @@ def respostas_seguidas_do_robo(mensagens: List[Dict[str, Any]]) -> int:
     return n
 
 
-from app import ai_oferta  # noqa: E402
-from app.ai_sdr import forma_do_preco, montar_prompt, normalizar, problemas_da_resposta, resolver_marcadores  # noqa: E402
+from app import ai_oferta, identidade  # noqa: E402
+from app.ai_sdr import forma_do_preco, gancho_de_preco, montar_prompt, normalizar, objecao_de_preco, problemas_da_resposta, resolver_marcadores  # noqa: E402
 
 
 def decidir(
@@ -414,6 +418,14 @@ def decidir(
             return Decisao(passar_para_humano=True, usou_ia=True, sdr=n["sdr"],
                            motivo="a resposta do robô não passou na conferência (" + restantes[0][:110] + ") — responda você")
     humano = n["passar_para_humano"]
+
+    # Reclamou de preço ("estou sem condições", "tá caro"): o gancho vai e uma PESSOA assume para passar o valor. O modelo às vezes
+    # esquece de marcar a passagem ou devolve vazio; isto é regra de código, não de prompt.
+    if objecao_de_preco(texto) and not n.get("automatica"):
+        if not n["mensagens"]:
+            n["mensagens"] = gancho_de_preco(cfg, identidade.da_conta(cfg, perfil))
+        humano = True
+        n["motivo"] = n["motivo"] or "objeção de preço — gancho dado, passe a condição e o valor"
 
     if not n["mensagens"] and not humano:
         return Decisao(passar_para_humano=True, motivo="a IA não produziu resposta", usou_ia=True, sdr=n["sdr"])

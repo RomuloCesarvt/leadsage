@@ -44,6 +44,8 @@ CAMPOS_CANAL = (
     # base de conhecimento do SDR: o que existe para vender e o que pode
     # ser concedido. O que nao estiver aqui, o robo nao inventa.
     "catalogo", "faq", "desconto_maximo",
+    # a promocao REAL do momento: unica que o robo pode citar como gancho quando o cliente diz que esta sem condicoes
+    "condicao_especial",
     # o servico que o robo vende, em campos (ai_oferta)
     "oferta",
     # preenchidos pela conexao com um clique (app do LeadSage)

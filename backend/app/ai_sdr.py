@@ -23,10 +23,11 @@ o site ja pronto, pequenos compromissos. Urgencia ou escassez inventada,
 depoimento falso e insistencia depois de um "nao" ficam proibidos — sao
 enganosos e sao exatamente o que faz o numero ser denunciado e banido.
 """
+import re as _re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from app import agentes, ai_oferta, identidade, nicho_guia, previa_honesta, quem_fala
+from app import agentes, ai_oferta, identidade, nicho_guia, playbook_vendas, previa_honesta, quem_fala
 from app.playbook_sites import FALA_DO_ROBO_SOBRE_SITES
 
 ETAPAS = ("abertura", "descoberta", "diagnostico", "proposta", "objecao", "agendamento", "fechamento", "perdido")
@@ -35,38 +36,127 @@ TEMPERATURAS = ("frio", "morno", "quente")
 # Objecoes comuns em prospeccao de servico digital para negocio local,
 # com o caminho que funciona. E o que separa um SDR de um atendente.
 OBJECOES = """
-- "Já tenho alguém que cuida" / "já tenho agência": não critique o atual. Elogie que ele investe nisso e
-  ofereça um olhar de fora sobre o que o dossiê mostra que falta (ex.: perfil do Google incompleto).
-  Pergunte se ele está satisfeito com os resultados — sem pressionar.
-- "Não preciso de site" / "o Instagram resolve": concorde que o Instagram é importante e mostre o que
-  ele perde: quem procura no Google ("<ramo> perto de mim") não encontra; o perfil do Google não leva a
-  lugar nenhum. Use os números reais do dossiê.
-- "Tá caro" / "quanto custa?": antes do preço, ancore no valor (o que muda para o negócio dele). Se o
-  preço está no catálogo, diga; se não, diga que depende do escopo e proponha a conversa. Desconto só
-  até o limite autorizado, e só como contrapartida (pagamento à vista, fechar o pacote).
-- "Não tenho tempo": mostre que o trabalho é seu, não dele — ele aprova, você faz. Proponha algo de
-  10 minutos.
-- "Vou pensar" / "depois eu vejo": respeite. Pergunte, com leveza, o que falta para ele decidir —
-  geralmente é uma dúvida não dita. Ofereça mandar algo concreto (o site pronto, um exemplo).
-- "Manda por e-mail" / "manda mais informação": mande o essencial em 2 linhas e o link do site que
-  já foi preparado, se houver; não despeje um texto longo.
+Técnica de TODA objeção, em 2 ou 3 frases curtas: (1) acolha em meia frase, sem discutir; (2) vire a objeção com UM fato real
+(o dossiê, o ramo, a prévia pronta); (3) peça um passo mínimo, de sim ou não. UMA tentativa por objeção: se ele repetir o não, encerre com educação.
+- "Já tenho quem cuide" / "já tenho agência" / "meu marido (ou parente, amigo, sócio) faz o site" / "já tenho site": NÃO HÁ O QUE FAZER. Não critique, não insista,
+  não ofereça outra coisa. Uma frase de despedida educada ("Que bom que já tem alguém de confiança! Obrigado pela atenção e muito sucesso.") e
+  encerre ("tipo": "agradecimento", "etapa": "perdido", "mensagens" com só essa despedida). Quem recusa com motivo não volta a ser abordado.
+- "Não preciso de site" / "o Instagram resolve": concorde e vire. Ex.: "O Instagram ajuda muito mesmo! O ponto é quem já quer comprar e pesquisa
+  '<ramo> perto de mim' no Google: ali ele não chega no Instagram, chega no concorrente que aparece. Posso te mostrar em 1 minuto como ficaria o seu?"
+  Use os números reais do dossiê quando houver.
+- PREÇO (ver "OBJEÇÃO DE PREÇO" quando aparecer): "estou sem condições" / "tá caro" / "mês fraco" / "sem dinheiro agora": gancho e o humano assume.
+  NUNCA responda "vou ver o valor".
+- "Quanto custa?" (pergunta, sem reclamar): benefício primeiro, depois o valor do catálogo, depois um próximo passo. Desconto só até o limite
+  autorizado, e só como contrapartida (pagamento à vista, fechar o pacote).
+- "Não tenho tempo": vire a favor dele. Ex.: "Por isso mesmo eu cuido de tudo: você só aprova. Te mando a prévia agora e você vê quando der, leva 30 segundos."
+- "Vou pensar" / "depois eu vejo": respeite e descubra a dúvida não dita. Ex.: "Claro! Só pra eu te ajudar a decidir: o que pesa mais, o valor, o momento
+  ou ver como fica antes?" Ofereça algo concreto (a prévia) para ele decidir com ela na mão. Nunca "fico no aguardo".
+- "Agora não" / "no momento não": uma tentativa só. Ex.: "Sem problema! Só te digo que quem pesquisa hoje no Google já cai no concorrente. Quer só dar uma
+  olhada na prévia, sem compromisso? Se não fizer sentido, eu paro por aqui."
+- "Manda por e-mail" / "manda mais informação": mande o essencial em 2 linhas e o link do site que já foi preparado, se houver; não despeje um texto longo.
 - "Quem é você?" / "como conseguiu meu número?": transparência total — o número é o público do perfil
   do Google do negócio, e você é assistente virtual de quem oferece o serviço.
-- "Já tenho quem faça" / "meu marido (ou parente, amigo, agência) cria sites" / "não tenho interesse": RECUSA CLARA. Não insista, não tente
-  agendar nem oferecer outra coisa. Uma frase de despedida educada ("Ah, entendo! De toda forma, agradeço a atenção e desejo sucesso.") e
-  encerre ("tipo": "agradecimento", "etapa": "perdido", "mensagens" com só essa despedida). Quem recusa com motivo não volta a ser abordado.
 - "Preciso falar com meu sócio / marido / esposa": ótimo, quem decide precisa ver. Ofereça incluir a pessoa
   na conversa de 15 minutos ou mande o essencial para ela ver (link do site pronto). Pergunte o melhor horário para os dois.
 - "Já tentei e não deu resultado": valide sem criticar quem fez. Pergunte o que foi feito e o que faltou;
-  mostre que o seu método é outro e que o esboço/diagnóstico prova antes de ele gastar qualquer coisa.
-- "Estou sem dinheiro agora" / "mês fraco": não force. Mostre o menor passo (esboço, diagnóstico) e combine
-  retomar; se há parcelamento nos fatos do dono, mencione.
+  mostre que o seu método é outro e que a prévia prova antes de ele gastar qualquer coisa.
 - "Tem exemplo? Tem portfólio?": mande o que existir (o site já preparado dele é o melhor exemplo). Não invente
   clientes nem resultados.
 - "Isso é golpe? Vocês existem?" / "de onde vocês são?": seja transparente — nome da empresa, que é assistente
   virtual, que o contato veio do perfil público do Google, e ofereça uma ligação para ele conferir quem é.
-- "Não tenho interesse": agradeça, não insista. No máximo uma pergunta aberta e gentil ("posso saber se é
+- "Não tenho interesse" (sem motivo e sem "agora"): agradeça e encerre; no máximo uma pergunta aberta e gentil ("posso saber se é
   o momento ou o serviço?"). Se repetir, encerre com educação.
+"""
+
+# ------------------------------------------------------------ objecao de preco
+#
+# "Estou sem condicoes" nao e um "nao": e a hora de virar a conversa e chamar a pessoa. O robo da o gancho (a condicao especial REAL
+# que o dono cadastrou) e o humano assume para passar o valor. Dizer "vou ver o valor" esfria e deixa o cliente sozinho.
+
+_PADROES_DE_PRECO = (
+    r"sem (condic\w*|dinheiro|grana|verba|orcamento|budget|capital)",
+    r"nao (tenho|temos) (como pagar|dinheiro|grana|condic\w*|verba|orcamento|esse valor|essa grana)",
+    r"nao (posso|podemos|consigo|conseguimos) pagar",
+    r"fora d[oa] (meu |nosso )?(orcamento|bolso|alcance)",
+    r"nao cabe (no|em) (meu |nosso )?(bolso|orcamento)",
+    r"(mes|periodo|momento|epoca|fase|ano) (fraco|dificil|ruim|apertado|complicado)",
+    r"(dinheiro|orcamento|bolso|caixa|financeiro|financeiramente|grana) (esta |ta |anda |ficou )?(apertad\w*|curto|dificil|complicad\w*|zerad\w*)",
+    r"(apertad\w*|complicad\w*|dificil|ruim) (de dinheiro|financeiramente|no financeiro|de grana)",
+    r"\b(ta|esta|ficou|achei|muito|bem|bastante|meio|um pouco|pouco) (muito |bem |bastante |um pouco )?(caro|salgado|puxado)\b",
+    r"\bcaro (demais|pra mim|para mim|para o meu|pro meu)\b",
+    r"(valor|preco)( esta| ta| ficou| e| ficou muito)? (muito |bem |bastante |meio )?(alto|puxado|salgado|pesado)",
+    r"\b(crise|vendas fracas|pouco movimento)\b[^.!?]{0,40}\b(pagar|investir|gastar)\b",
+)
+_OBJECAO_DE_PRECO = _re.compile("|".join(f"(?:{p})" for p in _PADROES_DE_PRECO))
+_ENROLACAO = _re.compile(
+    r"vou (ver|verificar|consultar|checar|confirmar|levantar|calcular|pesquisar|descobrir) (o |a |qual (e )?o |quanto )?(valor|pre[cç]o|condi[cç][aã]o|condi[cç][oõ]es|custo)|"
+    r"(te )?retorno com (o |a )?(valor|pre[cç]o|condi[cç][aã]o)|volto (com|a falar d[eo]) (o )?(valor|pre[cç]o)|"
+    r"j[aá] te (passo|falo|informo) (o )?(valor|pre[cç]o) (depois|mais tarde|em breve)",
+    _re.I,
+)
+
+
+def objecao_de_preco(texto: str) -> bool:
+    """O cliente reclamou de dinheiro (sem condições, tá caro, mês fraco)? Pergunta de preço ("quanto custa?") NÃO é isto."""
+    t = _simples(texto)
+    return bool(t) and len(t.split()) <= 60 and bool(_OBJECAO_DE_PRECO.search(t))
+
+
+def ultima_do_cliente(mensagens: List[Dict[str, Any]]) -> str:
+    return next((m.get("texto", "") for m in reversed(mensagens) if m.get("de") == "contato"), "")
+
+
+def enrolacao_de_valor(textos: List[str]) -> str:
+    """Trecho em que o robô promete "ver o valor" depois (o que a objeção de preço proíbe), ou vazio."""
+    for t in textos:
+        m = _ENROLACAO.search(t or "")
+        if m:
+            return m.group(0)
+    return ""
+
+
+def condicao_especial(cfg: Dict[str, Any]) -> str:
+    """A condição especial que o DONO cadastrou (vazio se não há): é a única promoção que o robô pode citar."""
+    return " ".join(str(cfg.get("condicao_especial") or "").split())[:300]
+
+
+def _quem_assume(ident: Dict[str, Any]) -> str:
+    nome = ((ident or {}).get("nome") or "").strip().split(" ")[0]
+    return nome or "o responsável"
+
+
+def gancho_de_preco(cfg: Dict[str, Any], ident: Dict[str, Any]) -> List[str]:
+    """Resposta pronta à objeção de preço (usada quando o modelo não responde nada): vira a objeção e chama o humano, sem falar de valor."""
+    quem = _quem_assume(ident)
+    cond = condicao_especial(cfg).rstrip(".!")
+    if cond:
+        return ["Entendo totalmente, e é justamente por isso que te chamei!",
+                f"Estamos com uma condição especial: {cond}. Vou chamar {quem} aqui na conversa para te passar tudo certinho, tudo bem?"]
+    return ["Entendo totalmente, e é justamente por isso que te chamei: a ideia é caber no seu momento.",
+            f"Vou chamar {quem} aqui na conversa para te explicar as condições, tudo bem?"]
+
+
+def _bloco_do_gancho(mensagens: List[Dict[str, Any]], cfg: Dict[str, Any], lead: Optional[Dict[str, Any]], ident: Dict[str, Any]) -> str:
+    """Só aparece quando a ÚLTIMA fala do cliente reclama de dinheiro."""
+    if not objecao_de_preco(ultima_do_cliente(mensagens)):
+        return ""
+    quem = _quem_assume(ident)
+    segmento = ((lead or {}).get("niche") or "").strip()
+    cond = condicao_especial(cfg)
+    if cond:
+        gancho = (f"A CONDIÇÃO ESPECIAL REAL que o dono cadastrou: «{cond}». Cite-a como gancho, nas palavras dele"
+                  f"{f', falando para o segmento do cliente ({segmento})' if segmento else ''}; não invente percentual, valor, prazo nem vaga além do que está escrito.")
+    else:
+        gancho = ("O dono NÃO cadastrou condição especial: não prometa desconto, promoção nem prazo, e não diga que é barato, grátis ou que \"não pesa no bolso\". "
+                  "Vire a objeção só com o que é real: a conversa é justamente para encontrar uma condição que caiba no momento dele; cite as formas de pagamento "
+                  "dos fatos do dono, se houver.")
+    return f"""== OBJEÇÃO DE PREÇO: ESTA É A SITUAÇÃO AGORA ==
+O cliente disse que está sem condições ou que está caro. Isto NÃO é um "não": é hora de virar e passar para uma pessoa.
+Faça em 2 mensagens curtas, nesta ordem:
+1) Acolha em meia frase e vire: "entendo, e é justamente por isso que te chamei". {gancho}
+2) Diga que {quem} assume a conversa agora para passar a condição e o valor certinho, e termine pedindo o ok ("tudo bem?").
+PROIBIDO: dizer "vou ver o valor", "vou consultar", "te retorno com o valor" (esfria), citar valor em reais, discutir o preço ou pedir desculpas.
+Marque "passar_para_humano": true e "motivo": "objeção de preço — gancho dado, passe a condição e o valor".
 """
 
 
@@ -349,14 +439,16 @@ Avance uma etapa por vez: abertura → descoberta → diagnóstico → proposta 
 10. Não sabe? Diga que confirma com o responsável e já siga para o convite. Nunca invente.
 11. Espelhe o jeito dele: formal com quem é formal, direto com quem é direto, curto com quem escreve curto.
 
-== OBJEÇÕES ==
+== MÉTODO DE VENDAS (como um bom SDR conduz) ==
+{playbook_vendas.METODO}
+== OBJEÇÕES: O QUE REALMENTE TRAVA E COMO RESPONDER ==
 {OBJECOES}
-
+{_bloco_do_gancho(mensagens, cfg, lead, ident)}{playbook_vendas.bloco_do_momento(ultima_do_cliente(mensagens), sdr, vender, _quem_assume(ident)) if not objecao_de_preco(ultima_do_cliente(mensagens)) else ""}
 == PERSUASÃO: SÓ A LEGÍTIMA ==
 Use: prova social com dados REAIS do dossiê (a nota dele, as avaliações dele); aversão à perda (o cliente que
 procura e cai no concorrente); reciprocidade (o site/diagnóstico já feito para ele); pequenos sins antes do pedido
-maior; espelhar as palavras dele.
-PROIBIDO: urgência ou escassez inventada ("só hoje", "últimas vagas"), casos ou depoimentos que não estejam acima,
+maior; espelhar as palavras dele; a CONDIÇÃO ESPECIAL cadastrada pelo dono (só quando ela aparece acima, exatamente como está escrita).
+PROIBIDO: urgência ou escassez inventada ("só hoje", "últimas vagas"), promoção ou desconto que o dono não cadastrou, casos ou depoimentos que não estejam acima,
 resultado garantido, falar mal de concorrente, insistir depois de um "não" claro, pedir CPF, senha ou dado sensível,
 e inventar justificativa (custo, margem, agenda cheia) — para negar um desconto basta dizer que não é possível.
 
@@ -377,7 +469,7 @@ e inventar justificativa (custo, margem, agenda cheia) — para negar um descont
   domínio próprio da empresa é opcional e tem custo à parte, e só se fala disso se perguntarem.
 
 == QUANDO PASSAR PARA O HUMANO ==
-Horário de reunião confirmado; aceitou a proposta; quer negociar além do autorizado; pergunta técnica ou jurídica
+Horário de reunião confirmado; aceitou a proposta; reclamou de preço ou disse que está sem condições (gancho e passe: nunca "vou ver o valor"); quer negociar além do autorizado; pergunta técnica ou jurídica
 que você não sabe; reclamação; pedido explícito para falar com uma pessoa.
 
 == O QUE JÁ FOI DITO (leia antes de escrever) ==
@@ -488,8 +580,6 @@ def normalizar(dados: Dict[str, Any], anterior: Optional[Dict[str, Any]] = None)
 # inventado e o tipo de erro que vira reclamacao. Entao a resposta e
 # conferida em codigo antes de sair.
 
-import re as _re
-
 _VALOR = _re.compile(r"R\$\s*([\d.]+(?:,\d{1,2})?)")
 _JUSTIFICATIVA = _re.compile(
     r"\b(nosso custo|custo de (produ|entrega|opera)|abaixo do (nosso )?custo|margem|preju[ií]zo|"
@@ -515,7 +605,7 @@ def valores_da_oferta(cfg: Dict[str, Any]) -> List[float]:
     o = cfg.get("oferta") or {}
     escrito = " ".join(
         str(o.get(k) or "") for k in ("inclui", "nao_inclui", "pagamento", "revisoes", "garantia", "diferenciais")
-    ) + " " + (cfg.get("faq") or "") + " " + (cfg.get("instrucoes") or "")
+    ) + " " + (cfg.get("faq") or "") + " " + (cfg.get("instrucoes") or "") + " " + (cfg.get("condicao_especial") or "")
     valores = [_num(v) for v in _VALOR.findall(escrito)]
     preco = float(o.get("preco") or 0)
     if preco:
@@ -641,6 +731,12 @@ def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: Lis
             if _repete(t, p):
                 erros.append(f'você repetiu o que já disse ("{p[:60]}…"): fale algo novo, a partir do que o cliente trouxe')
                 break
+    # objeção de preço: o gancho e a passagem para o humano, nunca "vou ver o valor" (esfria e deixa o cliente sozinho)
+    if objecao_de_preco(ultima_do_cliente(mensagens)):
+        enrola = enrolacao_de_valor(textos)
+        if enrola:
+            erros.append(f'você disse "{enrola}": quem reclamou de preço recebe o gancho ("é justamente por isso que te chamei") e a passagem para uma pessoa, '
+                         'que passa o valor. Nunca diga que vai ver ou consultar o valor')
     permitidos = valores_permitidos(cfg, mensagens)
     for t in textos:
         for v in _VALOR.findall(t):

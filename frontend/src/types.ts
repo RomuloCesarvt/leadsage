@@ -369,6 +369,8 @@ export interface RoboConfigEntrada {
   catalogo: string;
   faq: string;
   desconto_maximo: number;
+  /** a promoção real do momento: o gancho do robô quando o cliente diz que está sem condições */
+  condicao_especial: string;
   /** o servico que o robo vende, em campos */
   oferta: Partial<OfertaRobo>;
 }

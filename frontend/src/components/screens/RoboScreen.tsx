@@ -223,7 +223,7 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
           ativo: c.ativo, objetivo: (c.objetivo || 'agendar') as any, instrucoes: c.instrucoes,
           link_agenda: c.link_agenda, nome_assistente: c.nome_assistente,
           meu_nome: c.meu_nome, meu_cargo: c.meu_cargo, minha_empresa: c.minha_empresa,
-          catalogo: c.catalogo, faq: c.faq, desconto_maximo: c.desconto_maximo || 0,
+          catalogo: c.catalogo, faq: c.faq, desconto_maximo: c.desconto_maximo || 0, condicao_especial: c.condicao_especial || '',
           oferta: c.oferta || {},
           wa_phone_id: c.wa_phone_id, page_id: c.page_id, ig_id: c.ig_id,
         });
@@ -383,6 +383,15 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
                 onChange={e => mudar('desconto_maximo', Math.max(0, Math.min(50, Number(e.target.value) || 0)))}
                 className={campo} />
               <p className="text-xs text-slate-500 mt-1.5">Só em troca de pagamento à vista ou de fechar na hora. 0 = nunca dá desconto.</p>
+            </div>
+            <div className="md:col-span-2">
+              <label className={rotulo}>Condição especial do momento (opcional)</label>
+              <input value={form.condicao_especial || ''} maxLength={300} onChange={e => mudar('condicao_especial', e.target.value)}
+                placeholder="Ex.: desconto de lançamento para o seu segmento nesta semana" className={campo} data-testid="condicao-especial" />
+              <p className="text-xs text-slate-500 mt-1.5">
+                Quando o cliente diz que está sem condições ou que está caro, o robô usa esta frase como gancho ("é justamente por isso que te chamei") e chama você
+                para passar o valor. Escreva só o que for verdade: o robô não inventa promoção. Vazio = ele chama você sem prometer desconto.
+              </p>
             </div>
           </div>
         </div>

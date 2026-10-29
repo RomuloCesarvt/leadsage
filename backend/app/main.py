@@ -966,6 +966,7 @@ class RoboConfigRequest(BaseModel):
     catalogo: Optional[str] = Field(default=None, max_length=4000)
     faq: Optional[str] = Field(default=None, max_length=4000)
     desconto_maximo: Optional[int] = Field(default=None, ge=0, le=50)
+    condicao_especial: Optional[str] = Field(default=None, max_length=300)
     # o servico que o robo vende; normalizado em ai_oferta antes de gravar
     oferta: Optional[Dict[str, Any]] = None
 
