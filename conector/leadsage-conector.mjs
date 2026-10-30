@@ -118,6 +118,20 @@ export function paraLeadsage(m, inicioS = 0) {
 // ------------------------------------------------------- ciclo: o que enviar
 
 /**
+ * Quanto esperar antes de perguntar de novo, sem nunca perguntar mais depressa do que isto. O servidor sugere o ritmo (`proxima_em`),
+ * mas um servidor antigo ainda sugere 4 s/45 s, e cada pergunta custa CPU numa hospedagem gratuita (a Vercel bloqueou a conta por isso):
+ * conversa em andamento (sugestão curta) nunca abaixo de 10 s, e sem movimento nunca abaixo de 90 s. Resposta de robô sai logo
+ * mesmo assim, porque quem acabou de responder já pergunta de novo na hora (`proximaSaida = 0`).
+ * `proxima_em` de 3 s é o celular olhando a tela: esse ritmo é preservado.
+ */
+export function intervaloDeConsulta(sugerido) {
+  const s = Number(sugerido) || 30;
+  if (s <= 3) return s;          // alguém olhando as conversas agora
+  if (s < 30) return Math.max(s, 10);
+  return Math.max(s, 90);
+}
+
+/**
  * Pergunta ao LeadSage o que enviar e envia, com pausa humana.
  * `wa.enviar(telefone, texto, digitandoMs)` devolve { ok, erro }.
  */
@@ -125,7 +139,7 @@ export async function enviarPendentes(ls, wa, aviso = log, dorme = dormir) {
   const t = await ls.tarefas();
   if (!t.ok) {
     if (t.status === 401) throw new Error('A chave do Conector foi revogada ou está errada. Gere outra no LeadSage.');
-    return { enviadas: 0, proximaEm: 30 };
+    return { enviadas: 0, proximaEm: intervaloDeConsulta(30) };
   }
   let enviadas = 0;
   for (const tarefa of t.dados.tarefas || []) {
@@ -143,7 +157,7 @@ export async function enviarPendentes(ls, wa, aviso = log, dorme = dormir) {
   }
   if (t.dados.motivo_sem_frio) aviso(`Abordagem fria em espera: ${t.dados.motivo_sem_frio}`);
   return {
-    enviadas, proximaEm: Number(t.dados.proxima_em) || 30,
+    enviadas, proximaEm: intervaloDeConsulta(Number(t.dados.proxima_em) || 30),
     // o que o celular pediu: olhar, quais conversas, conectar pelo numero
     pedidos: { remoto: Boolean(t.dados.remoto), abrir: t.dados.abrir || [], parear: t.dados.parear || '' },
   };

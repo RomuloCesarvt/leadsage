@@ -111,7 +111,7 @@ test('envia as tarefas, avisa o resultado e relata falha', async () => {
     },
   };
   const r = await enviarPendentes(clienteLeadsage({ site: ls.url, chave: CHAVE }), wa, () => {}, semEspera);
-  assert.equal(r.enviadas, 1); assert.equal(r.proximaEm, 4);
+  assert.equal(r.enviadas, 1); assert.equal(r.proximaEm, 10);
   assert.equal(enviados[0].tel, '5514998003784');
   assert.ok(enviados[0].digitando >= 800);
   const resultados = ls.chamadas.filter((x) => x.caminho.endsWith('/resultado'));
@@ -130,7 +130,7 @@ test('chave revogada derruba o conector com mensagem clara', async () => {
 test('LeadSage fora do ar nao derruba: tenta de novo mais tarde', async () => {
   const cli = clienteLeadsage({ site: 'http://127.0.0.1:9', chave: CHAVE });
   const r = await enviarPendentes(cli, { enviar: async () => ({ ok: true }) }, () => {}, semEspera);
-  assert.equal(r.enviadas, 0); assert.equal(r.proximaEm, 30);
+  assert.equal(r.enviadas, 0); assert.equal(r.proximaEm, 90);
 });
 
 test('acha o Edge ou o Chrome instalado', () => {
@@ -148,4 +148,14 @@ test('so o LeadSage pode ler o estado local (QR code)', () => {
   assert.ok(!o.has('https://site-malicioso.test'));
   assert.ok(origensPermitidas('https://meu.dominio.com').has('https://meu.dominio.com'));
   assert.equal(origensPermitidas('lixo').size, 1);
+});
+
+test('consulta: nunca mais depressa que o piso (servidor antigo sugere 4 s e 45 s), e quem olha a tela mantem 3 s', async () => {
+  const { intervaloDeConsulta } = await import('./leadsage-conector.mjs');
+  assert.equal(intervaloDeConsulta(4), 10);
+  assert.equal(intervaloDeConsulta(8), 10);
+  assert.equal(intervaloDeConsulta(45), 90);
+  assert.equal(intervaloDeConsulta(120), 120);
+  assert.equal(intervaloDeConsulta(3), 3);
+  assert.equal(intervaloDeConsulta(undefined), 90);
 });
