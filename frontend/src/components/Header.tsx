@@ -2,9 +2,11 @@ import React from 'react';
 import { Menu, Zap, Bell } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Avatar } from './Avatar';
+import { naoLidos, useAvisos } from '../lib/avisos';
 
 export const Header: React.FC<{ toggleSidebar: () => void }> = ({ toggleSidebar }) => {
-  const { user, setIsProfileModalOpen, viewState } = useApp() as any;
+  const { user, setIsProfileModalOpen, viewState, setViewState } = useApp() as any;
+  const pendentes = naoLidos(useAvisos());
 
   const getPageTitle = () => {
     switch(viewState) {
@@ -53,8 +55,17 @@ export const Header: React.FC<{ toggleSidebar: () => void }> = ({ toggleSidebar 
             <span>{user?.semDados ? '—' : (user?.credits ?? 0)} créditos</span>
           </div>
 
-          <button className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors">
+          <button
+            onClick={() => setViewState('notifications')}
+            aria-label={pendentes ? `${pendentes} avisos novos` : 'Avisos'}
+            className="relative p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+          >
             <Bell className="w-5 h-5" />
+            {pendentes > 0 && (
+              <span data-testid="avisos-contador" className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center">
+                {pendentes > 9 ? '9+' : pendentes}
+              </span>
+            )}
           </button>
 
           <div className="h-6 w-px bg-slate-200 mx-1"></div>

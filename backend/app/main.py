@@ -48,7 +48,7 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, acesso_total, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
-from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, abordagem_mestra, conector_whatsapp, caixa_de_entrada, ai_providers, espelho_whatsapp, previa_abertura, agentes
+from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, abordagem_mestra, conector_whatsapp, caixa_de_entrada, ai_providers, espelho_whatsapp, previa_abertura, agentes, avisos
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote as _quote
 from app.ai_robo import decidir as robo_decidir
@@ -1437,6 +1437,23 @@ async def robo_conversas(user: dict = Depends(get_current_user)):
         print(f"Caixa de entrada: sem a fila de envio: {exc}")
         itens = []
     return caixa_de_entrada.juntar(conversas, itens)
+
+
+@app.get("/api/avisos")
+async def listar_avisos(user: dict = Depends(get_current_user)):
+    """O que o dono precisa saber agora: prévia aberta, lead pedindo uma pessoa, resposta nova. Cada fonte que falhar só some da lista."""
+    uid = user.get("uid")
+    try:
+        aberturas = await previa_abertura.listar(uid)
+    except Exception as exc:
+        print(f"Avisos: sem as prévias abertas: {type(exc).__name__}")
+        aberturas = []
+    try:
+        conversas = await robo_store.listar_conversas(uid)
+    except Exception as exc:
+        print(f"Avisos: sem as conversas: {type(exc).__name__}")
+        conversas = []
+    return {"avisos": avisos.montar(aberturas, conversas)}
 
 
 @app.get("/api/robo/conversas/{cid}")

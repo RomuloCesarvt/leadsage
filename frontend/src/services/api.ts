@@ -27,6 +27,7 @@ import type {
   RoboConfigEntrada,
   RoboConversa,
   RoboConversaResumo,
+  Aviso,
   RoboMensagem,
   RoboTeste,
   RaioX,
@@ -279,6 +280,11 @@ export const api = {
 
   async roboConversas(): Promise<RoboConversaResumo[]> {
     return await fetchWithToken('/robo/conversas');
+  },
+
+  async avisos(): Promise<Aviso[]> {
+    const r = await fetchWithToken('/avisos');
+    return Array.isArray(r?.avisos) ? r.avisos : [];
   },
 
   async roboConversa(id: string): Promise<RoboConversa> {

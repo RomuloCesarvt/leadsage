@@ -1,19 +1,96 @@
-import React from 'react';
-import { Bell, ArrowRight, Sparkles } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Bell, ArrowRight, Sparkles, Eye, UserRound, MessageCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { marcarAvisosComoVistos, useAvisos } from '../../lib/avisos';
+import type { Aviso } from '../../types';
+
+const ICONE = { previa: Eye, humano: UserRound, resposta: MessageCircle } as const;
+const COR = { previa: 'bg-violet-50 text-violet-600', humano: 'bg-rose-50 text-rose-600', resposta: 'bg-emerald-50 text-emerald-600' } as const;
+
+function ha(iso: string): string {
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (!isFinite(s)) return '';
+  if (s < 90) return 'agora';
+  if (s < 3600) return `há ${Math.round(s / 60)} min`;
+  if (s < 86400) return `há ${Math.round(s / 3600)} h`;
+  return `há ${Math.round(s / 86400)} d`;
+}
 
 export const NotificationsScreen: React.FC = () => {
   const { setViewState } = useApp() as any;
+  const { avisos, visto, carregado } = useAvisos();
+  const [vistoAoAbrir, setVistoAoAbrir] = useState<string | null>(null);
+  const [permissao, setPermissao] = useState<string>(() => (typeof Notification === 'undefined' ? 'indisponivel' : Notification.permission));
+
+  // o que era novo ao abrir fica destacado; só depois a lista é marcada como vista
+  useEffect(() => {
+    if (!carregado) return;
+    setVistoAoAbrir((v) => (v === null ? visto : v));
+    marcarAvisosComoVistos();
+  }, [carregado]);
+
+  const ir = (a: Aviso) => setViewState(a.tipo === 'previa' ? 'workspace' : 'conversas');
+
   return (
     <div className="flex-1 flex flex-col h-full relative max-w-4xl w-full">
-      
+
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight text-slate-800">Avisos e Novidades</h1>
-        <p className="text-slate-500 text-sm mt-1">Fique por dentro das atualizações da plataforma.</p>
+        <p className="text-slate-500 text-sm mt-1">O que está acontecendo com seus leads agora e as novidades da plataforma.</p>
       </div>
 
-      <div className="space-y-6 mt-4">
+      <section className="mb-8" aria-label="Avisos dos seus leads">
+        <div className="flex items-center justify-between mb-3 gap-3">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500">Seus leads</h2>
+          {permissao === 'default' && (
+            <button
+              onClick={async () => setPermissao(await Notification.requestPermission())}
+              className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+            >
+              Avisar também no navegador
+            </button>
+          )}
+        </div>
+        {!carregado ? (
+          <p className="text-sm text-slate-400">Carregando…</p>
+        ) : avisos.length === 0 ? (
+          <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-6 text-sm text-slate-500">
+            Nada novo por enquanto. Quando um lead abrir a prévia do site, responder ou pedir uma pessoa, aparece aqui e no sino.
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {avisos.map((a) => {
+              const Icone = ICONE[a.tipo] || Bell;
+              const novo = a.quando > (vistoAoAbrir ?? visto);
+              return (
+                <li key={a.id}>
+                  <button
+                    onClick={() => ir(a)}
+                    data-testid="aviso"
+                    className={`w-full text-left flex items-start gap-4 rounded-2xl border p-4 transition-colors hover:bg-slate-50 ${novo ? 'bg-white border-blue-200 shadow-sm' : 'bg-white border-slate-200'}`}
+                  >
+                    <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${COR[a.tipo] || 'bg-slate-100 text-slate-500'}`}>
+                      <Icone className="w-5 h-5" />
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="flex items-center gap-2">
+                        <span className="font-bold text-slate-800 truncate">{a.titulo}</span>
+                        {novo && <span className="text-[10px] font-bold uppercase tracking-wide bg-blue-600 text-white rounded-full px-2 py-0.5">novo</span>}
+                      </span>
+                      <span className="block text-sm text-slate-500 mt-0.5">{a.texto}</span>
+                    </span>
+                    <span className="text-xs text-slate-400 whitespace-nowrap">{ha(a.quando)}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-3">Novidades</h2>
+      <div className="space-y-6">
         
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-8 text-white shadow-md relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -translate-y-1/2 translate-x-1/3 blur-2xl"></div>

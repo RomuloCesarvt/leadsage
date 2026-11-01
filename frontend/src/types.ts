@@ -446,6 +446,17 @@ export interface EstadoFilaWhats {
   motivo: string;
 }
 
+/** Um aviso para o dono: prévia aberta, lead pedindo uma pessoa ou resposta nova. */
+export interface Aviso {
+  id: string;
+  tipo: 'previa' | 'humano' | 'resposta';
+  titulo: string;
+  texto: string;
+  quando: string;
+  lead_id?: string;
+  conversa_id?: string;
+}
+
 export interface RoboConversaResumo {
   id: string;
   canal: RoboCanal;
