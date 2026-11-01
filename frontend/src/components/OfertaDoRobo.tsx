@@ -26,6 +26,7 @@ const SERVICOS: { id: Servico; nome: string; icone: React.FC<{ className?: strin
 const VAZIA: OfertaRobo = {
   servico: 'site', nome: '', preco: '', prazo_dias: '', inclui: '', nao_inclui: '', esboco: 'gratis',
   esboco_prazo: '', esboco_preco: '', pagamento: '', revisoes: '', garantia: '', diferenciais: '',
+  pix_chave: '', pix_titular: '', pix_banco: '', sinal_percentual: '', itens_do_cliente: '', dados_do_contrato: '',
 };
 
 const campo = 'w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500';
@@ -55,6 +56,7 @@ export const OfertaDoRobo: React.FC<{ valor?: Partial<OfertaRobo>; onChange: (o:
     o.esboco === 'gratis' ? `Esboço grátis${o.esboco_prazo ? ` ${o.esboco_prazo}` : ''}, sem compromisso.` : '',
     o.esboco === 'pago' ? `Esboço pago${brl(o.esboco_preco) ? ` (${brl(o.esboco_preco)})` : ''}.` : '',
     o.pagamento ? `Pagamento: ${o.pagamento}.` : '',
+    o.pix_chave ? `Ao fechar, manda o Pix${Number(o.sinal_percentual) ? ` (sinal de ${o.sinal_percentual}%)` : ''} e o checklist do que precisa receber.` : '',
   ].filter(Boolean).join(' ');
 
   return (
@@ -141,6 +143,39 @@ export const OfertaDoRobo: React.FC<{ valor?: Partial<OfertaRobo>; onChange: (o:
           <label className={rotulo}>Diferenciais reais (opcional)</label>
           <input value={o.diferenciais} onChange={e => set('diferenciais', e.target.value)}
             placeholder="Só o que é verdade: o robô não inventa outros" className={campo} />
+        </div>
+
+        <div className="md:col-span-3 mt-2 pt-4 border-t border-slate-100">
+          <h3 className="text-sm font-bold text-slate-800">Fechamento</h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Quando o lead diz “quero fechar”, o robô manda o resumo, a forma de pagar e o checklist do que você precisa para começar. Só usa o que estiver aqui; o que faltar, ele avisa você.
+          </p>
+        </div>
+        <div className="md:col-span-2">
+          <label className={rotulo}>Chave Pix</label>
+          <input value={o.pix_chave || ''} onChange={e => set('pix_chave', e.target.value)} placeholder="CNPJ, e-mail, telefone ou chave aleatória" className={campo} />
+        </div>
+        <div>
+          <label className={rotulo}>Sinal para começar (%)</label>
+          <input inputMode="numeric" value={o.sinal_percentual ?? ''} onChange={e => set('sinal_percentual', e.target.value)} placeholder="Ex.: 50" className={campo} />
+        </div>
+        <div className="md:col-span-2">
+          <label className={rotulo}>Nome do titular do Pix</label>
+          <input value={o.pix_titular || ''} onChange={e => set('pix_titular', e.target.value)} placeholder="Como aparece para quem vai pagar" className={campo} />
+        </div>
+        <div>
+          <label className={rotulo}>Banco (opcional)</label>
+          <input value={o.pix_banco || ''} onChange={e => set('pix_banco', e.target.value)} className={campo} />
+        </div>
+        <div className="md:col-span-3">
+          <label className={rotulo}>Dados que você precisa para o contrato</label>
+          <input value={o.dados_do_contrato || ''} onChange={e => set('dados_do_contrato', e.target.value)}
+            placeholder="Ex.: Nome completo ou razão social, CPF/CNPJ, e-mail e endereço" className={campo} />
+        </div>
+        <div className="md:col-span-3">
+          <label className={rotulo}>O que o cliente precisa mandar (um item por linha; vazio = lista padrão do serviço)</label>
+          <textarea rows={4} value={o.itens_do_cliente || ''} onChange={e => set('itens_do_cliente', e.target.value)}
+            placeholder={'Logo\nFotos do negócio\nTextos dos serviços\nAcesso ao Instagram'} className={`${campo} resize-none`} />
         </div>
       </div>
 

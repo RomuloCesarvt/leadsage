@@ -311,7 +311,7 @@ def respostas_seguidas_do_robo(mensagens: List[Dict[str, Any]]) -> int:
     return n
 
 
-from app import ai_oferta, identidade  # noqa: E402
+from app import ai_oferta, fechamento, identidade  # noqa: E402
 from app.ai_sdr import forma_do_preco, gancho_de_preco, montar_prompt, normalizar, objecao_de_preco, problemas_da_resposta, resolver_marcadores  # noqa: E402
 
 
@@ -374,6 +374,15 @@ def decidir(
         return Decisao(
             passar_para_humano=True,
             motivo=f"{MAX_RESPOSTAS_SEGUIDAS} respostas seguidas sem você — pode ser outro robô do outro lado",
+        )
+
+    # "Quero fechar": o robo entrega o checklist do fechamento (valor, Pix, contrato, material) em vez de perguntar de novo.
+    # Sai de codigo, so com o que o dono cadastrou; uma vez por conversa, e uma pessoa assume para confirmar o pagamento.
+    if (fechamento.quer_fechar(texto) and not objecao_de_preco(texto) and not (sdr or {}).get("fechamento_enviado")):
+        mensagens_f, pendencias = fechamento.montar(cfg, lead, (sdr or {}).get("dados", {}).get("nome", "") if isinstance((sdr or {}).get("dados"), dict) else "")
+        return Decisao(
+            mensagens=mensagens_f, resposta=mensagens_f[0], passar_para_humano=True, motivo=fechamento.motivo_para_o_dono(pendencias),
+            sdr={**(sdr or {}), "etapa": "fechamento", "temperatura": "quente", "fechamento_enviado": True, "fechamento_pendencias": pendencias},
         )
 
     prompt = montar_prompt(mensagens, canal, perfil, cfg, lead, raio=raio, sdr=sdr)

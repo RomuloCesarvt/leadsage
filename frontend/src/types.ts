@@ -389,6 +389,13 @@ export interface OfertaRobo {
   revisoes: string;
   garantia: string;
   diferenciais: string;
+  /** fechamento: o que o robô entrega quando o lead diz "quero fechar" */
+  pix_chave?: string;
+  pix_titular?: string;
+  pix_banco?: string;
+  sinal_percentual?: string | number;
+  itens_do_cliente?: string;
+  dados_do_contrato?: string;
 }
 
 /** O que a tela recebe: os segredos so aparecem como "configurado". */

@@ -123,6 +123,13 @@ def normalizar(d: Any) -> Dict[str, Any]:
         "revisoes": _texto(d.get("revisoes"), 240),
         "garantia": _texto(d.get("garantia"), 240),
         "diferenciais": _texto(d.get("diferenciais"), 500),
+        # fechamento: o que o robo pode passar quando o lead diz que quer fechar
+        "pix_chave": _texto(d.get("pix_chave"), 120),
+        "pix_titular": _texto(d.get("pix_titular"), 80),
+        "pix_banco": _texto(d.get("pix_banco"), 60),
+        "sinal_percentual": max(0, min(100, int(_numero(d.get("sinal_percentual"))))),
+        "itens_do_cliente": _texto(d.get("itens_do_cliente"), 600),
+        "dados_do_contrato": _texto(d.get("dados_do_contrato"), 300),
     }
 
 
