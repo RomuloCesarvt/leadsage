@@ -51,8 +51,24 @@ def disponivel() -> Dict[str, bool]:
     base = bool(settings.META_APP_ID and settings.META_APP_SECRET)
     return {
         "facebook": base,
+        # o Instagram profissional entra pelo mesmo login do Facebook (pagina + Instagram ligado a ela)
+        "instagram": base,
         "whatsapp": base and bool(settings.META_WA_CONFIG_ID),
     }
+
+
+def faltando_configurar() -> List[str]:
+    """Os ajustes do sistema (variaveis de ambiente) que ainda impedem conectar o Instagram, em portugues.
+
+    Sem eles o botao fica desligado e a pessoa nao sabe por que: o aviso diz exatamente o que falta."""
+    falta = []
+    if not settings.META_APP_ID:
+        falta.append("META_APP_ID (o ID do app, em developers.facebook.com)")
+    if not settings.META_APP_SECRET:
+        falta.append("META_APP_SECRET (a chave secreta do app)")
+    if not settings.META_VERIFY_TOKEN:
+        falta.append("META_VERIFY_TOKEN (qualquer texto; o mesmo vai no webhook do app)")
+    return falta
 
 
 def redirect_uri() -> str:

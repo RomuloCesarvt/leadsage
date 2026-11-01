@@ -16,7 +16,7 @@ import { WhatsAppIcon, InstagramIcon, FacebookIcon, TelegramIcon } from './Brand
 import { ConectorWhatsApp } from './ConectorWhatsApp';
 import type { RoboConfig } from '../types';
 
-type Disponivel = { facebook: boolean; whatsapp: boolean; app_id: string; wa_config_id: string };
+type Disponivel = { facebook: boolean; instagram?: boolean; whatsapp: boolean; app_id: string; wa_config_id: string; faltando?: string[]; webhook_url?: string; retorno_url?: string };
 
 declare global {
   interface Window { FB?: any; fbAsyncInit?: () => void }
@@ -218,28 +218,49 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
         {cfg.nuvem_disponivel && <ConectorWhatsApp cfg={cfg} aoMudar={aoMudar} modo="nuvem" />}
         <ConectorWhatsApp cfg={cfg} aoMudar={aoMudar} modo="pc" />
 
-        {/* Facebook + Instagram */}
-        <div className="p-4 rounded-xl border border-slate-200 flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-1.5"><FacebookIcon className="w-7 h-7" /><InstagramIcon className="w-7 h-7" /></div>
-          <div className="flex-1 min-w-[160px]">
-            <p className="font-bold text-slate-800 text-sm">Messenger e Instagram</p>
-            <p className="text-xs text-slate-500">
-              {fbConectado
-                ? <>Conectado: <b>{cfg.page_nome}</b>{cfg.ig_usuario ? <> · @{cfg.ig_usuario}</> : <> · sem Instagram ligado à página</>}</>
-                : 'A página do Facebook e o Instagram profissional ligado a ela'}
-            </p>
+        {/* Instagram: conta profissional ligada a uma página do Facebook (API oficial da Meta) */}
+        <div className="p-4 rounded-xl border border-slate-200 space-y-2">
+          <div className="flex flex-wrap items-center gap-4">
+            <InstagramIcon className="w-7 h-7" />
+            <div className="flex-1 min-w-[160px]">
+              <p className="font-bold text-slate-800 text-sm">Instagram</p>
+              <p className="text-xs text-slate-500">
+                {fbConectado && cfg.ig_usuario
+                  ? <>Conectado: <b>@{cfg.ig_usuario}</b> · o robô lê e responde as mensagens diretas de quem escrever</>
+                  : fbConectado
+                    ? <>A página <b>{cfg.page_nome}</b> está conectada, mas <b>sem Instagram ligado a ela</b>. Veja o passo a passo abaixo e conecte de novo.</>
+                    : 'Entre com o Facebook e escolha a página ligada ao Instagram profissional da sua empresa'}
+              </p>
+            </div>
+            {fbConectado ? (
+              <button onClick={() => desconectar('facebook')} className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 flex items-center gap-1.5">
+                <Unplug className="w-3.5 h-3.5" /> Desconectar
+              </button>
+            ) : (
+              <button onClick={conectarFacebook} disabled={!disp.facebook || !!ocupado}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#833AB4] via-[#E1306C] to-[#F77737] disabled:opacity-40 text-white text-sm font-bold flex items-center gap-2">
+                {ocupado === 'facebook' ? <Loader2 className="w-4 h-4 animate-spin" /> : <InstagramIcon className="w-4 h-4" />}
+                Conectar Instagram
+              </button>
+            )}
           </div>
-          {fbConectado ? (
-            <button onClick={() => desconectar('facebook')} className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 flex items-center gap-1.5">
-              <Unplug className="w-3.5 h-3.5" /> Desconectar
-            </button>
-          ) : (
-            <button onClick={conectarFacebook} disabled={!disp.facebook || !!ocupado}
-              className="px-4 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#166FE5] disabled:opacity-40 text-white text-sm font-bold flex items-center gap-2">
-              {ocupado === 'facebook' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FacebookIcon className="w-4 h-4" />}
-              Conectar com Facebook
-            </button>
+          {!disp.facebook && (disp.faltando?.length ?? 0) > 0 && (
+            <div className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg p-2.5">
+              Falta ativar no sistema: <b>{disp.faltando!.join('; ')}</b>.
+            </div>
           )}
+          {(!fbConectado || !cfg.ig_usuario) && (
+            <ol className="text-xs text-slate-600 list-decimal pl-5 space-y-0.5">
+              <li>No Instagram, mude a conta para <b>profissional</b> (Configurações → Tipo de conta).</li>
+              <li>Ligue o Instagram a uma <b>página do Facebook</b> (Configurações → Conta → Página ligada).</li>
+              <li>Clique em <b>Conectar Instagram</b>, entre com o Facebook e marque a página e o Instagram.</li>
+              <li>No Instagram, ative <b>Permitir acesso às mensagens</b> (Configurações → Mensagens → Ferramentas conectadas).</li>
+            </ol>
+          )}
+          <p className="text-[11px] text-slate-500">
+            Regra do Instagram: o robô responde a quem escreveu primeiro (até 24 h depois). A primeira mensagem para um lead que nunca falou com você segue pelo
+            link que abre a conversa pronta. Messenger vem junto, pela mesma página.
+          </p>
         </div>
 
         {cfg.paginas_pendentes?.length > 0 && (

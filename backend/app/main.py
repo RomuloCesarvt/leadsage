@@ -2315,6 +2315,9 @@ async def meta_disponivel(user: dict = Depends(get_current_user)):
     sistema, so o modo manual existe."""
     return {
         **meta_oauth.disponivel(),
+        "faltando": meta_oauth.faltando_configurar(),
+        "webhook_url": f"{settings.APP_URL.rstrip('/')}/api/robo/meta/webhook",
+        "retorno_url": meta_oauth.redirect_uri(),
         "app_id": settings.META_APP_ID,
         "wa_config_id": settings.META_WA_CONFIG_ID,
     }
