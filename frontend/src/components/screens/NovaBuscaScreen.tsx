@@ -198,11 +198,11 @@ export const NovaBuscaScreen: React.FC = () => {
         </div>
       </div>
       {/* Floating Action Button */}
-      <div className="fixed bottom-8 right-8 z-30">
+      <div className="fixed z-30 inset-x-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:inset-x-auto md:bottom-8 md:right-8">
         <button 
           onClick={handleSearch}
           disabled={isSearching}
-          className={`px-8 py-4 font-bold rounded-full shadow-xl transition-all flex items-center gap-3 text-lg ${isSearching ? 'bg-blue-400 cursor-not-allowed text-white shadow-none' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/30 hover:scale-105 active:scale-95'}`}
+          className={`w-full md:w-auto justify-center px-6 md:px-8 py-4 font-bold rounded-full shadow-xl transition-all flex items-center gap-3 text-base md:text-lg ${isSearching ? 'bg-blue-400 cursor-not-allowed text-white shadow-none' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/30 hover:scale-105 active:scale-95'}`}
         >
           {isSearching ? (
             <>

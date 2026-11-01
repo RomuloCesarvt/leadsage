@@ -104,34 +104,34 @@ export const SplitViewWorkspace: React.FC = () => {
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] min-h-0">
+    <div className="w-full flex-1 flex flex-col md:h-[calc(100dvh-8rem)] md:max-h-[calc(100dvh-8rem)] min-h-0">
       
       {/* Title Area */}
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Meus Leads</h1>
           <p className="text-sm text-slate-500 font-medium mt-1">
             Os leads que você escolheu. É daqui que o contato começa. <span className="text-blue-600 font-bold">{leads.length} leads</span>
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <button
             onClick={() => setViewState('results')}
-            className="flex items-center gap-2 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600 transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 md:py-2 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600 transition-colors"
           >
             Resultados da busca
           </button>
           <button 
             onClick={handleExportCSV}
             disabled={isLoading || leads.length === 0}
-            className="flex items-center gap-2 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2.5 md:py-2 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600 transition-colors disabled:opacity-50"
           >
             <Download className="w-4 h-4" /> CSV
           </button>
           <button 
             onClick={handleExportExcel}
             disabled={isLoading || leads.length === 0}
-            className="flex items-center gap-2 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2.5 md:py-2 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600 transition-colors disabled:opacity-50"
           >
             <Download className="w-4 h-4" /> Excel
           </button>
@@ -139,7 +139,7 @@ export const SplitViewWorkspace: React.FC = () => {
       </div>
 
       {/* Main Table Area */}
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden w-full relative">
+      <div className="md:flex-1 md:min-h-0 flex flex-col md:overflow-hidden w-full relative">
         {isLoading ? (
           <div className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-8 animate-pulse">
             <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-6"></div>

@@ -33,13 +33,14 @@ export const Header: React.FC<{ toggleSidebar: () => void }> = ({ toggleSidebar 
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-slate-50 border-b border-slate-200">
-      <div className="h-16 px-4 md:px-8 flex items-center justify-between">
+    <header className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur border-b border-slate-200" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <div className="h-14 md:h-16 px-3 md:px-8 flex items-center justify-between">
         
         <div className="flex items-center gap-4">
           <button
             onClick={toggleSidebar}
-            className="p-2 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200 md:hidden transition-colors"
+            aria-label="Abrir menu"
+            className="w-11 h-11 -ml-2 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-200 md:hidden transition-colors"
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -48,7 +49,7 @@ export const Header: React.FC<{ toggleSidebar: () => void }> = ({ toggleSidebar 
           </h1>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1 md:gap-4">
           
           <div className="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-full bg-white border border-slate-200 text-sm font-bold text-slate-700 shadow-sm">
             <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
@@ -58,7 +59,7 @@ export const Header: React.FC<{ toggleSidebar: () => void }> = ({ toggleSidebar 
           <button
             onClick={() => setViewState('notifications')}
             aria-label={pendentes ? `${pendentes} avisos novos` : 'Avisos'}
-            className="relative p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+            className="relative w-11 h-11 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
           >
             <Bell className="w-5 h-5" />
             {pendentes > 0 && (

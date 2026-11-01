@@ -20,7 +20,7 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 SAIDA = os.path.join(AQUI, "saida")
 os.makedirs(SAIDA, exist_ok=True)
 URL = "http://localhost:5198/"
-EDGE = r"C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+EDGE = os.environ.get("QA_NAVEGADOR") or (r"C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" if os.name == "nt" else None)
 
 TELAS = [
     ("dashboard", "Dashboard"), ("hero", "Nova Busca"), ("results", "Resultados"), ("workspace", "Meus Leads"), ("pipeline", "Pipeline de Vendas"),
@@ -30,6 +30,8 @@ TELAS = [
     ("subscription", "Assinatura"),
 ]
 TAMANHOS = [("desktop", 1440, 900), ("notebook", 1280, 720), ("tablet", 820, 1100), ("celular", 390, 844)]
+if os.environ.get("QA_SO"):  # ex.: QA_SO=celular
+    TAMANHOS = [t for t in TAMANHOS if t[0] in os.environ["QA_SO"].split(",")]
 
 NOMES = ["Padaria Flor do Lageado", "Clínica Sorriso Pleno", "Academia Corpo em Ação", "Auto Center Rodrigues",
          "Studio Bella Pele", "Tintas Botucatu", "Prime Imóveis", "Pizzaria Forno de Ouro", "Dra. Helena Prado Advocacia",
@@ -203,9 +205,9 @@ async def main():
     filtro = set(sys.argv[1:])
     relatorio = []
     async with async_playwright() as p:
-        nav = await p.chromium.launch(executable_path=EDGE, headless=True)
+        nav = await p.chromium.launch(**({"executable_path": EDGE} if EDGE else {}), headless=True)
         for tamanho, w, h in TAMANHOS:
-            ctx = await nav.new_context(viewport={"width": w, "height": h})
+            ctx = await nav.new_context(viewport={"width": w, "height": h}, **({"is_mobile": True, "has_touch": True, "device_scale_factor": 2} if w <= 480 else {}))
             await preparar(ctx)
             for id_, rotulo in TELAS:
                 if filtro and id_ not in filtro:

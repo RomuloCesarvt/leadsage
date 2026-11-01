@@ -35,7 +35,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> =
     <button
       onClick={() => { if (disabled) return; setViewState(id); if (window.innerWidth < 768 && isOpen) toggleSidebar(); }}
       disabled={disabled}
-      className={`w-full py-2.5 px-3 rounded-xl flex items-center gap-3 text-sm font-semibold transition-all ${
+      className={`w-full py-3 md:py-2.5 px-3 rounded-xl flex items-center gap-3 text-sm font-semibold transition-all ${
         viewState === id 
           ? 'bg-blue-50 text-blue-600' 
           : disabled 
@@ -50,7 +50,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> =
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 flex flex-col transition-transform duration-300 ease-in-out ${
+      className={`fixed inset-y-0 left-0 z-40 w-[82vw] max-w-72 md:w-64 bg-white border-r border-slate-200 flex flex-col transition-transform duration-300 ease-in-out ${
         isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
       }`}
     >
@@ -58,14 +58,14 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> =
         <Logo size={30} />
         <button
           onClick={toggleSidebar}
-          className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors md:hidden"
+          className="p-2.5 -mr-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors md:hidden"
           title="Recolher Menu"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-8 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5 md:py-6 space-y-6 md:space-y-8 custom-scrollbar" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}>
         
         {/* Principal Section */}
         <div className="space-y-1">

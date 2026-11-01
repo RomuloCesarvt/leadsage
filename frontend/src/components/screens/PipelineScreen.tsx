@@ -81,8 +81,8 @@ export const PipelineScreen: React.FC = () => {
 
   return (
     <div ref={quadro} onDragOver={(e) => rolarNasBordas(quadro.current, e.clientX)}
-      className="quadro-arrastavel flex-1 overflow-x-auto overflow-y-hidden pb-2 h-full barra-grande" title="Segure o fundo e puxe para os lados">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      className="quadro-arrastavel flex-1 overflow-x-auto overflow-y-hidden pb-2 h-full barra-grande snap-x snap-mandatory md:snap-none -mx-4 px-4 md:mx-0 md:px-0" title="Segure o fundo e puxe para os lados">
+      <div className="mb-4 md:mb-6 flex flex-wrap items-end justify-between gap-3 sticky left-0 w-[calc(100vw-2rem)] md:w-auto">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-800">Pipeline de Vendas</h1>
           <p className="text-slate-500 text-sm mt-1">
@@ -100,13 +100,13 @@ export const PipelineScreen: React.FC = () => {
 
       <AvisoReguaConcluida />
 
-      <div className="flex gap-4 items-start min-w-max pb-8 h-[calc(100vh-200px)]">
+      <div className="flex gap-4 items-start min-w-max pb-8 h-[calc(100dvh-17rem)] md:h-[calc(100vh-200px)]">
         {COLUMNS.map(column => {
           const columnLeads = leads.filter((l: LeadItem) => ehSalvo(l) && etapaDe(l) === column.key);
           return (
             <div 
               key={column.key}
-              className="flex flex-col w-[300px] bg-slate-50 rounded-2xl border border-slate-200 h-full"
+              className="flex flex-col w-[86vw] max-w-[340px] md:w-[300px] shrink-0 snap-center md:snap-align-none bg-slate-50 rounded-2xl border border-slate-200 h-full"
               onDragOver={onDragOver}
               onDrop={(e) => onDrop(e, column.key)}
             >
@@ -167,6 +167,18 @@ export const PipelineScreen: React.FC = () => {
                           {scoreInfo.text}
                         </span>
                       </div>
+
+                      {/* Celular: arrastar com o dedo não funciona; este seletor move o card de etapa */}
+                      <label className="md:hidden mt-3 block" onClick={e => e.stopPropagation()}>
+                        <span className="sr-only">Mover {lead.company} para outra etapa</span>
+                        <select
+                          value={column.key} aria-label={`Mover ${lead.company} para outra etapa`}
+                          onChange={e => { if (e.target.value !== column.key) updateLeadStage(lead.id, e.target.value); }}
+                          className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700"
+                        >
+                          {COLUMNS.map(c => <option key={c.key} value={c.key}>Mover para: {c.key}</option>)}
+                        </select>
+                      </label>
 
                       {lead.pipeline_motivo && (
                         <p className="mt-2.5 text-[11px] text-slate-500 flex items-start gap-1.5 leading-snug">

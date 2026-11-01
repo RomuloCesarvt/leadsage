@@ -15,7 +15,7 @@ export const ResultadosBusca: React.FC = () => {
   const salvos = (leads as LeadItem[]).filter(ehSalvo).length;
 
   return (
-    <div className="w-full flex-1 flex flex-col h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] min-h-0">
+    <div className="w-full flex-1 flex flex-col md:h-[calc(100dvh-8rem)] md:max-h-[calc(100dvh-8rem)] min-h-0">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
@@ -34,7 +34,7 @@ export const ResultadosBusca: React.FC = () => {
           {resultados.length > 0 && (
             <button
               onClick={() => { if (window.confirm('Descartar todos os resultados que você não adicionou?')) limparResultados(); }}
-              className="flex items-center gap-2 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600"
+              className="flex items-center gap-2 px-4 py-2.5 md:py-2 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600"
             ><Trash2 className="w-4 h-4" /> Limpar resultados</button>
           )}
           <button
@@ -44,7 +44,7 @@ export const ResultadosBusca: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden w-full relative">
+      <div className="md:flex-1 md:min-h-0 flex flex-col md:overflow-hidden w-full relative">
         {isLoading ? (
           <div className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-8 animate-pulse">
             <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-6"></div>

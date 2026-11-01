@@ -90,3 +90,17 @@
 .quadro-arrastavel button, .quadro-arrastavel a, .quadro-arrastavel input, .quadro-arrastavel select, .quadro-arrastavel textarea {
   cursor: pointer;
 }
+
+/* ---- Celular: o mínimo para o app se comportar como app, não como página de computador encolhida ---- */
+@media (max-width: 767px) {
+  html { -webkit-text-size-adjust: 100%; }
+  body { -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+  /* 16 px: abaixo disso o iPhone aproxima a tela sozinho ao tocar num campo */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: 16px !important; }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select { min-height: 44px; }
+  /* tabelas que ainda não viraram cartões rolam de lado, nunca estouram a página */
+  .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+  /* modais e painéis laterais ocupam a tela toda e respeitam o notch */
+  .animate-slide-in-right { max-width: 100vw; }
+  h1 { word-break: normal; overflow-wrap: anywhere; }
+}

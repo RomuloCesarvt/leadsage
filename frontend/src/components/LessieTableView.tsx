@@ -134,29 +134,29 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
     );
   }
 
-  const campo = 'px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500';
+  const campo = 'px-3 py-2.5 md:py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500';
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+    <div className="md:flex-1 md:min-h-0 flex flex-col md:overflow-hidden">
 
       {/* Filtros */}
-      <div className="bg-white border border-slate-200 rounded-t-xl px-5 py-3 shrink-0">
+      <div className="bg-white border border-slate-200 rounded-t-xl px-3 md:px-5 py-3 shrink-0">
         <div className="flex flex-wrap items-center gap-3 mb-3">
           <div className="flex items-center gap-2 text-slate-500 text-sm font-bold">
             <Filter className="w-4 h-4" /> FILTROS
           </div>
-          <div className="relative">
+          <div className="relative w-full md:w-auto">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text" value={empresa} onChange={e => setEmpresa(e.target.value)} placeholder="Buscar empresa…"
-              aria-label="Buscar empresa" className={`${campo} pl-8 w-48`}
+              aria-label="Buscar empresa" className={`${campo} pl-8 w-full md:w-48`}
             />
           </div>
-          <select value={nicho} onChange={e => setNicho(e.target.value)} aria-label="Filtrar por nicho" className={campo}>
+          <select value={nicho} onChange={e => setNicho(e.target.value)} aria-label="Filtrar por nicho" className={`${campo} w-full md:w-auto`}>
             <option value="">Todos nichos</option>
             {nichos.map(n => <option key={n} value={n}>{n}</option>)}
           </select>
-          <select value={cidade} onChange={e => setCidade(e.target.value)} aria-label="Filtrar por cidade" className={campo}>
+          <select value={cidade} onChange={e => setCidade(e.target.value)} aria-label="Filtrar por cidade" className={`${campo} w-full md:w-auto`}>
             <option value="">Todas as cidades</option>
             {cidades.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
@@ -169,7 +169,7 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
           <span className="text-xs text-slate-500 ml-auto">{filteredLeads.length} de {base.length}</span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2" data-testid="filtros-de-leads">
+        <div className="flex flex-nowrap md:flex-wrap items-center gap-2 overflow-x-auto md:overflow-visible -mx-3 px-3 md:mx-0 md:px-0 pb-1 md:pb-0 custom-scrollbar" data-testid="filtros-de-leads">
           {botoes.map(f => {
             const ligado = filtros.has(f.key);
             const n = contarFiltro(universo, f.key);
@@ -178,7 +178,7 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
                 key={f.key} type="button" aria-pressed={ligado} data-filtro={f.key}
                 onClick={() => setFiltros(prev => alternarFiltro(prev, f.key))}
                 title={ligado ? 'Clique para tirar este filtro' : `Mostrar só: ${f.rotulo.toLowerCase()}. Os filtros se combinam.`}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 border whitespace-nowrap ${
+                className={`px-3 py-2 md:py-1.5 shrink-0 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 border whitespace-nowrap ${
                   ligado ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                 }`}
               >
@@ -201,8 +201,42 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
       )}
 
       {/* Tabela */}
-      <div className="flex-1 min-h-0 bg-white border border-t-0 border-slate-200 rounded-b-xl overflow-auto custom-scrollbar">
-        <table className="w-full text-left border-collapse">
+      <div className="md:flex-1 md:min-h-0 bg-white border border-t-0 border-slate-200 rounded-b-xl md:overflow-auto custom-scrollbar">
+        {/* Celular: um cartão por lead, com os toques grandes o bastante para o dedo */}
+        <ul className="md:hidden divide-y divide-slate-100" data-testid="leads-em-cartoes">
+          {filteredLeads.length === 0 && <li className="py-10 text-center text-sm text-slate-500">Nenhum lead com esses filtros.</li>}
+          {filteredLeads.map((lead: LeadItem) => {
+            const scoreInfo = getScoreLabel(lead.opportunityScore);
+            const marcado = marcados.has(lead.id);
+            return (
+              <li key={lead.id} className={`p-3 ${marcado ? 'bg-blue-50/60' : ''}`}>
+                <div className="flex items-start gap-3">
+                  <label className="-m-2 p-2 shrink-0 flex items-center" onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" checked={marcado} onChange={() => alternar(lead.id)} aria-label={`Selecionar ${lead.company}`} className="w-5 h-5 rounded border-slate-300" />
+                  </label>
+                  <button type="button" onClick={() => setSelectedProfileLead(lead)} className="flex-1 min-w-0 text-left">
+                    <p className="font-bold text-slate-800 text-[15px] leading-snug break-words">{lead.company}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 break-words">{[lead.niche, lead.city || lead.location?.split(',')[0]].filter(Boolean).join(' · ')}</p>
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${scoreInfo.color}`}>{scoreInfo.text}</span>
+                      {lead.phone && <span className="text-xs font-medium text-slate-600">+{lead.phone}</span>}
+                    </div>
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 mt-3 pl-8">
+                  <button onClick={() => setSelectedProfileLead(lead)} className="flex-1 h-11 text-blue-700 bg-blue-50 active:bg-blue-100 rounded-xl text-sm font-bold">Detalhes</button>
+                  {modo === 'resultados' ? (
+                    <button onClick={() => adicionar([lead.id])} aria-label="Adicionar a Meus Leads" className="w-11 h-11 flex items-center justify-center text-slate-500 bg-slate-50 active:bg-amber-50 rounded-xl"><Star className="w-5 h-5" /></button>
+                  ) : (
+                    <button onClick={() => alternarFavorito(lead.id)} aria-pressed={!!lead.favorito} aria-label={lead.favorito ? 'Tirar dos favoritos' : 'Favoritar'} className="w-11 h-11 flex items-center justify-center bg-slate-50 active:bg-amber-50 rounded-xl"><Star className={`w-5 h-5 ${lead.favorito ? 'text-amber-500 fill-amber-500' : 'text-slate-500'}`} /></button>
+                  )}
+                  <button onClick={() => remover([lead.id])} aria-label={modo === 'meus' ? 'Excluir este lead' : 'Descartar'} className="w-11 h-11 flex items-center justify-center text-slate-500 bg-slate-50 active:bg-rose-50 rounded-xl"><Trash2 className="w-5 h-5" /></button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <table className="hidden md:table w-full text-left border-collapse">
           <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
             <tr>
               <th className="py-3 px-4 w-10">
@@ -299,7 +333,7 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
 
       {/* Barra de ações dos selecionados */}
       {marcados.size > 0 && (
-        <div className="mt-3 shrink-0 bg-slate-900 text-white rounded-2xl px-5 py-3 flex flex-wrap items-center gap-3 shadow-lg">
+        <div className="fixed md:static inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-auto md:inset-x-auto z-30 md:mt-3 shrink-0 bg-slate-900 text-white rounded-2xl px-4 md:px-5 py-3 flex flex-wrap items-center gap-2 md:gap-3 shadow-lg">
           <span className="text-sm font-bold">{marcados.size} selecionado{marcados.size > 1 ? 's' : ''}</span>
           {modo === 'resultados' ? (
             <button

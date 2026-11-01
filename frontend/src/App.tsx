@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
+import { BottomNav } from './components/BottomNav';
 import { NovaBuscaScreen } from './components/screens/NovaBuscaScreen';
 import { ResultadosBusca } from './components/ResultadosBusca';
 import { SplitViewWorkspace } from './components/SplitViewWorkspace';
@@ -47,7 +48,7 @@ const MainApp: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex font-sans antialiased selection:bg-blue-100 selection:text-blue-900">
+    <div className="min-h-dvh bg-slate-50 text-slate-900 flex font-sans antialiased selection:bg-blue-100 selection:text-blue-900">
       
       {/* Mobile Overlay */}
       {isSidebarOpen && (
@@ -67,7 +68,7 @@ const MainApp: React.FC = () => {
         <Header toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
         {/* View Switcher */}
-        <main className="flex-1 w-full max-w-7xl mx-auto flex flex-col p-6 transition-all duration-300">
+        <main className="flex-1 w-full max-w-7xl mx-auto flex flex-col p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:p-6 transition-all duration-300">
           
           {/* Principal */}
           {viewState === 'dashboard' && <DashboardScreen />}
@@ -101,6 +102,8 @@ const MainApp: React.FC = () => {
         </main>
 
       </div>
+
+      <BottomNav abrirMenu={() => setIsSidebarOpen(true)} />
 
       {/* Global Modals */}
       <LeadProfilePanel />

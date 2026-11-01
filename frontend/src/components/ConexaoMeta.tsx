@@ -202,7 +202,7 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+    <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-6 shadow-sm">
       <h2 className="text-lg font-bold text-slate-800 mb-1">Canais</h2>
       <p className="text-sm text-slate-500 mb-5">Por onde o robô conversa. Comece pelo WhatsApp: é só escanear o QR code.</p>
 
