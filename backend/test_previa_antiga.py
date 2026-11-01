@@ -22,7 +22,7 @@ def _preparar(monkeypatch, site):
         gravados.append(("modelo", modelo))
         return {"html": PAGINA, "template": "Natural", "company": "Psicóloga Isabelly", "builder_data": json.dumps({"empresa": "x"})}
 
-    async def fotos(nicho, quantidade=8):
+    async def fotos(nicho, quantidade=8, especialidade=""):
         return []
 
     async def atualizar(uid, site_id, company, html, template="", builder_data="", marcar_edicao=True):
@@ -81,7 +81,7 @@ def test_previa_do_robo_leva_o_texto_proprio_da_ia_ao_motor(monkeypatch):
         visto["lead"] = lead
         return {"html": PAGINA, "template": "Forno", "company": "Padaria", "builder_data": "{}"}
 
-    async def fotos(nicho, quantidade=8):
+    async def fotos(nicho, quantidade=8, especialidade=""):
         return []
 
     async def copia(lead):

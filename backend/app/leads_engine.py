@@ -15,6 +15,7 @@ from app.lead_intel import (
     montar_ganchos,
 )
 from app.models import LeadItem, LeadSocialLinks
+from app import identidade_lead
 from app.social_scraper import SocialScraper
 
 PLACES_URL = "https://places.googleapis.com/v1/places:searchText"
@@ -714,6 +715,15 @@ class LeadsEngine:
 
             if data.get("bio"):
                 lead.bio = data["bio"][:400]
+
+            # Identidade: logo, fotos do proprio negocio, cor da marca e perfil do Instagram
+            ident = data.get("identidade") or {}
+            if identidade_lead.tem_algo(ident):
+                lead.identidade = ident
+                if ident.get("instagram") and not lead.socials.instagram:
+                    lead.socials.instagram = ident["instagram"]
+                if not lead.bio and (ident.get("instagram_bio") or ident.get("descricao")):
+                    lead.bio = (ident.get("instagram_bio") or ident.get("descricao"))[:400]
 
             # Diagnostico do site. So existe quando havia site para abrir:
             # para quem nao tem, a oportunidade ja esta em missingDigitalAssets.

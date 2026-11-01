@@ -93,9 +93,17 @@ def pontuar(f: Dict[str, Any], bons: set, ruins: set) -> int:
     if palavras & ruins:
         return -1
     pontos = 3 * len(palavras & bons) + 3 * len(set(re.findall(r"[a-z0-9\-]+", (f.get("titulo") or "").lower())) & bons)  # o título vale em dobro
-    if (f.get("largura") or 0) >= 3000:  # imagem grande e larga serve para capa
+    # resolução: capa de site pede foto grande, nítida e horizontal; a pequena ou vertical fica por último
+    larg, alt = f.get("largura") or 0, f.get("altura") or 0
+    if larg >= 3000:
+        pontos += 2
+    elif larg >= 1800:
         pontos += 1
-    return pontos
+    elif 0 < larg < 1000:
+        pontos -= 1
+    if larg and alt and alt > larg:
+        pontos -= 2
+    return max(pontos, 0)
 
 
 def escolher(fotos: List[Dict[str, Any]], bons: set, ruins: set, quantidade: int, exigir: bool = False) -> List[Dict[str, Any]]:

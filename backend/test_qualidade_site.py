@@ -77,7 +77,7 @@ def _preparar(monkeypatch, html, copia=None):
     async def renderizar(lead, fotos, modelo="", anterior=None):
         return {"html": html, "template": "Natural", "company": lead.get("company") or lead.get("name"), "builder_data": "{}"}
 
-    async def fotos(nicho, quantidade=8):
+    async def fotos(nicho, quantidade=8, especialidade=""):
         return []
 
     async def copia_do_lead(lead):
@@ -143,7 +143,7 @@ def test_atualizacao_reprovada_deixa_o_site_que_ja_esta_no_ar(monkeypatch):
     async def atualizar(*a, **k):
         gravados.append(a)
 
-    async def fotos(n, quantidade=8):
+    async def fotos(n, quantidade=8, especialidade=""):
         return []
 
     async def copia(lead):

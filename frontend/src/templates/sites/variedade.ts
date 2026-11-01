@@ -101,7 +101,7 @@ export const aplicarCopia = (dados: SiteData, copia: CopiaIA | null | undefined,
 export const individualizar = (dados: SiteData, lead: any, temCopia = false): SiteData => {
   const chave = `${dados.empresa}|${dados.cidade || ''}`;
   const saida: SiteData = { ...dados };
-  const desc = txt(lead?.google_description, 420);
+  const desc = txt(lead?.google_description, 420) || txt(lead?.identidade?.descricao, 420);
   if (!temCopia && desc.length >= 60 && /[a-zà-ú]{4,}/i.test(desc) && !/^https?:/i.test(desc)) saida.sobre = desc;
   const avaliacao = txt(lead?.review_highlight, 240);
   if (avaliacao.length >= 30 && !(dados.depoimentos || []).some(d => (d.texto || '').trim())) {

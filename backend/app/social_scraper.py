@@ -8,6 +8,7 @@ from urllib.parse import urljoin, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
+from app import identidade_lead
 from app.lead_intel import analisar_site, qualidade_do_site
 
 # Enderecos que aparecem em sites mas nunca sao contato real do negocio
@@ -81,6 +82,8 @@ def empty_result() -> Dict[str, Any]:
         "site": {},
         "site_quality": None,
         "site_issues": [],
+        # Logo, fotos, cor da marca e perfil do Instagram do proprio lead (a prévia do site nasce com a cara dele).
+        "identidade": {},
     }
 
 
@@ -264,6 +267,10 @@ class SocialScraper:
 
                 base = str(resp.url)
                 contact_links = SocialScraper.parse_page(resp.text, base, result)
+                try:
+                    result["identidade"] = identidade_lead.ler_site(resp.text, base)
+                except Exception:
+                    pass
 
                 # Diagnostico do site: e daqui que sai a frase que abre a
                 # conversa. "Voce precisa de um site" nao vende para quem
@@ -325,11 +332,13 @@ class SocialScraper:
         # Rede social nao vale scrapear (exige login e bloqueia bot).
         # Linktree vale: costuma listar todas as redes num HTML simples.
         if direct_social and not is_aggregator:
+            if direct_social == "instagram":
+                data["identidade"] = await identidade_lead.buscar(instagram=website)
             return data
 
         scraped = await SocialScraper.scrape_website(website)
         for key, value in scraped.items():
-            if key in ("emails", "whatsapp_numbers", "phones", "site", "site_issues"):
+            if key in ("emails", "whatsapp_numbers", "phones", "site", "site_issues", "identidade"):
                 data[key] = value
             elif key == "site_quality":
                 data[key] = value
@@ -338,6 +347,19 @@ class SocialScraper:
 
         site_domain = urlparse(website).netloc.replace("www.", "")
         data["emails"].sort(key=lambda e: score_email(e, site_domain), reverse=True)
+
+        # O Instagram que o site aponta: foto de perfil, bio e seguidores completam a identidade
+        if data.get("instagram"):
+            try:
+                ig = await identidade_lead.buscar(instagram=data["instagram"])
+                ident = data.get("identidade") or identidade_lead.vazia()
+                for k in ("foto_perfil", "instagram", "instagram_usuario", "seguidores", "publicacoes", "instagram_bio"):
+                    ident[k] = ig.get(k) or ident.get(k)
+                ident["nome"] = ident.get("nome") or ig.get("nome", "")
+                ident["logo"] = ident.get("logo") or ig.get("foto_perfil", "")
+                data["identidade"] = ident
+            except Exception:
+                pass
         return data
 
     @staticmethod

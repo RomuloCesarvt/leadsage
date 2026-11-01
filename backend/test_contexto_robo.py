@@ -252,7 +252,7 @@ def motor_de_sites_falso(monkeypatch):
         return {"html": f'<!DOCTYPE html><html><body><h1>{nome}</h1><p>{corpo}</p><a href="https://wa.me/5514998005560">WhatsApp</a></body></html>',
                 "template": "Modelo de teste", "company": nome, "builder_data": "{}"}
 
-    async def fotos(nicho, quantidade=8):
+    async def fotos(nicho, quantidade=8, especialidade=""):
         return ["https://exemplo.test/f1.jpg", "https://exemplo.test/f2.jpg"]
 
     monkeypatch.setattr(previa_site, "renderizar", renderizar)

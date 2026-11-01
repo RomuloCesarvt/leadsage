@@ -17,6 +17,21 @@ import { limparNomeDaMarca } from './marca';
 import { SITE_TEMPLATES, sugerirTemplate } from './layouts';
 import { aplicarCopia, individualizar, variarCor } from './variedade';
 
+/**
+ * Nota e avaliações do Google só entram no site quando são mérito de verdade: nota alta E volume que a sustente.
+ * 5,0 com 3 avaliações, ou 4,2 com 200, não vendem nada (e ainda podem queimar o negócio): nesses casos o selo some.
+ */
+export const NOTA_MINIMA = 4.5;
+export const AVALIACOES_MINIMAS = 30;
+export const notaComMerito = (nota: unknown, avaliacoes: unknown): { nota: number; avaliacoes: number } | null => {
+  const n = Number(nota); const a = Number(avaliacoes);
+  return n >= NOTA_MINIMA && a >= AVALIACOES_MINIMAS ? { nota: n, avaliacoes: a } : null;
+};
+
+const urlHttps = (u: unknown): string => (/^https:\/\/[^\s"'<>()\\]+$/.test(String(u || '')) ? String(u) : '');
+
+const corDaMarca = (c: unknown): string => (/^#[0-9a-f]{6}$/i.test(String(c || '')) ? String(c).toLowerCase() : '');
+
 /** Os dados iniciais de um site: os do lead quando há, já com o conteúdo do ramo. */
 export const dadosDoLead = (lead: any): SiteData => {
   const base: SiteData = {
@@ -40,12 +55,13 @@ export const dadosDoLead = (lead: any): SiteData => {
     endereco: lead?.address || lead?.location || '',
     // a semana inteira resumida ("Seg a Sex 08:00–18:00 · Sáb ..."), não só os 3 primeiros dias
     horario: lead?.opening_hours_week?.length ? resumirSemana(lead.opening_hours_week) : lead?.opening_hours || '',
-    instagram: lead?.socials?.instagram || lead?.instagram || '',
+    instagram: lead?.socials?.instagram || lead?.identidade?.instagram || lead?.instagram || '',
+    // a logo do próprio negócio (do site ou a foto do perfil do Instagram), quando a busca de identidade achou
+    logo: urlHttps(lead?.identidade?.logo) || undefined,
     corPrimaria: '#2563eb',
     corDestaque: '#f59e0b',
     // a nota do Google vira o selo de prova social no site
-    nota: lead?.rating ?? null,
-    avaliacoes: lead?.rating_count ?? null,
+    ...(() => { const m = notaComMerito(lead?.rating, lead?.rating_count); return { nota: m ? m.nota : null, avaliacoes: m ? m.avaliacoes : null }; })(),
   };
   // com um negócio de verdade, o repertório do ramo já vem escrito (e editável)
   return lead ? semearConteudo(base, { cores: true }) : base;
@@ -56,7 +72,7 @@ export const dadosDoLead = (lead: any): SiteData => {
  * uma prévia quando a versão gravada nela é outra. Sem esta marca, todo site criado pelo Disparo era refeito de novo pelo servidor
  * ao preparar a mensagem (o dobro de tempo e de chamadas de IA).
  */
-export const MOTOR_VERSAO = '2026-10-19b-cada-nicho-no-seu-modelo';
+export const MOTOR_VERSAO = '2026-11-01-identidade-e-nota-com-merito';
 
 const indiceEstavel = (texto: string, n: number): number => {
   let h = 0;
@@ -71,7 +87,6 @@ export const escolherTemplate = (nicho: string, empresa: string): SiteTemplate =
   return validos.length ? validos[indiceEstavel(empresa, validos.length)] : sugerirTemplate(nicho);
 };
 
-const urlHttps = (u: unknown): string => (/^https:\/\/[^\s"'<>()\\]+$/.test(String(u || '')) ? String(u) : '');
 
 /**
  * O site do lead, pronto para publicar.
@@ -91,7 +106,13 @@ export const montarPrevia = (lead: any, fotos: string[] = [], preferido = '', an
   dados = copia ? aplicarCopia(dados, copia, lead?.city || '') : dados;
   dados = individualizar(dados, lead, !!copia);
   // a cor do segmento, com um desvio próprio de cada empresa: duas padarias não repetem o mesmo tom
-  dados.corPrimaria = variarCor(dados.corPrimaria, `${dados.empresa}|p`);
+  const corMarca = corDaMarca(lead?.identidade?.cor);
+  if (corMarca) {
+    // o negócio já tem cor: o site usa a dele (o destaque continua o do segmento, para combinar)
+    dados.corPrimaria = corMarca;
+  } else {
+    dados.corPrimaria = variarCor(dados.corPrimaria, `${dados.empresa}|p`);
+  }
   dados.corDestaque = variarCor(dados.corDestaque, `${dados.empresa}|d`, 0.6);
   if (anterior && typeof anterior === 'object') {
     const d = dados as unknown as Record<string, unknown>;
@@ -102,7 +123,13 @@ export const montarPrevia = (lead: any, fotos: string[] = [], preferido = '', an
     if (!(dados.galeria || []).length && Array.isArray(anterior.galeria)) dados.galeria = anterior.galeria.filter(x => typeof x === 'string').slice(0, 4);
     if (!dados.depoimentos?.some(x => x.texto?.trim()) && Array.isArray(anterior.depoimentos)) dados.depoimentos = anterior.depoimentos;
   }
-  const urls = [...new Set((fotos || []).map(urlHttps).filter(Boolean))];
+  // o site anterior pode ter guardado uma nota fraca: a regra do mérito vale também para ele
+  const meritoFinal = notaComMerito(dados.nota, dados.avaliacoes);
+  dados.nota = meritoFinal ? meritoFinal.nota : null;
+  dados.avaliacoes = meritoFinal ? meritoFinal.avaliacoes : null;
+  // fotos do próprio negócio (as do site dele) vêm antes das do banco de imagens; o banco completa
+  const proprias = (Array.isArray(lead?.identidade?.imagens) ? lead.identidade.imagens : []).map(urlHttps).filter(Boolean).slice(0, 3);
+  const urls = [...new Set([...proprias, ...(fotos || []).map(urlHttps).filter(Boolean)])];
   if (urls.length) {
     dados.capa = dados.capa || urls[0];
     dados.fotoSobre = dados.fotoSobre || urls[1] || urls[0];

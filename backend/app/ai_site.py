@@ -216,6 +216,8 @@ def _dados_do_lead(lead: Any) -> Dict[str, Any]:
         "review_highlight": getattr(lead, "review_highlight", "") or "",
         "price_level": getattr(lead, "price_level", "") or "",
         "instagram": ((getattr(lead, "socials", None).instagram if getattr(lead, "socials", None) else "") or ""),
+        "bio": getattr(lead, "bio", "") or "",
+        "identidade": getattr(lead, "identidade", None) or {},
     }
 
 
@@ -227,9 +229,17 @@ def _contexto(d: Dict[str, Any]) -> str:
     ]
     if d.get("address"):
         linhas.append(f"- Endereço: {d['address']}")
-    if d.get("rating") and d.get("rating_count"):
+    # nota fraca ou com pouca avaliação não é mérito: nem entra no texto (o site também não a mostra)
+    if float(d.get("rating") or 0) >= 4.5 and int(d.get("rating_count") or 0) >= 30:
         nota = f"{float(d['rating']):.1f}".replace(".", ",")
         linhas.append(f"- Reputação real: nota {nota} com {d['rating_count']} avaliações no Google")
+    ident = d.get("identidade") or {}
+    if ident.get("instagram_bio"):
+        linhas.append(f"- Como ele mesmo se apresenta no Instagram: {ident['instagram_bio']}")
+    if ident.get("seguidores") and int(ident["seguidores"]) >= 1000:
+        linhas.append(f"- Instagram com {int(ident['seguidores']):,} seguidores".replace(",", "."))
+    if ident.get("descricao") and not d.get("google_description"):
+        linhas.append(f"- Como o site dele se descreve: {ident['descricao']}")
     if d.get("google_description"):
         linhas.append(f"- Descrição do Google: {d['google_description']}")
     if d.get("review_highlight"):

@@ -81,7 +81,7 @@ def _tem_dados_reais(lead: Dict[str, Any], copia_ia: Optional[Dict[str, Any]]) -
     if copia_ia:
         return True
     for k in ("address", "location", "google_description", "review_highlight", "rating", "rating_count",
-              "opening_hours", "opening_hours_week", "instagram", "socials", "email"):
+              "opening_hours", "opening_hours_week", "instagram", "socials", "email", "identidade", "bio"):
         if lead.get(k) not in (None, "", [], {}):
             return True
     return False

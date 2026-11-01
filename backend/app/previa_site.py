@@ -8,24 +8,26 @@ daqui com o segredo do serviço; assim o robô e o disparo geram exatamente o me
 
 Se o motor não responder, NÃO se publica uma página qualquer: o robô avisa que está finalizando e o dono assume.
 """
+import asyncio
 import json
 from typing import Any, Dict, List, Tuple
 
 import httpx
 
-from app import banco_imagens, qualidade_site
+from app import banco_imagens, identidade_lead, qualidade_site
 from app.config import settings
 from app.credit_system import acesso_total
 
 # Versao do motor de sites. Ao mudar o visual (cores, modelos, titulos), troque o valor: as previas ja criadas e
 # nunca editadas sao refeitas, com o mesmo link, na proxima vez que forem enviadas.
-MOTOR_VERSAO = "2026-10-19b-cada-nicho-no-seu-modelo"
+MOTOR_VERSAO = "2026-11-01-identidade-e-nota-com-merito"
 
 # o que o motor de sites sabe usar de um lead
 CAMPOS_DO_LEAD = (
     "id", "name", "company", "niche", "role", "city", "phone", "whatsapp", "email", "address", "location",
     "rating", "rating_count", "opening_hours", "opening_hours_week", "socials", "instagram",
     "google_description", "review_highlight", "copia_ia",
+    "neighborhood", "price_level", "bio", "website", "identidade", "reviews_sample",
 )
 
 
@@ -33,13 +35,45 @@ def lead_para_o_motor(lead: Dict[str, Any]) -> Dict[str, Any]:
     return {k: lead[k] for k in CAMPOS_DO_LEAD if lead.get(k) not in (None, "")}
 
 
-async def fotos_do_ramo(nicho: str, quantidade: int = 8) -> List[str]:
-    """Endereços https de fotos do ramo (vazio se o banco de imagens não responder: o site cai no fundo desenhado)."""
+async def garantir_identidade(lead: Dict[str, Any]) -> Dict[str, Any]:
+    """Leads que chegaram antes da busca de identidade (ou cujo site estava fora do ar) ganham a identidade aqui, uma vez."""
+    if identidade_lead.tem_algo(lead.get("identidade")):
+        return lead
+    socials = lead.get("socials") if isinstance(lead.get("socials"), dict) else {}
+    site = str(lead.get("website") or socials.get("website") or "")
+    insta = str(socials.get("instagram") or lead.get("instagram") or "")
+    if not (site or insta):
+        return lead
     try:
-        r = await banco_imagens.buscar(nicho=(nicho or "")[:80], quantidade=quantidade)
-        return [str(f["url"]) for f in (r.get("imagens") or []) if str(f.get("url", "")).startswith("https://")][:quantidade]
+        ident = await asyncio.wait_for(identidade_lead.buscar(site=site, instagram=insta), timeout=12)
     except Exception:
-        return []
+        return lead
+    if identidade_lead.tem_algo(ident):
+        lead = {**lead, "identidade": ident}
+    return lead
+
+
+async def fotos_do_ramo(nicho: str, quantidade: int = 8, especialidade: str = "") -> List[str]:
+    """Endereços https de fotos do ramo (vazio se o banco de imagens não responder: o site cai no fundo desenhado).
+
+    `especialidade`: o que o Google (ou a IA) diz que o negócio é, mais específico que o ramo da busca ("Clínica de implantes"
+    para "Dentistas"). Quando o banco tem um perfil próprio para ela, essas fotos vêm primeiro."""
+    def https(r: Dict[str, Any]) -> List[str]:
+        return [str(f["url"]) for f in (r.get("imagens") or []) if str(f.get("url", "")).startswith("https://")]
+    saida: List[str] = []
+    try:
+        esp = (especialidade or "").strip()[:80]
+        if esp and esp.lower() != (nicho or "").strip().lower():
+            saida += https(await banco_imagens.buscar(nicho=esp, quantidade=quantidade))
+        saida += https(await banco_imagens.buscar(nicho=(nicho or "")[:80], quantidade=quantidade))
+    except Exception:
+        pass
+    vistos, unicas = set(), []
+    for u in saida:
+        if u not in vistos:
+            vistos.add(u)
+            unicas.append(u)
+    return unicas[:quantidade]
 
 
 async def copia_do_lead(lead: Dict[str, Any]) -> Dict[str, Any]:
@@ -60,6 +94,7 @@ async def _montar_e_avaliar(lead: Dict[str, Any], fotos: List[str], modelo: str 
                             anterior: Dict[str, Any] = None) -> Tuple[Dict[str, Any], List[str]]:
     """Monta o site e o avalia. Se reprovar por falta de texto proprio, tenta mais uma vez pedindo o texto a IA."""
     extra = ([modelo, anterior] if (modelo or anterior) else [])
+    lead = await garantir_identidade(lead)
     copia = await copia_do_lead(lead)
     site = await renderizar({**lead, "copia_ia": copia}, fotos, *extra)
     bloqueios, _ = qualidade_site.avaliar(str(site.get("html") or ""), {**lead, "company": site.get("company") or lead.get("company")}, copia)
@@ -149,7 +184,7 @@ async def atualizar_se_antigo(uid: str, email: str, lead: Dict[str, Any]) -> boo
                 dados = (await get_site(uid, s["id"]) or {}).get("builder_data") or ""
             if _carimbo(dados) == MOTOR_VERSAO:
                 return False
-            fotos = await fotos_do_ramo(str(lead.get("niche") or lead.get("role") or ""))
+            fotos = await fotos_do_ramo(str(lead.get("niche") or lead.get("role") or ""), especialidade=str(lead.get("role") or ""))
             site, bloqueios = await _montar_e_avaliar(lead, fotos, str(s.get("template") or ""), _do_site_anterior(dados))
             if bloqueios:
                 print(f"Atualizacao da previa reprovada na avaliacao ({lead_id}): {qualidade_site.resumo(bloqueios)}")
@@ -181,7 +216,7 @@ async def criar(uid: str, email: str, lead: Dict[str, Any]) -> Tuple[str, str]:
             cota = (await get_profile(uid)).sites_quota or 0
             if await contar_sites(uid) >= cota:
                 return "", "o plano não tem mais vagas de site"
-        fotos = await fotos_do_ramo(str(lead.get("niche") or lead.get("role") or ""))
+        fotos = await fotos_do_ramo(str(lead.get("niche") or lead.get("role") or ""), especialidade=str(lead.get("role") or ""))
         site, bloqueios = await _montar_e_avaliar(lead, fotos)
         if bloqueios:
             # nada sai sem passar na avaliacao: melhor chamar o dono do que mandar um link ruim

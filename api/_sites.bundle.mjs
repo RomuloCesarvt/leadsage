@@ -480,7 +480,7 @@ var BANCO = [
   {
     id: "padaria",
     nome: "Padaria e confeitaria",
-    chaves: ["padaria", "panificadora", "confeitaria", "doceria", "cafeteria", "bolo", "confeiteir", "doceir", "cafe "],
+    chaves: ["padaria", "panificadora", "confeitaria", "doceria", "cafeteria", "bolo", "confeiteir", "doceir", "cafe ", "sorvet", "acai", "chocolate", "casa de cha", "casa de suco", "bolos"],
     schema: "Bakery",
     layout: "forno",
     paleta: { primaria: "#8a4b1f", destaque: "#e9a23b" },
@@ -511,7 +511,7 @@ var BANCO = [
   {
     id: "restaurante",
     nome: "Restaurante, pizzaria e lanchonete",
-    chaves: ["restaurante", "pizzaria", "lanchonete", "hamburgueria", "bar ", "churrascaria", "cantina", "marmitaria", "japones", "sushi", "boteco", "pub", "choperia", "espetaria", "self service", "por quilo", "rotisseria"],
+    chaves: ["restaurante", "pizzaria", "lanchonete", "hamburgueria", "bar ", "churrascaria", "cantina", "marmitaria", "japones", "sushi", "boteco", "pub ", "pubs ", "choperia", "espetaria", "self service", "por quilo", "rotisseria", "salgader", "pastelaria", "tapioca", "creperia", "food truck", "dark kitchen", "hot dog", "churrasc", "casa de carne", "marmit", "pizza", "cervejaria", "chopp", "bar com musica", "gastronomia"],
     schema: "Restaurant",
     layout: "mesa",
     paleta: { primaria: "#9b2c1a", destaque: "#f0a82b" },
@@ -536,7 +536,7 @@ var BANCO = [
   {
     id: "saude-medica",
     nome: "Cl\xEDnica m\xE9dica e consult\xF3rio",
-    chaves: ["clinica medica", "clinica geral", "clinica popular", "clinica de saude", "medic", "consultorio", "dermato", "pediatr", "ortoped", "cardio", "oftalmo", "ginecolog", "urolog", "endocrin", "neurolog", "psiquiatr", "otorrino", "geriatr", "laboratorio", "diagnostico", "gastro", "reumat", "pneumo", "oncolog", "proctolog", "hematolog", "nefrolog", "angiolog", "alergist", "imunolog", "infectolog", "mastolog", "obstetr", "anestesi", "cirurg", "hospital", "centro medico", "pronto atend", "ambulatorio", "check up", "doutor", "doutora", "dr ", "dra ", "fisioterap", "nutricion", "posto de saude"],
+    chaves: ["clinica medica", "clinica geral", "clinica popular", "clinica de saude", "medic", "consultorio", "dermato", "pediatr", "ortoped", "cardio", "oftalmo", "ginecolog", "urolog", "endocrin", "neurolog", "psiquiatr", "otorrino", "geriatr", "laboratorio", "diagnostico", "gastro", "reumat", "pneumo", "oncolog", "proctolog", "hematolog", "nefrolog", "angiolog", "alergist", "imunolog", "infectolog", "mastolog", "obstetr", "anestesi", "cirurg", "hospital", "radiolog", "nutrolog", "casa de repouso", "home care", "cuidador", "maternidade", "centro medico", "pronto atend", "ambulatorio", "check up", "doutor", "doutora", "dr ", "dra ", "posto de saude"],
     schema: "MedicalClinic",
     layout: "clinica",
     paleta: { primaria: "#0f7c8a", destaque: "#2f9e6f" },
@@ -559,9 +559,62 @@ var BANCO = [
     imagens: ["cl\xEDnica m\xE9dica consult\xF3rio", "m\xE9dico atendimento", "medical clinic doctor", "health care"]
   },
   {
+    id: "nutricao",
+    nome: "Nutri\xE7\xE3o e nutricionistas",
+    prioritario: true,
+    chaves: ["nutricion", "nutricao", "nutri", "dietista", "reeducacao alimentar"],
+    schema: "MedicalBusiness",
+    layout: "natural",
+    paleta: { primaria: "#2f6b3f", destaque: "#c9741f" },
+    cta: { principal: "Agendar consulta", secundario: "Como funciona" },
+    etiqueta: "Alimenta\xE7\xE3o com orienta\xE7\xE3o profissional",
+    titulos: ["Comer bem pode ser simples e prazeroso", "Tenha um plano alimentar pensado para a sua rotina", "Cuide da sua alimenta\xE7\xE3o com orienta\xE7\xE3o de verdade"],
+    subtitulo: "Atendimento individual, orienta\xE7\xE3o clara e agendamento f\xE1cil pelo WhatsApp.",
+    sobre: "Alimenta\xE7\xE3o n\xE3o \xE9 igual para todo mundo. Aqui a consulta olha a sua rotina, os seus objetivos e a sua sa\xFAde para montar um caminho poss\xEDvel de seguir.",
+    servicos: [
+      S("Consulta nutricional", "Avalia\xE7\xE3o da rotina, dos h\xE1bitos e dos objetivos, com tempo para ouvir voc\xEA."),
+      S("Plano alimentar", "Orienta\xE7\xE3o individual, adaptada \xE0 sua rotina e \xE0s suas prefer\xEAncias."),
+      S("Reeduca\xE7\xE3o alimentar", "Mudan\xE7a de h\xE1bitos com acompanhamento, sem solu\xE7\xF5es milagrosas."),
+      S("Acompanhamento e retornos", "Ajustes ao longo do caminho, conforme a sua evolu\xE7\xE3o."),
+      S("Alimenta\xE7\xE3o no dia a dia", "Dicas pr\xE1ticas de compras, preparo e organiza\xE7\xE3o das refei\xE7\xF5es."),
+      S("D\xFAvidas e mitos", "Orienta\xE7\xE3o clara para separar informa\xE7\xE3o confi\xE1vel de modismo.")
+    ],
+    diferenciais: [I("Plano individual", "Nada de modelo pronto: o plano parte da sua realidade."), I("Escuta atenta", "Sua rotina, seus gostos e seus limites entram na conversa."), I("Explica\xE7\xE3o clara", "Voc\xEA entende o porqu\xEA de cada orienta\xE7\xE3o."), I("Agendamento f\xE1cil", "Marque pelo WhatsApp, sem complica\xE7\xE3o.")],
+    passos: [I("Agende", "Chame pelo WhatsApp e escolha o melhor dia e hor\xE1rio."), I("Conte sua rotina", "Na consulta, conversamos sobre h\xE1bitos, objetivos e sa\xFAde."), I("Siga o plano", "Receba a orienta\xE7\xE3o e combine os retornos para ajustar.")],
+    faq: [P("Como agendo uma consulta?", "Pelo bot\xE3o de WhatsApp desta p\xE1gina: escolha o dia e o hor\xE1rio que preferir."), P("Preciso levar exames?", "Se tiver exames recentes, leve ou envie antes da consulta. Se n\xE3o tiver, confirme pelo WhatsApp como proceder."), P("A consulta \xE9 presencial ou online?", "Confirme pelo WhatsApp as op\xE7\xF5es de atendimento dispon\xEDveis."), P("Voc\xEAs atendem por conv\xEAnio?", "Confirme pelo WhatsApp quais conv\xEAnios s\xE3o aceitos e as condi\xE7\xF5es."), P("Qual o endere\xE7o e o hor\xE1rio de atendimento?", "Est\xE3o na se\xE7\xE3o de contato logo abaixo, com o caminho no mapa.")],
+    imagens: ["nutri\xE7\xE3o alimenta\xE7\xE3o saud\xE1vel", "frutas legumes", "healthy food", "nutritionist"]
+  },
+  {
+    id: "fisioterapia",
+    nome: "Fisioterapia e reabilita\xE7\xE3o",
+    prioritario: true,
+    chaves: ["fisioterap", "reabilit", "quiropr", "osteopat"],
+    schema: "MedicalBusiness",
+    layout: "natural",
+    paleta: { primaria: "#1d6b7a", destaque: "#c9672a" },
+    cta: { principal: "Agendar avalia\xE7\xE3o", secundario: "Como chegar" },
+    etiqueta: "Avalia\xE7\xE3o individual antes de tratar",
+    titulos: ["Volte a se mover com mais conforto", "Cuide da dor e recupere o seu movimento", "Tratamento acompanhado, no seu ritmo"],
+    subtitulo: "Avalia\xE7\xE3o individual, tratamento explicado em cada etapa e agendamento f\xE1cil pelo WhatsApp.",
+    sobre: "Cada corpo responde de um jeito. Aqui o tratamento come\xE7a por uma avalia\xE7\xE3o e \xE9 ajustado ao longo do caminho.",
+    servicos: [
+      S("Avalia\xE7\xE3o fisioterap\xEAutica", "Entendemos onde d\xF3i, o que limita o seu dia e o que voc\xEA quer voltar a fazer."),
+      S("Tratamento da dor", "T\xE9cnicas indicadas para o seu caso, explicadas antes de come\xE7ar."),
+      S("Reabilita\xE7\xE3o", "Recupera\xE7\xE3o ap\xF3s les\xE3o, cirurgia ou per\xEDodo sem movimento."),
+      S("Exerc\xEDcios terap\xEAuticos", "Movimentos orientados para fortalecer e dar mais estabilidade."),
+      S("Orienta\xE7\xE3o de postura e rotina", "Ajustes simples no dia a dia para aliviar e prevenir."),
+      S("Acompanhamento", "Reavalia\xE7\xF5es para ajustar o tratamento conforme a sua evolu\xE7\xE3o.")
+    ],
+    diferenciais: [I("Avalia\xE7\xE3o primeiro", "O tratamento parte do seu caso, n\xE3o de um protocolo pronto."), I("Explica\xE7\xE3o clara", "Voc\xEA entende o que ser\xE1 feito e por qu\xEA."), I("Aten\xE7\xE3o ao seu ritmo", "O plano respeita o seu limite e a sua rotina."), I("Agendamento f\xE1cil", "Marque pelo WhatsApp, sem ficar preso ao telefone.")],
+    passos: [I("Agende a avalia\xE7\xE3o", "Chame pelo WhatsApp e escolha o hor\xE1rio."), I("Receba o plano", "Explicamos o que foi encontrado e como ser\xE1 o tratamento."), I("Acompanhe a evolu\xE7\xE3o", "Sess\xF5es e reavalia\xE7\xF5es para ajustar o caminho.")],
+    faq: [P("Preciso de pedido m\xE9dico?", "Confirme pelo WhatsApp se o seu caso exige pedido ou indica\xE7\xE3o m\xE9dica."), P("Quantas sess\xF5es vou precisar?", "Depende da avalia\xE7\xE3o: o plano e a frequ\xEAncia s\xE3o definidos individualmente."), P("Voc\xEAs atendem por conv\xEAnio?", "Confirme pelo WhatsApp quais conv\xEAnios s\xE3o aceitos e as condi\xE7\xF5es."), P("Como agendo a avalia\xE7\xE3o?", "Pelo bot\xE3o de WhatsApp desta p\xE1gina: escolha o dia e o hor\xE1rio que preferir."), P("Qual o endere\xE7o e o hor\xE1rio de atendimento?", "Est\xE3o na se\xE7\xE3o de contato logo abaixo, com o caminho no mapa.")],
+    imagens: ["fisioterapia tratamento", "alongamento reabilita\xE7\xE3o", "physical therapy", "physiotherapy"]
+  },
+  {
     id: "odonto",
     nome: "Dentista e odontologia",
-    chaves: ["odonto", "dentista", "ortodont", "implante dent", "endodont", "periodont"],
+    prioritario: true,
+    chaves: ["odonto", "dentista", "ortodont", "implante dent", "implantod", "endodont", "periodont", "clareamento dent", "protetic", "bucomaxilo", "odontopediatr"],
     schema: "Dentist",
     layout: "sorriso",
     paleta: { primaria: "#1e6fd9", destaque: "#18b8a4" },
@@ -586,7 +639,8 @@ var BANCO = [
   {
     id: "psicologia",
     nome: "Psicologia e terapias",
-    chaves: ["psicolog", "terapeut", "psicanal", "neuropsic", "psicopedag", "fonoaudi", "terapia"],
+    prioritario: true,
+    chaves: ["psicolog", "terapeut", "psicanal", "neuropsic", "psicopedag", "fonoaudi", "terapia", "acupunt", "massoterap", "reiki", "hipnoter", "naturopat", "constelac"],
     schema: "MedicalBusiness",
     layout: "natural",
     paleta: { primaria: "#5b7fa6", destaque: "#c58b6b" },
@@ -609,7 +663,8 @@ var BANCO = [
   {
     id: "estetica",
     nome: "Est\xE9tica, sal\xE3o e barbearia",
-    chaves: ["estetic", "salao", "barbearia", "barbeiro", "manicure", "cabeleir", "beleza", "sobrancelha", "depila", "spa", "massag", "cilios", "unhas", "maquiador", "micropigment", "podolog"],
+    prioritario: true,
+    chaves: ["estetic", "salao de beleza", "salao de noiva", "tatuador", "salao unissex", "salao feminino", "salao masculino", "barbearia", "barbeiro", "manicure", "cabeleir", "beleza", "sobrancelha", "depila", "spa", "massag", "cilios", "unhas", "maquiador", "micropigment", "podolog", "tatuag", "piercing", "bronzeamento", "extensao capilar", "tricolog", "escovaria"],
     schema: "BeautySalon",
     layout: "ritual",
     paleta: { primaria: "#8a3f5d", destaque: "#d9a35b" },
@@ -634,7 +689,7 @@ var BANCO = [
   {
     id: "academia",
     nome: "Academia e treino",
-    chaves: ["academia", "pilates", "crossfit", "personal", "fitness", "muscula", "yoga", "danca", "natacao", "treino", "jiu", "boxe", "muay", "karate", "judo", "capoeira", "funcional"],
+    chaves: ["academia", "pilates", "crossfit", "personal", "fitness", "muscula", "yoga", "danca", "natacao", "treino", "jiu", "boxe", "muay", "karate", "judo", "capoeira", "funcional", "ginastica", "spinning", "hidroginastica", "assessoria esportiva", "assessoria de corrida", "quadra", "escolinha", "beach tennis", "padel", "society", "clube de tenis", "clube de teni", "arena esportiva", "patinacao", "escalada", "clube esportivo"],
     schema: "HealthClub",
     layout: "impacto",
     paleta: { primaria: "#e0451f", destaque: "#facc15" },
@@ -659,7 +714,7 @@ var BANCO = [
   {
     id: "advocacia",
     nome: "Advocacia",
-    chaves: ["advoca", "advogad", "juridic", "direito"],
+    chaves: ["advoca", "advogad", "juridic", "direito", "mediacao", "arbitragem", "perito", "pericia"],
     schema: "LegalService",
     layout: "classico",
     paleta: { primaria: "#1b2a4a", destaque: "#b08d57" },
@@ -684,7 +739,7 @@ var BANCO = [
   {
     id: "contabilidade",
     nome: "Contabilidade",
-    chaves: ["contab", "contad", "fiscal", "bpo", "abertura de empresa"],
+    chaves: ["contab", "contad", "fiscal", "bpo", "abertura de empresa", "auditoria", "tribut", "consultoria tributaria", "consultoria fiscal"],
     schema: "AccountingService",
     layout: "classico",
     paleta: { primaria: "#0f4c5c", destaque: "#e08e45" },
@@ -709,7 +764,7 @@ var BANCO = [
   {
     id: "imobiliaria",
     nome: "Imobili\xE1ria e corretor",
-    chaves: ["imobiliaria", "corretor", "imoveis", "imovel", "incorporadora", "loteamento", "construtora"],
+    chaves: ["imobiliaria", "corretor", "imoveis", "imovel", "incorporadora", "loteamento", "loteadora", "construtora", "condominio", "galpao", "lancamento imobiliario", "home stag", "consultor imobiliario", "sala comercial", "laudo", "vistoria tecnica"],
     schema: "RealEstateAgent",
     layout: "escritorio",
     paleta: { primaria: "#13405b", destaque: "#d6a03c" },
@@ -734,7 +789,7 @@ var BANCO = [
   {
     id: "oficina",
     nome: "Oficina mec\xE2nica e auto center",
-    chaves: ["oficina", "mecanic", "auto center", "autocenter", "funilaria", "lava jato", "lavajato", "borracharia", "pneus", "auto pecas", "autopecas", "estetica automotiva", "auto eletric", "martelinho", "retifica", "alinhamento", "insulfilm", "som automotivo"],
+    chaves: ["oficina", "mecanic", "auto center", "autocenter", "funilaria", "lava jato", "lavajato", "borracharia", "pneus", "auto pecas", "autopecas", "estetica automotiva", "auto eletric", "martelinho", "retifica", "alinhamento", "insulfilm", "som automotivo", "autoeletric", "cambio automatico", "escapamento", "suspensao", "freio", "lanternagem", "vidro automotivo", "troca de oleo", "pecas para caminhao", "lavagem de carro", "centro automotivo", "vistoria veicular", "adesivo automotivo", "pintura automotiva", "bicicletaria", "estacionamento", "guincho", "reboque"],
     schema: "AutoRepair",
     layout: "oficina",
     paleta: { primaria: "#c2410c", destaque: "#facc15" },
@@ -759,7 +814,8 @@ var BANCO = [
   {
     id: "pet",
     nome: "Pet shop e veterin\xE1ria",
-    chaves: ["pet", "veterin", "banho e tosa", "agropet", "racao", "adestr"],
+    prioritario: true,
+    chaves: ["pet", "veterin", "banho e tosa", "agropet", "racao", "adestr", "canil", "gatil", "gati", "cani", "aquario", "passeador", "taxi dog", "hotel para pet", "creche para pet", "pet sitter"],
     schema: "PetStore",
     layout: "patinhas",
     paleta: { primaria: "#2a7de1", destaque: "#f5a524" },
@@ -784,7 +840,7 @@ var BANCO = [
   {
     id: "loja-moda",
     nome: "Loja de roupas e acess\xF3rios",
-    chaves: ["roupa", "moda", "boutique", "vestuario", "calcado", "sapato", "acessorio", "lingerie", "jeans", "bolsa", "brecho", "semijoia", "joalheria", "otica"],
+    chaves: ["roupa", "moda", "boutique", "vestuario", "calcado", "sapato", "acessorio", "lingerie", "jeans", "bolsa", "brecho", "enxoval", "semijoia", "joalheria", "otica"],
     schema: "ClothingStore",
     layout: "estudio",
     paleta: { primaria: "#1f1f1f", destaque: "#c9a227" },
@@ -809,7 +865,7 @@ var BANCO = [
   {
     id: "construcao",
     nome: "Constru\xE7\xE3o, reforma e arquitetura",
-    chaves: ["construc", "reforma", "marcenaria", "arquitet", "engenhar", "pintura", "gesso", "moveis planejados", "serralheria", "vidracaria", "pedreiro", "empreiteira", "paisagismo", "piscina", "material de construcao", "marmoraria", "energia solar", "decoracao", "interiores"],
+    chaves: ["construc", "reforma", "marcenaria", "arquitet", "engenhar", "pintura", "gesso", "moveis planejados", "serralheria", "vidracaria", "pedreiro", "empreiteira", "paisagismo", "piscina", "material de construcao", "marmoraria", "energia solar", "decoracao", "interiores", "pintor", "telhado", "cobertura", "esquadria", "toldo", "piso", "papel de parede", "forro", "drywall", "vidro temperado", "box para banheiro", "granito", "revestimento", "ceramica", "vidraceir", "gesseiro", "demolicao", "olaria", "calha", "concreteira", "terraplanagem", "poco artesiano", "cacamba", "container", "casa pre", "steel frame", "pre moldado", "estrutura metalica", "topografia", "projeto estrutural", "mestre de obra", "paisagista", "portao", "churrasqueira", "lareira", "elevador", "marceneir", "tapeceir", "decorador", "madeireira", "ferragem", "instalacao eletrica", "instalacao hidraulica", "projeto eletrico", "instalador de painel", "engenheiro", "mestres de obra"],
     schema: "HomeAndConstructionBusiness",
     layout: "planta",
     paleta: { primaria: "#374151", destaque: "#f59e0b" },
@@ -834,7 +890,7 @@ var BANCO = [
   {
     id: "servicos-residenciais",
     nome: "Servi\xE7os residenciais",
-    chaves: ["eletricist", "encanador", "dedetiz", "limpeza", "ar condicionado", "chaveiro", "desentup", "diarista", "jardinagem", "impermeabiliza", "mudanca", "frete", "lavanderia", "costureir", "assistencia tecnica", "manutencao"],
+    chaves: ["eletricist", "encanador", "dedetiz", "limpeza", "ar condicionado", "chaveiro", "desentup", "diarista", "jardinagem", "impermeabiliza", "mudanca", "frete", "lavanderia", "costureir", "assistencia tecnica", "manutencao", "conserto", "reparo", "instalacao de tv", "instalador de antena", "tecnico em", "afiacao", "lavagem de estofado", "zeladoria", "poda", "controle de praga", "dedetizacao de condominio", "dedetizadora de condominio", "sapateir", "tinturaria", "atelie de costura", "assistencia de notebook"],
     schema: "HomeAndConstructionBusiness",
     layout: "oficina",
     paleta: { primaria: "#1d4ed8", destaque: "#f97316" },
@@ -859,7 +915,7 @@ var BANCO = [
   {
     id: "educacao",
     nome: "Escola, cursos e idiomas",
-    chaves: ["escola", "curso", "idioma", "ingles", "autoescola", "cfc", "colegio", "creche", "faculdade", "treinamento", "reforco", "musica", "violao", "ber\xE7ario", "bercario", "pre vestibular"],
+    chaves: ["escola", "curso", "idioma", "ingles", "autoescola", "cfc", "colegio", "creche", "faculdade", "treinamento", "reforco", "musica", "violao", "ber\xE7ario", "bercario", "pre vestibular", "escola de fotografia", "curso de fotografia", "universidade", "pos graduacao", "professor particular", "robotica", "educacao especial", "intercambio", "curso de barbeiro"],
     schema: "EducationalOrganization",
     layout: "vibrante",
     paleta: { primaria: "#6d28d9", destaque: "#f59e0b" },
@@ -884,7 +940,7 @@ var BANCO = [
   {
     id: "eventos",
     nome: "Eventos, buffet e fotografia",
-    chaves: ["evento", "buffet", "fotograf", "cerimonial", "festa", "casamento", "filmagem", "som e luz", "espaco de eventos", "decoracao de festa", "dj ", "salao de festas"],
+    chaves: ["evento", "buffet", "fotograf", "cerimonial", "festa", "casamento", "filmagem", "som e luz", "espaco de eventos", "decoracao de festa", "dj ", "djs ", "salao de festa", "banda", "sonorizacao", "palco", "casa de show", "cabine fotografica", "bartender", "garcom", "recreacao", "animacao", "formatura", "aluguel de brinquedo", "aluguel de mesa", "lembrancinha", "fogos", "casa noturna", "balada", "karaoke", "boliche", "parque de diversao", "parque aquatico", "paintball", "escape room", "locadora de game", "lan house", "aluguel de som", "churrasqueiro", "casa de recepcao", "aluguel de traje", "atelie de noiva", "convite", "aluguel de tenda", "locacao de louca", "teatro", "musico", "cantor"],
     schema: "EventVenue",
     layout: "estudio",
     paleta: { primaria: "#7a2e5c", destaque: "#d4a24c" },
@@ -909,7 +965,7 @@ var BANCO = [
   {
     id: "turismo",
     nome: "Hotel, pousada e turismo",
-    chaves: ["hotel", "hoteis", "pousada", "hospedagem", "turismo", "agencia de viagens", "hostel", "chale", "resort", "camping", "apart hotel", "flat"],
+    chaves: ["hotel", "hoteis", "pousada", "hospedagem", "turismo", "agencia de viagem", "operadora de turismo", "hotel fazenda", "fazenda hotel", "hostel", "chale", "resort", "camping", "apart hotel", "flat", "pesqueiro", "hipica", "marina", "passeio", "buggy", "mergulho", "rafting", "ecoturismo", "parque tematico", "receptivo", "transfer", "passaporte", "locacao de temporada", "casa de temporada", "motel", "airbnb"],
     schema: "LodgingBusiness",
     layout: "aurora",
     paleta: { primaria: "#0b6e6e", destaque: "#e7a33e" },
@@ -934,7 +990,7 @@ var BANCO = [
   {
     id: "agro",
     nome: "Agro e rural",
-    chaves: ["agro", "fazenda", "rural", "insumo", "sementes", "implement", "cooperativa", "pecuaria", "trator", "fertiliz", "defensivo", "granja", "viveiro"],
+    chaves: ["agro", "fazenda", "rural", "insumo", "sementes", "implement", "cooperativa agricola", "cooperativa rural", "cooperativa de leite", "haras", "sitio", "pecuaria", "pecuarista", "avicultura", "suinocultura", "piscicultura", "apicultura", "cafeicultor", "trator", "fertiliz", "defensivo", "granja", "viveiro", "maquina agricola", "horta", "armazem de grao", "irrigacao", "drone agricola", "produtor de leite", "produtor de hortalica", "produtor de fruta", "produtor de mel", "engenheiro agronomo", "silvicultura", "reflorestamento", "selaria"],
     schema: "LocalBusiness",
     layout: "oficina",
     paleta: { primaria: "#2f6b3a", destaque: "#d97706" },
@@ -959,7 +1015,7 @@ var BANCO = [
   {
     id: "varejo",
     nome: "Com\xE9rcio e varejo em geral",
-    chaves: ["loja", "mercado", "supermercado", "papelaria", "livraria", "floricultura", "presente", "utilidades", "eletro", "moveis", "colchoes", "informatica", "celular", "material", "distribuidora", "atacado", "farmac", "drogaria"],
+    chaves: ["loja", "mercado", "supermercado", "papelaria", "livraria", "floricultura", "presente", "utilidades", "eletro", "moveis", "colchoes", "informatica", "celular", "material", "distribuidora", "atacado", "farmac", "drogaria", "acougue", "hortifruti", "emporio", "mercearia", "peixaria", "quitanda", "minimercado", "atacarejo", "atacadista", "conveniencia", "banca de jornal", "loterica", "sebo", "armarinho", "tabacaria", "importadora", "adega", "cortina", "relojoaria", "perfumaria", "cosmetic", "outlet", "showroom", "ecommerce", "e commerce", "representante comercial", "loja de decoracao", "loja de camping", "instrumento musical", "surf shop", "skate shop", "antiquario", "galeria de arte"],
     schema: "Store",
     layout: "estudio",
     paleta: { primaria: "#0f5132", destaque: "#f2a900" },
@@ -984,7 +1040,7 @@ var BANCO = [
   {
     id: "tecnologia-marketing",
     nome: "Tecnologia, marketing e servi\xE7os profissionais",
-    chaves: ["software", "desenvolv", "ti ", "tecnologia", "marketing", "agencia", "publicidade", "design", "grafica", "consultoria", "coach", "treinamento corporativo", "seguranca eletronica", "cftv", "provedor", "informatica", "rh", "recrutamento"],
+    chaves: ["software", "desenvolv", "ti ", "tecnologia", "marketing", "agencia", "publicidade", "design", "grafica", "hospedagem de site", "consultoria", "coach", "treinamento corporativo", "provedor", "informatica", "rh", "recrutamento", "seguranca da informacao", "startup", "saas", "erp", "automacao comercial", "automacao residencial", "iot", "data center", "criacao de site", "inteligencia artificial", "chatbot", "telecom", "cabeamento", "redes e infra", "telefonia", "rastreador", "impressora", "trafego", "social media", "assessoria de imprensa", "relacoes publicas", "criador de conteudo", "copywriter", "influenciador", "mentor", "trabalho temporario", "palestrante", "call center", "telemarketing", "tradutor", "traducao", "interprete", "franquia", "escritorio compartilhado", "escritorio virtual", "coworking", "assessoria empresarial", "certificacoes iso", "representacoes comerciais", "produtora de video", "produtora musical", "produtora de cinema", "videomaker", "podcast", "estudio de gravacao", "gravadora", "editora", "radio ", "jornal", "cinema", "estudio de design", "copiadora", "comunicacao visual", "letreiro", "serigrafia", "estamparia", "bordado", "impressao", "adesivo", "cartao de visita", "outdoor", "midia exterior", "despachante", "cartorio", "registro de marca", "licenciamento"],
     schema: "ProfessionalService",
     layout: "bento",
     paleta: { primaria: "#2d3a8c", destaque: "#00b8a9" },
@@ -1009,7 +1065,7 @@ var BANCO = [
   {
     id: "concessionaria",
     nome: "Concession\xE1ria e revenda de ve\xEDculos",
-    chaves: ["concessionaria", "revenda", "carros usados", "veiculos novos", "veiculo novo", "seminovo", "multimarcas", "automoveis", "automovel", "revendedora", "motos novas", "veiculos"],
+    chaves: ["concessionaria", "revenda", "carros usados", "veiculos novos", "veiculo novo", "seminovo", "multimarcas", "automoveis", "automovel", "revendedora", "motos novas", "veiculos", "blindagem", "rastreamento veicular", "protecao veicular", "locacao de moto", "locacao de motorhome"],
     schema: "AutoDealer",
     layout: "showroom",
     paleta: { primaria: "#b4121b", destaque: "#cbd5e1" },
@@ -1040,7 +1096,7 @@ var BANCO = [
   {
     id: "credito",
     nome: "Credi\xE1rio, financeira e cr\xE9dito",
-    chaves: ["crediario", "credito", "financeira", "emprestimo", "consignado", "consorcio", "financiamento", "microcredito", "cooperativa de credito", "fintech", "correspondente bancario", "cobranca", "renegociacao"],
+    chaves: ["crediario", "credito", "financeira", "emprestimo", "consignado", "consorcio", "financiamento", "microcredito", "cooperativa de credito", "fintech", "correspondente bancario", "cobranca", "renegociacao", "factoring", "penhor", "compra de ouro", "meios de pagamento", "maquininha", "casa de cambio"],
     schema: "FinancialService",
     layout: "credito",
     paleta: { primaria: "#0a6b52", destaque: "#f2b705" },
@@ -1067,6 +1123,131 @@ var BANCO = [
       P("A aprova\xE7\xE3o \xE9 autom\xE1tica?", "N\xE3o. Toda concess\xE3o passa por an\xE1lise e aprova\xE7\xE3o.")
     ],
     imagens: ["financeira cr\xE9dito", "dinheiro finan\xE7as", "financial advisor", "credit loan"]
+  },
+  {
+    id: "industria",
+    nome: "Ind\xFAstria, f\xE1brica e produ\xE7\xE3o",
+    chaves: ["industria", "fabrica", "fabricante", "metalurgica", "usinagem", "caldeiraria", "fundicao", "textil", "confeccao", "faccao", "malharia", "frigorific", "laticinio", "cachacaria", "quimica", "borracha", "cimento", "maquinas e equipamento", "automacao industrial", "eletrica industrial", "tratamento de agua", "reciclagem", "residuo", "sucata", "ferro velho", "distribuidor industrial", "epi ", "uniforme industrial", "tornearia", "ferramentaria", "cozinha industrial", "grafica industrial", "atacadista de alimento"],
+    schema: "LocalBusiness",
+    layout: "oficina",
+    paleta: { primaria: "#1f3a5f", destaque: "#e07b00" },
+    cta: { principal: "Pedir or\xE7amento", secundario: "Conhecer a produ\xE7\xE3o" },
+    etiqueta: "Produ\xE7\xE3o com prazo e qualidade combinados",
+    titulos: ["Produ\xE7\xE3o com prazo combinado e qualidade conferida", "Do pedido \xE0 entrega, tudo acertado antes", "Fabrica\xE7\xE3o sob medida para a sua necessidade"],
+    subtitulo: "Envie a sua demanda, receba o or\xE7amento com prazo e condi\xE7\xF5es e acompanhe tudo pelo WhatsApp.",
+    sobre: "Na produ\xE7\xE3o, o que vale \xE9 cumprir o combinado. Aqui voc\xEA informa o que precisa, recebe o or\xE7amento com prazo e especifica\xE7\xF5es e acompanha o pedido at\xE9 a entrega.",
+    servicos: [
+      S("Produ\xE7\xE3o sob encomenda", "Fabrica\xE7\xE3o conforme as especifica\xE7\xF5es do seu pedido."),
+      S("Produ\xE7\xE3o em s\xE9rie", "Lotes com padr\xE3o de qualidade e prazo definidos antes de come\xE7ar."),
+      S("Or\xE7amento t\xE9cnico", "Valor, prazo e especifica\xE7\xF5es apresentados por escrito."),
+      S("Controle de qualidade", "Confer\xEAncia do produto antes da entrega."),
+      S("Entrega e log\xEDstica", "Combinamos prazo e forma de entrega junto com o pedido."),
+      S("Atendimento a empresas", "Contato direto para pedidos recorrentes e condi\xE7\xF5es comerciais.")
+    ],
+    diferenciais: [I("Prazo combinado", "A data de entrega vai no or\xE7amento, antes de fechar."), I("Padr\xE3o de qualidade", "O produto \xE9 conferido antes de sair."), I("Or\xE7amento claro", "Especifica\xE7\xE3o, quantidade e valor por escrito."), I("Contato direto", "Acompanhe o pedido pelo WhatsApp.")],
+    passos: [I("Envie a demanda", "Conte o que precisa, com medidas, quantidade e prazo desejado."), I("Receba o or\xE7amento", "Com especifica\xE7\xF5es, valor e prazo de entrega."), I("Acompanhe", "Produ\xE7\xE3o e entrega com atualiza\xE7\xE3o pelo WhatsApp.")],
+    faq: [P("Como pe\xE7o um or\xE7amento?", "Pelo bot\xE3o de WhatsApp desta p\xE1gina: informe o que precisa, a quantidade e o prazo desejado."), P("H\xE1 pedido m\xEDnimo?", "Depende do produto. Confirme pelo WhatsApp as quantidades e condi\xE7\xF5es."), P("Qual o prazo de entrega?", "Varia conforme o pedido e \xE9 informado no or\xE7amento, antes de fechar."), P("Entregam em outras cidades?", "Confirme pelo WhatsApp a regi\xE3o de entrega e o frete."), P("Qual o endere\xE7o e o hor\xE1rio?", "Est\xE3o na se\xE7\xE3o de contato logo abaixo, com o caminho no mapa.")],
+    imagens: ["ind\xFAstria produ\xE7\xE3o", "f\xE1brica m\xE1quinas", "factory production", "industrial machinery"]
+  },
+  {
+    id: "logistica",
+    nome: "Transporte e log\xEDstica",
+    chaves: ["transportadora", "transporte", "carreto", "motoboy", "entregador", "logistica", "armazem", "centro de distribuicao", "fulfillment", "courier", "correios", "agenciamento de carga", "self storage", "guarda movel", "fretamento", "importacao", "exportacao", "locacao de caminho", "locacao de empilhadeira", "carga", "taxi", "cooperativa de taxi"],
+    schema: "LocalBusiness",
+    layout: "oficina",
+    paleta: { primaria: "#16456b", destaque: "#f28c00" },
+    cta: { principal: "Pedir cota\xE7\xE3o", secundario: "Como funciona" },
+    etiqueta: "Cota\xE7\xE3o r\xE1pida pelo WhatsApp",
+    titulos: ["Transporte com prazo combinado e acompanhamento", "Sua carga ou entrega, do come\xE7o ao fim", "Log\xEDstica simples: pe\xE7a a cota\xE7\xE3o e acompanhe"],
+    subtitulo: "Informe origem, destino e o que ser\xE1 transportado e receba a cota\xE7\xE3o pelo WhatsApp.",
+    sobre: "Transportar bem \xE9 cumprir o prazo e manter voc\xEA informado. Aqui voc\xEA pede a cota\xE7\xE3o, combina os detalhes antes e acompanha a entrega.",
+    servicos: [
+      S("Transporte de cargas", "Coleta e entrega conforme o tipo e o volume da carga."),
+      S("Entregas locais e regionais", "Rotas combinadas com janela de entrega."),
+      S("Armazenagem", "Guarda e organiza\xE7\xE3o, conforme a necessidade e o prazo."),
+      S("Fretes e mudan\xE7as", "Or\xE7amento conforme a dist\xE2ncia, o volume e o acesso."),
+      S("Atendimento a empresas", "Contrato e rotina de entregas para opera\xE7\xF5es recorrentes."),
+      S("Acompanhamento da entrega", "Informa\xE7\xF5es sobre o andamento pelo WhatsApp.")
+    ],
+    diferenciais: [I("Cota\xE7\xE3o antes de contratar", "Valor e prazo informados antes de fechar."), I("Prazo combinado", "A janela de coleta e entrega vai por escrito."), I("Acompanhamento", "Voc\xEA sabe em que etapa est\xE1 a sua entrega."), I("Contato direto", "Fale pelo WhatsApp, sem fila de atendimento.")],
+    passos: [I("Pe\xE7a a cota\xE7\xE3o", "Informe origem, destino, tipo e volume."), I("Aprove e agende", "Combine data, hor\xE1rio e condi\xE7\xF5es."), I("Acompanhe", "Receba o andamento at\xE9 a entrega.")],
+    faq: [P("Como pe\xE7o uma cota\xE7\xE3o?", "Pelo bot\xE3o de WhatsApp desta p\xE1gina: informe origem, destino e o que ser\xE1 transportado."), P("Qual o prazo de entrega?", "Depende da rota e do tipo de carga e \xE9 informado na cota\xE7\xE3o."), P("Atendem a minha regi\xE3o?", "Confirme pelo WhatsApp as cidades e rotas atendidas."), P("Como pago?", "As formas de pagamento s\xE3o combinadas antes do servi\xE7o."), P("Qual o hor\xE1rio de atendimento?", "Est\xE1 na se\xE7\xE3o de contato, logo abaixo.")],
+    imagens: ["transporte log\xEDstica", "caminh\xE3o entrega", "delivery truck", "logistics warehouse"]
+  },
+  {
+    id: "seguranca",
+    nome: "Seguran\xE7a e prote\xE7\xE3o",
+    chaves: ["seguranca", "vigilancia", "alarme", "camera", "cftv", "cerca eletrica", "controle de acesso", "monitoramento", "portaria", "escolta", "brigadista", "extintor", "incendio", "bombeiro", "cofre", "interfone", "detetive", "terceirizacao", "fechadura"],
+    schema: "ProfessionalService",
+    layout: "impacto",
+    paleta: { primaria: "#14324f", destaque: "#d9480f" },
+    cta: { principal: "Pedir avalia\xE7\xE3o", secundario: "Como funciona" },
+    etiqueta: "Prote\xE7\xE3o com projeto sob medida",
+    titulos: ["Prote\xE7\xE3o pensada para o seu espa\xE7o", "Seguran\xE7a com projeto, instala\xE7\xE3o e suporte", "Mais tranquilidade para o seu dia a dia"],
+    subtitulo: "Pe\xE7a uma avalia\xE7\xE3o, conhe\xE7a as op\xE7\xF5es e receba a proposta pelo WhatsApp.",
+    sobre: "Cada espa\xE7o tem um risco diferente. Aqui a avalia\xE7\xE3o vem primeiro, e a solu\xE7\xE3o \xE9 combinada de acordo com a sua necessidade.",
+    servicos: [
+      S("Avalia\xE7\xE3o do local", "Visita para entender o espa\xE7o e indicar o que faz sentido."),
+      S("Projeto sob medida", "Solu\xE7\xE3o conforme o tamanho e o uso do ambiente."),
+      S("Instala\xE7\xE3o", "Equipamentos instalados com orienta\xE7\xE3o de uso."),
+      S("Monitoramento e suporte", "Acompanhamento e assist\xEAncia quando precisar."),
+      S("Manuten\xE7\xE3o", "Revis\xE3o e ajustes para manter tudo funcionando."),
+      S("Atendimento a empresas e condom\xEDnios", "Proposta conforme a rotina e o porte do local.")
+    ],
+    diferenciais: [I("Avalia\xE7\xE3o antes da proposta", "A solu\xE7\xE3o parte do que o seu espa\xE7o precisa."), I("Orienta\xE7\xE3o clara", "Voc\xEA entende como cada item funciona."), I("Suporte", "Assist\xEAncia para d\xFAvidas e manuten\xE7\xE3o."), I("Contato direto", "Pe\xE7a a avalia\xE7\xE3o pelo WhatsApp.")],
+    passos: [I("Pe\xE7a a avalia\xE7\xE3o", "Conte onde e o que precisa proteger."), I("Receba a proposta", "Com a solu\xE7\xE3o indicada, o valor e o prazo."), I("Instale e use", "Instala\xE7\xE3o feita e orienta\xE7\xE3o de uso.")],
+    faq: [P("Como pe\xE7o uma avalia\xE7\xE3o?", "Pelo bot\xE3o de WhatsApp desta p\xE1gina: informe o tipo de local e o que quer proteger."), P("A avalia\xE7\xE3o tem custo?", "Confirme pelo WhatsApp as condi\xE7\xF5es da avalia\xE7\xE3o."), P("Quanto tempo leva a instala\xE7\xE3o?", "Depende do projeto e \xE9 informado na proposta."), P("H\xE1 suporte depois da instala\xE7\xE3o?", "Confirme pelo WhatsApp as condi\xE7\xF5es de suporte e manuten\xE7\xE3o."), P("Qual o hor\xE1rio de atendimento?", "Est\xE1 na se\xE7\xE3o de contato, logo abaixo.")],
+    imagens: ["seguran\xE7a c\xE2meras", "alarme monitoramento", "security camera", "surveillance"]
+  },
+  {
+    id: "comunidade",
+    nome: "Igrejas, associa\xE7\xF5es e entidades",
+    chaves: ["igreja", "templo", "centro espirita", "ong", "sindicato", "clube de servico", "caridade", "entidade", "escoteiro", "associacao", "camara de comercio", "fundacao", "ensino religioso", "sociedade beneficente"],
+    schema: "Organization",
+    layout: "classico",
+    paleta: { primaria: "#2c4a6e", destaque: "#c78a1b" },
+    cta: { principal: "Falar com a gente", secundario: "Como participar" },
+    etiqueta: "Todos s\xE3o bem-vindos",
+    titulos: ["Uma comunidade de bra\xE7os abertos", "Venha conhecer e participar", "Juntos, fazemos mais"],
+    subtitulo: "Conhe\xE7a as atividades, os hor\xE1rios e como participar. Fale com a gente pelo WhatsApp.",
+    sobre: "Somos uma comunidade que se encontra para cuidar das pessoas e fazer o bem. Aqui voc\xEA v\xEA as atividades, os hor\xE1rios e como participar.",
+    servicos: [
+      S("Encontros e atividades", "Programa\xE7\xE3o regular aberta a quem quiser conhecer."),
+      S("A\xE7\xF5es sociais", "Iniciativas de apoio a quem precisa."),
+      S("Voluntariado", "Venha ajudar nas atividades e nos projetos."),
+      S("Eventos", "Datas e programa\xE7\xE3o divulgadas aqui e pelo WhatsApp."),
+      S("Acolhimento", "Atendimento a quem chega pela primeira vez."),
+      S("Contribui\xE7\xF5es", "Informe-se pelo WhatsApp sobre as formas de apoiar.")
+    ],
+    diferenciais: [I("Acolhimento", "Quem chega pela primeira vez \xE9 bem recebido."), I("Transpar\xEAncia", "Atividades e informa\xE7\xF5es claras, sem rodeios."), I("Participa\xE7\xE3o", "H\xE1 espa\xE7o para quem quer ajudar."), I("Contato direto", "Tire d\xFAvidas pelo WhatsApp.")],
+    passos: [I("Conhe\xE7a", "Veja as atividades e os hor\xE1rios."), I("Participe", "Venha a um encontro ou fale com a gente."), I("Fique por perto", "Receba as novidades pelo WhatsApp.")],
+    faq: [P("Preciso confirmar presen\xE7a?", "Em geral n\xE3o. Para eventos espec\xEDficos, confirme pelo WhatsApp."), P("Como posso ajudar?", "Fale com a gente pelo WhatsApp e conte como gostaria de participar."), P("Onde fica e quais os hor\xE1rios?", "Est\xE3o na se\xE7\xE3o de contato logo abaixo, com o caminho no mapa."), P("Como recebo as novidades?", "Pelo WhatsApp. Chame e pe\xE7a para ser avisado."), P("Posso levar a fam\xEDlia?", "Sim, todos s\xE3o bem-vindos. Confirme pelo WhatsApp se houver atividade espec\xEDfica.")],
+    imagens: ["comunidade pessoas", "volunt\xE1rios", "community", "people together"]
+  },
+  {
+    id: "seguros",
+    nome: "Seguros, investimentos e planejamento financeiro",
+    chaves: ["seguro", "seguradora", "corretor de seguro", "corretora de seguro", "previdencia", "investimento", "planejador financeiro", "gestao de patrimonio", "consultor financeiro"],
+    schema: "InsuranceAgency",
+    layout: "escritorio",
+    paleta: { primaria: "#12446b", destaque: "#c9951a" },
+    cta: { principal: "Pedir cota\xE7\xE3o", secundario: "Como funciona" },
+    etiqueta: "Atendimento direto pelo WhatsApp",
+    titulos: ["Prote\xE7\xE3o e planejamento explicados com clareza", "Compare, entenda e escolha com seguran\xE7a", "Cuide do que importa com uma orienta\xE7\xE3o de confian\xE7a"],
+    subtitulo: "Pe\xE7a a cota\xE7\xE3o, tire as d\xFAvidas e entenda as condi\xE7\xF5es antes de contratar.",
+    sobre: "Seguro e planejamento financeiro precisam ser entendidos antes de contratados. Aqui voc\xEA recebe a explica\xE7\xE3o clara e compara as op\xE7\xF5es, sem pressa.",
+    servicos: [
+      S("Cota\xE7\xE3o de seguros", "Compare coberturas e condi\xE7\xF5es antes de decidir."),
+      S("Seguro de vida", "Prote\xE7\xE3o para voc\xEA e para a sua fam\xEDlia, conforme a necessidade."),
+      S("Seguro residencial e empresarial", "Coberturas para o im\xF3vel e para o neg\xF3cio."),
+      S("Seguro de ve\xEDculos", "Op\xE7\xF5es de cobertura conforme o ve\xEDculo e o perfil."),
+      S("Planejamento financeiro", "Organiza\xE7\xE3o de objetivos, reservas e investimentos."),
+      S("Orienta\xE7\xE3o sobre sinistros", "Apoio para entender os passos quando precisar acionar.")
+    ],
+    diferenciais: [I("Explica\xE7\xE3o clara", "Coberturas, limites e car\xEAncias em linguagem simples."), I("Compara\xE7\xE3o de op\xE7\xF5es", "Voc\xEA v\xEA alternativas antes de decidir."), I("Atendimento pr\xF3ximo", "Tire d\xFAvidas pelo WhatsApp com quem conhece o seu caso."), I("Apoio no uso", "Orienta\xE7\xE3o quando for preciso acionar o seguro.")],
+    passos: [I("Conte o que precisa", "Informe o que deseja proteger ou planejar."), I("Compare", "Receba as op\xE7\xF5es com coberturas e valores."), I("Contrate com seguran\xE7a", "Com tudo explicado antes de assinar.")],
+    faq: [P("Como pe\xE7o uma cota\xE7\xE3o?", "Pelo bot\xE3o de WhatsApp desta p\xE1gina: informe o que quer proteger e os dados b\xE1sicos."), P("A cota\xE7\xE3o tem custo?", "Confirme pelo WhatsApp as condi\xE7\xF5es da cota\xE7\xE3o."), P("Quais documentos preciso?", "Depende do tipo de seguro. Orientamos a lista pelo WhatsApp."), P("Como aciono o seguro?", "Orientamos os passos conforme a ap\xF3lice e a seguradora."), P("Qual o hor\xE1rio de atendimento?", "Est\xE1 na se\xE7\xE3o de contato, logo abaixo.")],
+    imagens: ["seguros prote\xE7\xE3o", "consultoria financeira", "financial advisor", "insurance"]
   }
 ];
 var GENERICO = {
@@ -1095,9 +1276,19 @@ var GENERICO = {
   imagens: ["atendimento cliente", "pequeno neg\xF3cio", "small business", "customer service"]
 };
 var normalizar = (t) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+var singular = (texto) => texto.split(" ").map((p) => {
+  if (p.length <= 3) return p;
+  for (const [fim2, troca] of [["oes", "ao"], ["aes", "ao"], ["ais", "al"], ["eis", "el"], ["ois", "ol"], ["ens", "em"], ["ns", "m"]]) {
+    if (p.endsWith(fim2)) return p.slice(0, -fim2.length) + troca;
+  }
+  if (/(res|zes|ses)$/.test(p) && p.length > 4) return p.slice(0, -2);
+  return p.endsWith("s") ? p.slice(0, -1) : p;
+}).join(" ");
 function achar(nicho) {
-  const alvo = ` ${normalizar(nicho || "")} `;
-  if (!alvo.trim()) return GENERICO;
+  const base = normalizar(nicho || "");
+  if (!base) return GENERICO;
+  if (/^(escolas?|cursos?|faculdades?|universidades?|aulas?) /.test(base)) return BANCO.find((c) => c.id === "educacao") || GENERICO;
+  const alvo = ` ${base} ${singular(base)} `;
   let melhor = null;
   let pontos = 0;
   for (const c of BANCO) {
@@ -1105,9 +1296,10 @@ function achar(nicho) {
       const chave = normalizar(k);
       if (!chave) continue;
       const padrao = k.endsWith(" ") ? ` ${chave} ` : ` ${chave}`;
-      if (alvo.includes(padrao) && chave.length > pontos) {
+      const valor = chave.length + (c.prioritario ? 100 : 0);
+      if (alvo.includes(padrao) && valor > pontos) {
         melhor = c;
-        pontos = chave.length;
+        pontos = valor;
       }
     }
   }
@@ -1119,6 +1311,8 @@ var SOBRE_COMPLEMENTO = {
   padaria: "Do p\xE3o de todo dia \xE0 encomenda especial, \xE9 s\xF3 chegar ou chamar no WhatsApp.",
   restaurante: "Pe\xE7a pelo WhatsApp ou venha comer com a gente.",
   "saude-medica": "O agendamento \xE9 simples e o contato \xE9 direto, pelo WhatsApp.",
+  nutricao: "Agende uma consulta e conte a sua rotina para montarmos o caminho juntos.",
+  fisioterapia: "Agende uma avalia\xE7\xE3o e conte onde d\xF3i e o que voc\xEA quer voltar a fazer.",
   odonto: "Agende uma avalia\xE7\xE3o e tire todas as d\xFAvidas antes de come\xE7ar.",
   psicologia: "O ritmo \xE9 o seu. Se fizer sentido, mande uma mensagem e conversamos sem compromisso.",
   estetica: "Escolha o servi\xE7o, marque o hor\xE1rio e venha relaxar.",
@@ -1138,6 +1332,11 @@ var SOBRE_COMPLEMENTO = {
   varejo: "Venha conhecer ou pe\xE7a pelo WhatsApp.",
   concessionaria: "Pe\xE7a a avalia\xE7\xE3o do seu usado e tire as d\xFAvidas pelo WhatsApp.",
   credito: "Chame no WhatsApp e fa\xE7a a sua simula\xE7\xE3o.",
+  industria: "Envie a sua demanda e receba o or\xE7amento com prazo e condi\xE7\xF5es.",
+  logistica: "Pe\xE7a a cota\xE7\xE3o pelo WhatsApp e combine coleta e entrega.",
+  seguranca: "Pe\xE7a uma avalia\xE7\xE3o do local e receba a proposta pelo WhatsApp.",
+  comunidade: "Venha conhecer ou fale com a gente pelo WhatsApp.",
+  seguros: "Pe\xE7a a sua cota\xE7\xE3o e tire as d\xFAvidas pelo WhatsApp antes de decidir.",
   "tecnologia-marketing": "Combinamos escopo, prazo e investimento antes de iniciar. Pe\xE7a uma proposta.",
   generico: "Fale com a gente pelo WhatsApp e conte o que voc\xEA precisa."
 };
@@ -6403,7 +6602,7 @@ var aplicarCopia = (dados, copia, cidade) => {
 var individualizar = (dados, lead, temCopia = false) => {
   const chave = `${dados.empresa}|${dados.cidade || ""}`;
   const saida = { ...dados };
-  const desc = txt(lead?.google_description, 420);
+  const desc = txt(lead?.google_description, 420) || txt(lead?.identidade?.descricao, 420);
   if (!temCopia && desc.length >= 60 && /[a-zà-ú]{4,}/i.test(desc) && !/^https?:/i.test(desc)) saida.sobre = desc;
   const avaliacao = txt(lead?.review_highlight, 240);
   if (avaliacao.length >= 30 && !(dados.depoimentos || []).some((d) => (d.texto || "").trim())) {
@@ -6417,6 +6616,15 @@ var individualizar = (dados, lead, temCopia = false) => {
 };
 
 // src/templates/sites/previa.ts
+var NOTA_MINIMA = 4.5;
+var AVALIACOES_MINIMAS = 30;
+var notaComMerito = (nota, avaliacoes) => {
+  const n = Number(nota);
+  const a = Number(avaliacoes);
+  return n >= NOTA_MINIMA && a >= AVALIACOES_MINIMAS ? { nota: n, avaliacoes: a } : null;
+};
+var urlHttps = (u) => /^https:\/\/[^\s"'<>()\\]+$/.test(String(u || "")) ? String(u) : "";
+var corDaMarca = (c) => /^#[0-9a-f]{6}$/i.test(String(c || "")) ? String(c).toLowerCase() : "";
 var dadosDoLead = (lead) => {
   const base = {
     // a marca no topo do site é o nome, sem a cidade da busca nem o "| descrição" que o Google Meu Negócio cola no título
@@ -6439,16 +6647,20 @@ var dadosDoLead = (lead) => {
     endereco: lead?.address || lead?.location || "",
     // a semana inteira resumida ("Seg a Sex 08:00–18:00 · Sáb ..."), não só os 3 primeiros dias
     horario: lead?.opening_hours_week?.length ? resumirSemana(lead.opening_hours_week) : lead?.opening_hours || "",
-    instagram: lead?.socials?.instagram || lead?.instagram || "",
+    instagram: lead?.socials?.instagram || lead?.identidade?.instagram || lead?.instagram || "",
+    // a logo do próprio negócio (do site ou a foto do perfil do Instagram), quando a busca de identidade achou
+    logo: urlHttps(lead?.identidade?.logo) || void 0,
     corPrimaria: "#2563eb",
     corDestaque: "#f59e0b",
     // a nota do Google vira o selo de prova social no site
-    nota: lead?.rating ?? null,
-    avaliacoes: lead?.rating_count ?? null
+    ...(() => {
+      const m = notaComMerito(lead?.rating, lead?.rating_count);
+      return { nota: m ? m.nota : null, avaliacoes: m ? m.avaliacoes : null };
+    })()
   };
   return lead ? semearConteudo(base, { cores: true }) : base;
 };
-var MOTOR_VERSAO = "2026-10-19b-cada-nicho-no-seu-modelo";
+var MOTOR_VERSAO = "2026-11-01-identidade-e-nota-com-merito";
 var indiceEstavel2 = (texto, n) => {
   let h = 0;
   for (let i = 0; i < texto.length; i++) h = h * 31 + texto.charCodeAt(i) >>> 0;
@@ -6459,7 +6671,6 @@ var escolherTemplate = (nicho, empresa) => {
   const validos = modelos.map((id) => SITE_TEMPLATES.find((t) => t.id === id)).filter(Boolean);
   return validos.length ? validos[indiceEstavel2(empresa, validos.length)] : sugerirTemplate(nicho);
 };
-var urlHttps = (u) => /^https:\/\/[^\s"'<>()\\]+$/.test(String(u || "")) ? String(u) : "";
 var CAMPOS_DO_SITE_ANTERIOR = ["telefone", "whatsapp", "email", "endereco", "horario", "instagram", "nota", "avaliacoes", "logo", "capa", "fotoSobre"];
 var montarPrevia = (lead, fotos2 = [], preferido = "", anterior = null) => {
   const ramoBruto = lead?.niche || lead?.role || "";
@@ -6469,7 +6680,12 @@ var montarPrevia = (lead, fotos2 = [], preferido = "", anterior = null) => {
   const copia = lead?.copia_ia && typeof lead.copia_ia === "object" && Object.keys(lead.copia_ia).length ? lead.copia_ia : null;
   dados = copia ? aplicarCopia(dados, copia, lead?.city || "") : dados;
   dados = individualizar(dados, lead, !!copia);
-  dados.corPrimaria = variarCor(dados.corPrimaria, `${dados.empresa}|p`);
+  const corMarca = corDaMarca(lead?.identidade?.cor);
+  if (corMarca) {
+    dados.corPrimaria = corMarca;
+  } else {
+    dados.corPrimaria = variarCor(dados.corPrimaria, `${dados.empresa}|p`);
+  }
   dados.corDestaque = variarCor(dados.corDestaque, `${dados.empresa}|d`, 0.6);
   if (anterior && typeof anterior === "object") {
     const d = dados;
@@ -6481,7 +6697,11 @@ var montarPrevia = (lead, fotos2 = [], preferido = "", anterior = null) => {
     if (!(dados.galeria || []).length && Array.isArray(anterior.galeria)) dados.galeria = anterior.galeria.filter((x) => typeof x === "string").slice(0, 4);
     if (!dados.depoimentos?.some((x) => x.texto?.trim()) && Array.isArray(anterior.depoimentos)) dados.depoimentos = anterior.depoimentos;
   }
-  const urls = [...new Set((fotos2 || []).map(urlHttps).filter(Boolean))];
+  const meritoFinal = notaComMerito(dados.nota, dados.avaliacoes);
+  dados.nota = meritoFinal ? meritoFinal.nota : null;
+  dados.avaliacoes = meritoFinal ? meritoFinal.avaliacoes : null;
+  const proprias = (Array.isArray(lead?.identidade?.imagens) ? lead.identidade.imagens : []).map(urlHttps).filter(Boolean).slice(0, 3);
+  const urls = [.../* @__PURE__ */ new Set([...proprias, ...(fotos2 || []).map(urlHttps).filter(Boolean)])];
   if (urls.length) {
     dados.capa = dados.capa || urls[0];
     dados.fotoSobre = dados.fotoSobre || urls[1] || urls[0];

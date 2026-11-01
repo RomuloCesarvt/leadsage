@@ -76,6 +76,8 @@ class LeadItem(BaseModel):
     site_has_booking: Optional[bool] = None
     site_has_form: Optional[bool] = None
     site_title: Optional[str] = None
+    # --- Identidade do proprio lead (logo, fotos, cor, Instagram), buscada quando o lead chega ---
+    identidade: Optional[Dict[str, Any]] = None
     # --- Leitura comercial (deterministica, nunca gerada por IA) ---
     hooks: Optional[List[str]] = []
     diagnosis: Optional[str] = None
