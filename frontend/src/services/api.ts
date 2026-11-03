@@ -1,4 +1,5 @@
 import type {
+  DesempenhoPorSegmento,
   LeadSearchRequest,
   LeadSearchResponse,
   PitchGenerationRequest,
@@ -321,6 +322,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ mensagens: mensagens.map(m => ({ de: m.de, texto: m.texto })), canal }),
     });
+  },
+
+  async segmentosDoDashboard(): Promise<DesempenhoPorSegmento> {
+    return await fetchWithToken('/dashboard/segmentos');
   },
 
   async metaDisponivel(): Promise<{ facebook: boolean; whatsapp: boolean; app_id: string; wa_config_id: string }> {

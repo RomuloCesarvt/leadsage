@@ -328,8 +328,8 @@ async def salvar_conversa(uid: str, conversa: Dict[str, Any]) -> None:
     await _sql_put(f"conversa:{uid}:{conversa['id']}", uid, "conversa", conversa)
 
 
-async def listar_conversas(uid: str) -> List[Dict[str, Any]]:
-    """Sem as mensagens: a lista mostra so a ultima."""
+async def listar_conversas(uid: str, com_mensagens: bool = False) -> List[Dict[str, Any]]:
+    """Sem as mensagens: a lista mostra so a ultima. `com_mensagens` e de uso interno (estatisticas do dashboard)."""
     todas: List[Dict[str, Any]] = []
     if _sql_primeiro():
         todas = await _sql_listar(uid, "conversa")
@@ -364,7 +364,7 @@ async def listar_conversas(uid: str) -> List[Dict[str, Any]]:
 
     resumo = []
     for c in todas:
-        r = {k: v for k, v in c.items() if k != "mensagens"}
+        r = {k: v for k, v in c.items() if k != "mensagens" or com_mensagens}
         msgs = c.get("mensagens") or []
         r["ultima"] = msgs[-1] if msgs else None
         r["silencio"] = c.get("silencio", "")

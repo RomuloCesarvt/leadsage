@@ -661,3 +661,23 @@ export interface SaudeDoNumero {
   usadas_hoje?: number;
   limite_hoje?: number;
 }
+
+
+/** Desempenho por segmento (ramo) no dashboard: quem responde, mostra interesse e pede o link da prévia. */
+export interface SegmentoDesempenho {
+  segmento: string;
+  leads: number;
+  abordados: number;
+  responderam: number;
+  interessados: number;
+  pediram_link: number;
+  fechados: number;
+  taxa_resposta: number;
+  taxa_interesse: number;
+}
+export interface DestaqueDeSegmento { segmento: string; valor: number; abordados: number }
+export interface DesempenhoPorSegmento {
+  segmentos: SegmentoDesempenho[];
+  destaques: { responde_mais: DestaqueDeSegmento | null; mais_interesse: DestaqueDeSegmento | null; mais_pedem_link: DestaqueDeSegmento | null };
+  minimo_para_taxa: number;
+}

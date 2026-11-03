@@ -1,11 +1,20 @@
 import { ehSalvo } from '../../lib/leadsSalvos';
-import React from 'react';
-import { Search, Users, ArrowUpRight, BarChart2, Zap, Globe, MessageCircle, Target, ArrowRight } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Search, Users, ArrowUpRight, BarChart2, Zap, Globe, MessageCircle, Target, ArrowRight, Link2, Flame, Reply } from 'lucide-react';
+import { api } from '../../services/api';
+import type { DesempenhoPorSegmento } from '../../types';
 import { useApp } from '../../context/AppContext';
 
 export const DashboardScreen: React.FC = () => {
   const { setViewState, leads: todos, history, user } = useApp() as any;
   const leads = (todos as any[]).filter(ehSalvo);
+
+  // quais segmentos (ramos) respondem mais, mostram mais interesse e mais pedem o link da prévia
+  const [segmentos, setSegmentos] = useState<DesempenhoPorSegmento | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    api.segmentosDoDashboard().then(setSegmentos).catch(() => setSegmentos(null));
+  }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Real computed metrics
   const totalLeads = leads.length;
@@ -233,6 +242,72 @@ export const DashboardScreen: React.FC = () => {
 
       </div>
 
+
+      {/* Segmentos: onde está a resposta, o interesse e o pedido de link */}
+      <div className="mt-6" data-testid="segmentos-do-dashboard">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-bold text-slate-800 text-lg">Segmentos que mais respondem</h3>
+          <button onClick={() => setViewState('conversas')} className="text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
+            Conversas <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+        {!segmentos || segmentos.segmentos.length === 0 ? (
+          <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 text-center">
+            <MessageCircle className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 font-medium text-sm">Quando os leads começarem a responder, aqui aparece qual segmento responde mais, tem mais interesse e mais pede o link da prévia.</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              {([
+                ['Responde mais', segmentos.destaques.responde_mais, Reply, (d: any) => `${d.valor}% de resposta`, 'text-blue-600 bg-blue-50'],
+                ['Mais interesse', segmentos.destaques.mais_interesse, Flame, (d: any) => `${d.valor} interessado${d.valor > 1 ? 's' : ''}`, 'text-orange-600 bg-orange-50'],
+                ['Mais pedem o link', segmentos.destaques.mais_pedem_link, Link2, (d: any) => `${d.valor} pedido${d.valor > 1 ? 's' : ''} de link`, 'text-emerald-600 bg-emerald-50'],
+              ] as const).map(([titulo, d, Icone, texto, cor]) => (
+                <div key={titulo} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${cor}`}><Icone className="w-5 h-5" /></div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{titulo}</p>
+                    {d ? (
+                      <>
+                        <p className="font-bold text-slate-800 truncate">{d.segmento}</p>
+                        <p className="text-xs text-slate-500">{texto(d)}</p>
+                      </>
+                    ) : <p className="text-sm text-slate-400">Ainda sem dados{titulo === 'Responde mais' ? ` (precisa de ${segmentos.minimo_para_taxa}+ abordados)` : ''}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+              <div className="hidden sm:grid grid-cols-[1.6fr_repeat(5,1fr)] gap-2 px-5 py-3 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <span>Segmento</span><span className="text-right">Abordados</span><span className="text-right">Responderam</span><span className="text-right">Interesse</span><span className="text-right">Pediram link</span><span className="text-right">Fechados</span>
+              </div>
+              <ul className="divide-y divide-slate-100">
+                {segmentos.segmentos.map(s => (
+                  <li key={s.segmento} className="px-4 sm:px-5 py-3">
+                    <div className="sm:grid sm:grid-cols-[1.6fr_repeat(5,1fr)] sm:gap-2 sm:items-center">
+                      <p className="font-bold text-slate-800 text-sm truncate">{s.segmento}</p>
+                      <div className="grid grid-cols-5 gap-2 mt-2 sm:mt-0 sm:contents text-center sm:text-right">
+                        {([['Abord.', s.abordados], ['Resp.', s.responderam], ['Interesse', s.interessados], ['Link', s.pediram_link], ['Fechados', s.fechados]] as const).map(([r, v]) => (
+                          <div key={r} className="sm:text-right">
+                            <p className="sm:hidden text-[10px] font-bold uppercase text-slate-400">{r}</p>
+                            <p className="font-bold text-slate-800 text-sm">{v}</p>
+                            {r === 'Resp.' && s.abordados >= segmentos.minimo_para_taxa && <p className="text-[11px] text-slate-400 sm:hidden">{s.taxa_resposta}%</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {s.abordados >= segmentos.minimo_para_taxa && (
+                      <div className="hidden sm:block mt-1 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-blue-500/60 rounded-full" style={{ width: `${s.taxa_resposta}%` }} /></div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };

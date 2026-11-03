@@ -1107,6 +1107,17 @@ class PipelineMoverRequest(BaseModel):
     lead: Optional[Dict[str, Any]] = None
 
 
+@app.get("/api/dashboard/segmentos")
+async def dashboard_segmentos(user: dict = Depends(get_current_user)):
+    """Quais segmentos respondem mais, mostram mais interesse e mais pedem o link da prévia (só leitura do que já existe)."""
+    from app import desempenho
+    try:
+        return await desempenho.do_usuario(user.get("uid"))
+    except Exception as exc:
+        print(f"Dashboard: falha ao calcular os segmentos: {exc}")
+        return {"segmentos": [], "destaques": {"responde_mais": None, "mais_interesse": None, "mais_pedem_link": None}, "minimo_para_taxa": 3}
+
+
 @app.get("/api/pipeline")
 async def pipeline_listar(user: dict = Depends(get_current_user)):
     await exigir_recurso(user, "pipeline", "O pipeline")
