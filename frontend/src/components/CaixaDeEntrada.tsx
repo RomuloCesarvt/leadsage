@@ -75,7 +75,7 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
     if (!aberta || aberta.somente_leitura) return;
     return sondar(async () => {
       try { setAberta(await api.roboConversa(aberta.id)); } catch { /* segue com o que tem */ }
-    }, 20000);
+    }, 12000);
   }, [aberta?.id, aberta?.somente_leitura]);
 
   // rola só a lista de mensagens, nunca a página

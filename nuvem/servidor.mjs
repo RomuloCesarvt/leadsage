@@ -191,7 +191,16 @@ export class Sessao {
     for (const id of this.pedidos.abrir) {
       if (t - (this.ultimoEspelhoMsgs.get(id) || 0) > 3000) {
         this.ultimoEspelhoMsgs.set(id, t);
-        await this.ls.espelho({ chat_id: id, mensagens: await this.wa.mensagens(id, 60) });
+        // a conversa inteira (até 120 falas), mas só reenvia quando mudou ou de 30 em 30 s: poupa a banda da hospedagem grátis
+        const msgs = await this.wa.mensagens(id, 120);
+        const u = msgs[msgs.length - 1];
+        const assinatura = `${msgs.length}|${u?.id || ''}|${u?.status ?? ''}`;
+        this.assinaturasAbertas = this.assinaturasAbertas || new Map();
+        const anterior = this.assinaturasAbertas.get(id);
+        if (!anterior || anterior.assinatura !== assinatura || t - anterior.em > 30000) {
+          this.assinaturasAbertas.set(id, { assinatura, em: t });
+          await this.ls.espelho({ chat_id: id, mensagens: msgs });
+        }
       }
     }
   }

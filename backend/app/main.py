@@ -1482,10 +1482,40 @@ async def robo_conversa(cid: str, user: dict = Depends(get_current_user)):
         if not item or item.get("status") not in ("enviado", "enviando"):
             raise HTTPException(status_code=404, detail="Conversa não encontrada.")
         return caixa_de_entrada.conversa_do_envio(item)
-    conversa = await robo_store.obter_conversa(user.get("uid"), cid)
+    uid = user.get("uid")
+    conversa = await robo_store.obter_conversa(uid, cid)
     if not conversa:
         raise HTTPException(status_code=404, detail="Conversa não encontrada.")
+    if conversa.get("canal") == "whatsapp":
+        conversa = await _com_o_chat_do_whatsapp(uid, conversa)
     return conversa
+
+
+async def _com_o_chat_do_whatsapp(uid: str, conversa: Dict[str, Any]) -> Dict[str, Any]:
+    """A conversa inteira como no WhatsApp: o que o robô gravou junto do chat de verdade (espelho), sem repetir e sem perder falas.
+
+    Nunca derruba a conversa: sem espelho (conector fora, nada sincronizado ainda) devolve exatamente o que o robô tem."""
+    from app import thread_whatsapp
+    try:
+        contato = conversa.get("contato", "")
+        chat_id = ""
+        chats, _ = await espelho_whatsapp.ler_chats(uid)
+        for c in chats:
+            if pipeline_store.mesmo_telefone(str(c.get("id", "")).split("@")[0], contato):
+                chat_id = str(c["id"])
+                break
+        digitos = re.sub(r"\D", "", contato)
+        chat_id = chat_id or (f"{digitos}@c.us" if len(digitos) >= 10 else "")
+        if not espelho_whatsapp.chat_valido(chat_id):
+            return conversa
+        await espelho_whatsapp.marcar_olhando(uid, abrir=chat_id)       # o conector traz esta conversa inteira enquanto ela esta aberta
+        mensagens, idade = await espelho_whatsapp.ler_mensagens(uid, chat_id)
+        if not mensagens:
+            return conversa
+        return {**conversa, "mensagens": thread_whatsapp.juntar(conversa.get("mensagens") or [], mensagens), "whatsapp_idade_s": idade}
+    except Exception as exc:
+        print(f"Conversa: nao juntou com o chat do WhatsApp: {type(exc).__name__}: {exc}")
+        return conversa
 
 
 @app.post("/api/robo/conversas/{cid}/robo")
@@ -1514,7 +1544,7 @@ async def robo_ligar_desligar(cid: str, req: RoboAtivoRequest, user: dict = Depe
         conversa.pop("silencio", None)
     conversa["atualizado"] = robo_store.agora()
     await robo_store.salvar_conversa(uid, conversa)
-    return conversa
+    return await _com_o_chat_do_whatsapp(uid, conversa)
 
 
 @app.post("/api/robo/chat")
@@ -1539,7 +1569,7 @@ async def robo_responder(cid: str, req: RoboTextoRequest, user: dict = Depends(g
             detail="Esta pessoa ainda não respondeu. Quando responder, a conversa se abre aqui e você pode escrever.",
         )
     try:
-        return await robo_service.responder_como_humano(user.get("uid"), cid, req.texto)
+        return await _com_o_chat_do_whatsapp(user.get("uid"), await robo_service.responder_como_humano(user.get("uid"), cid, req.texto))
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except meta_canais.EnvioFalhou as exc:
@@ -1553,7 +1583,7 @@ async def robo_enviar_previa(cid: str, user: dict = Depends(get_current_user)):
     if cid.startswith(caixa_de_entrada.PREFIXO_ENVIO):
         raise HTTPException(status_code=409, detail="Esta pessoa ainda não respondeu: a prévia vai quando ela responder ou pelo disparo.")
     try:
-        return await robo_service.enviar_previa(user.get("uid"), user.get("email", ""), cid)
+        return await _com_o_chat_do_whatsapp(user.get("uid"), await robo_service.enviar_previa(user.get("uid"), user.get("email", ""), cid))
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except meta_canais.EnvioFalhou as exc:

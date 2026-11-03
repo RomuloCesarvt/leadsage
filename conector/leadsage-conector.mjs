@@ -896,6 +896,7 @@ export async function executar() {
     let pareando = '';
     let ultimoEspelhoChats = 0;
     const ultimoEspelhoMsgs = new Map();
+    const assinaturasAbertas = new Map();
     const responderAgora = async (contato) => {
       if (roboAtivo) waAtual?.digitar(contato, true); // "digitando…" enquanto a IA pensa
       const r = await ls.reprocessar(contato);
@@ -984,7 +985,15 @@ export async function executar() {
       for (const id of pedidos.abrir) {
         if (agora - (ultimoEspelhoMsgs.get(id) || 0) > 3000) {
           ultimoEspelhoMsgs.set(id, agora);
-          await ls.espelho({ chat_id: id, mensagens: await wa.mensagens(id, 60) });
+          // a conversa inteira (até 120 falas), reenviada só quando mudou ou de 30 em 30 s
+          const msgs = await wa.mensagens(id, 120);
+          const u = msgs[msgs.length - 1];
+          const assinatura = `${msgs.length}|${u?.id || ''}|${u?.status ?? ''}`;
+          const anterior = assinaturasAbertas.get(id);
+          if (!anterior || anterior.assinatura !== assinatura || agora - anterior.em > 30000) {
+            assinaturasAbertas.set(id, { assinatura, em: agora });
+            await ls.espelho({ chat_id: id, mensagens: msgs });
+          }
         }
       }
     };
