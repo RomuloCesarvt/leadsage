@@ -283,6 +283,7 @@ async def avaliar_chat(uid: str, telefone: str, nome: str, mensagens: list, ativ
             conversa.update({"precisa_humano": False, "motivo": "", "contato_robo": False, "automaticas": 0, "falhas_ia": 0})
             conversa.pop("silencio", None)
             conversa.pop("classificado", None)
+            conversa.pop("pausa_humana", None)
             conversa["avaliado_em"] = marca      # a pessoa decidiu: a IA não discute com ela sobre esta fala
     elif ultima and ultima.get("de") == "contato" and not conversa.get("optout") and conversa.get("avaliado_em") != marca:
         veredito = await asyncio.to_thread(ai_robo.classificar_contato, conversa["mensagens"], gerar or _gerador_padrao())
@@ -457,7 +458,8 @@ async def _processar(
         conversa["silencio"] = "O robô está desligado. Ligue em Robô → Comportamento e clique em Salvar."
         return await salvar()
     if not conversa.get("robo_ativo"):
-        conversa["silencio"] = "O robô está pausado nesta conversa."
+        conversa["silencio"] = ("Você respondeu pelo celular: o robô pausou nesta conversa. Ligue o robô na conversa para ele voltar."
+                                if conversa.get("pausa_humana") else "O robô está pausado nesta conversa.")
         return await salvar()
     if conversa.get("precisa_humano"):
         conversa["silencio"] = conversa.get("motivo") or "O robô passou esta conversa para você."
@@ -590,6 +592,40 @@ async def _processar(
         _marcar(conversa, decisao.motivo or "o robô pediu sua ajuda")
 
     return await salvar()
+
+
+async def humano_respondeu(cfg: Dict[str, Any], contato: str, texto: str, meta_id: str = "", momento: int = 0) -> Dict[str, Any]:
+    """Uma PESSOA escreveu nesta conversa direto no celular: o robô pausa e só volta quando a pessoa ligar o robô na conversa.
+
+    O Conector só chama isto para mensagens que o próprio sistema não enviou (ele reconhece o que mandou). Aqui ainda se
+    confere a conversa: texto igual a uma fala recente do robô é eco, não pessoa. Sem conversa ainda (a pessoa escreveu
+    primeiro para um contato novo), ela nasce pausada: quando o lead responder, o robô não atravessa a conversa."""
+    uid = cfg["uid"]
+    digitos = re.sub(r"\D", "", contato or "")
+    if len(digitos) < 10:
+        raise ValueError("Número de contato inválido.")
+    cid = robo_store.id_da_conversa("whatsapp", digitos)
+    trava = _TRAVAS.setdefault(f"{uid}:{cid}", asyncio.Lock())
+    async with trava:
+        conversa = await robo_store.obter_conversa(uid, cid) or {
+            "id": cid, "canal": "whatsapp", "contato": digitos, "nome": "", "lead_id": "", "robo_ativo": False,
+            "optout": False, "precisa_humano": False, "motivo": "", "mensagens": [], "criado": robo_store.agora(), "origem_chat": True,
+        }
+        texto = (texto or "").strip()
+        if meta_id and any(m.get("meta_id") == meta_id for m in conversa["mensagens"]):
+            return conversa
+        normal = " ".join(texto.lower().split())
+        if any(m.get("de") in ("robo", "voce") and " ".join(str(m.get("texto") or "").lower().split()) == normal
+               for m in conversa["mensagens"][-12:]):
+            return conversa                      # eco do que o sistema (ou a tela) já mandou
+        conversa["mensagens"].append({"de": "voce", "texto": texto[:2000], "em": robo_store.agora(), "meta_id": meta_id, "origem": "celular"})
+        conversa.update({
+            "robo_ativo": False, "pausa_humana": True, "precisa_humano": False, "motivo": "",
+            "silencio": "Você respondeu pelo celular: o robô pausou nesta conversa. Ligue o robô na conversa para ele voltar.",
+            "atualizado": robo_store.agora(),
+        })
+        await robo_store.salvar_conversa(uid, conversa)
+        return conversa
 
 
 async def responder_como_humano(

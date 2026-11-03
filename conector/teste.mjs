@@ -159,3 +159,33 @@ test('consulta: nunca mais depressa que o piso (servidor antigo sugere 4 s e 45 
   assert.equal(intervaloDeConsulta(3), 3);
   assert.equal(intervaloDeConsulta(undefined), 90);
 });
+
+// ---------------------------------------------------------------- a pessoa escreveu no celular: o robô pausa
+import { criarGuardaDeEnvios, entregarMinha } from './leadsage-conector.mjs';
+
+test('guarda de envios: reconhece o que o sistema mandou e deixa passar o que a pessoa digitou', () => {
+  let t = 1000;
+  const g = criarGuardaDeEnvios({ validadeMs: 60000, agora: () => t });
+  g.registrar('Aqui está a  prévia: https://x');
+  assert.equal(g.nosso('aqui está a prévia: https://x'), true);
+  assert.equal(g.nosso('Oi, sou eu mesmo'), false);
+  t += 61000;
+  assert.equal(g.nosso('Aqui está a prévia: https://x'), false);
+});
+
+test('mensagem digitada pela pessoa vai ao LeadSage; a do sistema, a antiga e a de grupo não', async () => {
+  const chamadas = [];
+  const ls = { humano: async (m) => { chamadas.push(m); return { ok: true, status: 200 }; } };
+  const guarda = criarGuardaDeEnvios();
+  guarda.registrar('resposta do robô');
+  const agora = () => 1_700_000_100_000;
+  const base = { id: 'a1', para: '5514999990001', texto: 'Oi, aqui é o Rômulo', momento: 1_700_000_090, grupo: false };
+  const vistos = new Set();
+  assert.equal(await entregarMinha(ls, base, guarda, vistos, () => {}, agora), true);
+  assert.equal(await entregarMinha(ls, base, guarda, vistos, () => {}, agora), false);                                   // mesma mensagem
+  assert.equal(await entregarMinha(ls, { ...base, id: 'a2', texto: 'resposta do robô' }, guarda, vistos, () => {}, agora), false); // foi o sistema
+  assert.equal(await entregarMinha(ls, { ...base, id: 'a3', momento: 1_699_999_000 }, guarda, vistos, () => {}, agora), false);   // histórico antigo
+  assert.equal(await entregarMinha(ls, { ...base, id: 'a4', grupo: true }, guarda, vistos, () => {}, agora), false);
+  assert.equal(chamadas.length, 1);
+  assert.equal(chamadas[0].contato, '5514999990001');
+});

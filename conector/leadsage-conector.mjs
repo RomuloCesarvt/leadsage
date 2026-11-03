@@ -80,6 +80,8 @@ export function clienteLeadsage({ site, chave }) {
     tarefas: () => http_(`${base}/tarefas`, { cabecalhos: h }),
     resultado: (id, ok, erro = '') => http_(`${base}/tarefas/${encodeURIComponent(id)}/resultado`, { metodo: 'POST', cabecalhos: h, corpo: { ok, erro } }),
     mensagem: (m) => http_(`${base}/mensagem`, { metodo: 'POST', cabecalhos: h, corpo: m, tempoMs: 60000 }),
+    // o dono escreveu direto no celular: o robô pausa nessa conversa
+    humano: (m) => http_(`${base}/humano`, { metodo: 'POST', cabecalhos: h, corpo: m, tempoMs: 30000 }),
     reprocessar: (contato = '') => http_(`${base}/reprocessar`, { metodo: 'POST', cabecalhos: h, corpo: { contato }, tempoMs: 60000 }),
     /** O texto falado de um áudio (o LeadSage transcreve de graça). '' quando não deu para ouvir ou não havia fala. */
     transcrever: async (audio, mimetype = 'audio/ogg') => {
@@ -161,6 +163,34 @@ export async function enviarPendentes(ls, wa, aviso = log, dorme = dormir) {
     // o que o celular pediu: olhar, quais conversas, conectar pelo numero
     pedidos: { remoto: Boolean(t.dados.remoto), abrir: t.dados.abrir || [], parear: t.dados.parear || '' },
   };
+}
+
+/**
+ * O que o próprio sistema (robô, fila, tela) mandou nos últimos minutos. Uma mensagem "minha" que NÃO está aqui foi digitada por
+ * uma pessoa no celular: o robô precisa sair da conversa.
+ */
+export function criarGuardaDeEnvios({ validadeMs = 10 * 60 * 1000, agora = () => Date.now() } = {}) {
+  const norm = (t) => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const itens = new Map(); // texto normalizado -> quando
+  const podar = () => { const t = agora(); for (const [k, v] of itens) if (t - v > validadeMs) itens.delete(k); };
+  return {
+    registrar(texto) { podar(); const k = norm(texto); if (k) itens.set(k, agora()); },
+    nosso(texto) { podar(); return itens.has(norm(texto)); },
+  };
+}
+
+/** Uma mensagem enviada por PESSOA (digitada no celular): avisa o LeadSage, que pausa o robô nessa conversa. */
+export async function entregarMinha(ls, m, guarda, vistos, aviso = log, agora = () => Date.now()) {
+  if (!m || m.grupo || !m.para || vistos.has(String(m.id))) return false;
+  const idadeS = agora() / 1000 - Number(m.momento || 0);
+  if (m.momento && (idadeS > 180 || idadeS < -60)) return false;       // histórico antigo que chega ao conectar não conta
+  if (guarda?.nosso(m.texto)) return false;                              // foi o próprio sistema que mandou
+  vistos.add(String(m.id));
+  if (vistos.size > 1000) vistos.delete(vistos.values().next().value);
+  const e = await ls.humano({ contato: m.para, id: String(m.id), texto: String(m.texto || '').slice(0, 2000), momento: Number(m.momento) || 0 });
+  if (e.ok) aviso(`Você respondeu ${m.para} pelo celular: o robô pausou nessa conversa.`);
+  else if (e.status !== 422) vistos.delete(String(m.id));
+  return Boolean(e.ok);
 }
 
 /** Entrega ao LeadSage uma mensagem recebida. Devolve true se foi aceita. */
@@ -506,7 +536,8 @@ export function acharNavegador(existe = existsSync, plataforma = process.platfor
 }
 
 /** Liga o WhatsApp Web. Devolve um adaptador { enviar, parar } e chama os ouvintes. */
-async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoCodigo = () => {}, parear = '' }) {
+async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = () => {}, aoCodigo = () => {}, parear = '' }) {
+  const envios = criarGuardaDeEnvios();
   const historico = criarHistorico(join(AQUI, 'historico.json'));
   await historico.carregar();
   const diag = { fonteChats: '', fonteMensagens: '', erros: {} };
@@ -538,6 +569,11 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoCodigo = (
     try {
       const id = msg.fromMe ? msg.to : msg.from;
       if (!id || msg.isStatus || String(id).includes('broadcast') || String(id).includes('@newsletter')) return;
+      if (msg.fromMe && !String(id).endsWith('@g.us')) {
+        // escrita por uma pessoa no celular? espera o envio do sistema (se foi ele) se registrar, e então decide
+        const para = [...destinos.entries()].find(([, v]) => v === id)?.[0] || String(id).split('@')[0].replace(/\D/g, '');
+        setTimeout(() => { Promise.resolve(aoMinha({ id: msg.id?._serialized || msg.id?.id, para, texto: msg.body || `[${msg.type || 'mensagem'}]`, momento: msg.timestamp, grupo: false, guarda: envios })).catch(() => {}); }, 1500);
+      }
       historico.registrar({
         chatId: id,
         grupo: String(id).endsWith('@g.us'),
@@ -593,6 +629,7 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoCodigo = (
         // se já está "digitando" desde que o lead escreveu, só falta o resto do tempo
         if (!digitando.ativo(telefone)) await estado('typing');
         await dormir(digitando.restante(telefone, digitandoMs));
+        envios.registrar(texto);
         await client.sendMessage(id._serialized, texto);
         await digitando.parar(telefone);
         await estado('stop');
@@ -697,6 +734,7 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoCodigo = (
     digitar: (contato, ligado) => (ligado ? digitando.iniciar(contato) : digitando.parar(contato)),
     diagnostico: () => ({ ...diag, historicoChats: historico.chats(1000).length }),
     async enviarNoChat(chatId, texto) {
+      envios.registrar(texto);
       const enviada = await client.sendMessage(chatId, texto);
       // nas versões atuais a biblioteca pode devolver nada mesmo com a mensagem enviada;
       // falhar aqui faria a tela mostrar erro e a pessoa reenviar (mensagem em dobro)
@@ -841,6 +879,7 @@ export async function executar() {
     ligado = true;
     const ls = clienteLeadsage(cfg);
     const vistos = new Set();
+    const vistosMinhas = new Set();
     const inicioS = Math.floor(Date.now() / 1000);
     const QRCode = (await import('qrcode')).default;
     let wa = null;
@@ -904,6 +943,10 @@ export async function executar() {
         aoCair: (motivo) => {
           pronto = false; pareando = ''; estado.fase = 'erro'; estado.mensagem = `WhatsApp desconectado (${motivo}). Feche e abra o Conector.`; log(estado.mensagem);
           empurrarEstado().catch(() => {});
+        },
+        aoMinha: async (m) => {
+          if (!pronto) return;
+          await entregarMinha(ls, m, m.guarda, vistosMinhas, log);
         },
         aoReceber: async (m) => {
           if (!pronto) return;

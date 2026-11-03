@@ -14,7 +14,7 @@ import http from 'node:http';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  clienteLeadsage, criarAgrupador, criarHistorico, enviarPendentes, entregarMensagem, tentarDeNovo, tratarChat,
+  clienteLeadsage, criarAgrupador, criarHistorico, enviarPendentes, entregarMensagem, entregarMinha, tentarDeNovo, tratarChat,
 } from '../conector/leadsage-conector.mjs';
 import { iniciarBaileys } from './adaptador-baileys.mjs';
 import { authRemoto, guardaRemota, ESPERA_HISTORICO_MS } from './auth-remoto.mjs';
@@ -135,6 +135,11 @@ export class Sessao {
         this.estado = { ...this.estado, fase: 'erro', qr: '', codigo: '' };
         this.aviso(`WhatsApp desconectado (${motivo}).`);
         this.empurrar().catch(() => {});
+      },
+      aoMinha: async (m) => {
+        if (!this.pronto) return;
+        this.vistosMinhas = this.vistosMinhas || new Set();
+        await entregarMinha(this.ls, m, m.guarda, this.vistosMinhas, this.aviso);
       },
       aoReceber: async (m) => {
         if (!this.pronto) return;

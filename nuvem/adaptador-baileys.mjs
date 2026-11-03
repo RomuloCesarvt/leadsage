@@ -11,7 +11,7 @@ import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import * as B from '@whiskeysockets/baileys';
 import pino from 'pino';
-import { criarDigitando } from '../conector/leadsage-conector.mjs';
+import { criarDigitando, criarGuardaDeEnvios } from '../conector/leadsage-conector.mjs';
 
 const makeWASocket = B.default?.default || B.default || B.makeWASocket;
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -144,7 +144,8 @@ export function telefoneDoRemetente(key) {
 
 // ------------------------------------------------------------------ o adaptador
 
-export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPronto, aoCair, aoReceber, historico, aviso = () => {}, auth = null, transcrever = null }) {
+export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPronto, aoCair, aoReceber, aoMinha = () => {}, historico, aviso = () => {}, auth = null, transcrever = null }) {
+  const envios = criarGuardaDeEnvios();
   const authDir = join(dir, 'auth');
   const destinos = new Map(); // telefone -> id da conversa de verdade
   let sock = null;
@@ -239,6 +240,14 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
     s.ev.on('messages.upsert', ({ messages, type }) => {
       for (const m of messages || []) {
         try {
+          // escrita pelo celular (não pelo sistema)? o servidor decide se pausa o robô; espera o envio do sistema se registrar
+          const jidM = m.key?.remoteJid || '';
+          if (m.key?.fromMe && jidM && !jidM.endsWith('@g.us') && jidM !== 'status@broadcast' && !jidM.endsWith('@broadcast') && !jidM.endsWith('@newsletter')) {
+            const chatM = paraChatId(jidM);
+            const para = [...destinos.entries()].find(([, v]) => v === chatM)?.[0] || telefoneDoRemetente(m.key);
+            const resumoM = resumoBaileys(m);
+            if (resumoM.id) setTimeout(() => { Promise.resolve(aoMinha({ id: resumoM.id, para, texto: resumoM.texto, momento: resumoM.quando, grupo: false, guarda: envios })).catch(() => {}); }, 1500);
+          }
           const nova = guardar(m, { novo: type === 'notify' });
           if (!nova) continue;
           const info = transcrever && (nova.tipo === 'ptt' || nova.tipo === 'audio') ? infoDoAudio(m.message) : null;
@@ -319,6 +328,7 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
         await sock.sendPresenceUpdate('composing', jid).catch(() => {});
         await dormir(espera);
         await sock.sendPresenceUpdate('paused', jid).catch(() => {});
+        envios.registrar(texto);
         const enviada = await sock.sendMessage(jid, { text: texto });
         if (!enviada?.key?.id) return { ok: false, erro: 'o WhatsApp não devolveu o envio' };
         // só conta como enviada quando o servidor do WhatsApp confirma; sem isso a tela dizia "enviado" e o celular não tinha nada
@@ -334,6 +344,7 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
     /** Resposta feita pelo dono direto no chat do LeadSage. */
     async enviarNoChat(chatId, texto) {
       if (!sock || !pronto) throw new Error('O WhatsApp não está conectado agora.');
+      envios.registrar(texto);
       const enviada = await sock.sendMessage(paraJid(chatId), { text: texto });
       if (!enviada?.key?.id) throw new Error('o WhatsApp não devolveu o envio');
       const confirmacao = await entregas.aguardar(enviada.key.id, 25000);

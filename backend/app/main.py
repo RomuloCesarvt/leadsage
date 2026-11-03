@@ -2286,6 +2286,28 @@ async def conector_audio(request: Request):
         raise HTTPException(status_code=503, detail="Nenhum motor conseguiu ouvir o áudio agora.")
 
 
+class ConectorHumano(BaseModel):
+    contato: str = Field(min_length=3, max_length=40)
+    id: str = Field(default="", max_length=120)
+    texto: str = Field(default="", max_length=4000)
+    momento: int = 0
+
+
+@app.post("/api/conector/humano")
+async def conector_humano(req: ConectorHumano, request: Request):
+    """O dono escreveu no celular (não foi o robô nem a tela): o robô pausa nessa conversa até a pessoa ligá-lo de novo."""
+    canal = await _canal_do_conector(request)
+    contato = conector_whatsapp.telefone_whatsapp(req.contato)
+    if not 10 <= len(contato) <= 15:
+        raise HTTPException(status_code=422, detail="Número de contato inválido.")
+    try:
+        conversa = await robo_service.humano_respondeu(canal, contato, req.texto, req.id, req.momento)
+    except Exception as exc:
+        print(f"Robo: falha ao registrar a resposta humana {req.id}: {exc}")
+        return {"ok": False}
+    return {"ok": True, "pausado": not conversa.get("robo_ativo", True)}
+
+
 @app.post("/api/conector/mensagem")
 async def conector_mensagem(req: ConectorMensagem, request: Request):
     """Um lead respondeu no WhatsApp do usuário. O robô decide e enfileira a resposta."""
