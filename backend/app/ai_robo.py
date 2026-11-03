@@ -381,7 +381,7 @@ def decidir(
     if (fechamento.quer_fechar(texto) and not objecao_de_preco(texto) and not (sdr or {}).get("fechamento_enviado")):
         mensagens_f, pendencias = fechamento.montar(cfg, lead, (sdr or {}).get("dados", {}).get("nome", "") if isinstance((sdr or {}).get("dados"), dict) else "")
         return Decisao(
-            mensagens=mensagens_f, resposta=mensagens_f[0], passar_para_humano=True, motivo=fechamento.motivo_para_o_dono(pendencias),
+            mensagens=mensagens_f, resposta=mensagens_f[0], passar_para_humano=True, motivo=fechamento.motivo_para_o_dono(pendencias, cfg),
             sdr={**(sdr or {}), "etapa": "fechamento", "temperatura": "quente", "fechamento_enviado": True, "fechamento_pendencias": pendencias},
         )
 

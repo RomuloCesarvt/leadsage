@@ -146,11 +146,22 @@ export const OfertaDoRobo: React.FC<{ valor?: Partial<OfertaRobo>; onChange: (o:
         </div>
 
         <div className="md:col-span-3 mt-2 pt-4 border-t border-slate-100">
-          <h3 className="text-sm font-bold text-slate-800">Fechamento</h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Quando o lead diz “quero fechar”, o robô manda o resumo, a forma de pagar e o checklist do que você precisa para começar. Só usa o que estiver aqui; o que faltar, ele avisa você.
-          </p>
+          <h3 className="text-sm font-bold text-slate-800">Quando o lead diz “quero fechar”</h3>
+          <p className="text-xs text-slate-500 mt-0.5">O robô só usa o que estiver cadastrado; o que faltar, ele avisa você.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+            {([
+              ['conversa', 'Levar para uma conversa (recomendado)', 'Deixa claro que o que ele viu é uma prévia (entram as fotos dele e o layout pode mudar) e convida para uma conversa rápida, em que você mostra como melhorar e acerta pagamento e contrato.'],
+              ['checklist', 'Mandar o checklist de fechamento', 'Manda o resumo, a chave Pix e a lista do que o cliente precisa enviar (comprovante, dados do contrato, logo, fotos...).'],
+            ] as const).map(([id, titulo, texto]) => (
+              <button key={id} type="button" onClick={() => set('fechamento', id)} aria-pressed={(o.fechamento || 'conversa') === id}
+                className={`text-left p-3.5 rounded-xl border-2 transition-colors ${(o.fechamento || 'conversa') === id ? 'border-blue-500 bg-blue-50/60' : 'border-slate-200 hover:border-slate-300'}`}>
+                <span className="block text-sm font-bold text-slate-800">{titulo}</span>
+                <span className="block text-xs text-slate-500 mt-0.5 leading-relaxed">{texto}</span>
+              </button>
+            ))}
+          </div>
         </div>
+        {o.fechamento === 'checklist' && (<>
         <div className="md:col-span-2">
           <label className={rotulo}>Chave Pix</label>
           <input value={o.pix_chave || ''} onChange={e => set('pix_chave', e.target.value)} placeholder="CNPJ, e-mail, telefone ou chave aleatória" className={campo} />
@@ -177,6 +188,7 @@ export const OfertaDoRobo: React.FC<{ valor?: Partial<OfertaRobo>; onChange: (o:
           <textarea rows={4} value={o.itens_do_cliente || ''} onChange={e => set('itens_do_cliente', e.target.value)}
             placeholder={'Logo\nFotos do negócio\nTextos dos serviços\nAcesso ao Instagram'} className={`${campo} resize-none`} />
         </div>
+        </>)}
       </div>
 
       <div className="mt-5 p-3.5 rounded-xl bg-blue-50/70 border border-blue-100 text-[13px] text-blue-900 leading-relaxed flex gap-2.5">

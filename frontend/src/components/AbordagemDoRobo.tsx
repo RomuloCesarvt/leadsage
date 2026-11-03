@@ -87,7 +87,7 @@ export const AbordagemDoRobo: React.FC<{
             </div>
             <div className="md:col-span-3">
               <label className={rotulo}>Frase final do convite (opcional)</label>
-              <input value={p.chamada} onChange={e => set('chamada', e.target.value)} placeholder="Vazio = “Gostou da prévia? … é só me dizer quero fechar”" className={campo} />
+              <input value={p.chamada} onChange={e => set('chamada', e.target.value)} placeholder="Vazio = “Que tal uma conversa rápida para eu te mostrar como ele pode ficar ainda melhor?”" className={campo} />
             </div>
           </div>
 
@@ -98,9 +98,11 @@ export const AbordagemDoRobo: React.FC<{
               <div className="mt-1.5 whitespace-pre-line">
                 🔥 Promoção imperdível! O site sai por apenas {brl(p.preco) || 'R$ …'}.{itens.length ? '\nJá está incluso:\n' + itens.map(i => `✅ ${i}`).join('\n') : ''}
                 {p.validade ? `\nCondição válida ${p.validade}.` : ''}
+                {'\nLembrando que o que você viu é uma prévia, uma primeira ideia com fotos e textos de exemplo. No site de verdade entram as suas fotos e informações, e o layout, as cores e as seções podem mudar.'}
+                {'\n' + (p.chamada || 'Que tal uma conversa rápida para eu te mostrar como ele pode ficar ainda melhor?')}
               </div>
               {(!p.ativa || !brl(p.preco)) && <div className="mt-1.5 text-amber-700">Com a promoção desligada ou sem valor, o robô não anuncia nada.</div>}
-              <div className="mt-1.5 text-orange-900/80">O robô só cita o que está aqui: sem “só hoje”, brinde ou prazo inventado. Quando o lead disser “quero fechar”, o checklist usa este valor.</div>
+              <div className="mt-1.5 text-orange-900/80">O robô só cita o que está aqui: sem “só hoje”, brinde ou prazo inventado. Quando o lead disser “quero fechar”, o robô leva para uma conversa e repete este valor (a forma do fechamento você escolhe em “O que o robô vende”).</div>
             </div>
           </div>
         </div>

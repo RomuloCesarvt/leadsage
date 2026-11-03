@@ -130,6 +130,8 @@ def normalizar(d: Any) -> Dict[str, Any]:
         "sinal_percentual": max(0, min(100, int(_numero(d.get("sinal_percentual"))))),
         "itens_do_cliente": _texto(d.get("itens_do_cliente"), 600),
         "dados_do_contrato": _texto(d.get("dados_do_contrato"), 300),
+        # o que acontece quando o lead diz "quero fechar": conversa (padrao: mostrar como melhorar e alinhar) ou checklist (Pix e material)
+        "fechamento": d.get("fechamento") if d.get("fechamento") in ("conversa", "checklist") else "conversa",
     }
 
 
@@ -174,7 +176,10 @@ def mensagem_da_promocao(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]] = N
         linhas.append("Já está incluso:\n" + "\n".join(f"✅ {i}" for i in itens))
     if p["validade"]:
         linhas.append(f"Condição válida {p['validade'].rstrip('.')}.")
-    linhas.append(p["chamada"] or "Gostou da prévia? Se quiser garantir, é só me dizer *quero fechar* que eu te passo o passo a passo. 🙂")
+    # a prévia é uma primeira ideia: isso fica claro antes de qualquer convite
+    linhas.append("Lembrando que o que você viu é uma *prévia*, uma primeira ideia com fotos e textos de exemplo. No site de verdade entram as *suas fotos* e informações, "
+                  "e o *layout, as cores e as seções podem mudar* do jeito que combinar com o seu negócio.")
+    linhas.append(p["chamada"] or "Que tal uma conversa rápida para eu te mostrar como ele pode ficar ainda melhor? 🙂")
     return "\n\n".join(linhas)
 
 
@@ -282,7 +287,9 @@ O dono quer uma abordagem mais comercial e atrativa. PROMOÇÃO REAL: {nome} por
 - O aviso da promoção sai AUTOMÁTICO logo depois do link da prévia (não o escreva você nem repita). Nas respostas seguintes, quando falar de valor, use SÓ este preço e estes itens.
 - Tom: entusiasmado, direto e positivo, com benefício concreto (aparecer no Google, receber contato pelo WhatsApp, site no ar sem dor de cabeça) e um convite claro ao final ("quer garantir o seu?").
 - Nunca invente escassez ("só hoje", "últimas vagas"), desconto extra, brinde ou prazo que não esteja aqui. O endereço do site é um endereço .vercel.app (sem custo de domínio): se perguntarem, diga isso com clareza, sem prometer .com.br.
-- Quando ele disser que quer fechar, o checklist de fechamento sai automático."""
+- O objetivo final é levar para uma CONVERSA (chamada ou mensagens) em que você mostra como o site pode ficar melhor e alinha os detalhes. NÃO empurre pagamento nem peça Pix, documentos ou material por conta própria.
+- Deixe claro, sempre que for natural, que o que ele viu é uma PRÉVIA (primeira ideia): no site final entram as fotos dele, os textos reais e o layout pode mudar.
+- Quando ele disser que quer fechar, a resposta de fechamento sai automática."""
     return f"""== O SERVIÇO QUE VOCÊ VENDE AGORA (fatos do dono; fora disso não existe) ==
 {chr(10).join('- ' + f for f in fatos)}
 - {regra_esboco}

@@ -408,6 +408,8 @@ export interface OfertaRobo {
   sinal_percentual?: string | number;
   itens_do_cliente?: string;
   dados_do_contrato?: string;
+  /** o que o robô faz quando o lead diz "quero fechar": uma conversa (padrão) ou o checklist de Pix e material */
+  fechamento?: 'conversa' | 'checklist';
 }
 
 /** O que a tela recebe: os segredos so aparecem como "configurado". */
