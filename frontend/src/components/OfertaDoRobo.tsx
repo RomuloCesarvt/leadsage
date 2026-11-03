@@ -56,7 +56,7 @@ export const OfertaDoRobo: React.FC<{ valor?: Partial<OfertaRobo>; onChange: (o:
     o.esboco === 'gratis' ? `Esboço grátis${o.esboco_prazo ? ` ${o.esboco_prazo}` : ''}, sem compromisso.` : '',
     o.esboco === 'pago' ? `Esboço pago${brl(o.esboco_preco) ? ` (${brl(o.esboco_preco)})` : ''}.` : '',
     o.pagamento ? `Pagamento: ${o.pagamento}.` : '',
-    o.pix_chave ? `Ao fechar, manda o Pix${Number(o.sinal_percentual) ? ` (sinal de ${o.sinal_percentual}%)` : ''} e o checklist do que precisa receber.` : '',
+    o.fechamento === 'checklist' && o.pix_chave ? `Ao fechar, manda o Pix${Number(o.sinal_percentual) ? ` (sinal de ${o.sinal_percentual}%)` : ''} e o checklist do que precisa receber.` : '',
   ].filter(Boolean).join(' ');
 
   return (
