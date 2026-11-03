@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { SeletorDeLeadSolto } from './SeletorDeLead';
 import { X, Save, Copy, Check, Download, FileText, Users, AlertCircle, Printer, Upload, Palette } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
@@ -248,16 +249,7 @@ export const TemplateEditor: React.FC<Props> = ({
                       <Users className="w-3.5 h-3.5 inline mr-1" />
                       Preencher a partir de um lead
                     </label>
-                    <select
-                      onChange={e => e.target.value && preencherComLead(e.target.value)}
-                      defaultValue=""
-                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Escolha um lead...</option>
-                      {(leads || []).map((l: any) => (
-                        <option key={l.id} value={l.id}>{l.company || l.name}</option>
-                      ))}
-                    </select>
+                    <SeletorDeLeadSolto leads={leads || []} placeholder="Escolha um lead..." onEscolher={id => { if (id) preencherComLead(id); }} />
                   </div>
                 )}
 

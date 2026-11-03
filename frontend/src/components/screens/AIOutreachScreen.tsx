@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { MessageSquare, Sparkles, ChevronDown, Check, Copy } from 'lucide-react';
+import { MessageSquare, Sparkles, Check, Copy } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
+import { SeletorDeLead } from '../SeletorDeLead';
 
 const TONES = [
   { id: 'Consultivo', label: 'Consultivo', desc: 'Tom de consultor de negócios' },
@@ -74,18 +75,8 @@ export const AIOutreachScreen: React.FC = () => {
           {/* Lead Selection */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
             <label className="block text-sm font-bold text-slate-700 mb-2">Lead</label>
-            <div className="relative mb-4">
-              <select 
-                value={selectedLeadId}
-                onChange={(e) => setSelectedLeadId(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-              >
-                <option value="">Selecione um lead...</option>
-                {leads.map((l: any) => (
-                  <option key={l.id} value={l.id}>{l.name} - {l.company}</option>
-                ))}
-              </select>
-              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <div className="mb-4">
+              <SeletorDeLead leads={leads} valor={selectedLeadId} onChange={setSelectedLeadId} />
             </div>
 
             {selectedLead && (

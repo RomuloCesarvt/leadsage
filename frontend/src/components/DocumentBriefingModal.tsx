@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { SeletorDeLead } from './SeletorDeLead';
 import { X, Sparkles, Loader2, AlertCircle, Wand2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
@@ -120,18 +121,7 @@ export const DocumentBriefingModal: React.FC<Props> = ({ kind, onFechar, onPront
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-600">Para qual lead</label>
-            <select
-              value={leadId}
-              onChange={e => setLeadId(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:border-blue-500"
-            >
-              <option value="">Sem lead vinculado (cliente que já é meu)</option>
-              {(leads || []).map((l: any) => (
-                <option key={l.id} value={l.id}>
-                  {l.company || l.name} — {l.city}
-                </option>
-              ))}
-            </select>
+            <SeletorDeLead leads={(leads || []).map((l: any) => ({ ...l, name: l.name }))} valor={leadId} onChange={setLeadId} placeholder="Sem lead vinculado (cliente que já é meu)" />
             {lead?.diagnosis && (
               <p className="text-[11px] text-slate-500 leading-snug bg-slate-50 border border-slate-200 rounded-lg p-2">
                 <strong className="text-slate-700">Entra no diagnóstico:</strong> {lead.diagnosis}

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { SeletorDeLeadSolto } from './SeletorDeLead';
 import {
   ArrowLeft, Monitor, Smartphone, Save, Code, Download, Upload,
   Plus, Trash2, Check, AlertCircle, Sparkles,
@@ -402,16 +403,9 @@ export const SiteBuilder: React.FC = () => {
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
               Começar a partir de um lead <span className="normal-case font-medium text-slate-400">(opcional)</span>
             </label>
-            <select
-              onChange={e => escolherLead(e.target.value)}
-              defaultValue=""
-              className="w-full md:w-96 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Criar do zero...</option>
-              {(leads || []).map((l: any) => (
-                <option key={l.id} value={l.id}>{l.company || l.name}</option>
-              ))}
-            </select>
+            <div className="w-full md:w-96">
+              <SeletorDeLeadSolto leads={leads || []} placeholder="Criar do zero..." onEscolher={escolherLead} />
+            </div>
             <p className="text-xs text-slate-400 mt-2">
               Escolha um lead e cada modelo aparece com o nome, as cores, os serviços, o endereço e as fotos do ramo dele.
             </p>
