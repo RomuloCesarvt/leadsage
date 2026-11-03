@@ -1731,6 +1731,8 @@ class ConectorMensagem(BaseModel):
     momento: int = 0
     # so guarda: a resposta vem quando o lead parar de escrever (o Conector pede depois)
     adiar: bool = False
+    # as ultimas falas deste chat no proprio WhatsApp (a oferta da previa, por exemplo): o contexto que a conversa ainda nao tem
+    contexto: List[Dict[str, Any]] = Field(default_factory=list, max_length=20)
 
 
 class ConectorResultado(BaseModel):
@@ -2331,7 +2333,7 @@ async def conector_mensagem(req: ConectorMensagem, request: Request):
     msg = meta_canais.Recebida(canal="whatsapp", contato=contato, nome=req.nome.strip(),
                                texto=req.texto.strip(), meta_id=req.id, momento=req.momento)
     try:
-        conversa = await robo_service.processar(canal, msg, adiar=req.adiar)
+        conversa = await robo_service.processar(canal, msg, adiar=req.adiar, contexto=req.contexto)
     except Exception as exc:
         print(f"Robo: falha ao processar mensagem do conector {req.id}: {exc}")
         return {"ok": False}

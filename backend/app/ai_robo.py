@@ -286,6 +286,37 @@ def pediu_o_link(texto: str) -> bool:
     return bool(t and _PEDIU_ENVIO.search(t) and _PEDIU_ALVO.search(t))
 
 
+_AFIRMA = re.compile(
+    r"^(?:(?:oi|ola|opa|bom dia|boa tarde|boa noite|tudo bem|e ai|tudo bom)\b[ ]*)*"
+    r"(?:(?:sim|pode sim|pode mandar|pode enviar|pode ser|pode|claro|com certeza|certo|ok|okay|beleza|blz|manda|mande|mandar|envia|envie|enviar|quero ver|quero sim|quero|"
+    r"bora|vamos|positivo|ta bom|tá bom|fechado|por favor|gostaria|aceito|isso|uhum|aham|tudo certo)\b[ ]*)+$")
+_OFERTA_DE_PREVIA = re.compile(r"\b(previa|site|link|esboco|modelo|layout|ideia|mostrar|exemplo|projeto)\b")
+
+
+def aceitou_a_previa(mensagens: List[Dict[str, Any]], lead: Optional[Dict[str, Any]] = None) -> bool:
+    """O lead respondeu "pode", "pode sim", "manda" a uma fala NOSSA que oferecia a prévia/o link: é um aceite, o link vai na hora.
+
+    Conferido em código porque a IA (principalmente quando cai para um modelo menor) já respondeu "como posso ajudar?" a um "pode"."""
+    falas = [m for m in mensagens if m.get("texto")]
+    fim = []
+    for m in reversed(falas):
+        if m.get("de") != "contato":
+            break
+        fim.append(m.get("texto", ""))
+    if not fim:
+        return False
+    # as falas dele desde a nossa última, em ordem ("Boa tarde" + "Pode")
+    dele = _normal(" ".join(reversed(fim)))
+    if not dele or len(dele.split()) > 10 or re.search(r"\b(nao|agora nao|depois|talvez|sem interesse)\b", dele):
+        return False
+    if not _AFIRMA.match(dele):
+        return False
+    nossa = next((m for m in reversed(falas[: len(falas) - len(fim)]) if m.get("de") in ("robo", "voce")), None)
+    if not nossa or not _OFERTA_DE_PREVIA.search(_normal(nossa.get("texto", ""))):
+        return False
+    return not _ja_mandou_o_link(mensagens, lead)
+
+
 def _ja_mandou_o_link(mensagens: List[Dict[str, Any]], lead: Optional[Dict[str, Any]]) -> bool:
     url = ((lead or {}).get("site_publicado") or "").strip()
     return any(m.get("de") in ("robo", "voce") and ("http" in (m.get("texto") or "").lower() or (url and url in (m.get("texto") or "")))
@@ -384,6 +415,20 @@ def decidir(
             mensagens=mensagens_f, resposta=mensagens_f[0], passar_para_humano=True, motivo=fechamento.motivo_para_o_dono(pendencias, cfg),
             sdr={**(sdr or {}), "etapa": "fechamento", "temperatura": "quente", "fechamento_enviado": True, "fechamento_pendencias": pendencias},
         )
+
+    # Aceitou a prévia ("pode", "manda"): o link sai agora, sem depender da IA (nem de cota dela).
+    if aceitou_a_previa(mensagens, lead):
+        nome = (((sdr or {}).get("dados") or {}).get("nome") or "").strip().split(" ")[0]
+        textos = [f"Perfeito{', ' + nome if nome else ''}! Aqui está a prévia: [LINK_DA_PREVIA]",
+                  "Lembrando que é uma *prévia*, uma primeira ideia com fotos e textos de exemplo: no site de verdade entram as suas fotos e informações, e o layout "
+                  "pode mudar. Dá uma olhada e me conta o que achou! 🙂"]
+        textos = resolver_marcadores(textos, lead)
+        criar = not ((lead or {}).get("site_publicado") or "").strip()
+        novo_sdr = {**(sdr or {}), "etapa": "diagnostico", "temperatura": "morno"}
+        if ai_oferta.promocao_ativa(cfg) and not novo_sdr.get("promo_enviada"):
+            textos.append(ai_oferta.mensagem_da_promocao(cfg, lead))
+            novo_sdr["promo_enviada"] = True
+        return Decisao(resposta="\n\n".join(textos), mensagens=textos, sdr=novo_sdr, criar_previa=criar)
 
     prompt = montar_prompt(mensagens, canal, perfil, cfg, lead, raio=raio, sdr=sdr)
     n = normalizar(gerar_json(prompt), sdr)

@@ -192,7 +192,7 @@ def test_com_previa_criada_pode_falar_dela_mas_o_link_precisa_estar_la():
 
 
 def test_decidir_sem_previa_nao_deixa_o_modelo_alucinar_e_passa_ao_dono():
-    hist = [{"de": "robo", "texto": ABORDAGEM}, {"de": "contato", "texto": "Ok"}]
+    hist = [{"de": "robo", "texto": ABORDAGEM}, {"de": "contato", "texto": "Interessante, me fala mais sobre isso"}]
     d = decidir(hist, "whatsapp", {}, {"ativo": True}, {"id": "L1", "name": "Clínica"},
                 lambda p: {"mensagens": ["Que ótimo! Segue o link da prévia: [LINK_DA_PREVIA]."]})
     assert d.passar_para_humano and not d.mensagens and "conferência" in d.motivo

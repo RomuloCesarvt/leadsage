@@ -317,6 +317,34 @@ def _marcar(conversa: Dict[str, Any], motivo: str) -> None:
 
 
 
+def _semear_do_whatsapp(conversa: Dict[str, Any], contexto: Optional[list]) -> None:
+    """Antes da primeira fala nossa na conversa, põe as últimas falas do chat do WhatsApp (as nossas viram "robo", as do lead "contato").
+
+    Só vale quando a conversa ainda não tem nenhuma fala nossa: depois disso o histórico daqui já é o certo. Não duplica nada."""
+    if not contexto or any(m.get("de") in ("robo", "voce") for m in conversa["mensagens"]):
+        return
+    if not any(isinstance(x, dict) and x.get("minha") for x in contexto):
+        return                                    # o lead só falou: não há o que importar
+    from datetime import datetime, timezone
+
+    ja = {str(m.get("meta_id")) for m in conversa["mensagens"] if m.get("meta_id")}
+    textos = {" ".join(str(m.get("texto") or "").lower().split()) for m in conversa["mensagens"] if m.get("de") == "contato"}
+    novas = []
+    for x in sorted((c for c in contexto if isinstance(c, dict)), key=lambda c: int(c.get("quando") or 0)):
+        texto = str(x.get("texto") or "").strip()
+        meta_id = str(x.get("id") or "")
+        if not texto or (meta_id and meta_id in ja):
+            continue
+        if not x.get("minha") and " ".join(texto.lower().split()) in textos:
+            continue                              # a fala do lead que acabou de chegar já está na conversa
+        quando = int(x.get("quando") or 0)
+        em = datetime.fromtimestamp(quando, timezone.utc).isoformat(timespec="seconds") if quando > 0 else robo_store.agora()
+        novas.append({"de": "robo" if x.get("minha") else "contato", "texto": texto[:2000], "em": em, "meta_id": meta_id, "origem": "whatsapp"})
+    if novas:
+        conversa["mensagens"] = novas[-12:] + conversa["mensagens"]
+        conversa["abordagem_incluida"] = True
+
+
 async def _incluir_abordagem(uid: str, conversa: Dict[str, Any], lead: Optional[Dict[str, Any]], msg: Any) -> None:
     """Põe no começo da conversa a abordagem que o LeadSage já mandou a este lead.
 
@@ -363,11 +391,12 @@ async def processar(
     enviar: Optional[Enviar] = None,
     reprocessar: bool = False,
     adiar: bool = False,
+    contexto: Optional[list] = None,
 ) -> Dict[str, Any]:
     chave = f"{cfg['uid']}:{robo_store.id_da_conversa(msg.canal, msg.contato)}"
     trava = _TRAVAS.setdefault(chave, asyncio.Lock())
     async with trava:
-        return await _processar(cfg, msg, gerar, enviar, reprocessar, adiar)
+        return await _processar(cfg, msg, gerar, enviar, reprocessar, adiar, contexto)
 
 
 async def _processar(
@@ -377,6 +406,7 @@ async def _processar(
     enviar: Optional[Enviar] = None,
     reprocessar: bool = False,
     adiar: bool = False,
+    contexto: Optional[list] = None,
 ) -> Dict[str, Any]:
     """`reprocessar`: a mensagem ja esta na conversa e ficou sem resposta (a IA falhou ou demorou);
     tenta responder de novo, sem repetir a mensagem nem tratar como reenvio.
@@ -423,6 +453,8 @@ async def _processar(
         # robo nao possa responder (desligado, sem plano, sem creditos)
         await _atualizar_pipeline(uid, conversa, {"etapa": "abertura"})
 
+    # o que o proprio WhatsApp ja mostra neste chat (a oferta da previa, a apresentacao) entra primeiro: sem isso um "pode" do lead fica sem pergunta
+    _semear_do_whatsapp(conversa, contexto)
     await _incluir_abordagem(uid, conversa, lead, msg)
 
     async def salvar() -> Dict[str, Any]:
@@ -612,6 +644,8 @@ async def humano_respondeu(cfg: Dict[str, Any], contato: str, texto: str, meta_i
             "optout": False, "precisa_humano": False, "motivo": "", "mensagens": [], "criado": robo_store.agora(), "origem_chat": True,
         }
         texto = (texto or "").strip()
+        if not texto:
+            return conversa                      # reação, mensagem apagada, aviso: não é uma pessoa escrevendo
         if meta_id and any(m.get("meta_id") == meta_id for m in conversa["mensagens"]):
             return conversa
         normal = " ".join(texto.lower().split())

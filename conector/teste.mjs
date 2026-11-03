@@ -189,3 +189,19 @@ test('mensagem digitada pela pessoa vai ao LeadSage; a do sistema, a antiga e a 
   assert.equal(chamadas.length, 1);
   assert.equal(chamadas[0].contato, '5514999990001');
 });
+
+// ---------------------------------------------------------------- o contexto do chat vai junto da mensagem
+test('paraLeadsage leva as últimas falas do chat (sem a própria mensagem) e corta o excesso', () => {
+  const base = { id: 'm9', de: '5514999990001', nome: 'João', texto: 'Pode', tipo: 'text', grupo: false, minha: false, momento: 1_700_000_100 };
+  const ctx = [
+    { id: 'm1', texto: 'Posso te mostrar uma prévia do site?', minha: true, quando: 1_700_000_000 },
+    { id: 'm9', texto: 'Pode', minha: false, quando: 1_700_000_100 },        // a própria mensagem: não repete
+    { id: 'm2', texto: '   ', minha: false, quando: 1 },                       // vazia: descartada
+  ];
+  const p = paraLeadsage({ ...base, contexto: ctx });
+  assert.equal(p.contexto.length, 1);
+  assert.deepEqual(p.contexto[0], { id: 'm1', texto: 'Posso te mostrar uma prévia do site?', minha: true, quando: 1_700_000_000 });
+  assert.equal(paraLeadsage(base).contexto, undefined);                        // sem contexto, o corpo é o de antes
+  const muitas = Array.from({ length: 30 }, (_, i) => ({ id: `c${i}`, texto: `fala ${i}`, minha: i % 2 === 0, quando: i }));
+  assert.equal(paraLeadsage({ ...base, contexto: muitas }).contexto.length, 12);
+});

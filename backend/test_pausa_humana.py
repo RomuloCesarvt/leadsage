@@ -46,3 +46,8 @@ def test_eco_do_robo_e_repeticao_nao_pausam(com_robo, rodar):
 def test_contato_novo_escrito_primeiro_pela_pessoa_nasce_pausado(com_robo, rodar):
     c = rodar(robo_service.humano_respondeu, CFG, "5514999990004", "Olá! Vi sua empresa", "w1")
     assert c["robo_ativo"] is False and c["pausa_humana"] is True
+
+
+def test_evento_sem_texto_nao_pausa_o_robo(com_robo, rodar):
+    c = rodar(robo_service.humano_respondeu, CFG, "5514999990009", "   ", "w0")
+    assert c["robo_ativo"] is False and c["mensagens"] == []        # nasceu vazia e continua sem fala "você": nada foi registrado

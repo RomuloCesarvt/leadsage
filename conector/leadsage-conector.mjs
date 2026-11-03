@@ -114,7 +114,12 @@ export function paraLeadsage(m, inicioS = 0) {
   if (inicioS && Number(m.momento) && Number(m.momento) < inicioS - 10) return null; // histórico antigo
   const texto = String(m.texto || '').trim() || ROTULO_MIDIA[m.tipo] || '';
   if (!texto) return null;
-  return { id: String(m.id), contato: m.de, nome: String(m.nome || ''), texto, momento: Number(m.momento) || 0 };
+  // o que já foi dito neste chat no WhatsApp (a oferta da prévia, por exemplo): sem isso, um "pode" do lead não tem a que responder
+  const contexto = (Array.isArray(m.contexto) ? m.contexto : [])
+    .filter((x) => x && String(x.texto || '').trim() && String(x.id) !== String(m.id))
+    .slice(-12)
+    .map((x) => ({ id: String(x.id), texto: String(x.texto).slice(0, 600), minha: Boolean(x.minha), quando: Number(x.quando) || 0 }));
+  return { id: String(m.id), contato: m.de, nome: String(m.nome || ''), texto, momento: Number(m.momento) || 0, ...(contexto.length ? { contexto } : {}) };
 }
 
 // ------------------------------------------------------- ciclo: o que enviar
@@ -569,7 +574,7 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
     try {
       const id = msg.fromMe ? msg.to : msg.from;
       if (!id || msg.isStatus || String(id).includes('broadcast') || String(id).includes('@newsletter')) return;
-      if (msg.fromMe && !String(id).endsWith('@g.us')) {
+      if (msg.fromMe && !String(id).endsWith('@g.us') && ['chat', 'image', 'video', 'audio', 'ptt', 'document', 'sticker', 'location', 'vcard'].includes(String(msg.type)) && (msg.body || msg.type !== 'chat')) {
         // escrita por uma pessoa no celular? espera o envio do sistema (se foi ele) se registrar, e então decide
         const para = [...destinos.entries()].find(([, v]) => v === id)?.[0] || String(id).split('@')[0].replace(/\D/g, '');
         setTimeout(() => { Promise.resolve(aoMinha({ id: msg.id?._serialized || msg.id?.id, para, texto: msg.body || `[${msg.type || 'mensagem'}]`, momento: msg.timestamp, grupo: false, guarda: envios })).catch(() => {}); }, 1500);
@@ -604,7 +609,7 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
       destinos.set(digitos, msg.from);
       aoReceber({
         id: msg.id?._serialized || msg.id?.id, de: digitos, nome: contato?.pushname || contato?.name || '',
-        texto: msg.body, tipo: msg.type === 'chat' ? 'text' : msg.type, grupo: false, minha: false, momento: msg.timestamp,
+        texto: msg.body, tipo: msg.type === 'chat' ? 'text' : msg.type, grupo: false, minha: false, momento: msg.timestamp, chatId: msg.from,
       });
     } catch (e) {
       log('Aviso ao ler mensagem:', e.message);
@@ -950,6 +955,7 @@ export async function executar() {
         },
         aoReceber: async (m) => {
           if (!pronto) return;
+          try { m.contexto = await waAtual?.mensagens?.(m.chatId, 14); } catch { /* sem contexto: segue como antes */ }
           // guarda a mensagem; a resposta vem quando o lead parar de escrever
           const guardada = await entregarMensagem(ls, m, inicioS, vistos, log, null, { adiar: true });
           if (guardada) agrupador.registrar(m.de);

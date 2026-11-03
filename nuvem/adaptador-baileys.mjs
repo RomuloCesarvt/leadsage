@@ -172,7 +172,7 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
     if (novo && !m.key.fromMe && !jid.endsWith('@g.us')) {
       const de = telefoneDoRemetente(m.key);
       destinos.set(de, chatId);
-      return { id: resumo.id, de, nome: m.pushName || '', texto: lerConteudo(m.message).texto, tipo: resumo.tipo, grupo: false, minha: false, momento: resumo.quando };
+      return { id: resumo.id, de, nome: m.pushName || '', texto: lerConteudo(m.message).texto, tipo: resumo.tipo, grupo: false, minha: false, momento: resumo.quando, chatId };
     }
     return null;
   };
@@ -246,7 +246,8 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
             const chatM = paraChatId(jidM);
             const para = [...destinos.entries()].find(([, v]) => v === chatM)?.[0] || telefoneDoRemetente(m.key);
             const resumoM = resumoBaileys(m);
-            if (resumoM.id) setTimeout(() => { Promise.resolve(aoMinha({ id: resumoM.id, para, texto: resumoM.texto, momento: resumoM.quando, grupo: false, guarda: envios })).catch(() => {}); }, 1500);
+            // reação, mensagem apagada, aviso do sistema: sem texto nem mídia não é uma pessoa escrevendo
+            if (resumoM.id && resumoM.texto) setTimeout(() => { Promise.resolve(aoMinha({ id: resumoM.id, para, texto: resumoM.texto, momento: resumoM.quando, grupo: false, guarda: envios })).catch(() => {}); }, 1500);
           }
           const nova = guardar(m, { novo: type === 'notify' });
           if (!nova) continue;

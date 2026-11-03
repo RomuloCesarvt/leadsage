@@ -43,7 +43,7 @@ CFG_COMERCIAL = {"estilo": "comercial", "promocao": PROMO, "oferta": {"servico":
 def _decidir_com_modelo(cfg, resposta_do_modelo, sdr=None):
     def gerar(_):
         return resposta_do_modelo
-    msgs = [{"de": "robo", "texto": "Posso mandar a prévia?"}, {"de": "contato", "texto": "pode mandar"}]
+    msgs = [{"de": "robo", "texto": "Posso mandar a prévia?"}, {"de": "contato", "texto": "Interessante, me conta como funciona"}]
     return ai_robo.decidir(msgs, "whatsapp", {"name": "Rômulo"}, cfg, {"id": "L1", "name": "Maria", "site_publicado": "https://x.vercel.app/s/maria"}, gerar, None, sdr)
 
 

@@ -143,6 +143,7 @@ export class Sessao {
       },
       aoReceber: async (m) => {
         if (!this.pronto) return;
+        try { m.contexto = await this.wa?.mensagens?.(m.chatId, 14); } catch { /* sem contexto: segue como antes */ }
         const guardada = await entregarMensagem(this.ls, m, this.inicioS, this.vistos, this.aviso, null, { adiar: true });
         if (guardada) this.agrupador.registrar(m.de);
       },
