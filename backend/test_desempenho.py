@@ -39,3 +39,29 @@ def test_taxa_so_ganha_destaque_com_amostra_minima():
     r = desempenho.calcular(itens, conversas)
     assert r["destaques"]["responde_mais"] is None or r["destaques"]["responde_mais"]["segmento"] != "Pets"
     assert desempenho.calcular([], [])["segmentos"] == []
+
+
+def _item_em(i, nicho, cidade, location, etapa="Contato Enviado"):
+    return {"id": f"L{i}", "etapa": etapa, "origem": "salvo", "lead": {"niche": nicho, "city": cidade, "location": location}}
+
+
+def test_mesmo_segmento_em_cidades_e_estados_diferentes():
+    itens = [
+        _item_em(1, "Padarias", "Botucatu", "Botucatu - SP"), _item_em(2, "Padarias", "Botucatu", "Botucatu - SP"),
+        _item_em(3, "Padarias", "Curitiba", "Curitiba - PR", "Qualificado"), _item_em(4, "Padarias", "Curitiba", "Curitiba, PR", "Qualificado"),
+        _item_em(5, "Padarias", "Lugar", "sem estado"),
+    ]
+    conversas = [{"lead_id": "L1", "sdr": {}, "mensagens": [{"de": "robo", "texto": "oi"}, {"de": "contato", "texto": "me envia o link"}]}]
+    r = desempenho.calcular(itens, conversas)
+    por_cidade = {(x["cidade"], x["estado"]): x for x in r["linhas"]}
+    assert por_cidade[("Botucatu", "SP")]["pediram_link"] == 1 and por_cidade[("Botucatu", "SP")]["responderam"] == 1
+    assert por_cidade[("Curitiba", "PR")]["interessados"] == 2 and por_cidade[("Curitiba", "PR")]["estado"] == "PR"
+    assert por_cidade[("Lugar", "")]["estado"] == ""
+    assert len(r["segmentos"]) == 1 and r["segmentos"][0]["leads"] == 5          # o total do segmento soma as cidades
+
+
+def test_estado_do_lead():
+    assert desempenho.estado_do_lead({"location": "Botucatu - SP"}) == "SP"
+    assert desempenho.estado_do_lead({"location": "São Paulo, sp"}) == "SP"
+    assert desempenho.estado_do_lead({"location": "Brasil"}) == ""
+    assert desempenho.estado_do_lead({}) == ""

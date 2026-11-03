@@ -676,8 +676,11 @@ export interface SegmentoDesempenho {
   taxa_interesse: number;
 }
 export interface DestaqueDeSegmento { segmento: string; valor: number; abordados: number }
+/** O mesmo desempenho no nível segmento x cidade x estado (a tela agrupa como quiser). */
+export interface LinhaDeDesempenho extends SegmentoDesempenho { cidade: string; estado: string }
 export interface DesempenhoPorSegmento {
   segmentos: SegmentoDesempenho[];
+  linhas?: LinhaDeDesempenho[];
   destaques: { responde_mais: DestaqueDeSegmento | null; mais_interesse: DestaqueDeSegmento | null; mais_pedem_link: DestaqueDeSegmento | null };
   minimo_para_taxa: number;
 }

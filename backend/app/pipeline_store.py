@@ -35,7 +35,7 @@ MAX_HISTORICO = 40
 # O que se guarda do lead: o que o robo usa para conversar e o que o
 # pipeline mostra. Nada de campo grande (reviews, horarios).
 CAMPOS_LEAD = (
-    "name", "company", "phone", "email", "niche", "city", "website", "instagram",
+    "name", "company", "phone", "email", "niche", "city", "location", "website", "instagram",
     "rating", "rating_count", "missingDigitalAssets", "diagnosis", "hooks",
     "opportunityScore", "maps_url",
 )

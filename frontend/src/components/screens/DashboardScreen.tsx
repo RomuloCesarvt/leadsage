@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Search, Users, ArrowUpRight, BarChart2, Zap, Globe, MessageCircle, Target, ArrowRight, Link2, Flame, Reply } from 'lucide-react';
 import { api } from '../../services/api';
 import type { DesempenhoPorSegmento } from '../../types';
+import { agrupar, destaques as destaquesDe, segmentosDasLinhas, type Visao } from '../../lib/desempenho';
 import { useApp } from '../../context/AppContext';
 
 export const DashboardScreen: React.FC = () => {
@@ -11,9 +12,13 @@ export const DashboardScreen: React.FC = () => {
 
   // quais segmentos (ramos) respondem mais, mostram mais interesse e mais pedem o link da prévia
   const [segmentos, setSegmentos] = useState<DesempenhoPorSegmento | null>(null);
+  // ver por segmento, cidade ou estado; com um segmento escolhido, compara o mesmo ramo entre cidades e estados
+  const [visao, setVisao] = useState<Visao>('segmento');
+  const [filtroSegmento, setFiltroSegmento] = useState('');
   useEffect(() => {
     if (!user) return;
-    api.segmentosDoDashboard().then(setSegmentos).catch(() => setSegmentos(null));
+    // resposta fora do formato esperado = sem dados: o resto do dashboard nunca quebra por causa desta seção
+    api.segmentosDoDashboard().then(r => setSegmentos(Array.isArray(r?.segmentos) && r?.destaques ? r : null)).catch(() => setSegmentos(null));
   }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Real computed metrics
@@ -243,71 +248,109 @@ export const DashboardScreen: React.FC = () => {
       </div>
 
 
-      {/* Segmentos: onde está a resposta, o interesse e o pedido de link */}
-      <div className="mt-6" data-testid="segmentos-do-dashboard">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold text-slate-800 text-lg">Segmentos que mais respondem</h3>
-          <button onClick={() => setViewState('conversas')} className="text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
-            Conversas <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-        {!segmentos || segmentos.segmentos.length === 0 ? (
-          <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 text-center">
-            <MessageCircle className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500 font-medium text-sm">Quando os leads começarem a responder, aqui aparece qual segmento responde mais, tem mais interesse e mais pede o link da prévia.</p>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-              {([
-                ['Responde mais', segmentos.destaques.responde_mais, Reply, (d: any) => `${d.valor}% de resposta`, 'text-blue-600 bg-blue-50'],
-                ['Mais interesse', segmentos.destaques.mais_interesse, Flame, (d: any) => `${d.valor} interessado${d.valor > 1 ? 's' : ''}`, 'text-orange-600 bg-orange-50'],
-                ['Mais pedem o link', segmentos.destaques.mais_pedem_link, Link2, (d: any) => `${d.valor} pedido${d.valor > 1 ? 's' : ''} de link`, 'text-emerald-600 bg-emerald-50'],
-              ] as const).map(([titulo, d, Icone, texto, cor]) => (
-                <div key={titulo} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${cor}`}><Icone className="w-5 h-5" /></div>
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{titulo}</p>
-                    {d ? (
-                      <>
-                        <p className="font-bold text-slate-800 truncate">{d.segmento}</p>
-                        <p className="text-xs text-slate-500">{texto(d)}</p>
-                      </>
-                    ) : <p className="text-sm text-slate-400">Ainda sem dados{titulo === 'Responde mais' ? ` (precisa de ${segmentos.minimo_para_taxa}+ abordados)` : ''}</p>}
-                  </div>
-                </div>
-              ))}
+      {/* Segmentos, cidades e estados: onde está a resposta, o interesse e o pedido de link */}
+      {(() => {
+        const minimo = segmentos?.minimo_para_taxa ?? 3;
+        const linhas = segmentos?.linhas || [];
+        const grupos = linhas.length
+          ? agrupar(linhas, visao, filtroSegmento)
+          : (segmentos?.segmentos || []).map(x => ({ nome: x.segmento, ...x })) as ReturnType<typeof agrupar>;
+        const d = linhas.length ? destaquesDe(grupos, minimo) : null;
+        const vazio = !segmentos || segmentos.segmentos.length === 0;
+        const rotuloDaVisao = { segmento: 'Segmento', cidade: 'Cidade', estado: 'Estado' }[visao];
+        const cards = [
+          ['Responde mais', d ? d.respondeMais : segmentos?.destaques.responde_mais && { nome: segmentos.destaques.responde_mais.segmento, ...segmentos.destaques.responde_mais }, Reply, (x: any) => `${x.valor}% de resposta`, 'text-blue-600 bg-blue-50'],
+          ['Mais interesse', d ? d.maisInteresse : segmentos?.destaques.mais_interesse && { nome: segmentos.destaques.mais_interesse.segmento, ...segmentos.destaques.mais_interesse }, Flame, (x: any) => `${x.valor} interessado${x.valor > 1 ? 's' : ''}`, 'text-orange-600 bg-orange-50'],
+          ['Mais pedem o link', d ? d.maisPedemLink : segmentos?.destaques.mais_pedem_link && { nome: segmentos.destaques.mais_pedem_link.segmento, ...segmentos.destaques.mais_pedem_link }, Link2, (x: any) => `${x.valor} pedido${x.valor > 1 ? 's' : ''} de link`, 'text-emerald-600 bg-emerald-50'],
+        ] as const;
+        return (
+          <div className="mt-6" data-testid="segmentos-do-dashboard">
+            <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
+              <h3 className="font-bold text-slate-800 text-lg">Onde mais respondem</h3>
+              <button onClick={() => setViewState('conversas')} className="text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                Conversas <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-              <div className="hidden sm:grid grid-cols-[1.6fr_repeat(5,1fr)] gap-2 px-5 py-3 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                <span>Segmento</span><span className="text-right">Abordados</span><span className="text-right">Responderam</span><span className="text-right">Interesse</span><span className="text-right">Pediram link</span><span className="text-right">Fechados</span>
+            {vazio ? (
+              <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 text-center">
+                <MessageCircle className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500 font-medium text-sm">Quando os leads começarem a responder, aqui aparece qual segmento, cidade e estado respondem mais, têm mais interesse e mais pedem o link da prévia.</p>
               </div>
-              <ul className="divide-y divide-slate-100">
-                {segmentos.segmentos.map(s => (
-                  <li key={s.segmento} className="px-4 sm:px-5 py-3">
-                    <div className="sm:grid sm:grid-cols-[1.6fr_repeat(5,1fr)] sm:gap-2 sm:items-center">
-                      <p className="font-bold text-slate-800 text-sm truncate">{s.segmento}</p>
-                      <div className="grid grid-cols-5 gap-2 mt-2 sm:mt-0 sm:contents text-center sm:text-right">
-                        {([['Abord.', s.abordados], ['Resp.', s.responderam], ['Interesse', s.interessados], ['Link', s.pediram_link], ['Fechados', s.fechados]] as const).map(([r, v]) => (
-                          <div key={r} className="sm:text-right">
-                            <p className="sm:hidden text-[10px] font-bold uppercase text-slate-400">{r}</p>
-                            <p className="font-bold text-slate-800 text-sm">{v}</p>
-                            {r === 'Resp.' && s.abordados >= segmentos.minimo_para_taxa && <p className="text-[11px] text-slate-400 sm:hidden">{s.taxa_resposta}%</p>}
-                          </div>
-                        ))}
+            ) : (
+              <>
+                {linhas.length > 0 && (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+                    <div className="flex bg-slate-100 rounded-xl p-1 self-start" role="tablist" aria-label="Agrupar por">
+                      {(['segmento', 'cidade', 'estado'] as const).map(v => (
+                        <button key={v} role="tab" aria-selected={visao === v} onClick={() => setVisao(v)}
+                          className={`px-4 h-10 rounded-lg text-sm font-bold transition-colors ${visao === v ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}>
+                          {{ segmento: 'Segmento', cidade: 'Cidade', estado: 'Estado' }[v]}
+                        </button>
+                      ))}
+                    </div>
+                    <select value={filtroSegmento} onChange={e => setFiltroSegmento(e.target.value)} aria-label="Filtrar por segmento"
+                      className="px-3 h-11 sm:h-10 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 sm:max-w-xs">
+                      <option value="">Todos os segmentos</option>
+                      {segmentosDasLinhas(linhas).map(x => <option key={x} value={x}>{x}</option>)}
+                    </select>
+                    {filtroSegmento && visao === 'segmento' && <p className="text-xs text-slate-500">Escolha Cidade ou Estado para comparar “{filtroSegmento}” entre lugares.</p>}
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                  {cards.map(([titulo, x, Icone, texto, cor]) => (
+                    <div key={titulo} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${cor}`}><Icone className="w-5 h-5" /></div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{titulo}</p>
+                        {x ? (
+                          <>
+                            <p className="font-bold text-slate-800 truncate">{x.nome}</p>
+                            <p className="text-xs text-slate-500">{texto(x)}</p>
+                          </>
+                        ) : <p className="text-sm text-slate-400">Ainda sem dados{titulo === 'Responde mais' ? ` (precisa de ${minimo}+ abordados)` : ''}</p>}
                       </div>
                     </div>
-                    {s.abordados >= segmentos.minimo_para_taxa && (
-                      <div className="hidden sm:block mt-1 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-blue-500/60 rounded-full" style={{ width: `${s.taxa_resposta}%` }} /></div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </>
-        )}
-      </div>
+                  ))}
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                  <div className="hidden sm:grid grid-cols-[1.6fr_repeat(5,1fr)] gap-2 px-5 py-3 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <span>{rotuloDaVisao}</span><span className="text-right">Abordados</span><span className="text-right">Responderam</span><span className="text-right">Interesse</span><span className="text-right">Pediram link</span><span className="text-right">Fechados</span>
+                  </div>
+                  {grupos.length === 0 ? (
+                    <p className="px-5 py-6 text-sm text-slate-500">Nenhum lead com esse filtro.</p>
+                  ) : (
+                    <ul className="divide-y divide-slate-100">
+                      {grupos.slice(0, 15).map(g => (
+                        <li key={g.nome} className="px-4 sm:px-5 py-3">
+                          <div className="sm:grid sm:grid-cols-[1.6fr_repeat(5,1fr)] sm:gap-2 sm:items-center">
+                            <p className="font-bold text-slate-800 text-sm truncate">{g.nome}</p>
+                            <div className="grid grid-cols-5 gap-2 mt-2 sm:mt-0 sm:contents text-center sm:text-right">
+                              {([['Abord.', g.abordados], ['Resp.', g.responderam], ['Interesse', g.interessados], ['Link', g.pediram_link], ['Fechados', g.fechados]] as const).map(([r, v]) => (
+                                <div key={r} className="sm:text-right">
+                                  <p className="sm:hidden text-[10px] font-bold uppercase text-slate-400">{r}</p>
+                                  <p className="font-bold text-slate-800 text-sm">{v}</p>
+                                  {r === 'Resp.' && g.abordados >= minimo && <p className="text-[11px] text-slate-400 sm:hidden">{g.taxa_resposta}%</p>}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          {g.abordados >= minimo && (
+                            <div className="hidden sm:block mt-1 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-blue-500/60 rounded-full" style={{ width: `${g.taxa_resposta}%` }} /></div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                {linhas.length > 0 && visao !== 'segmento' && grupos.some(g => g.nome === 'Sem estado' || g.nome === 'Sem cidade') && (
+                  <p className="mt-2 text-xs text-slate-400">“Sem estado/cidade”: leads salvos antes desta versão ganham o estado na próxima vez que o sistema sincronizar Meus Leads.</p>
+                )}
+              </>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 };

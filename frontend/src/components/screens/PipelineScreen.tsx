@@ -52,11 +52,16 @@ export const PipelineScreen: React.FC = () => {
   const [atualizando, setAtualizando] = React.useState(false);
   // cartão com o seletor de agente aberto
   const [agenteAberto, setAgenteAberto] = React.useState<string | null>(null);
+  // onde o menu do agente aparece: fixo na janela, para a coluna (que rola) nunca cortá-lo nos primeiros cards
+  const [posMenu, setPosMenu] = React.useState<{ left: number; top?: number; bottom?: number }>({ left: 8 });
   React.useEffect(() => {
     if (!agenteAberto) return;
     const fechar = () => setAgenteAberto(null);
     window.addEventListener('click', fechar);
-    return () => window.removeEventListener('click', fechar);
+    // o menu é fixo na janela: se a coluna ou a página rolar, ele fecha em vez de ficar solto no lugar errado
+    window.addEventListener('scroll', fechar, true);
+    window.addEventListener('resize', fechar);
+    return () => { window.removeEventListener('click', fechar); window.removeEventListener('scroll', fechar, true); window.removeEventListener('resize', fechar); };
   }, [agenteAberto]);
 
   const onDragStart = (e: React.DragEvent, leadId: string) => {
@@ -194,7 +199,15 @@ export const PipelineScreen: React.FC = () => {
                         <div className="relative">
                           <button
                             type="button" title="Gerenciar agente: quem atende este lead" data-testid="agente"
-                            onClick={e => { e.stopPropagation(); setAgenteAberto(agenteAberto === lead.id ? null : lead.id); }}
+                            onClick={e => {
+                              e.stopPropagation();
+                              const r = e.currentTarget.getBoundingClientRect();
+                              const largura = 256, altura = 240;
+                              const left = Math.max(8, Math.min(r.left, window.innerWidth - largura - 8));
+                              // sem espaço em cima, o menu abre para baixo
+                              setPosMenu(r.top > altura + 8 ? { left, bottom: window.innerHeight - r.top + 4 } : { left, top: r.bottom + 4 });
+                              setAgenteAberto(agenteAberto === lead.id ? null : lead.id);
+                            }}
                             className={`flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg border transition-colors ${eu ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'} hover:brightness-95`}
                           >
                             {eu ? <UserRound className="w-3 h-3" /> : <Bot className="w-3 h-3" />}
@@ -202,7 +215,7 @@ export const PipelineScreen: React.FC = () => {
                             <ChevronDown className="w-3 h-3 opacity-60" />
                           </button>
                           {agenteAberto === lead.id && (
-                            <div className="absolute left-0 bottom-full mb-1 z-20 w-64 bg-white border border-slate-200 rounded-xl shadow-lg p-1.5" role="menu">
+                            <div className="fixed z-50 w-64 max-w-[calc(100vw-16px)] max-h-[70vh] overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg p-1.5" style={posMenu} role="menu">
                               {AGENTES_PADRAO.map(a => (
                                 <button
                                   key={a.id} type="button" role="menuitemradio" aria-checked={a.id === agente.id}
