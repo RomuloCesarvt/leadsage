@@ -283,13 +283,9 @@ def bloco_do_servico(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]]) -> str
         promo_txt = f"""
 
 == ESTILO COMERCIAL E PROMOÇÃO ATIVA ==
-O dono quer uma abordagem mais comercial e atrativa. PROMOÇÃO REAL: {nome} por {_brl(p['preco'])}, com: {itens}.{(' Válida ' + p['validade'] + '.') if p['validade'] else ''}
-- O aviso da promoção sai AUTOMÁTICO logo depois do link da prévia (não o escreva você nem repita). Nas respostas seguintes, quando falar de valor, use SÓ este preço e estes itens.
-- Tom: entusiasmado, direto e positivo, com benefício concreto (aparecer no Google, receber contato pelo WhatsApp, site no ar sem dor de cabeça) e um convite claro ao final ("quer garantir o seu?").
-- Nunca invente escassez ("só hoje", "últimas vagas"), desconto extra, brinde ou prazo que não esteja aqui. O endereço do site é um endereço .vercel.app (sem custo de domínio): se perguntarem, diga isso com clareza, sem prometer .com.br.
-- O objetivo final é levar para uma CONVERSA (chamada ou mensagens) em que você mostra como o site pode ficar melhor e alinha os detalhes. NÃO empurre pagamento nem peça Pix, documentos ou material por conta própria.
-- Deixe claro, sempre que for natural, que o que ele viu é uma PRÉVIA (primeira ideia): no site final entram as fotos dele, os textos reais e o layout pode mudar.
-- Quando ele disser que quer fechar, a resposta de fechamento sai automática."""
+PROMOÇÃO REAL: {nome} por {_brl(p['preco'])}, com: {itens}.{(' Válida ' + p['validade'] + '.') if p['validade'] else ''} O aviso dela sai automático depois do link da prévia (não o escreva nem repita); depois, cite só este preço e estes itens.
+Tom entusiasmado e direto, com benefício concreto, e rumo a uma CONVERSA em que você mostra como melhorar o site: sem empurrar pagamento nem pedir Pix, documentos ou material. Lembre que o que ele viu é uma PRÉVIA (entram as fotos dele e o layout pode mudar).
+Nunca invente escassez, desconto, brinde ou prazo. O endereço é .vercel.app (sem custo de domínio): diga com clareza se perguntarem. "Quero fechar" tem resposta automática."""
     return f"""== O SERVIÇO QUE VOCÊ VENDE AGORA (fatos do dono; fora disso não existe) ==
 {chr(10).join('- ' + f for f in fatos)}
 - {regra_esboco}

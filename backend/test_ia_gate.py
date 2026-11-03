@@ -277,3 +277,20 @@ def test_quando_um_motor_falha_o_outro_assume_sem_o_usuario_perceber(monkeypatch
     respostas = [ai_client.generate_hedged(None, "p", time.monotonic() + 20, max_tokens=500) for _ in range(4)]
     assert all('"gemini"' in r for r in respostas)                  # o Groq recusou; o Gemini respondeu tudo
     assert usos["groq"] == 1                                         # e o Groq descansa pelo tempo que mandou, sem martelar de novo
+
+
+def test_resposta_do_robo_cabe_no_groq_mesmo_com_o_gemini_pausado():
+    """O pedido do robô (~24 mil caracteres) já não cabia no orçamento do Groq: sem o Gemini (cota diária), a conversa ficava sem resposta."""
+    from app import ai_client, ia_gate
+    ia_gate.reiniciar()
+    token = ia_gate.PRIORIDADE.set("alta")
+    try:
+        tokens = ai_client._tokens_do_pedido("x" * 24000, 700)
+        groq = ia_gate.Alvo("groq:teste", "groq", lambda limite: "{}")
+        assert ia_gate.espera_do_alvo(groq, tokens) == 0
+        # um lote (prioridade normal) segue com a estimativa e o orçamento conservadores
+        ia_gate.PRIORIDADE.set("normal")
+        assert ia_gate.espera_do_alvo(groq, ai_client._tokens_do_pedido("x" * 24000, 700)) >= 1e8
+    finally:
+        ia_gate.PRIORIDADE.reset(token)
+        ia_gate.reiniciar()

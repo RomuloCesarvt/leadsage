@@ -117,7 +117,11 @@ def _tentar_modelo(client, model: str, prompt: str, limite_ms: int, max_tokens: 
 
 def _tokens_do_pedido(prompt: str, max_tokens: Optional[int]) -> int:
     """Quanto o pedido pesa no limite por minuto: entrada (~3 caracteres por token em português) mais a saída pedida."""
-    return int(len(prompt) / 3.6) + int(max_tokens or 1500)
+    # resposta do robo a quem escreveu (prioridade alta): estimativa menos pessimista (~4 caracteres por token em portugues nos modelos do Groq),
+    # senao o pedido grande do robo nunca cabe no Groq e a conversa fica refem do limite diario do Gemini
+    from app import ia_gate
+    por_token = 4.0 if ia_gate.PRIORIDADE.get() == "alta" else 3.6
+    return int(len(prompt) / por_token) + int(max_tokens or 1500)
 
 
 def _alvos(client, prompt: str, max_tokens: Optional[int], json_mode: bool, qualidade: bool = False) -> list:

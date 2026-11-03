@@ -83,6 +83,8 @@ def espera_do_alvo(alvo: Alvo, tokens: int, agora: Optional[float] = None) -> fl
     agora = agora if agora is not None else time.time()
     e = _estado(alvo.chave)
     tpm = e["tpm"] or alvo.tpm
+    if PRIORIDADE.get() == "alta" and not e["tpm"]:
+        tpm = int(tpm * 1.15)           # resposta do robô: usa a margem de segurança também (o limite real, aprendido dos cabeçalhos e das recusas, vale quando existe)
     if tokens > tpm:
         return 1e9                      # pedido maior que o orçamento por minuto do modelo: nunca cabe aqui
     if e["quebrado_ate"] > agora:
