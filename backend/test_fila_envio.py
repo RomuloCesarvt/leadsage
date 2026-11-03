@@ -46,8 +46,8 @@ class Pontas:
         self.creditos -= 2
 
 
-def preparar(rodar, leads, p, uid=UID):
-    return rodar(fila_envio.preparar_lote, uid, leads, p.gerar, p.enviar, p.pode, p.cobrar, 0)
+def preparar(rodar, leads, p, uid=UID, reabordar=False):
+    return rodar(fila_envio.preparar_lote, uid, leads, p.gerar, p.enviar, p.pode, p.cobrar, 0, reabordar=reabordar)
 
 
 # ------------------------------------------------------------------ canais
@@ -281,7 +281,7 @@ def test_numero_que_ja_recebeu_volta_para_revisao_com_aviso_e_nao_sai_sozinho(co
     preparar(rodar, [lead("A", phone="14998003784")], p)
     rodar(fila_envio.marcar_enviado, UID, "f_A")                              # A saiu pelo WhatsApp
     # outro lead com o MESMO numero (escrito com 55 e formatacao diferente) e o proprio A de novo
-    r = preparar(rodar, [lead("B", phone="+55 (14) 99800-3784"), lead("A", phone="14998003784")], p)
+    r = preparar(rodar, [lead("B", phone="+55 (14) 99800-3784"), lead("A", phone="14998003784")], p, reabordar=True)
     assert [x["resultado"] for x in r["resultados"]] == ["para revisar", "para revisar"]
     assert rodar(fila_envio.obter, UID, "f_A")["status"] == "enviado"          # o registro do envio antigo nao e apagado
     assert rodar(fila_envio.obter, UID, "f_A_r1")["status"] == "rascunho"
@@ -319,3 +319,16 @@ def test_a_ia_recebe_o_aviso_de_retomada_para_quem_ja_recebeu(com_robo, rodar):
     assert main._instrucao_de_retomada(None) == ""
     t = main._instrucao_de_retomada({"quando": "2026-10-10T10:00:00"})
     assert "JÁ RECEBEU" in t and "2026-10-10" in t and "retomada" in t
+
+
+def test_quem_ja_recebeu_sai_da_lista_e_o_robo_conduz_o_resto(com_robo, rodar):
+    """Depois de uma atualizacao (ou de uma geracao interrompida) rodar de novo nunca manda duas vezes."""
+    p = Pontas()
+    preparar(rodar, [lead("A", phone="14998003784")], p)
+    rodar(fila_envio.marcar_enviado, UID, "f_A")
+    r = preparar(rodar, [lead("A", phone="14998003784"), lead("B", phone="+55 (14) 99800-3784"), lead("C", phone="14997001122")], p)
+    por_lead = {x["lead_id"]: x for x in r["resultados"]}
+    assert por_lead["A"]["resultado"] == "ignorado" and "já recebeu a abordagem" in por_lead["A"]["motivo"] and "robô conduz" in por_lead["A"]["motivo"]
+    assert por_lead["B"]["resultado"] == "ignorado"                           # outro cadastro do mesmo numero
+    assert por_lead["C"]["resultado"] != "ignorado"                           # quem nunca recebeu segue normalmente
+    assert rodar(fila_envio.obter, UID, "f_A_r1") is None and rodar(fila_envio.obter, UID, "f_B") is None

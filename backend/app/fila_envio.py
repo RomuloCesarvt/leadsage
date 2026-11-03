@@ -476,6 +476,7 @@ async def preparar_lote(
     pausa: float = 0.8,
     revisar: bool = False,
     orcamento_s: float = 0.0,
+    reabordar: bool = False,
 ) -> Dict[str, Any]:
     """Prepara até LOTE_MAXIMO leads. Com `revisar`, nada sai: as mensagens ficam como rascunho para a pessoa conferir. Devolve o que aconteceu com cada um.
 
@@ -507,6 +508,13 @@ async def preparar_lote(
         antes = await historico_do_contato(uid, lead, canal, existentes)
         if antes and antes.get("optout"):
             saida.append({"lead_id": lid, "nome": nome, "resultado": "ignorado", "motivo": "pediu para não receber mensagens"})
+            continue
+        if antes and not reabordar:
+            # o robô conduz a régua e a conversa sozinho: quem já recebeu a abordagem sai da lista (nada sai duas vezes depois de uma
+            # atualização ou de uma geração interrompida); só entra de novo se a pessoa mandar de propósito (reabordar)
+            quando = str(antes.get("quando") or "")[:10]
+            saida.append({"lead_id": lid, "nome": nome, "resultado": "ignorado",
+                          "motivo": f"já recebeu a abordagem{f' em {quando}' if quando else ''}: o robô conduz o resto (seguimentos e conversa)"})
             continue
         if antes:
             historicos[lid] = antes

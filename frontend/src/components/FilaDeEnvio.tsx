@@ -18,6 +18,7 @@ import { WhatsAppIcon, InstagramIcon, LinkedInIcon } from './BrandIcons';
 import { ehSalvo } from '../lib/leadsSalvos';
 import { jaDisparado, ordenarCandidatos } from '../lib/ordemDaFila';
 import { sondar } from '../lib/sondagem';
+import { guardarSelecao, iniciarTrabalho, lerSelecao } from '../lib/trabalhoEmAndamento';
 import { montarPreviaDoLead } from './SiteBuilder';
 import { buscarFotos } from './BancoImagens';
 import type { CanalFila, EstadoFilaWhats, ItemFila, LeadItem, ResultadoPreparo, ResumoFila } from '../types';
@@ -75,12 +76,13 @@ const ESTADO: Record<string, { rotulo: string; cor: string }> = {
 type Aba = 'revisar' | 'fila' | 'problema';
 
 export const FilaDeEnvio: React.FC = () => {
-  const { leads, atualizarPipeline, leadsParaContato, setLeadsParaContato } = useApp() as any;
+  const { leads, atualizarPipeline, leadsParaContato, setLeadsParaContato, user } = useApp() as any;
   const [itens, setItens] = useState<ItemFila[]>([]);
   const [resumo, setResumo] = useState<ResumoFila | null>(null);
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(true);
-  const [marcados, setMarcados] = useState<Set<string>>(() => new Set(leadsParaContato || []));
+  // a seleção sobrevive a uma atualização do app: quem já recebeu mensagem é tirado dela assim que a fila carrega (abaixo)
+  const [marcados, setMarcados] = useState<Set<string>>(() => new Set((leadsParaContato && leadsParaContato.length ? leadsParaContato : lerSelecao(user?.uid || ''))));
   const [escolherAberto, setEscolherAberto] = useState(true);
   const [preparando, setPreparando] = useState(false);
   const [progresso, setProgresso] = useState({ feitos: 0, total: 0 });
@@ -157,6 +159,19 @@ export const FilaDeEnvio: React.FC = () => {
     // Os que acabaram de entrar em Meus Leads vêm primeiro; quem já foi trabalhado antes (fila descartada) vai para o fim.
     return ordenarCandidatos(lista, new Set(itens.map(i => i.lead_id)));
   }, [leads, itens]);
+
+  // guarda a seleção e tira dela quem já recebeu a abordagem (o robô conduz o resto: nada sai duas vezes)
+  useEffect(() => {
+    if (carregando || !(leads as unknown[]).length) return;   // sem os leads carregados ainda, não dá para saber quem saiu
+    const validos = new Set(candidatos.map(l => l.id));
+    setMarcados(prev => {
+      const ficam = [...prev].filter(id => validos.has(id));
+      return ficam.length === prev.size ? prev : new Set(ficam);
+    });
+  }, [carregando, candidatos, leads]);
+  useEffect(() => { if (!carregando) guardarSelecao(user?.uid || '', [...marcados]); }, [marcados, carregando, user?.uid]);
+  // enquanto gera, o app não pede para recarregar e o navegador pergunta antes de fechar a aba
+  useEffect(() => { if (!preparando) return; return iniciarTrabalho(); }, [preparando]);
 
   const alternarLead = (id: string) => setMarcados(prev => {
     const novo = new Set(prev);

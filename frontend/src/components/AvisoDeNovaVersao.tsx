@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
+import { emAndamento } from '../lib/trabalhoEmAndamento';
 
 /** O arquivo principal do app que esta aberto (o nome muda a cada versao publicada). */
 const arquivoAberto = (): string => {
@@ -13,6 +14,9 @@ const arquivoAberto = (): string => {
  */
 export const AvisoDeNovaVersao = () => {
   const [nova, setNova] = useState(false);
+  // enquanto uma geração está rodando, recarregar derrubaria o trabalho: o botão espera
+  const [ocupado, setOcupado] = useState(false);
+  useEffect(() => { if (!nova) return; const t = setInterval(() => setOcupado(emAndamento()), 1000); return () => clearInterval(t); }, [nova]);
 
   useEffect(() => {
     const aberto = arquivoAberto();
@@ -37,9 +41,13 @@ export const AvisoDeNovaVersao = () => {
   return (
     <div role="status" className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] max-w-[92vw] flex items-center gap-3 bg-slate-900 text-white rounded-2xl shadow-xl px-4 py-3 text-sm">
       <span>Saiu uma versão nova do LeadSage. Recarregue para usar as melhorias.</span>
-      <button onClick={() => window.location.reload()} className="shrink-0 flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 rounded-lg px-3 py-1.5 font-bold">
-        <RefreshCw className="w-4 h-4" /> Recarregar
-      </button>
+      {ocupado
+        ? <span className="shrink-0 text-amber-300 font-semibold">Termine a geração em andamento antes de recarregar.</span>
+        : (
+          <button onClick={() => window.location.reload()} className="shrink-0 flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 rounded-lg px-3 py-1.5 font-bold">
+            <RefreshCw className="w-4 h-4" /> Recarregar
+          </button>
+        )}
     </div>
   );
 };

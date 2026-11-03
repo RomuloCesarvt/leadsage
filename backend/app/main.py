@@ -1193,6 +1193,8 @@ class FilaPrepararRequest(BaseModel):
     tom: str = "Consultivo"
     # a pessoa confere cada mensagem antes de qualquer envio
     revisar: bool = False
+    # mandar de propósito para quem já recebeu a abordagem (por padrão o robô conduz a régua e quem já recebeu sai da lista)
+    reabordar: bool = False
 
 
 class FilaEditarRequest(BaseModel):
@@ -1307,7 +1309,7 @@ async def fila_preparar(req: FilaPrepararRequest, user: dict = Depends(get_curre
     try:
         return await asyncio.wait_for(
             fila_envio.preparar_lote(user.get("uid"), req.leads,
-                                     lambda l, c: gerar(l, c, req.tom), enviar, pode_enviar, cobrar, revisar=req.revisar, orcamento_s=44),
+                                     lambda l, c: gerar(l, c, req.tom), enviar, pode_enviar, cobrar, revisar=req.revisar, orcamento_s=44, reabordar=req.reabordar),
             timeout=56,
         )
     except asyncio.TimeoutError:
