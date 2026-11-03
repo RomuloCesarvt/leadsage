@@ -1319,8 +1319,11 @@ async def fila_preparar(req: FilaPrepararRequest, user: dict = Depends(get_curre
 @app.get("/api/robo/fila")
 async def fila_listar(user: dict = Depends(get_current_user)):
     await exigir_recurso(user, "ia_abordagem", "O disparo")
-    itens = await fila_envio.listar(user.get("uid"))
-    return {"itens": itens[:200], "resumo": fila_envio.resumo(itens)}
+    uid = user.get("uid")
+    # quem já foi abordado por fora da fila (celular, Conversas) sai da fila e do "Novo Lead"; a tela usa a lista para não oferecer de novo
+    rec = await fila_envio.reconciliar(uid)
+    itens = await fila_envio.listar(uid)
+    return {"itens": itens[:200], "resumo": fila_envio.resumo(itens), "ja_contatados": rec.get("ja_contatados", [])}
 
 
 @app.post("/api/robo/fila/enviar-aguardando")

@@ -332,3 +332,36 @@ def test_quem_ja_recebeu_sai_da_lista_e_o_robo_conduz_o_resto(com_robo, rodar):
     assert por_lead["B"]["resultado"] == "ignorado"                           # outro cadastro do mesmo numero
     assert por_lead["C"]["resultado"] != "ignorado"                           # quem nunca recebeu segue normalmente
     assert rodar(fila_envio.obter, UID, "f_A_r1") is None and rodar(fila_envio.obter, UID, "f_B") is None
+
+
+# ------------------------------------------- quem ja foi abordado por fora da fila (Conversas, celular)
+def test_conversa_ou_chat_do_whatsapp_tira_da_fila_e_do_novo_lead(com_robo, rodar):
+    from app import espelho_whatsapp, robo_store
+    p = Pontas()
+    # tres leads com mensagem pronta na fila: A ja tem conversa, B ja tem chat no WhatsApp, C nao tem nada
+    for l in (lead("A", phone="14998003784"), lead("B", phone="14997001122"), lead("C", phone="14996005533")):
+        rodar(pipeline_store.registrar, UID, l, "", "salvo")                      # os três estão em Meus Leads
+    r = preparar(rodar, [lead("A", phone="14998003784"), lead("B", phone="14997001122"), lead("C", phone="14996005533")], p, reabordar=True)
+    assert [x["resultado"] for x in r["resultados"]] == ["na fila"] * 3
+    rodar(robo_store.salvar_conversa, UID, {"id": robo_store.id_da_conversa("whatsapp", "5514998003784"), "canal": "whatsapp", "contato": "5514998003784",
+                                           "mensagens": [{"de": "voce", "texto": "Oi! Vi sua padaria"}], "atualizado": "2026-11-03T10:00:00"})
+    rodar(espelho_whatsapp.salvar_chats, UID, [{"id": "5514997001122@c.us", "nome": "Padaria B"}, {"id": "120363@g.us", "nome": "Grupo"}])
+
+    rec = rodar(fila_envio.reconciliar, UID, True)
+    assert rec["pulados"] == 2 and rec["movidos"] == 2
+    assert set(rec["ja_contatados"]) == {fila_envio._chave_do_telefone("14998003784"), fila_envio._chave_do_telefone("14997001122")}
+    assert rodar(fila_envio.obter, UID, "f_A")["status"] == "pulado" and rodar(fila_envio.obter, UID, "f_B")["status"] == "pulado"
+    assert rodar(fila_envio.obter, UID, "f_C")["status"] == "pendente"          # quem nunca foi abordado segue na fila
+    etapa = {i["id"]: i["etapa"] for i in rodar(pipeline_store.listar, UID)}
+    assert etapa["A"] == "Contato Enviado" and etapa["B"] == "Contato Enviado" and etapa["C"] == "Novo Lead"
+
+
+def test_preparar_pula_quem_ja_tem_conversa_mesmo_sem_envio_na_fila(com_robo, rodar):
+    from app import robo_store
+    p = Pontas()
+    rodar(robo_store.salvar_conversa, UID, {"id": robo_store.id_da_conversa("whatsapp", "5514998003784"), "canal": "whatsapp", "contato": "5514998003784",
+                                           "mensagens": [{"de": "robo", "texto": "oi"}], "atualizado": "2026-11-03T10:00:00"})
+    r = preparar(rodar, [lead("A", phone="14998003784"), lead("C", phone="14996005533")], p)
+    por = {x["lead_id"]: x for x in r["resultados"]}
+    assert por["A"]["resultado"] == "ignorado" and "já há conversa" in por["A"]["motivo"]
+    assert por["C"]["resultado"] != "ignorado"

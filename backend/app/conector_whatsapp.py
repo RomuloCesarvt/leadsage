@@ -415,6 +415,13 @@ async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Di
 
     await _promover_seguimentos_vencidos(uid)
     itens = await _fila_whatsapp(uid)
+    if itens:
+        # antes de sacar a próxima abordagem: quem já tem conversa ou chat de WhatsApp com este usuário sai da fila (nada sai duas vezes)
+        try:
+            if (await fila_envio.reconciliar(uid)).get("pulados"):
+                itens = await _fila_whatsapp(uid)
+        except Exception as exc:
+            print(f"Conector: nao conferiu quem ja foi abordado: {type(exc).__name__}: {exc}")
     hoje = agora.strftime("%Y-%m-%d")
     frios_hoje = int(canal.get("cw_frio_n") or 0) if canal.get("cw_frio_dia") == hoje else 0
     limite = limite_frio_do_dia(canal, agora)

@@ -422,7 +422,7 @@ export const api = {
 
   // ------------------------------------------------- fila de envio
 
-  async filaListar(): Promise<{ itens: ItemFila[]; resumo: ResumoFila }> {
+  async filaListar(): Promise<{ itens: ItemFila[]; resumo: ResumoFila; ja_contatados?: string[] }> {
     return await fetchWithToken('/robo/fila');
   },
 

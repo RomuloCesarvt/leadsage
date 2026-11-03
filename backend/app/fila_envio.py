@@ -254,6 +254,80 @@ async def _ja_contatado(uid: str, lead_id: str, existentes: List[Dict[str, Any]]
     return ""
 
 
+# ------------------------------------------------------------ quem já foi abordado (por qualquer caminho)
+
+_ULTIMA_RECONCILIACAO: Dict[str, float] = {}
+RECONCILIAR_A_CADA_S = 60.0
+
+
+async def contatos_ja_abordados(uid: str) -> Dict[str, str]:
+    """{chave do telefone: de onde se sabe}: quem já tem conversa ou chat de WhatsApp com este usuário.
+
+    A fila só sabe o que ela mesma enviou. Mensagem mandada pelo celular, pela tela de Conversas ou por um envio cujo resultado não voltou
+    não aparece nela: o lead seguia na lista para receber outra abordagem. Aqui o que vale é o que as conversas e o WhatsApp mostram."""
+    from app import espelho_whatsapp
+
+    achados: Dict[str, str] = {}
+
+    def anotar(telefone: Any, origem: str) -> None:
+        chave = _chave_do_telefone(telefone)
+        if chave and chave not in achados:
+            achados[chave] = origem
+
+    try:
+        for c in await robo_store.listar_conversas(uid):
+            if c.get("canal") == "whatsapp" and (c.get("total") or c.get("ultima")):
+                anotar(c.get("contato"), "conversa")
+    except Exception as exc:
+        print(f"Fila: nao leu as conversas: {type(exc).__name__}: {exc}")
+    try:
+        chats, _ = await espelho_whatsapp.ler_chats(uid)
+        for ch in chats:
+            cid = str(ch.get("id") or "")
+            if cid.endswith("@c.us") and not ch.get("grupo"):
+                anotar(cid.split("@")[0], "whatsapp")
+    except Exception as exc:
+        print(f"Fila: nao leu o espelho do WhatsApp: {type(exc).__name__}: {exc}")
+    return achados
+
+
+async def reconciliar(uid: str, forcar: bool = False) -> Dict[str, Any]:
+    """Tira da fila (e do "Novo Lead") quem já foi abordado: o que estava para sair vira "pulado" e o card vai para "Contato Enviado".
+
+    Sem isto, uma mensagem enviada por fora ficava registrada só em Conversas, e a mesma pessoa recebia outra abordagem."""
+    agora_t = time.monotonic()
+    if not forcar and agora_t - _ULTIMA_RECONCILIACAO.get(uid, 0.0) < RECONCILIAR_A_CADA_S:
+        return {"pulados": 0, "movidos": 0, "ja_contatados": sorted((_CHAVES.get(uid) or {}).keys()), "pulou": True}
+    _ULTIMA_RECONCILIACAO[uid] = agora_t
+    ja = await contatos_ja_abordados(uid)
+    _CHAVES[uid] = ja
+    pulados = movidos = 0
+    if not ja:
+        return {"pulados": 0, "movidos": 0, "ja_contatados": []}
+    try:
+        for item in await listar(uid):
+            if item.get("canal") == "whatsapp" and item.get("status") in ("rascunho", "pendente", "aguardando_limite", "falhou") \
+                    and _chave_do_telefone((item.get("contato") or {}).get("phone")) in ja:
+                item.update({"status": "pulado", "motivo": "já havia conversa com este número: o robô conduz o resto"})
+                await _gravar(uid, item)
+                pulados += 1
+    except Exception as exc:
+        print(f"Fila: nao limpou a fila: {type(exc).__name__}: {exc}")
+    try:
+        for it in await pipeline_store.listar(uid):
+            lead = it.get("lead") or {}
+            if (it.get("etapa") or "Novo Lead") == "Novo Lead" and it.get("origem") != "busca" \
+                    and _chave_do_telefone(lead.get("phone")) in ja:
+                if await pipeline_store.mover(uid, it["id"], "Contato Enviado", motivo="já havia mensagem para este número (conversa ou WhatsApp)", por="robô", sozinho=True):
+                    movidos += 1
+    except Exception as exc:
+        print(f"Fila: nao atualizou o pipeline: {type(exc).__name__}: {exc}")
+    return {"pulados": pulados, "movidos": movidos, "ja_contatados": sorted(ja.keys())}
+
+
+_CHAVES: Dict[str, Dict[str, str]] = {}
+
+
 SEGUIMENTO_DIAS_UTEIS = (2, 5)   # o 1o seguimento 2 dias uteis depois do envio; o 2o, 5 dias uteis depois
 
 
@@ -484,6 +558,8 @@ async def preparar_lote(
     inteiro testa sem rede, sem SMTP e sem IA.
     """
     leads = leads[:LOTE_MAXIMO]
+    # quem já tem conversa ou chat de WhatsApp sai antes de qualquer coisa: a fila só conhece o que ela mesma enviou
+    ja = (await reconciliar(uid, forcar=True))["ja_contatados"] if not reabordar else []
     existentes = await listar(uid)
     restante = max(0, LIMITE_EMAIL_DIA - emails_enviados_hoje(existentes))
     saida: List[Dict[str, Any]] = []
@@ -508,6 +584,10 @@ async def preparar_lote(
         antes = await historico_do_contato(uid, lead, canal, existentes)
         if antes and antes.get("optout"):
             saida.append({"lead_id": lid, "nome": nome, "resultado": "ignorado", "motivo": "pediu para não receber mensagens"})
+            continue
+        if ja and _chave_do_telefone(lead.get("phone")) in set(ja):
+            saida.append({"lead_id": lid, "nome": nome, "resultado": "ignorado",
+                          "motivo": "já há conversa com este número (Conversas ou WhatsApp): o robô conduz o resto"})
             continue
         if antes and not reabordar:
             # o robô conduz a régua e a conversa sozinho: quem já recebeu a abordagem sai da lista (nada sai duas vezes depois de uma

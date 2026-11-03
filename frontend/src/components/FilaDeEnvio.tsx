@@ -79,6 +79,8 @@ export const FilaDeEnvio: React.FC = () => {
   const { leads, atualizarPipeline, leadsParaContato, setLeadsParaContato, user } = useApp() as any;
   const [itens, setItens] = useState<ItemFila[]>([]);
   const [resumo, setResumo] = useState<ResumoFila | null>(null);
+  // quem o servidor viu em Conversas ou no WhatsApp (chave do telefone): nunca volta para a lista de quem vai receber
+  const [jaContatados, setJaContatados] = useState<Set<string>>(new Set());
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(true);
   // a seleção sobrevive a uma atualização do app: quem já recebeu mensagem é tirado dela assim que a fila carrega (abaixo)
@@ -111,6 +113,7 @@ export const FilaDeEnvio: React.FC = () => {
       const lista = Array.isArray(r?.itens) ? r.itens : [];
       setItens(lista);
       setResumo(r?.resumo ?? null);
+      setJaContatados(new Set(Array.isArray((r as any)?.ja_contatados) ? (r as any).ja_contatados : []));
       // rascunhos novos já chegam marcados; o que a pessoa desmarcou continua desmarcado
       const novos = lista.filter(i => i.status === 'rascunho' && !vistos.current.has(i.id));
       if (novos.length) {
@@ -155,10 +158,11 @@ export const FilaDeEnvio: React.FC = () => {
     const lista = (leads as LeadItem[]).filter(l => ehSalvo(l) && SEM_CONTATO_AINDA.has(l.pipeline_stage || '') && canalDe(l)
       && !jaDisparado(l)
       && !itens.some(i => i.lead_id === l.id && EM_ANDAMENTO.concat('enviado').includes(i.status) && i.status !== 'falhou')
-      && !(chaveDoFone(l.phone) && jaFalamos.has(chaveDoFone(l.phone))));
+      && !(chaveDoFone(l.phone) && jaFalamos.has(chaveDoFone(l.phone)))
+      && !(chaveDoFone(l.phone) && jaContatados.has(chaveDoFone(l.phone))));
     // Os que acabaram de entrar em Meus Leads vêm primeiro; quem já foi trabalhado antes (fila descartada) vai para o fim.
     return ordenarCandidatos(lista, new Set(itens.map(i => i.lead_id)));
-  }, [leads, itens]);
+  }, [leads, itens, jaContatados]);
 
   // guarda a seleção e tira dela quem já recebeu a abordagem (o robô conduz o resto: nada sai duas vezes)
   useEffect(() => {
