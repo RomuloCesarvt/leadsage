@@ -133,6 +133,51 @@ def normalizar(d: Any) -> Dict[str, Any]:
     }
 
 
+ESTILOS = ("consultiva", "comercial")
+
+
+def estilo(cfg: Dict[str, Any]) -> str:
+    """Como o robo aborda: "consultiva" (padrao: descobre, mostra, convida) ou "comercial" (promocao clara e atrativa depois da previa)."""
+    return cfg.get("estilo") if cfg.get("estilo") in ESTILOS else "consultiva"
+
+
+def normalizar_promocao(d: Any) -> Dict[str, Any]:
+    """A promocao REAL do dono: so campos conhecidos. Nada de prazo ou escassez que ele nao tenha escrito."""
+    d = d if isinstance(d, dict) else {}
+    return {
+        "ativa": bool(d.get("ativa")),
+        "preco": _numero(d.get("preco")),
+        "inclui": _texto(d.get("inclui"), 500),     # um item por linha: hospedagem, dominio, manutencao...
+        "validade": _texto(d.get("validade"), 80),  # opcional ("ate 30/11"); vazio = nao cita prazo
+        "chamada": _texto(d.get("chamada"), 160),   # a pergunta final; vazio = a padrao
+    }
+
+
+def promocao_ativa(cfg: Dict[str, Any]) -> bool:
+    """Promocao so vale no estilo comercial, ligada e com preco: sem preco o robo nao tem o que anunciar."""
+    p = normalizar_promocao(cfg.get("promocao"))
+    return estilo(cfg) == "comercial" and p["ativa"] and p["preco"] > 0
+
+
+def _itens(texto: str) -> List[str]:
+    return [i.strip(" -*\u2022\t") for i in re.split(r"[\n;]", texto or "") if i.strip(" -*\u2022\t")][:8]
+
+
+def mensagem_da_promocao(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]] = None) -> str:
+    """O aviso da promocao, montado em codigo com o que o dono cadastrou (preco e itens exatos)."""
+    p = normalizar_promocao(cfg.get("promocao"))
+    oferta = normalizar(cfg.get("oferta") or {})
+    servico = (oferta["nome"] or "site").strip()
+    linhas = [f"🔥 *Promoção imperdível!* O {servico.lower() if servico.lower().startswith('site') else servico} sai por apenas *{_brl(p['preco'])}*."]
+    itens = _itens(p["inclui"])
+    if itens:
+        linhas.append("Já está incluso:\n" + "\n".join(f"✅ {i}" for i in itens))
+    if p["validade"]:
+        linhas.append(f"Condição válida {p['validade'].rstrip('.')}.")
+    linhas.append(p["chamada"] or "Gostou da prévia? Se quiser garantir, é só me dizer *quero fechar* que eu te passo o passo a passo. 🙂")
+    return "\n\n".join(linhas)
+
+
 def _brl(v: float) -> str:
     return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".").replace(",00", "")
 
@@ -152,6 +197,9 @@ def linhas_de_preco(oferta: Dict[str, Any]) -> List[str]:
         linhas.append(f"{nome}: {_brl(oferta['preco'])}{extra}")
     if oferta.get("esboco") == "pago" and oferta.get("esboco_preco"):
         linhas.append(f"Esboço do {nome}: {_brl(oferta['esboco_preco'])}")
+    promo = oferta.get("_promocao") or {}
+    if promo.get("preco"):
+        linhas.append(f"Promoção do {nome}: {_brl(promo['preco'])}")
     return linhas
 
 
@@ -164,6 +212,8 @@ def aplicar(cfg: Dict[str, Any]) -> Dict[str, Any]:
     if not ativa(cfg) or cfg.get("_oferta_aplicada"):
         return cfg
     oferta = normalizar(cfg["oferta"])
+    if promocao_ativa(cfg):
+        oferta["_promocao"] = normalizar_promocao(cfg.get("promocao"))
     linhas = linhas_de_preco(oferta)
     livre = (cfg.get("catalogo") or "").strip()
     return {**cfg, "oferta": oferta, "_oferta_aplicada": True,
@@ -221,6 +271,18 @@ def bloco_do_servico(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]]) -> str
     else:
         regra_esboco = "ESBOÇO: não há esboço antes de fechar. Não prometa. Mostre valor com exemplos e o diagnóstico."
 
+    promo_txt = ""
+    if promocao_ativa(cfg):
+        p = normalizar_promocao(cfg.get("promocao"))
+        itens = "; ".join(_itens(p["inclui"])) or "o que estiver nos fatos acima"
+        promo_txt = f"""
+
+== ESTILO COMERCIAL E PROMOÇÃO ATIVA ==
+O dono quer uma abordagem mais comercial e atrativa. PROMOÇÃO REAL: {nome} por {_brl(p['preco'])}, com: {itens}.{(' Válida ' + p['validade'] + '.') if p['validade'] else ''}
+- O aviso da promoção sai AUTOMÁTICO logo depois do link da prévia (não o escreva você nem repita). Nas respostas seguintes, quando falar de valor, use SÓ este preço e estes itens.
+- Tom: entusiasmado, direto e positivo, com benefício concreto (aparecer no Google, receber contato pelo WhatsApp, site no ar sem dor de cabeça) e um convite claro ao final ("quer garantir o seu?").
+- Nunca invente escassez ("só hoje", "últimas vagas"), desconto extra, brinde ou prazo que não esteja aqui. O endereço do site é um endereço .vercel.app (sem custo de domínio): se perguntarem, diga isso com clareza, sem prometer .com.br.
+- Quando ele disser que quer fechar, o checklist de fechamento sai automático."""
     return f"""== O SERVIÇO QUE VOCÊ VENDE AGORA (fatos do dono; fora disso não existe) ==
 {chr(10).join('- ' + f for f in fatos)}
 - {regra_esboco}
@@ -229,4 +291,4 @@ def bloco_do_servico(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]]) -> str
 Tese: {pb['tese']}
 Descoberta: {pb['descoberta']}
 Condução: {pb['conducao']}
-Sempre que falar de preço, fale junto do que muda para o negócio dele e do que está incluso; nunca solte o número sozinho."""
+Sempre que falar de preço, fale junto do que muda para o negócio dele e do que está incluso; nunca solte o número sozinho.{promo_txt}"""

@@ -564,6 +564,8 @@ def normalizar(dados: Dict[str, Any], anterior: Optional[Dict[str, Any]] = None)
             "proximo_passo": _texto(dados.get("proximo_passo")) or anterior.get("proximo_passo", ""),
             "reuniao": _texto(dados.get("reuniao"), 80) or anterior.get("reuniao", ""),
             "entendi": _texto(dados.get("entendi"), 200),
+            # marcas do codigo (nao do modelo): o que ja foi entregue nesta conversa nao se repete
+            **{k: anterior[k] for k in ("promo_enviada", "fechamento_enviado", "fechamento_pendencias", "previa_enviada") if anterior.get(k)},
         },
         "automatica": bool(dados.get("automatica")) or dados.get("tipo") == "automatica",
         "enviar_previa": bool(dados.get("enviar_previa")),

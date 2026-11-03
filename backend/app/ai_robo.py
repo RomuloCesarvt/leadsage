@@ -451,6 +451,13 @@ def decidir(
         humano = True
         n["motivo"] = n["motivo"] or f"reunião combinada: {n['sdr']['reuniao']}"
 
+    # Estilo comercial: a previa foi enviada agora, entao o aviso da promocao vai logo atras do link (uma vez por conversa).
+    # Sai de codigo, com o preco e os itens que o dono cadastrou.
+    if (ai_oferta.promocao_ativa(cfg) and not (n["sdr"].get("promo_enviada") or (sdr or {}).get("promo_enviada"))
+            and (criar_previa or _tem_link(n["mensagens"])) and not humano):
+        n["mensagens"] = [*n["mensagens"], ai_oferta.mensagem_da_promocao(cfg, lead)]
+        n["sdr"] = {**n["sdr"], "promo_enviada": True}
+
     return Decisao(
         resposta="\n\n".join(n["mensagens"]),
         mensagens=n["mensagens"],

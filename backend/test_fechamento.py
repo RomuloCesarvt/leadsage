@@ -32,3 +32,42 @@ def test_so_uma_vez_e_negacao_nao_fecha():
     assert not fechamento.quer_fechar("como funciona?")
     assert fechamento.quer_fechar("bora fechar")
     assert fechamento.quer_fechar("Fechado!")
+
+
+# ---------------------------------------------------------------- estilo comercial e promoção
+
+PROMO = {"ativa": True, "preco": "600", "inclui": "Hospedagem por 1 ano\nEndereço .vercel.app, sem custo de domínio\nManutenção do site"}
+CFG_COMERCIAL = {"estilo": "comercial", "promocao": PROMO, "oferta": {"servico": "site", "nome": "Site profissional", "pix_chave": "x@pix.com"}}
+
+
+def _decidir_com_modelo(cfg, resposta_do_modelo, sdr=None):
+    def gerar(_):
+        return resposta_do_modelo
+    msgs = [{"de": "robo", "texto": "Posso mandar a prévia?"}, {"de": "contato", "texto": "pode mandar"}]
+    return ai_robo.decidir(msgs, "whatsapp", {"name": "Rômulo"}, cfg, {"id": "L1", "name": "Maria", "site_publicado": "https://x.vercel.app/s/maria"}, gerar, None, sdr)
+
+
+MODELO_COM_LINK = {"mensagens": ["Claro! Aqui está a prévia: https://x.vercel.app/s/maria"], "etapa": "proposta", "passar_para_humano": False}
+
+
+def test_previa_enviada_no_estilo_comercial_traz_a_promocao_com_os_itens_exatos():
+    d = _decidir_com_modelo(CFG_COMERCIAL, MODELO_COM_LINK)
+    assert len(d.mensagens) == 2 and "https://x.vercel.app/s/maria" in d.mensagens[0]
+    promo = d.mensagens[1]
+    assert "R$ 600" in promo and "Hospedagem por 1 ano" in promo and "sem custo de domínio" in promo and "Manutenção" in promo
+    assert d.sdr["promo_enviada"] is True
+
+
+def test_promocao_sai_uma_vez_so_e_so_no_estilo_comercial():
+    d = _decidir_com_modelo(CFG_COMERCIAL, MODELO_COM_LINK, sdr={"promo_enviada": True})
+    assert len(d.mensagens) == 1 and d.sdr["promo_enviada"] is True      # a marca sobrevive ao modelo
+    d2 = _decidir_com_modelo({**CFG_COMERCIAL, "estilo": "consultiva"}, MODELO_COM_LINK)
+    assert len(d2.mensagens) == 1 and "promo_enviada" not in d2.sdr
+    d3 = _decidir_com_modelo({**CFG_COMERCIAL, "promocao": {**PROMO, "ativa": False}}, MODELO_COM_LINK)
+    assert len(d3.mensagens) == 1
+
+
+def test_fechamento_na_promocao_usa_o_preco_e_os_itens_anunciados():
+    d = _decidir("quero fechar", CFG_COMERCIAL)
+    texto = "\n".join(d.mensagens)
+    assert "R$ 600" in texto and "Hospedagem por 1 ano" in texto and "x@pix.com" in texto

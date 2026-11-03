@@ -373,6 +373,18 @@ export interface RoboConfigEntrada {
   condicao_especial: string;
   /** o servico que o robo vende, em campos */
   oferta: Partial<OfertaRobo>;
+  /** como o robô aborda: consultiva (padrão) ou comercial (anuncia a promoção depois da prévia) */
+  estilo: 'consultiva' | 'comercial';
+  promocao: Partial<PromocaoRobo>;
+}
+
+export interface PromocaoRobo {
+  ativa: boolean;
+  preco: string | number;
+  /** um item por linha */
+  inclui: string;
+  validade: string;
+  chamada: string;
 }
 
 export interface OfertaRobo {

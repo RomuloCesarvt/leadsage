@@ -968,6 +968,9 @@ class RoboConfigRequest(BaseModel):
     condicao_especial: Optional[str] = Field(default=None, max_length=300)
     # o servico que o robo vende; normalizado em ai_oferta antes de gravar
     oferta: Optional[Dict[str, Any]] = None
+    # como o robo aborda: consultiva (padrao) ou comercial (anuncia a promocao depois da previa)
+    estilo: Optional[str] = Field(default=None, max_length=20)
+    promocao: Optional[Dict[str, Any]] = None
 
 
 class PreviaPorTelefone(BaseModel):
@@ -1020,6 +1023,10 @@ async def robo_salvar_config(req: RoboConfigRequest, user: dict = Depends(get_cu
     dados = req.model_dump(exclude_none=True)
     if "oferta" in dados:
         dados["oferta"] = ai_oferta.normalizar(dados["oferta"])
+    if "estilo" in dados and dados["estilo"] not in ai_oferta.ESTILOS:
+        raise HTTPException(status_code=400, detail="Estilo de abordagem inválido.")
+    if "promocao" in dados:
+        dados["promocao"] = ai_oferta.normalizar_promocao(dados["promocao"])
     canal = await robo_store.salvar_canal(user.get("uid"), user.get("email", ""), dados)
     if canal.get("cw_hash"):
         # o Conector guarda o canal por alguns segundos; ligar o robo tem de valer na hora

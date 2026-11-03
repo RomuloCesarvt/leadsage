@@ -58,6 +58,12 @@ def _itens_do_cliente(oferta: Dict[str, Any]) -> List[str]:
 def montar(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]], nome: str = "") -> Tuple[List[str], List[str]]:
     """(mensagens, pendencias_do_dono). Pendencias: o que o dono ainda nao cadastrou e uma pessoa precisa passar."""
     oferta = ai_oferta.normalizar(cfg.get("oferta") or {})
+    if ai_oferta.promocao_ativa(cfg):
+        # fecha-se pelo preco e pelos itens que foram anunciados na promocao
+        promo = ai_oferta.normalizar_promocao(cfg.get("promocao"))
+        oferta["preco"] = promo["preco"]
+        if promo["inclui"]:
+            oferta["inclui"] = "; ".join(ai_oferta._itens(promo["inclui"]))
     nome_servico = oferta["nome"] or ai_oferta.PLAYBOOKS[oferta["servico"]]["nome"]
     primeiro = (nome or (lead or {}).get("name") or "").strip().split(" ")[0]
     pend: List[str] = []
