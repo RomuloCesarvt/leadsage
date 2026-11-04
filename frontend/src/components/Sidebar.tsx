@@ -69,7 +69,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> =
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5 md:py-6 space-y-6 md:space-y-8 custom-scrollbar" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}>
+      <div key={empresa ? 'empresa' : 'agencia'} className="menu-modo-entra flex-1 overflow-y-auto overscroll-contain px-4 py-5 md:py-6 space-y-6 md:space-y-8 custom-scrollbar" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}>
         
         {/* Principal Section */}
         <div className="space-y-1">
