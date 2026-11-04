@@ -60,5 +60,11 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/sistema/sincronizar-bancos",
+      "schedule": "0 7 * * *"
+    }
   ]
 }
