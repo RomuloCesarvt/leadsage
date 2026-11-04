@@ -209,7 +209,8 @@ async def update_user_profile(profile: UserProfile, user: dict = Depends(get_cur
     compartilhada por todos os usuarios.
     """
     uid = user.get("uid")
-    corpo = profile.model_dump()
+    # só o que a tela mandou: o seletor de modo envia apenas {"modo"}, e os campos que ficaram de fora não podem virar vazio
+    corpo = profile.model_dump(exclude_unset=True)
     corpo.pop("modos", None)                       # nunca vem do usuário
     pedido = corpo.pop("modo", "")
     atual = await get_profile(uid)
