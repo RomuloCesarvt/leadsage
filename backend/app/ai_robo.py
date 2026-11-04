@@ -426,14 +426,15 @@ def decidir(
     # "Quero fechar": o robo entrega o checklist do fechamento (valor, Pix, contrato, material) em vez de perguntar de novo.
     # Sai de codigo, so com o que o dono cadastrou; uma vez por conversa, e uma pessoa assume para confirmar o pagamento.
     if (fechamento.quer_fechar(texto) and not objecao_de_preco(texto) and not (sdr or {}).get("fechamento_enviado")):
-        mensagens_f, pendencias = fechamento.montar(cfg, lead, (sdr or {}).get("dados", {}).get("nome", "") if isinstance((sdr or {}).get("dados"), dict) else "")
+        montar_f = fechamento.montar_visita if ai_oferta.sem_previa(cfg) else fechamento.montar
+        mensagens_f, pendencias = montar_f(cfg, lead, (sdr or {}).get("dados", {}).get("nome", "") if isinstance((sdr or {}).get("dados"), dict) else "")
         return Decisao(
             mensagens=mensagens_f, resposta=mensagens_f[0], passar_para_humano=True, motivo=fechamento.motivo_para_o_dono(pendencias, cfg),
             sdr={**(sdr or {}), "etapa": "fechamento", "temperatura": "quente", "fechamento_enviado": True, "fechamento_pendencias": pendencias},
         )
 
     # Aceitou a prévia ("pode", "manda"): o link sai agora, sem depender da IA (nem de cota dela).
-    if aceitou_a_previa(mensagens, lead):
+    if not ai_oferta.sem_previa(cfg) and aceitou_a_previa(mensagens, lead):
         nome = (((sdr or {}).get("dados") or {}).get("nome") or "").strip().split(" ")[0]
         textos = [f"Perfeito{', ' + nome if nome else ''}! Aqui está a prévia: [LINK_DA_PREVIA]",
                   "Lembrando que é uma *prévia*, uma primeira ideia com fotos e textos de exemplo: no site de verdade entram as suas fotos e informações, e o layout "
@@ -454,7 +455,7 @@ def decidir(
 
     # Quem atende (secretária, recepção) pediu o link para mostrar ao responsável: o link vai AGORA, e só depois se tenta chegar
     # ao responsável. O modelo já errou isso (pediu "qual o melhor horário para enviar" em vez de enviar): a regra também é de código.
-    if pediu_o_link(texto) and not _ja_mandou_o_link(mensagens, lead) and not _tem_link(n["mensagens"]) and not n.get("automatica"):
+    if not ai_oferta.sem_previa(cfg) and pediu_o_link(texto) and not _ja_mandou_o_link(mensagens, lead) and not _tem_link(n["mensagens"]) and not n.get("automatica"):
         sem_site = not ((lead or {}).get("site_publicado") or "").strip()
         aviso = ("\n\n== SUA RESPOSTA ANTERIOR FOI RECUSADA ==\n- A pessoa pediu ou aceitou receber o link da prévia (talvez para mostrar ao responsável) "
                  "e você NÃO mandou. Mande o link AGORA, nesta resposta"
@@ -475,7 +476,8 @@ def decidir(
     # saem. Uma chance de corrigir; errou de novo, o humano assume.
     n["mensagens"] = resolver_marcadores(n["mensagens"], lead)
     # o cliente aceitou e nao ha previa: o servico vai criar o site e trocar o marcador (vale so quando o modelo avisou)
-    criar_previa = bool(n.get("enviar_previa")) and not ((lead or {}).get("site_publicado") or "").strip()
+    criar_previa = (bool(n.get("enviar_previa")) and not ((lead or {}).get("site_publicado") or "").strip()
+                    and not ai_oferta.sem_previa(cfg))                    # ar-condicionado: nunca existe prévia para criar
     erros = problemas_da_resposta(n["mensagens"], cfg, mensagens, lead or {}, criar_previa) + forma_do_preco(n["mensagens"], mensagens)
     if erros:
         correcao = (prompt + "\n\n== SUA RESPOSTA ANTERIOR FOI RECUSADA ==\n"

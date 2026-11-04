@@ -75,6 +75,28 @@ def montar_conversa(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]], nome: s
     return [m1, m2], []
 
 
+def montar_visita(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]], nome: str = "") -> Tuple[List[str], List[str]]:
+    """Serviço local (ar-condicionado): "quero fechar" vira o levantamento do orçamento e o agendamento da visita.
+
+    Sem prévia, sem Pix, sem contrato: pede o que o técnico precisa e o melhor dia e horário; uma pessoa confirma."""
+    oferta = ai_oferta.normalizar(cfg.get("oferta") or {})
+    primeiro = (nome or (lead or {}).get("name") or "").strip().split(" ")[0]
+    m1 = (f"Ótimo, {primeiro}! 🙌 " if primeiro else "Ótimo! 🙌 ") + "Vamos agendar. Para o técnico já chegar preparado, me passa só isto:"
+    itens = ["Qual serviço (instalação, limpeza, manutenção ou conserto)",
+             "Quantos aparelhos e de que tipo (split, cassete, piso-teto) e, se souber, os BTUs",
+             "O endereço (bairro e rua)"]
+    m1 += "\n" + "\n".join(f"✅ {i}" for i in itens)
+    if oferta["visita"] == "gratis":
+        m1 += "\n\nA visita para o orçamento é *sem custo e sem compromisso*."
+    m2 = "E qual o melhor dia e horário para você?"
+    if oferta["agenda"]:
+        m2 = f"Atendemos {oferta['agenda'].rstrip('.')}. Qual dia e horário ficam bons para você?"
+    agenda = (cfg.get("link_agenda") or "").strip()
+    if agenda:
+        m2 += f" Se preferir, escolha por aqui: {agenda}"
+    return [m1, m2], []
+
+
 def montar(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]], nome: str = "") -> Tuple[List[str], List[str]]:
     """(mensagens, pendencias_do_dono). Pendencias: o que o dono ainda nao cadastrou e uma pessoa precisa passar."""
     oferta = ai_oferta.normalizar(cfg.get("oferta") or {})
@@ -134,6 +156,8 @@ def montar(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]], nome: str = "") 
 
 
 def motivo_para_o_dono(pendencias: List[str], cfg: Optional[Dict[str, Any]] = None) -> str:
+    if cfg is not None and ai_oferta.sem_previa(cfg):
+        return "quer contratar — o robô pediu os dados do orçamento (serviço, aparelhos, endereço) e o melhor dia e horário. Confirme a visita com ele(a)"
     if cfg is not None and ai_oferta.normalizar((cfg or {}).get("oferta") or {})["fechamento"] != "checklist":
         return "quer fechar — o robô deixou claro que é uma prévia e propôs uma conversa para mostrar como melhorar. Combine o horário e acerte pagamento e contrato nela"
     base = "quer fechar — o robô enviou o checklist (valor, Pix, contrato e material)"

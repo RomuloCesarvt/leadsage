@@ -207,6 +207,38 @@ ESTILO DESTA MENSAGEM (para ela ser diferente das outras do lote): {estilo}
 {voz}
 {evitar}"""
 
+ESTRUTURA_LOCAL = """COMO ESCREVER A PRIMEIRA MENSAGEM (prosa corrida, em linhas curtas, sem listas)
+1. {saudacao}, <nome da pessoa se estiver no dossiê>! + quem você é em UMA frase curta, neste jeito: "{apresentacao}" (pode ajustar a ordem das palavras).
+2. POR QUE ESCREVEU PARA ELES: diga com naturalidade que encontrou o negócio pesquisando no Google e que, em um ambiente como o deles ({ramo}),
+   o ar-condicionado funcionando bem faz diferença (conforto de quem chega e de quem trabalha, conta de luz, aparelho que não para). Um fato REAL do dossiê
+   (nota, avaliações, o tipo de ambiente) se houver; sem inventar nada sobre os aparelhos deles.
+3. O QUE VOCÊ OFERECE em UMA frase, só com o que está nos fatos do serviço (instalação, limpeza, manutenção). Sem preço, sem prazo, sem promessa que não esteja cadastrada.
+4. {pergunta}
+NÃO fale de site, prévia, marketing digital, Google Meu Negócio, redes sociais nem mande link: o serviço é de ar-condicionado.
+ESTILO DESTA MENSAGEM (para ela ser diferente das outras do lote): {estilo}
+{voz}
+{evitar}"""
+
+PERGUNTAS_LOCAL = (
+    "Termine com UMA pergunta fácil de sim ou não: quer que eu te passe um orçamento de limpeza, sem compromisso?",
+    "Termine perguntando quantos aparelhos vocês têm hoje, para eu ver se consigo ajudar.",
+    "Termine perguntando quando foi a última vez que os aparelhos passaram por limpeza ou manutenção.",
+    "Termine com UMA pergunta: vocês já têm alguém de confiança para cuidar dos aparelhos ou posso te mostrar como trabalhamos?",
+)
+
+
+def _estrutura_local(sender_name: str, agora: Optional[datetime], apresentacao: str, lead_id: str, variacao: int, nicho: str = "", evitar: Optional[list] = None) -> str:
+    sorteio = sorteio_da_mensagem(lead_id, "nenhuma", variacao)
+    passadas = [str(x).strip()[:80] for x in (evitar or []) if str(x).strip()][:6]
+    base = sum(ord(c) for c in str(lead_id or "")) + int(variacao or 0)
+    return ESTRUTURA_LOCAL.format(
+        saudacao=saudacao_do_horario(agora), apresentacao=quem_sou(sender_name, apresentacao, lead_id, variacao), ramo=(nicho or "o seu negócio").lower(),
+        pergunta=PERGUNTAS_LOCAL[base % len(PERGUNTAS_LOCAL)], estilo=estilo_da_mensagem(lead_id, variacao),
+        voz=VOZ_HUMANA.format(tamanho=sorteio["tamanho"]),
+        evitar=("NÃO comece como estas mensagens já usadas neste lote: " + " | ".join(f'"{p}"' for p in passadas)) if passadas else "",
+    )
+
+
 ESTILOS_DE_ABERTURA = (
     "abra com o cumprimento e o nome, diga numa frase simpática que encontrou o negócio no Google e só depois se apresente.",
     "abra se apresentando em uma frase e logo diga o que chamou sua atenção no perfil (um detalhe REAL do dossiê).",
@@ -241,7 +273,9 @@ def sorteio_da_mensagem(lead_id: str, previa: str, n: int) -> Dict[str, str]:
 
 
 def estrutura(sender_name: str, agora: Optional[datetime] = None, sem_site: bool = True, previa: str = "",
-              canal: str = "", lead_id: str = "", variacao: int = 0, evitar: Optional[list] = None, apresentacao: str = "") -> str:
+              canal: str = "", lead_id: str = "", variacao: int = 0, evitar: Optional[list] = None, apresentacao: str = "", nicho: str = "") -> str:
+    if previa == "nenhuma":
+        return _estrutura_local(sender_name, agora, apresentacao, lead_id, variacao, nicho, evitar)
     if (canal or "").startswith("whatsapp"):
         lacuna = ("Diz que, apesar dessa reputação, NÃO encontrou o site do negócio (como afirmação, sem ponto de interrogação)."
                   if sem_site else
@@ -331,6 +365,13 @@ def revisar_roteiro(texto: str, sem_site: bool, previa: str = "") -> list:
     """A mensagem precisa trazer o que o dono pediu: a prévia e, sem site, a confirmação."""
     t = (texto or "").lower()
     problemas = []
+    if previa == "nenhuma":
+        # serviço local: a mensagem não pode falar de site, prévia, link nem marketing digital, e termina numa pergunta fácil
+        if re.search(r"\b(site|pr[eé]via|esbo[çc]o|link|marketing|google meu neg[óo]cio|redes sociais)\b", t):
+            problemas.append("fala de site, prévia, link ou marketing digital: o serviço é de ar-condicionado")
+        if "?" not in t:
+            problemas.append("não termina com uma pergunta fácil de responder")
+        return problemas
     falso = previa_honesta.erro_de_site_pronto([texto])
     if falso:
         problemas.append(falso)

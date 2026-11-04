@@ -11,7 +11,7 @@ que o dono cadastrou (e o desconto que autorizou).
 import re
 from typing import Any, Dict, List, Optional
 
-SERVICOS = ("site", "gmn", "social", "trafego", "outro")
+SERVICOS = ("site", "gmn", "social", "trafego", "ar", "outro")
 ESBOCO = ("gratis", "pago", "nao")
 
 # O que cada servico resolve e como conduzir a conversa. E o miolo da venda:
@@ -70,6 +70,27 @@ PLAYBOOKS: Dict[str, Dict[str, str]] = {
         ),
         "descoberta": "Já anunciou antes? Quanto pode investir por mês em anúncio? Quantos clientes novos por mês seriam bons?",
         "conducao": "Qualifique orçamento de mídia primeiro. Nunca prometa número de clientes ou retorno.",
+    },
+    "ar": {
+        "nome": "Instalação, limpeza e manutenção de ar-condicionado",
+        "inclui": "",
+        "tese": (
+            "Ar-condicionado sem limpeza em dia rende menos, gasta mais energia, pinga, cheira mal e quebra antes. "
+            "Em clínica, escritório, loja, escola e condomínio, o aparelho parado ou com defeito afasta cliente e atrapalha quem trabalha. "
+            "Manutenção periódica sai mais barata que conserto e troca de aparelho. Em ambiente climatizado de uso coletivo existe também a "
+            "exigência de plano de manutenção (PMOC): cite isso SÓ se o dono cadastrou esse serviço."
+        ),
+        "descoberta": (
+            "Quantos aparelhos vocês têm e de que tipo (split, cassete, piso-teto)? Quando foi a última limpeza ou manutenção? "
+            "Algum aparelho pinga, cheira, gela pouco ou está parado? Alguém de confiança já cuida disso hoje?"
+        ),
+        "conducao": (
+            "1) Gancho do ramo e do dossiê (ambiente que depende de ar-condicionado: clínica, escritório, loja, academia). "
+            "2) Uma pergunta de descoberta (quantos aparelhos / última limpeza). 3) Mostre o que muda: conforto, conta de luz, menos quebra. "
+            "4) Convide para uma visita técnica ou orçamento sem compromisso, com a faixa de preço da tabela cadastrada quando perguntarem. "
+            "5) Levante os dados do orçamento (tipo e quantidade de aparelhos, BTUs, endereço, melhor dia e horário) e passe para o humano confirmar a visita. "
+            "NÃO existe site, prévia nem esboço neste serviço: nunca ofereça nem cite."
+        ),
     },
     "outro": {
         "nome": "Serviço",
@@ -132,7 +153,20 @@ def normalizar(d: Any) -> Dict[str, Any]:
         "dados_do_contrato": _texto(d.get("dados_do_contrato"), 300),
         # o que acontece quando o lead diz "quero fechar": conversa (padrao: mostrar como melhorar e alinhar) ou checklist (Pix e material)
         "fechamento": d.get("fechamento") if d.get("fechamento") in ("conversa", "checklist") else "conversa",
+        # serviço local (ar-condicionado): tabela de preços (uma linha por serviço, "Limpeza de split 9 a 12 mil BTU: R$ 150"),
+        # região atendida, visita técnica e agenda
+        "tabela_precos": _texto(d.get("tabela_precos"), 1200),
+        "regiao": _texto(d.get("regiao"), 240),
+        "visita": d.get("visita") if d.get("visita") in ("gratis", "paga", "nao") else "gratis",
+        "visita_preco": _numero(d.get("visita_preco")) if d.get("visita") == "paga" else 0.0,
+        "agenda": _texto(d.get("agenda"), 300),
     }
+
+
+def sem_previa(cfg: Optional[Dict[str, Any]]) -> bool:
+    """Serviço que não passa por site nem prévia (ar-condicionado): o robô nunca oferece, cria ou cita prévia."""
+    o = (cfg or {}).get("oferta")
+    return isinstance(o, dict) and o.get("servico") == "ar"
 
 
 ESTILOS = ("consultiva", "comercial")
@@ -158,7 +192,7 @@ def normalizar_promocao(d: Any) -> Dict[str, Any]:
 def promocao_ativa(cfg: Dict[str, Any]) -> bool:
     """Promocao so vale no estilo comercial, ligada e com preco: sem preco o robo nao tem o que anunciar."""
     p = normalizar_promocao(cfg.get("promocao"))
-    return estilo(cfg) == "comercial" and p["ativa"] and p["preco"] > 0
+    return estilo(cfg) == "comercial" and p["ativa"] and p["preco"] > 0 and not sem_previa(cfg)
 
 
 def _itens(texto: str) -> List[str]:
@@ -202,6 +236,12 @@ def linhas_de_preco(oferta: Dict[str, Any]) -> List[str]:
         linhas.append(f"{nome}: {_brl(oferta['preco'])}{extra}")
     if oferta.get("esboco") == "pago" and oferta.get("esboco_preco"):
         linhas.append(f"Esboço do {nome}: {_brl(oferta['esboco_preco'])}")
+    # tabela de preços do serviço local: cada linha com "R$" entra no catálogo que o verificador de valores conhece
+    for l in (oferta.get("tabela_precos") or "").split("\n"):
+        if "R$" in l and ":" in l:
+            linhas.append(l.strip(" -*•\t"))
+    if oferta.get("visita") == "paga" and oferta.get("visita_preco"):
+        linhas.append(f"Visita técnica: {_brl(oferta['visita_preco'])}")
     promo = oferta.get("_promocao") or {}
     if promo.get("preco"):
         linhas.append(f"Promoção do {nome}: {_brl(promo['preco'])}")
@@ -236,10 +276,18 @@ def bloco_do_servico(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]]) -> str
     tem_site = bool((lead or {}).get("site_publicado"))
 
     fatos = [f"Serviço: {nome}"]
-    fatos.append(f"Preço: {_brl(o['preco'])}" if o["preco"]
-                 else "Preço: NÃO cadastrado. Não diga valores; diga que depende do escopo e leve para a conversa.")
-    fatos.append(f"Prazo de entrega: {o['prazo_dias']} dias" if o["prazo_dias"]
-                 else "Prazo: NÃO cadastrado. Não prometa prazo; diga que confirma na conversa.")
+    if o["servico"] == "ar":
+        if o["preco"]:
+            fatos.append(f"Preço base: {_brl(o['preco'])}")
+        elif not o["tabela_precos"]:
+            fatos.append("Preços: NÃO cadastrados. Não diga valores; diga que o técnico passa o orçamento na visita ou pelo WhatsApp.")
+        if not o["prazo_dias"]:
+            fatos.append("Prazo para atender: NÃO cadastrado. Não prometa dia; combine o horário na conversa.")
+    else:
+        fatos.append(f"Preço: {_brl(o['preco'])}" if o["preco"]
+                     else "Preço: NÃO cadastrado. Não diga valores; diga que depende do escopo e leve para a conversa.")
+        fatos.append(f"Prazo de entrega: {o['prazo_dias']} dias" if o["prazo_dias"]
+                     else "Prazo: NÃO cadastrado. Não prometa prazo; diga que confirma na conversa.")
     if inclui:
         fatos.append(f"O que inclui: {inclui}")
     if o["nao_inclui"]:
@@ -253,7 +301,19 @@ def bloco_do_servico(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]]) -> str
     if o["diferenciais"]:
         fatos.append(f"Diferenciais reais (use só estes): {o['diferenciais']}")
 
-    if o["esboco"] == "gratis":
+    if o["servico"] == "ar":
+        if o["tabela_precos"]:
+            fatos.append("Tabela de preços (só estes valores existem; outro serviço ou aparelho: diga que o técnico confirma na visita):\n" + o["tabela_precos"])
+        if o["regiao"]:
+            fatos.append(f"Região atendida: {o['regiao']} (fora disso, diga que não atende)")
+        fatos.append({"gratis": "Visita técnica e orçamento: GRÁTIS, sem compromisso.",
+                      "paga": f"Visita técnica: paga{(' (' + _brl(o['visita_preco']) + ')') if o['visita_preco'] else ''}; diga como o valor entra no serviço só se estiver nos fatos.",
+                      "nao": "Não há visita técnica: o orçamento sai por mensagem, com o que a pessoa descrever."}[o["visita"]])
+        if o["agenda"]:
+            fatos.append(f"Agenda e horários de atendimento: {o['agenda']}")
+        regra_esboco = ("SEM SITE E SEM PRÉVIA: este serviço não envolve site, prévia, esboço nem link. Nunca ofereça nem cite. "
+                        "O próximo passo é sempre o orçamento ou a visita técnica.")
+    elif o["esboco"] == "gratis":
         prazo = f" {o['esboco_prazo']}" if o["esboco_prazo"] else ""
         if tem_site:
             regra_esboco = (
@@ -277,7 +337,7 @@ def bloco_do_servico(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]]) -> str
         regra_esboco = "ESBOÇO: não há esboço antes de fechar. Não prometa. Mostre valor com exemplos e o diagnóstico."
 
     promo_txt = ""
-    if promocao_ativa(cfg):
+    if promocao_ativa(cfg) and o["servico"] != "ar":
         p = normalizar_promocao(cfg.get("promocao"))
         itens = "; ".join(_itens(p["inclui"])) or "o que estiver nos fatos acima"
         promo_txt = f"""

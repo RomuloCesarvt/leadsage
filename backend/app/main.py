@@ -348,7 +348,9 @@ async def _preparar_pitch(user: dict, req: PitchGenerationRequest) -> None:
     elif not req.sender_name or req.sender_name in ("Prospecção LeadSage", "LeadSage", "Consultor LeadSage"):
         req.sender_name = perfil.company_name or perfil.name or req.sender_name
     req.service_brief = abordagem_mestra.produto(canal_robo, req.lead.model_dump(), req.user_product or "")
-    if req.previa not in ("criada", "oferecer"):
+    if ai_oferta.sem_previa(canal_robo):
+        req.previa = "nenhuma"      # serviço local (ar-condicionado): a mensagem não fala de site nem de prévia
+    elif req.previa not in ("criada", "oferecer"):
         req.previa = await _previa_do_lead(user.get("uid"), req.lead.id)
 
 
@@ -1256,7 +1258,7 @@ async def _funcoes_da_fila(user: dict):
         posicao[0] += 1
         lead = dict(lead)
         retomada = lead.pop("_retomada", None)
-        previa = await _previa_do_lead(uid, str(lead.get("id", "")), sites_do_usuario)
+        previa = "nenhuma" if ai_oferta.sem_previa(canal_robo) else await _previa_do_lead(uid, str(lead.get("id", "")), sites_do_usuario)
         if previa == "criada":
             # prévia feita por uma versão antiga do motor de sites: refeita (mesmo link) antes de o link seguir na mensagem
             from app import previa_site

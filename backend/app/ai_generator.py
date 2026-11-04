@@ -72,7 +72,7 @@ def _presenca(lead: LeadItem) -> str:
     return ", ".join(canais) if canais else "apenas o perfil no Google Maps"
 
 
-def _dossie(lead: LeadItem) -> str:
+def _dossie(lead: LeadItem, local: bool = False) -> str:
     """Tudo que sabemos do lead, em fatos verificáveis.
 
     Só entra aqui o que veio do Google ou do site do próprio negócio. É a
@@ -101,6 +101,9 @@ def _dossie(lead: LeadItem) -> str:
         if texto and texto != lead.review_highlight:
             linhas.append(f'- Outra avaliação ({nota}★): "{texto[:160]}"')
 
+    if local:
+        # serviço local (ar-condicionado): site, lacunas digitais e diagnóstico de site não são assunto
+        return "\n".join(linhas[:4] + [l for l in linhas[5:] if not l.startswith(("- Situação", "- Diagnóstico", "  · o site", "- O site roda"))])
     situacao = {
         "none": "não tem site nenhum no perfil do Google",
         "social": "o link do perfil leva a uma rede social, não a um site",
@@ -154,16 +157,16 @@ O PRODUTO (use só estes fatos; nunca invente preço, prazo, garantia ou resulta
 {brief}
 
 O NEGÓCIO (verificado, pode citar)
-{_dossie(lead)}
+{_dossie(lead, local=(req.previa == "nenhuma"))}
 
-Ganchos prontos (escolha UM): {_ganchos(lead)}
+Ganchos prontos (escolha UM): {_ganchos(lead) if req.previa != "nenhuma" else "(use o ramo e os dados acima)"}
 
 O RAMO DESTE NEGÓCIO
 {abordagem_mestra.bloco_do_ramo(lead.niche or lead.role)}
 
 {abordagem_mestra.TEMPERATURA}
 
-{abordagem_mestra.estrutura(assina, sem_site=sem_site, previa=(req.previa or ''), canal=canal, lead_id=str(lead.id), variacao=req.variacao, evitar=req.evitar, apresentacao=(req.apresentacao or ''))}
+{abordagem_mestra.estrutura(assina, sem_site=sem_site, previa=(req.previa or ''), canal=canal, lead_id=str(lead.id), variacao=req.variacao, evitar=req.evitar, apresentacao=(req.apresentacao or ''), nicho=(lead.niche or lead.role or ''))}
 
 {abordagem_mestra.GATILHOS}
 
