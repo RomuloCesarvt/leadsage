@@ -43,6 +43,8 @@ class Settings(BaseModel):
     ILIMITADOS_EMAILS: str = os.getenv("ILIMITADOS_EMAILS", "")
     # Mais e-mails com acesso total, somados aos de cima (assim da para acrescentar uma pessoa sem reescrever a lista toda).
     ILIMITADOS_EXTRAS: str = os.getenv("ILIMITADOS_EXTRAS", "")
+    # Uma terceira lista, também somada: a anterior é "sensível" na Vercel (não dá para ler o valor de volta), então acrescentar alguém nela apagaria os que já estão.
+    ILIMITADOS_MAIS: str = os.getenv("ILIMITADOS_MAIS", "")
     # Contas que usam o sistema sem ver a area de assinatura e compra de creditos.
     HIDE_SUBSCRIPTION_EMAILS: str = os.getenv("HIDE_SUBSCRIPTION_EMAILS", "")
     # Segredo do servico "LeadSage Nuvem" (o WhatsApp de cada usuario ligado num servidor). Vazio = recurso desligado.
@@ -94,7 +96,7 @@ class Settings(BaseModel):
 
     @property
     def ilimitados_emails(self) -> set:
-        return {e.strip().lower() for e in f"{self.ILIMITADOS_EMAILS},{self.ILIMITADOS_EXTRAS}".split(",") if e.strip()}
+        return {e.strip().lower() for e in f"{self.ILIMITADOS_EMAILS},{self.ILIMITADOS_EXTRAS},{self.ILIMITADOS_MAIS}".split(",") if e.strip()}
 
     @property
     def sem_assinatura_emails(self) -> set:
