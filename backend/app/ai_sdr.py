@@ -415,6 +415,8 @@ def montar_prompt(
   se passarem). Isto vale também para "indicou outro responsável": se ele ou ela aceita receber algo, mande o material junto.
 """
     local = _modo_local(cfg)
+    regra_orcamento = ('"orcamento": quando o cliente disse o que precisa e TODOS os serviços estão na tabela de preços, liste [{"item": "nome EXATO da linha da tabela", "qtd": 1}]. '
+                       'O SISTEMA soma e envia o orçamento com o total: não calcule nem escreva o total na sua mensagem. Se algo não está na tabela ou faltam dados, deixe [] e pergunte.\n') if local else ""
     bloco_previa = "" if local else f"== A PRÉVIA DO SITE DESTE NEGÓCIO ==\n{_bloco_da_previa(lead)}\n\n{REGRA_DA_PREVIA}\n\n"
     bloco_sites = "" if local else f"== SITES: O QUE UM ESPECIALISTA SABE ==\n{FALA_DO_ROBO_SOBRE_SITES}\n\n"
     objecoes = OBJECOES_LOCAL if local else OBJECOES
@@ -514,6 +516,7 @@ que você não sabe; reclamação; pedido explícito para falar com uma pessoa.
  "tipo": "pergunta|interesse|objecao|agradecimento|indicou_contato|automatica|outro",
  "automatica": false,
  "enviar_previa": false,
+ "orcamento": [],
  "mensagens": ["primeira mensagem", "segunda (opcional)"],
  "etapa": "{'|'.join(ETAPAS)}",
  "temperatura": "frio|morno|quente",
@@ -524,7 +527,7 @@ que você não sabe; reclamação; pedido explícito para falar com uma pessoa.
  "motivo": "por que passar (só se passar)",
  "reuniao": "SÓ quando o CLIENTE confirmou um dia e horário exatos que você ofereceu; se você propôs e ele ainda não respondeu, vazio"}}
 
-Regras dos dados: "nome" é SÓ o nome de quem está escrevendo (se ela disse), nunca o de alguém de quem ela fala; "orcamento" é quanto o CLIENTE disse que pode investir (nunca o preço do catálogo);
+{regra_orcamento}Regras dos dados: "nome" é SÓ o nome de quem está escrevendo (se ela disse), nunca o de alguém de quem ela fala; "orcamento" é quanto o CLIENTE disse que pode investir (nunca o preço do catálogo);
 "decisor" é quem decide a compra; deixe vazio o que ele não disse.
 """
     return _sem_site(prompt) if local else prompt
@@ -595,6 +598,14 @@ def _texto(v: Any, limite: int = 200) -> str:
     return str(v or "").strip()[:limite]
 
 
+def _pedidos_do_orcamento(v: Any) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for p in (v if isinstance(v, list) else [])[:12]:
+        if isinstance(p, dict) and str(p.get("item") or "").strip():
+            out.append({"item": str(p["item"]).strip()[:80], "qtd": p.get("qtd") or 1})
+    return out
+
+
 def normalizar(dados: Dict[str, Any], anterior: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Confere o que o modelo devolveu e funde com o estado anterior.
 
@@ -635,10 +646,11 @@ def normalizar(dados: Dict[str, Any], anterior: Optional[Dict[str, Any]] = None)
             "reuniao": _texto(dados.get("reuniao"), 80) or anterior.get("reuniao", ""),
             "entendi": _texto(dados.get("entendi"), 200),
             # marcas do codigo (nao do modelo): o que ja foi entregue nesta conversa nao se repete
-            **{k: anterior[k] for k in ("promo_enviada", "fechamento_enviado", "fechamento_pendencias", "previa_enviada") if anterior.get(k)},
+            **{k: anterior[k] for k in ("promo_enviada", "fechamento_enviado", "fechamento_pendencias", "previa_enviada", "orcamento_enviado") if anterior.get(k)},
         },
         "automatica": bool(dados.get("automatica")) or dados.get("tipo") == "automatica",
         "enviar_previa": bool(dados.get("enviar_previa")),
+        "orcamento": _pedidos_do_orcamento(dados.get("orcamento")),
         "passar_para_humano": bool(dados.get("passar_para_humano")),
         "motivo": _texto(dados.get("motivo")),
     }

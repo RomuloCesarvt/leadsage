@@ -46,3 +46,29 @@ def test_primeira_mensagem_sem_site_e_com_pergunta():
     assert "ar-condicionado" in est and "NÃO fale de site" in est
     assert abordagem_mestra.revisar_roteiro("Oi! Montei uma prévia do site", True, "nenhuma")
     assert not abordagem_mestra.revisar_roteiro("Bom dia! Sou o João da Frio Total. Quantos aparelhos vocês têm?", True, "nenhuma")
+
+
+def test_orcamento_soma_em_codigo_so_com_a_tabela():
+    o = ai_oferta.normalizar(CFG["oferta"])
+    calc = ai_oferta.calcular_orcamento(o, [{"item": "Limpeza de split 9 a 12 mil BTU", "qtd": 2}, {"item": "instalação de split", "qtd": 1}])
+    assert calc["total"] == 750 and not calc["fora_da_tabela"]
+    txt = ai_oferta.mensagem_do_orcamento(o, calc)
+    assert "R$ 750" in txt and "2 × Limpeza" in txt
+    # item que não está na tabela: nada de total chutado
+    fora = ai_oferta.calcular_orcamento(o, [{"item": "Troca de compressor", "qtd": 1}])
+    assert fora["fora_da_tabela"] == ["Troca de compressor"] and fora["total"] == 0
+
+
+def test_robo_manda_o_orcamento_calculado_pelo_codigo():
+    resposta = {"entendi": "x", "tipo": "pergunta", "mensagens": ["Consigo sim! Te passo o orçamento."], "etapa": "proposta",
+                "orcamento": [{"item": "Limpeza de split 9 a 12 mil BTU", "qtd": 3}]}
+    d = ai_robo.decidir([{"de": "contato", "texto": "preciso de limpeza em 3 splits de 12 mil BTU"}], "whatsapp", {"company_name": "Frio Total"}, CFG, LEAD, lambda p: resposta)
+    assert any("R$ 450" in m for m in d.mensagens)           # 3 x 150, somado em código
+    assert d.sdr.get("orcamento_enviado") == 450
+
+
+def test_robo_passa_para_humano_quando_pede_fora_da_tabela():
+    resposta = {"entendi": "x", "tipo": "pergunta", "mensagens": ["Vou ver com o técnico."], "etapa": "proposta",
+                "orcamento": [{"item": "Troca de compressor", "qtd": 1}]}
+    d = ai_robo.decidir([{"de": "contato", "texto": "preciso trocar o compressor"}], "whatsapp", {"company_name": "Frio Total"}, CFG, LEAD, lambda p: resposta)
+    assert d.passar_para_humano and "fora da tabela" in d.motivo

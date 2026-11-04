@@ -514,6 +514,17 @@ def decidir(
         humano = True
         n["motivo"] = n["motivo"] or f"reunião combinada: {n['sdr']['reuniao']}"
 
+    # Serviço local: o modelo diz o que o cliente quer; o orçamento e a soma saem de código, só com a tabela cadastrada (nunca um total inventado).
+    if ai_oferta.sem_previa(cfg) and n.get("orcamento") and not humano:
+        oferta = ai_oferta.normalizar(cfg.get("oferta") or {})
+        calc = ai_oferta.calcular_orcamento(oferta, n["orcamento"])
+        if calc["linhas"] and not calc["fora_da_tabela"] and not (sdr or {}).get("orcamento_enviado") == calc["total"]:
+            n["mensagens"] = [*n["mensagens"], ai_oferta.mensagem_do_orcamento(oferta, calc)]
+            n["sdr"] = {**n["sdr"], "orcamento_enviado": calc["total"]}
+        elif calc["fora_da_tabela"]:
+            humano = True
+            n["motivo"] = n["motivo"] or f"pediu algo fora da tabela ({', '.join(calc['fora_da_tabela'])[:80]}) — passe o valor"
+
     # Estilo comercial: a previa foi enviada agora, entao o aviso da promocao vai logo atras do link (uma vez por conversa).
     # Sai de codigo, com o preco e os itens que o dono cadastrou.
     if (ai_oferta.promocao_ativa(cfg) and not (n["sdr"].get("promo_enviada") or (sdr or {}).get("promo_enviada"))
