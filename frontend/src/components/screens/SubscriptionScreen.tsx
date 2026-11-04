@@ -3,13 +3,14 @@ import { api } from '../../services/api';
 import { Check, Zap, Crown, Flame } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { modoDaConta } from '../../lib/modoDaConta';
-import { COBRANCA_MENSAL_ATIVA, MODO_EXTRA, diferenciais, PLANOS_MENSAIS, ROBO_COMPLEMENTO, entregasDoPlano } from '../../data/planos';
+import { COBRANCA_MENSAL_ATIVA, MODO_EXTRA, diferenciais, PLANOS_MENSAIS, ROBO_COMPLEMENTO, entregasDoPlano, entregasDoRobo, precoComRobo } from '../../data/planos';
 
 export const SubscriptionScreen: React.FC = () => {
   const [comprando, setComprando] = useState<string | null>(null);
   const [erro, setErro] = useState('');
   const { user } = useApp() as any;
   const modo = modoDaConta(user);
+  const [comRobo, setComRobo] = useState(false);
 
   // Os botoes nao tinham onClick: a tela anunciava preco e nao vendia.
   const comprar = async (planoId: string) => {
@@ -62,6 +63,14 @@ export const SubscriptionScreen: React.FC = () => {
           <h2 className="text-2xl font-black text-slate-800">Planos mensais</h2>
           <p className="text-sm text-slate-500 mt-1">Você está no modo <b>{modo === 'empresa' ? 'Empresa' : 'Agência'}</b>: a lista de entregas abaixo é a do seu modo.</p>
         </div>
+        <div className="flex justify-center mb-8">
+          <div className="bg-slate-100 p-1 rounded-full flex items-center shadow-inner" role="radiogroup" aria-label="Robô de atendimento">
+            <button type="button" role="radio" aria-checked={!comRobo} onClick={() => setComRobo(false)}
+              className={`px-5 py-2.5 rounded-full text-sm font-bold transition-all ${!comRobo ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500'}`}>Só o plano</button>
+            <button type="button" role="radio" aria-checked={comRobo} onClick={() => setComRobo(true)}
+              className={`px-5 py-2.5 rounded-full text-sm font-bold transition-all ${comRobo ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500'}`}>Com robô de atendimento (IA)</button>
+          </div>
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {PLANOS_MENSAIS.map(p => (
             <div key={p.id} className={`bg-white rounded-[2rem] p-7 flex flex-col relative border ${p.destaque ? 'border-2 border-blue-500 shadow-xl shadow-blue-500/10' : 'border-slate-100 shadow-sm'}`}>
@@ -70,10 +79,15 @@ export const SubscriptionScreen: React.FC = () => {
               <p className="text-sm text-slate-500 mt-1 mb-5">{p.chamada}</p>
               <div className="flex items-end gap-1 mb-1">
                 <span className="text-lg font-bold text-slate-500 mb-1.5">R$</span>
-                <span className="text-6xl leading-none font-black tracking-tighter text-slate-900">{p.preco}</span>
+                <span className="text-6xl leading-none font-black tracking-tighter text-slate-900">{comRobo ? precoComRobo(p) : p.preco}</span>
                 <span className="text-sm font-bold text-slate-400 mb-1.5">/mês</span>
               </div>
-              <p className="text-xs font-bold text-slate-400 mb-6">{p.leads.toLocaleString('pt-BR')} leads por mês{p.robo === 'complemento' ? ` · robô de atendimento +R$ ${ROBO_COMPLEMENTO}` : ' · robô incluso'}</p>
+              <p className="text-xs font-bold text-slate-500 mb-1">
+                {p.robo === 'incluso'
+                  ? 'Robô de atendimento com IA já incluso'
+                  : comRobo ? `R$ ${p.preco} do plano + R$ ${ROBO_COMPLEMENTO} do robô de IA` : `Plano sem o robô de IA · com o robô: R$ ${precoComRobo(p)}/mês`}
+              </p>
+              <p className="text-xs font-bold text-slate-400 mb-5">{p.leads.toLocaleString('pt-BR')} leads por mês</p>
               <ul className="space-y-3 mb-7 flex-1">
                 {entregasDoPlano(p, modo).map(t => (
                   <li key={t} className="flex items-start gap-3 text-[14px] font-medium text-slate-600">
@@ -82,9 +96,27 @@ export const SubscriptionScreen: React.FC = () => {
                   </li>
                 ))}
               </ul>
+              <div className={`rounded-2xl border p-4 mb-6 ${p.robo === 'incluso' || comRobo ? 'border-blue-200 bg-blue-50/60' : 'border-dashed border-slate-200 bg-slate-50'}`}>
+                <p className="text-sm font-black text-slate-800 flex flex-wrap items-center justify-between gap-2">
+                  <span>Robô de atendimento com IA</span>
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap ${p.robo === 'incluso' || comRobo ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                    {p.robo === 'incluso' ? 'Incluso' : comRobo ? `+R$ ${ROBO_COMPLEMENTO}/mês` : `Opcional: +R$ ${ROBO_COMPLEMENTO}/mês`}
+                  </span>
+                </p>
+                <ul className="mt-3 space-y-2">
+                  {entregasDoRobo(p).map(t => (
+                    <li key={t} className={`flex items-start gap-2 text-[13px] leading-snug ${p.robo === 'incluso' || comRobo ? 'text-slate-700' : 'text-slate-400'}`}>
+                      <Check className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${p.robo === 'incluso' || comRobo ? 'text-blue-600' : 'text-slate-300'}`} /> {t}
+                    </li>
+                  ))}
+                </ul>
+                {p.robo === 'complemento' && !comRobo && (
+                  <button type="button" onClick={() => setComRobo(true)} className="mt-3 text-xs font-bold text-blue-600 hover:underline">Ver preço com o robô de IA</button>
+                )}
+              </div>
               <button disabled={!COBRANCA_MENSAL_ATIVA}
                 className={`w-full py-3.5 rounded-2xl text-sm font-bold transition-colors disabled:cursor-not-allowed ${p.destaque ? 'bg-blue-600 text-white disabled:opacity-60' : 'bg-slate-900 text-white disabled:opacity-60'}`}>
-                {COBRANCA_MENSAL_ATIVA ? `Assinar ${p.nome}` : 'Assinatura mensal em breve'}
+                {COBRANCA_MENSAL_ATIVA ? `Assinar ${p.nome}${comRobo && p.robo === 'complemento' ? ' com robô' : ''}` : 'Assinatura mensal em breve'}
               </button>
             </div>
           ))}

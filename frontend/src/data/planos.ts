@@ -32,7 +32,7 @@ export const PLANOS_MENSAIS: PlanoMensal[] = [
 
 const n = (v: number) => v.toLocaleString('pt-BR');
 
-/** O que o plano entrega, na linguagem do modo da conta (a agência vê sites; a empresa vê visitas e orçamento). */
+/** O que o plano entrega SEM o robô de atendimento (ele é um bloco à parte), na linguagem do modo da conta (a agência vê sites; a empresa vê visitas e orçamento). */
 export const entregasDoPlano = (p: PlanoMensal, modo: ModoDaConta): string[] => {
   const comuns = [
     `${n(p.leads)} leads por mês, buscados por segmento e cidade`,
@@ -53,11 +53,18 @@ export const entregasDoPlano = (p: PlanoMensal, modo: ModoDaConta): string[] => 
     ...(p.id !== 'essencial' ? ['Exportar leads'] : []),
     ...(p.id === 'escala' ? ['Propostas e contratos', 'Suporte prioritário'] : []),
   ];
-  const robo = p.robo === 'incluso'
-    ? [`Robô de atendimento com IA incluso (até ${n(p.conversas)} conversas por mês)`]
-    : [`Robô de atendimento com IA: complemento de R$ ${ROBO_COMPLEMENTO}/mês (até ${n(p.conversas)} conversas)`];
-  return [...comuns, ...(modo === 'empresa' ? empresa : agencia), ...robo];
+  return [...comuns, ...(modo === 'empresa' ? empresa : agencia)];
 };
+
+/** O que o robô de atendimento com IA faz: o mesmo para todos os planos. */
+export const entregasDoRobo = (p: PlanoMensal): string[] => [
+  'Responde as mensagens dos leads no WhatsApp, na hora, e conduz a conversa',
+  'Entende áudios e conversas longas',
+  'Só promete o que você cadastrou (preço, prazo, garantia)',
+  'Chama você quando o cliente quer fechar, agendar ou pede algo fora do combinado',
+  'Pausa sozinho quando você assume a conversa',
+  `Até ${n(p.conversas)} conversas por mês`,
+];
 
 export const precoComRobo = (p: PlanoMensal): number => p.preco + (p.robo === 'incluso' ? 0 : ROBO_COMPLEMENTO);
 
