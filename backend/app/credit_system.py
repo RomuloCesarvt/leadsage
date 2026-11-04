@@ -17,6 +17,9 @@ class BancoDeCreditosIndisponivel(RuntimeError):
     que o de servir buscas pagas de graca para qualquer visitante."""
 
 
+from app.espaco import conta as _conta
+
+
 def _sem_banco() -> None:
     if settings.CREDITO_SEM_BANCO:
         return
@@ -118,6 +121,7 @@ async def check_and_deduct_credits(
     Admins e contas de acesso total (por e-mail ou pelo papel no Firestore) nao consomem creditos.
     Returns the new balance or None if insufficient credits.
     """
+    uid = _conta(uid)
     if acesso_total(email):
         return UNLIMITED
 
@@ -163,6 +167,7 @@ async def check_and_deduct_credits(
     return new_credits
 
 async def get_user_balance(uid: str, email: Optional[str] = None) -> Dict[str, Any]:
+    uid = _conta(uid)
     if acesso_total(email):
         return {"credits": UNLIMITED, "history": [], "is_admin": is_admin(email)}
 
@@ -188,6 +193,7 @@ async def get_user_balance(uid: str, email: Optional[str] = None) -> Dict[str, A
     return {"credits": credits, "history": history}
 
 async def add_credits(uid: str, amount: int, reason: str = "Recarga de Créditos (Pix/Cartão)") -> int:
+    uid = _conta(uid)
     if _sql_principal():
         return await _sql_somar(uid, amount, reason)
 
@@ -218,6 +224,7 @@ async def add_credits(uid: str, amount: int, reason: str = "Recarga de Créditos
 
 async def e_ilimitado(uid: str) -> bool:
     """O admin liberou creditos infinitos para este usuario?"""
+    uid = _conta(uid)
     if _sql_principal():
         async with AsyncSessionLocal() as s:
             linha = (await s.execute(select(DBCredito).where(DBCredito.uid == uid))).scalar_one_or_none()
@@ -235,6 +242,7 @@ async def e_ilimitado(uid: str) -> bool:
 
 async def definir_ilimitado(uid: str, ativo: bool, por: str = "") -> None:
     """Liga ou desliga os creditos infinitos de um usuario (so o admin chama)."""
+    uid = _conta(uid)
     if _sql_principal():
         async with AsyncSessionLocal() as s:
             linha = await _sql_garantir(s, uid)

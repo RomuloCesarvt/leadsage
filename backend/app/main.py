@@ -94,8 +94,23 @@ app.add_middleware(
     allow_origins=_origins or ["*"],
     allow_credentials=bool(_origins),
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Authorization", "Content-Type", "X-Modo"],
 )
+
+def _espaco(user: dict) -> str:
+    """A chave de armazenamento do espaço de trabalho do modo ativo (agência = o uid de sempre; empresa = uid~empresa)."""
+    return user.get("espaco") or user.get("uid")
+
+
+async def usuario_do_espaco(request: Request, token: dict = Depends(get_current_user)) -> dict:
+    """O usuário do token mais o espaço do modo que o app diz estar usando (cabeçalho X-Modo).
+
+    `uid` continua sendo o da conta (perfil, plano, créditos); `espaco` é a chave dos dados de trabalho (leads, pipeline, conversas, robô...).
+    """
+    from app import espaco as espaco_mod
+    modo = (request.headers.get("x-modo") or "").strip().lower()
+    return {**token, "modo": modo, "espaco": espaco_mod.do_modo(token.get("uid") or "", modo)}
+
 
 async def exigir_recurso(user: dict, recurso: str, o_que: str) -> str:
     """Barra o acesso quando o plano do usuario nao inclui o recurso.
@@ -193,7 +208,7 @@ def _identidade(profile: UserProfile, user: dict) -> UserProfile:
 
 
 @app.get("/api/profile", response_model=UserProfile)
-async def get_user_profile(user: dict = Depends(get_current_user)):
+async def get_user_profile(user: dict = Depends(usuario_do_espaco)):
     uid = user.get("uid")
     profile = await get_profile(uid)
     balance = await get_user_balance(uid, user.get("email"))
@@ -202,7 +217,7 @@ async def get_user_profile(user: dict = Depends(get_current_user)):
 
 
 @app.put("/api/profile", response_model=UserProfile)
-async def update_user_profile(profile: UserProfile, user: dict = Depends(get_current_user)):
+async def update_user_profile(profile: UserProfile, user: dict = Depends(usuario_do_espaco)):
     """Salva o perfil do usuario autenticado.
 
     Antes esta rota nao exigia token e escrevia numa global de modulo,
@@ -230,12 +245,12 @@ async def update_user_profile(profile: UserProfile, user: dict = Depends(get_cur
     return _identidade(saved, user)
 
 @app.post("/api/search-leads", response_model=LeadSearchResponse)
-async def search_leads(request: Request, req: LeadSearchRequest, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def search_leads(request: Request, req: LeadSearchRequest, user: dict = Depends(usuario_do_espaco), db: AsyncSession = Depends(get_db)):
     if not req.niche or not req.location:
         raise HTTPException(status_code=400, detail="Nicho e localização são obrigatórios.")
 
     requested_limit = req.limit or 10
-    uid = user.get("uid")
+    uid = _espaco(user)
 
     # Confere saldo ANTES de gastar a cota do Google, mas so debita
     # depois, pelo numero de leads realmente entregues. Antes o credito
@@ -326,7 +341,7 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
     )
 
 @app.post("/api/generate-pitch", response_model=PitchGenerationResponse)
-async def generate_pitch(request: Request, req: PitchGenerationRequest, user: dict = Depends(get_current_user)):
+async def generate_pitch(request: Request, req: PitchGenerationRequest, user: dict = Depends(usuario_do_espaco)):
     """Escreve a abordagem e a cadencia de aquecimento.
 
     Uma falha da IA agora e 503, nao 200. Antes a excecao virava o corpo
@@ -354,7 +369,7 @@ async def _previa_do_lead(uid: str, lead_id: str, sites: Optional[List[Dict[str,
 async def _preparar_pitch(user: dict, req: PitchGenerationRequest) -> None:
     """O produto vem do cadastro do dono, nunca do navegador: e ele que garante que a
     mensagem so cita preco, prazo e entrega reais."""
-    canal_robo = await robo_store.canal_do_usuario(user.get("uid")) or {}
+    canal_robo = await robo_store.canal_do_usuario(_espaco(user)) or {}
     perfil = await get_profile(user.get("uid"))
     if not req.user_product:
         req.user_product = perfil.product_description or ""
@@ -374,7 +389,7 @@ async def _preparar_pitch(user: dict, req: PitchGenerationRequest) -> None:
 
 
 @app.post("/api/generate-followups")
-async def generate_followups(req: FollowupsRequest, user: dict = Depends(get_current_user)):
+async def generate_followups(req: FollowupsRequest, user: dict = Depends(usuario_do_espaco)):
     """As duas mensagens de acompanhamento, pedidas a parte para a primeira aparecer mais rapido."""
     await exigir_recurso(user, "ia_abordagem", "A IA de abordagem")
     try:
@@ -386,7 +401,7 @@ async def generate_followups(req: FollowupsRequest, user: dict = Depends(get_cur
 
 
 @app.post("/api/generate-demo-site", response_model=DemoSiteResponse)
-async def generate_demo_site(request: Request, req: DemoSiteRequest, user: dict = Depends(get_current_user)):
+async def generate_demo_site(request: Request, req: DemoSiteRequest, user: dict = Depends(usuario_do_espaco)):
     try:
         return await AIGenerator.generate_demo_site(req, api_key=settings.GEMINI_API_KEY)
     except AIIndisponivel as e:
@@ -394,7 +409,7 @@ async def generate_demo_site(request: Request, req: DemoSiteRequest, user: dict 
 
 
 @app.post("/api/generate-site-copy", response_model=SiteCopyResponse)
-async def gerar_texto_do_site(req: SiteCopyRequest, user: dict = Depends(get_current_user)):
+async def gerar_texto_do_site(req: SiteCopyRequest, user: dict = Depends(usuario_do_espaco)):
     """Conteudo do site + a identidade visual daquele negocio."""
     await exigir_recurso(user, "ia_abordagem", "A escrita com IA")
 
@@ -432,7 +447,7 @@ async def gerar_texto_do_site(req: SiteCopyRequest, user: dict = Depends(get_cur
 @app.post("/api/generate-document", response_model=DocumentAIResponse)
 async def gerar_documento_com_ia(
     req: DocumentAIRequest,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(usuario_do_espaco),
     db: AsyncSession = Depends(get_db),
 ):
     """Redige a proposta ou o contrato a partir do lead e do briefing.
@@ -452,7 +467,7 @@ async def gerar_documento_com_ia(
     lead = None
     if req.lead_id:
         resultado = await db.execute(
-            select(DBLead).where(DBLead.id.in_(chaves_do_lead(user.get("uid"), req.lead_id)), DBLead.owner_uid == user.get("uid"))
+            select(DBLead).where(DBLead.id.in_(chaves_do_lead(_espaco(user), req.lead_id)), DBLead.owner_uid == _espaco(user))
         )
         encontrado = resultado.scalar_one_or_none()
         if encontrado:
@@ -474,7 +489,7 @@ async def gerar_documento_com_ia(
 @app.post("/api/dispatch", response_model=DispatchResponse)
 async def dispatch_outreach(
     req: DispatchRequest,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(usuario_do_espaco),
     db: AsyncSession = Depends(get_db),
 ):
     """Dispara a mensagem e so cobra o que foi de fato entregue.
@@ -497,7 +512,7 @@ async def dispatch_outreach(
     except DispatchError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-    result = await db.execute(select(DBLead).where(DBLead.id.in_(chaves_do_lead(user.get("uid"), req.lead_id)), DBLead.owner_uid == user.get("uid")))
+    result = await db.execute(select(DBLead).where(DBLead.id.in_(chaves_do_lead(_espaco(user), req.lead_id)), DBLead.owner_uid == _espaco(user)))
     lead = result.scalar_one_or_none()
     if lead:
         # Um link gerado nao e uma mensagem entregue
@@ -515,7 +530,7 @@ async def dispatch_outreach(
 
 
 @app.post("/api/integrations/test-whatsapp")
-async def testar_whatsapp(user: dict = Depends(get_current_user)):
+async def testar_whatsapp(user: dict = Depends(usuario_do_espaco)):
     """Confere as credenciais da Meta sem enviar mensagem para ninguem."""
     config = await get_integrations(user.get("uid"))
     token = (config.get("wa_token") or "").strip()
@@ -544,19 +559,19 @@ async def testar_whatsapp(user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/integrations")
-async def read_integrations(user: dict = Depends(get_current_user)):
+async def read_integrations(user: dict = Depends(usuario_do_espaco)):
     """Nunca devolve a senha SMTP: so `has_password`."""
     return public_view(await get_integrations(user.get("uid")))
 
 
 @app.put("/api/integrations")
 async def update_integrations(
-    req: IntegrationSettings, user: dict = Depends(get_current_user)
+    req: IntegrationSettings, user: dict = Depends(usuario_do_espaco)
 ):
     return await save_integrations(user.get("uid"), req.model_dump())
 
 @app.get("/api/credits/balance")
-async def get_credits_balance(user: dict = Depends(get_current_user)):
+async def get_credits_balance(user: dict = Depends(usuario_do_espaco)):
     return await get_user_balance(user.get("uid"), user.get("email"))
 
 @app.get("/api/packages")
@@ -566,7 +581,7 @@ def listar_pacotes():
 
 
 @app.post("/api/checkout")
-async def iniciar_compra(req: CheckoutRequest, user: dict = Depends(get_current_user)):
+async def iniciar_compra(req: CheckoutRequest, user: dict = Depends(usuario_do_espaco)):
     """Cria o pedido pendente. NAO concede credito.
 
     O credito so entra pelo webhook, depois de o provedor confirmar o
@@ -606,12 +621,12 @@ async def iniciar_compra(req: CheckoutRequest, user: dict = Depends(get_current_
 
 
 @app.get("/api/orders")
-async def meus_pedidos(user: dict = Depends(get_current_user)):
+async def meus_pedidos(user: dict = Depends(usuario_do_espaco)):
     return await listar_pedidos(user.get("uid"))
 
 
 @app.get("/api/orders/{order_id}")
-async def ver_pedido(order_id: str, user: dict = Depends(get_current_user)):
+async def ver_pedido(order_id: str, user: dict = Depends(usuario_do_espaco)):
     pedido = await obter_pedido(user.get("uid"), order_id)
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido nao encontrado.")
@@ -673,10 +688,10 @@ async def webhook_pagamento(request: Request):
 
 
 @app.get("/api/history")
-async def get_search_history(user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_search_history(user: dict = Depends(usuario_do_espaco), db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(DBSearchHistory)
-        .where(DBSearchHistory.owner_uid == user.get("uid"))
+        .where(DBSearchHistory.owner_uid == _espaco(user))
         .order_by(DBSearchHistory.timestamp.desc())
         .limit(50)
     )
@@ -695,7 +710,7 @@ async def get_search_history(user: dict = Depends(get_current_user), db: AsyncSe
     return out
 
 @app.post("/api/sites", response_model=SiteItem)
-async def publish_site(req: SiteCreateRequest, user: dict = Depends(get_current_user)):
+async def publish_site(req: SiteCreateRequest, user: dict = Depends(usuario_do_espaco)):
     """Salva o site gerado, respeitando a cota do plano.
 
     O plano concede 10, 50 ou 200 sites, mas ate agora nada era conferido:
@@ -766,7 +781,7 @@ SITUACAO_DO_SITE = {
 
 
 @app.get("/api/leads/export")
-async def exportar_leads(user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def exportar_leads(user: dict = Depends(usuario_do_espaco), db: AsyncSession = Depends(get_db)):
     """Exporta os leads do usuario em CSV.
 
     A exportacao acontecia so no navegador, sem passar pelo backend, o
@@ -774,7 +789,7 @@ async def exportar_leads(user: dict = Depends(get_current_user), db: AsyncSessio
     """
     await exigir_recurso(user, "exportar_leads", "Exportar leads")
 
-    result = await db.execute(select(DBLead).where(DBLead.owner_uid == user.get("uid")))
+    result = await db.execute(select(DBLead).where(DBLead.owner_uid == _espaco(user)))
     leads = result.scalars().all()
 
     # A exportacao e o que o usuario leva para o CRM dele. Levar so o
@@ -821,7 +836,7 @@ async def exportar_leads(user: dict = Depends(get_current_user), db: AsyncSessio
 
 
 @app.get("/api/plan")
-async def meu_plano(user: dict = Depends(get_current_user)):
+async def meu_plano(user: dict = Depends(usuario_do_espaco)):
     """O que o plano do usuario libera, para a tela nao oferecer o que
     vai ser barrado depois."""
     if acesso_total(user.get("email")):
@@ -833,9 +848,9 @@ async def meu_plano(user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/previa/aberturas")
-async def previa_aberturas(user: dict = Depends(get_current_user)):
+async def previa_aberturas(user: dict = Depends(usuario_do_espaco)):
     """Quais prévias já foram abertas (visitas, primeira e última abertura), a mais recente primeiro."""
-    return {"aberturas": await previa_abertura.listar(user.get("uid"))}
+    return {"aberturas": await previa_abertura.listar(_espaco(user))}
 
 
 @app.get("/api/s/{slug}", include_in_schema=False)
@@ -879,7 +894,7 @@ async def site_publico(slug: str, request: Request):
 
 
 @app.get("/api/sites/quota")
-async def cota_de_sites(user: dict = Depends(get_current_user)):
+async def cota_de_sites(user: dict = Depends(usuario_do_espaco)):
     """Quanto da cota ja foi usado, para a tela mostrar."""
     uid = user.get("uid")
     usados = await contar_sites(uid)
@@ -890,7 +905,7 @@ async def cota_de_sites(user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/sites")
-async def get_sites(user: dict = Depends(get_current_user)):
+async def get_sites(user: dict = Depends(usuario_do_espaco)):
     """Lista os sites, dando apelido aos que nasceram antes do link publico.
 
     Sem esse remendo, quem ja tinha sites ficaria sem link para sempre e
@@ -902,7 +917,7 @@ async def get_sites(user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/sites/{site_id}", response_model=SiteItem)
-async def get_single_site(site_id: str, user: dict = Depends(get_current_user)):
+async def get_single_site(site_id: str, user: dict = Depends(usuario_do_espaco)):
     site = await get_site(user.get("uid"), site_id)
     if not site:
         raise HTTPException(status_code=404, detail="Site nao encontrado.")
@@ -910,20 +925,20 @@ async def get_single_site(site_id: str, user: dict = Depends(get_current_user)):
 
 
 @app.delete("/api/sites/{site_id}")
-async def remove_site(site_id: str, user: dict = Depends(get_current_user)):
+async def remove_site(site_id: str, user: dict = Depends(usuario_do_espaco)):
     if not await delete_site(user.get("uid"), site_id):
         raise HTTPException(status_code=404, detail="Site nao encontrado.")
     return {"status": "deleted", "id": site_id}
 
 
 @app.post("/api/documents", response_model=DocumentItem)
-async def criar_documento(req: DocumentCreateRequest, user: dict = Depends(get_current_user)):
+async def criar_documento(req: DocumentCreateRequest, user: dict = Depends(usuario_do_espaco)):
     """Salva a versao preenchida de um modelo de proposta ou contrato."""
     recurso = "propostas" if req.kind == "proposta" else "contratos"
     await exigir_recurso(user, recurso, f"Criar {req.kind}s")
     try:
         return await create_document(
-            user.get("uid"), req.kind, req.title, req.content,
+            _espaco(user), req.kind, req.title, req.content,
             req.fields, req.template_id or "", req.lead_id or "",
         )
     except ValueError as e:
@@ -931,13 +946,13 @@ async def criar_documento(req: DocumentCreateRequest, user: dict = Depends(get_c
 
 
 @app.get("/api/documents")
-async def listar_documentos(kind: str = None, user: dict = Depends(get_current_user)):
-    return await list_documents(user.get("uid"), kind)
+async def listar_documentos(kind: str = None, user: dict = Depends(usuario_do_espaco)):
+    return await list_documents(_espaco(user), kind)
 
 
 @app.get("/api/documents/{doc_id}", response_model=DocumentItem)
-async def obter_documento(doc_id: str, user: dict = Depends(get_current_user)):
-    doc = await get_document(user.get("uid"), doc_id)
+async def obter_documento(doc_id: str, user: dict = Depends(usuario_do_espaco)):
+    doc = await get_document(_espaco(user), doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Documento nao encontrado.")
     return doc
@@ -945,10 +960,10 @@ async def obter_documento(doc_id: str, user: dict = Depends(get_current_user)):
 
 @app.put("/api/documents/{doc_id}", response_model=DocumentItem)
 async def atualizar_documento(
-    doc_id: str, req: DocumentUpdateRequest, user: dict = Depends(get_current_user)
+    doc_id: str, req: DocumentUpdateRequest, user: dict = Depends(usuario_do_espaco)
 ):
     try:
-        doc = await update_document(user.get("uid"), doc_id, req.title, req.content, req.fields)
+        doc = await update_document(_espaco(user), doc_id, req.title, req.content, req.fields)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not doc:
@@ -957,8 +972,8 @@ async def atualizar_documento(
 
 
 @app.delete("/api/documents/{doc_id}")
-async def remover_documento(doc_id: str, user: dict = Depends(get_current_user)):
-    if not await delete_document(user.get("uid"), doc_id):
+async def remover_documento(doc_id: str, user: dict = Depends(usuario_do_espaco)):
+    if not await delete_document(_espaco(user), doc_id):
         raise HTTPException(status_code=404, detail="Documento nao encontrado.")
     return {"status": "deleted", "id": doc_id}
 
@@ -1024,20 +1039,20 @@ class RoboTesteRequest(BaseModel):
 
 
 @app.get("/api/robo/config")
-async def robo_config(user: dict = Depends(get_current_user)):
+async def robo_config(user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    canal = await robo_store.canal_do_usuario(user.get("uid"))
+    canal = await robo_store.canal_do_usuario(_espaco(user))
     visao = robo_store.visao_publica(canal, settings.APP_URL)
     # WhatsApp na nuvem sem sinal: confere se o Render suspendeu o serviço (cota mensal do plano grátis), para a tela dizer a verdade
     if visao.get("nuvem") and not visao.get("conector_online"):
-        atende = await worker_lease_mod.endereco_de_quem_atende(user.get("uid"))
+        atende = await worker_lease_mod.endereco_de_quem_atende(_espaco(user))
         # se outro serviço tem o número agora, a nuvem está funcionando; senão, confere o endereço principal
         visao["nuvem_suspensa"] = False if atende else await nuvem_saude.suspenso()
     return visao
 
 
 @app.put("/api/robo/config")
-async def robo_salvar_config(req: RoboConfigRequest, user: dict = Depends(get_current_user)):
+async def robo_salvar_config(req: RoboConfigRequest, user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     if req.objetivo and req.objetivo not in ("agendar", "site", "qualificar", "vender"):
         raise HTTPException(status_code=400, detail="Objetivo inválido.")
@@ -1048,7 +1063,7 @@ async def robo_salvar_config(req: RoboConfigRequest, user: dict = Depends(get_cu
         raise HTTPException(status_code=400, detail="Estilo de abordagem inválido.")
     if "promocao" in dados:
         dados["promocao"] = ai_oferta.normalizar_promocao(dados["promocao"])
-    canal = await robo_store.salvar_canal(user.get("uid"), user.get("email", ""), dados)
+    canal = await robo_store.salvar_canal(_espaco(user), user.get("email", ""), dados)
     if canal.get("cw_hash"):
         # o Conector guarda o canal por alguns segundos; ligar o robo tem de valer na hora
         _CACHE_CONECTOR.pop(canal["cw_hash"], None)
@@ -1129,22 +1144,22 @@ class PipelineMoverRequest(BaseModel):
 
 
 @app.get("/api/dashboard/segmentos")
-async def dashboard_segmentos(user: dict = Depends(get_current_user)):
+async def dashboard_segmentos(user: dict = Depends(usuario_do_espaco)):
     """Quais segmentos respondem mais, mostram mais interesse e mais pedem o link da prévia (só leitura do que já existe)."""
     from app import desempenho
     try:
-        return await desempenho.do_usuario(user.get("uid"))
+        return await desempenho.do_usuario(_espaco(user))
     except Exception as exc:
         print(f"Dashboard: falha ao calcular os segmentos: {exc}")
         return {"segmentos": [], "destaques": {"responde_mais": None, "mais_interesse": None, "mais_pedem_link": None}, "minimo_para_taxa": 3}
 
 
 @app.get("/api/pipeline")
-async def pipeline_listar(user: dict = Depends(get_current_user)):
+async def pipeline_listar(user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "pipeline", "O pipeline")
-    itens = await pipeline_store.listar(user.get("uid"))
+    itens = await pipeline_store.listar(_espaco(user))
     try:
-        abertas = {a.get("lead_id"): a for a in await previa_abertura.listar(user.get("uid"))}
+        abertas = {a.get("lead_id"): a for a in await previa_abertura.listar(_espaco(user))}
     except Exception:
         abertas = {}   # sem a contagem o quadro continua igual
     for i in itens:
@@ -1156,18 +1171,18 @@ async def pipeline_listar(user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/pipeline/sync")
-async def pipeline_sincronizar(req: PipelineSyncRequest, user: dict = Depends(get_current_user)):
+async def pipeline_sincronizar(req: PipelineSyncRequest, user: dict = Depends(usuario_do_espaco)):
     """O navegador entrega os leads que ja tem: e por esta copia que o robo
     reconhece quem escreveu."""
     await exigir_recurso(user, "pipeline", "O pipeline")
-    return {"novos": await pipeline_store.registrar_varios(user.get("uid"), req.leads, origem="salvo")}
+    return {"novos": await pipeline_store.registrar_varios(_espaco(user), req.leads, origem="salvo")}
 
 
 @app.delete("/api/pipeline/{lead_id}")
-async def pipeline_remover(lead_id: str, user: dict = Depends(get_current_user)):
+async def pipeline_remover(lead_id: str, user: dict = Depends(usuario_do_espaco)):
     """Tira um lead de Meus Leads (e do pipeline). So apaga o da propria conta."""
     await exigir_recurso(user, "pipeline", "O pipeline")
-    uid = user.get("uid")
+    uid = _espaco(user)
     # excluir o lead cancela o que ainda ia sair para ele (fila, rascunhos, seguimentos agendados): "aquele lead saiu" de verdade
     try:
         cancelados = await fila_envio.cancelar_do_lead(uid, lead_id)
@@ -1179,9 +1194,9 @@ async def pipeline_remover(lead_id: str, user: dict = Depends(get_current_user))
 
 
 @app.put("/api/pipeline/{lead_id}/etapa")
-async def pipeline_mover(lead_id: str, req: PipelineMoverRequest, user: dict = Depends(get_current_user)):
+async def pipeline_mover(lead_id: str, req: PipelineMoverRequest, user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "pipeline", "O pipeline")
-    uid = user.get("uid")
+    uid = _espaco(user)
     if not pipeline_store.etapa_valida(req.etapa):
         raise HTTPException(status_code=400, detail="Etapa desconhecida.")
     if await pipeline_store.obter(uid, lead_id) is None:
@@ -1193,10 +1208,10 @@ async def pipeline_mover(lead_id: str, req: PipelineMoverRequest, user: dict = D
 
 
 @app.put("/api/pipeline/{lead_id}/agente")
-async def pipeline_agente(lead_id: str, req: PipelineAgenteRequest, user: dict = Depends(get_current_user)):
+async def pipeline_agente(lead_id: str, req: PipelineAgenteRequest, user: dict = Depends(usuario_do_espaco)):
     """"Gerenciar agente": quem atende este lead (o robô, com um jeito de conversar, ou você)."""
     await exigir_recurso(user, "pipeline", "O pipeline")
-    uid = user.get("uid")
+    uid = _espaco(user)
     if not agentes.valido(req.agente):
         raise HTTPException(status_code=400, detail="Agente desconhecido.")
     if await pipeline_store.obter(uid, lead_id) is None:
@@ -1250,7 +1265,7 @@ def _instrucao_de_retomada(retomada: Optional[Dict[str, Any]]) -> str:
 
 async def _funcoes_da_fila(user: dict):
     """As três pontas que a fila usa: escrever, enviar e cobrar."""
-    uid, email = user.get("uid"), user.get("email")
+    uid, email = _espaco(user), user.get("email")
     perfil = await get_profile(uid)
     config = await get_integrations(uid)
     canal_robo = await robo_store.canal_do_usuario(uid) or {}
@@ -1317,7 +1332,7 @@ async def _funcoes_da_fila(user: dict):
 
 
 @app.post("/api/robo/fila/preparar")
-async def fila_preparar(req: FilaPrepararRequest, user: dict = Depends(get_current_user)):
+async def fila_preparar(req: FilaPrepararRequest, user: dict = Depends(usuario_do_espaco)):
     """O robô escreve a abordagem de cada lead e entrega no canal certo.
 
     E-mail sai sozinho (com limite diário); WhatsApp, Instagram e LinkedIn
@@ -1329,7 +1344,7 @@ async def fila_preparar(req: FilaPrepararRequest, user: dict = Depends(get_curre
     ai_client.PRAZO_DA_IA_S.set(24.0)   # vários textos na mesma requisição de 60 s: cada um espera no máximo 20 s por vaga na IA
     try:
         return await asyncio.wait_for(
-            fila_envio.preparar_lote(user.get("uid"), req.leads,
+            fila_envio.preparar_lote(_espaco(user), req.leads,
                                      lambda l, c: gerar(l, c, req.tom), enviar, pode_enviar, cobrar, revisar=req.revisar, orcamento_s=44, reabordar=req.reabordar),
             timeout=56,
         )
@@ -1352,9 +1367,9 @@ class VisitaBody(BaseModel):
 
 
 @app.get("/api/servico/visitas")
-async def servico_visitas(user: dict = Depends(get_current_user)):
+async def servico_visitas(user: dict = Depends(usuario_do_espaco)):
     """Modo empresa: as visitas agendadas e feitas, e os retornos de manutenção que já podem ser oferecidos (com a mensagem pronta)."""
-    uid = user.get("uid")
+    uid = _espaco(user)
     visitas = await servico_local.listar(uid)
     canal_robo = await robo_store.canal_do_usuario(uid) or {}
     perfil = await get_profile(uid)
@@ -1364,17 +1379,17 @@ async def servico_visitas(user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/servico/visitas")
-async def servico_visita_criar(body: VisitaBody, user: dict = Depends(get_current_user)):
+async def servico_visita_criar(body: VisitaBody, user: dict = Depends(usuario_do_espaco)):
     try:
-        return await servico_local.salvar(user.get("uid"), body.model_dump(exclude_none=True))
+        return await servico_local.salvar(_espaco(user), body.model_dump(exclude_none=True))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
 
 @app.put("/api/servico/visitas/{vid}")
-async def servico_visita_atualizar(vid: str, body: VisitaBody, user: dict = Depends(get_current_user)):
+async def servico_visita_atualizar(vid: str, body: VisitaBody, user: dict = Depends(usuario_do_espaco)):
     try:
-        return await servico_local.salvar(user.get("uid"), body.model_dump(exclude_none=True), vid)
+        return await servico_local.salvar(_espaco(user), body.model_dump(exclude_none=True), vid)
     except KeyError:
         raise HTTPException(status_code=404, detail="Visita não encontrada.")
     except ValueError as exc:
@@ -1382,15 +1397,15 @@ async def servico_visita_atualizar(vid: str, body: VisitaBody, user: dict = Depe
 
 
 @app.delete("/api/servico/visitas/{vid}")
-async def servico_visita_apagar(vid: str, user: dict = Depends(get_current_user)):
-    await servico_local.apagar(user.get("uid"), vid)
+async def servico_visita_apagar(vid: str, user: dict = Depends(usuario_do_espaco)):
+    await servico_local.apagar(_espaco(user), vid)
     return {"ok": True}
 
 
 @app.post("/api/servico/visitas/{vid}/retorno-avisado")
-async def servico_retorno_avisado(vid: str, user: dict = Depends(get_current_user)):
+async def servico_retorno_avisado(vid: str, user: dict = Depends(usuario_do_espaco)):
     """A pessoa mandou (ou dispensou) o convite de retorno: some da lista."""
-    uid = user.get("uid")
+    uid = _espaco(user)
     v = next((x for x in await servico_local.listar(uid) if x.get("id") == vid), None)
     if not v:
         raise HTTPException(status_code=404, detail="Visita não encontrada.")
@@ -1400,16 +1415,16 @@ async def servico_retorno_avisado(vid: str, user: dict = Depends(get_current_use
 
 
 @app.get("/api/robo/regua")
-async def robo_regua(user: dict = Depends(get_current_user)):
+async def robo_regua(user: dict = Depends(usuario_do_espaco)):
     """A régua de seguimentos: quem já recebeu a abordagem, em que passo está e quando sai o próximo (o robô faz sozinho)."""
     await exigir_recurso(user, "ia_abordagem", "O disparo")
-    return await fila_envio.regua(user.get("uid"))
+    return await fila_envio.regua(_espaco(user))
 
 
 @app.get("/api/robo/fila")
-async def fila_listar(user: dict = Depends(get_current_user)):
+async def fila_listar(user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "ia_abordagem", "O disparo")
-    uid = user.get("uid")
+    uid = _espaco(user)
     # quem já foi abordado por fora da fila (celular, Conversas) sai da fila e do "Novo Lead"; a tela usa a lista para não oferecer de novo
     rec = await fila_envio.reconciliar(uid)
     itens = await fila_envio.listar(uid)
@@ -1417,18 +1432,18 @@ async def fila_listar(user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/robo/fila/enviar-aguardando")
-async def fila_enviar_aguardando(user: dict = Depends(get_current_user)):
+async def fila_enviar_aguardando(user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "ia_abordagem", "O disparo")
     _, enviar, pode_enviar, cobrar = await _funcoes_da_fila(user)
-    return await fila_envio.enviar_aguardando(user.get("uid"), enviar, pode_enviar, cobrar)
+    return await fila_envio.enviar_aguardando(_espaco(user), enviar, pode_enviar, cobrar)
 
 
 @app.patch("/api/robo/fila/{item_id}")
-async def fila_editar(item_id: str, req: FilaEditarRequest, user: dict = Depends(get_current_user)):
+async def fila_editar(item_id: str, req: FilaEditarRequest, user: dict = Depends(usuario_do_espaco)):
     """Corrige a mensagem ou o assunto de um item que ainda não saiu."""
     await exigir_recurso(user, "ia_abordagem", "O disparo")
     try:
-        item = await fila_envio.editar(user.get("uid"), item_id, req.texto, req.assunto)
+        item = await fila_envio.editar(_espaco(user), item_id, req.texto, req.assunto)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     if item is None:
@@ -1437,25 +1452,25 @@ async def fila_editar(item_id: str, req: FilaEditarRequest, user: dict = Depends
 
 
 @app.post("/api/robo/fila/aprovar")
-async def fila_aprovar(req: FilaIdsRequest, user: dict = Depends(get_current_user)):
+async def fila_aprovar(req: FilaIdsRequest, user: dict = Depends(usuario_do_espaco)):
     """Libera para sair as mensagens que a pessoa revisou e deixou marcadas."""
     await exigir_recurso(user, "ia_abordagem", "O disparo")
     _, enviar, pode_enviar, cobrar = await _funcoes_da_fila(user)
-    return await fila_envio.aprovar(user.get("uid"), req.ids, enviar, pode_enviar, cobrar, confirmar_reenvio=req.confirmar_reenvio)
+    return await fila_envio.aprovar(_espaco(user), req.ids, enviar, pode_enviar, cobrar, confirmar_reenvio=req.confirmar_reenvio)
 
 
 @app.post("/api/robo/fila/descartar")
-async def fila_descartar(req: FilaIdsRequest, user: dict = Depends(get_current_user)):
+async def fila_descartar(req: FilaIdsRequest, user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "ia_abordagem", "O disparo")
-    n = await fila_envio.descartar(user.get("uid"), req.ids)
-    return {"descartadas": n, "resumo": fila_envio.resumo(await fila_envio.listar(user.get("uid")))}
+    n = await fila_envio.descartar(_espaco(user), req.ids)
+    return {"descartadas": n, "resumo": fila_envio.resumo(await fila_envio.listar(_espaco(user)))}
 
 
 @app.post("/api/robo/whats/retomar")
-async def whats_retomar(user: dict = Depends(get_current_user)):
+async def whats_retomar(user: dict = Depends(usuario_do_espaco)):
     """Tira a pausa por falhas seguidas (o usuário conferiu que o número está normal)."""
     await exigir_recurso(user, "ia_abordagem", "O disparo")
-    uid = user.get("uid")
+    uid = _espaco(user)
     canal = await robo_store.canal_do_usuario(uid)
     if not canal:
         raise HTTPException(status_code=404, detail="O WhatsApp ainda não foi conectado.")
@@ -1466,26 +1481,26 @@ async def whats_retomar(user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/robo/fila/descartar-todos")
-async def fila_descartar_todos(user: dict = Depends(get_current_user)):
+async def fila_descartar_todos(user: dict = Depends(usuario_do_espaco)):
     """Esvazia a fila inteira de uma vez (rascunhos, pendentes, com falha); o que ja foi enviado fica."""
     await exigir_recurso(user, "ia_abordagem", "O disparo")
-    n = await fila_envio.descartar_todos(user.get("uid"))
-    return {"descartadas": n, "resumo": fila_envio.resumo(await fila_envio.listar(user.get("uid")))}
+    n = await fila_envio.descartar_todos(_espaco(user))
+    return {"descartadas": n, "resumo": fila_envio.resumo(await fila_envio.listar(_espaco(user)))}
 
 
 @app.post("/api/robo/fila/{item_id}/enviado")
-async def fila_marcar_enviado(item_id: str, user: dict = Depends(get_current_user)):
+async def fila_marcar_enviado(item_id: str, user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "ia_abordagem", "O disparo")
-    item = await fila_envio.marcar_enviado(user.get("uid"), item_id)
+    item = await fila_envio.marcar_enviado(_espaco(user), item_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Item não encontrado na fila.")
     return item
 
 
 @app.post("/api/robo/fila/{item_id}/pular")
-async def fila_pular(item_id: str, user: dict = Depends(get_current_user)):
+async def fila_pular(item_id: str, user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "ia_abordagem", "O disparo")
-    item = await fila_envio.pular(user.get("uid"), item_id)
+    item = await fila_envio.pular(_espaco(user), item_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Item não encontrado na fila.")
     return item
@@ -1499,9 +1514,9 @@ class DisparoRequest(BaseModel):
 
 
 @app.get("/api/robo/whatsapp/modelo")
-async def robo_modelo_status(user: dict = Depends(get_current_user)):
+async def robo_modelo_status(user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    cfg = await robo_store.canal_do_usuario(user.get("uid"))
+    cfg = await robo_store.canal_do_usuario(_espaco(user))
     try:
         return {**await robo_disparo.status_modelo(cfg), "texto": robo_disparo.CORPO_PADRAO,
                 "lote": robo_disparo.TAMANHO_LOTE}
@@ -1512,9 +1527,9 @@ async def robo_modelo_status(user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/robo/whatsapp/modelo")
-async def robo_modelo_criar(user: dict = Depends(get_current_user)):
+async def robo_modelo_criar(user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    cfg = await robo_store.canal_do_usuario(user.get("uid"))
+    cfg = await robo_store.canal_do_usuario(_espaco(user))
     try:
         return await robo_disparo.criar_modelo(cfg)
     except ValueError as exc:
@@ -1524,11 +1539,11 @@ async def robo_modelo_criar(user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/robo/disparar")
-async def robo_disparar(req: DisparoRequest, user: dict = Depends(get_current_user)):
+async def robo_disparar(req: DisparoRequest, user: dict = Depends(usuario_do_espaco)):
     """Primeira mensagem pelo WhatsApp do cliente, com modelo aprovado."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     await exigir_recurso(user, "ia_abordagem", "O disparo")
-    uid, email = user.get("uid"), user.get("email", "")
+    uid, email = _espaco(user), user.get("email", "")
     cfg = await robo_store.canal_do_usuario(uid)
     perfil = await get_profile(uid)
     try:
@@ -1540,9 +1555,9 @@ async def robo_disparar(req: DisparoRequest, user: dict = Depends(get_current_us
 
 
 @app.get("/api/robo/conversas")
-async def robo_conversas(user: dict = Depends(get_current_user)):
+async def robo_conversas(user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    uid = user.get("uid")
+    uid = _espaco(user)
     conversas = await robo_store.listar_conversas(uid)
     try:
         itens = await fila_envio.listar(uid)
@@ -1553,9 +1568,9 @@ async def robo_conversas(user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/avisos")
-async def listar_avisos(user: dict = Depends(get_current_user)):
+async def listar_avisos(user: dict = Depends(usuario_do_espaco)):
     """O que o dono precisa saber agora: prévia aberta, lead pedindo uma pessoa, resposta nova. Cada fonte que falhar só some da lista."""
-    uid = user.get("uid")
+    uid = _espaco(user)
     try:
         aberturas = await previa_abertura.listar(uid)
     except Exception as exc:
@@ -1570,14 +1585,14 @@ async def listar_avisos(user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/robo/conversas/{cid}")
-async def robo_conversa(cid: str, user: dict = Depends(get_current_user)):
+async def robo_conversa(cid: str, user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     if cid.startswith(caixa_de_entrada.PREFIXO_ENVIO):
-        item = await fila_envio.obter(user.get("uid"), cid[len(caixa_de_entrada.PREFIXO_ENVIO):])
+        item = await fila_envio.obter(_espaco(user), cid[len(caixa_de_entrada.PREFIXO_ENVIO):])
         if not item or item.get("status") not in ("enviado", "enviando"):
             raise HTTPException(status_code=404, detail="Conversa não encontrada.")
         return caixa_de_entrada.conversa_do_envio(item)
-    uid = user.get("uid")
+    uid = _espaco(user)
     conversa = await robo_store.obter_conversa(uid, cid)
     if not conversa:
         raise HTTPException(status_code=404, detail="Conversa não encontrada.")
@@ -1614,9 +1629,9 @@ async def _com_o_chat_do_whatsapp(uid: str, conversa: Dict[str, Any]) -> Dict[st
 
 
 @app.post("/api/robo/conversas/{cid}/robo")
-async def robo_ligar_desligar(cid: str, req: RoboAtivoRequest, user: dict = Depends(get_current_user)):
+async def robo_ligar_desligar(cid: str, req: RoboAtivoRequest, user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    uid = user.get("uid")
+    uid = _espaco(user)
     conversa = await robo_store.obter_conversa(uid, cid)
     if not conversa:
         raise HTTPException(status_code=404, detail="Conversa não encontrada.")
@@ -1643,11 +1658,11 @@ async def robo_ligar_desligar(cid: str, req: RoboAtivoRequest, user: dict = Depe
 
 
 @app.post("/api/robo/chat")
-async def robo_no_chat(req: RoboChatRequest, user: dict = Depends(get_current_user)):
+async def robo_no_chat(req: RoboChatRequest, user: dict = Depends(usuario_do_espaco)):
     """O robô em qualquer conversa do WhatsApp: liga/pausa (ativar) ou só avalia pelo contexto se o outro lado é um robô."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     try:
-        c = await robo_service.avaliar_chat(user.get("uid"), req.telefone, req.nome, req.mensagens, req.ativar)
+        c = await robo_service.avaliar_chat(_espaco(user), req.telefone, req.nome, req.mensagens, req.ativar)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except PermissionError as e:
@@ -1656,7 +1671,7 @@ async def robo_no_chat(req: RoboChatRequest, user: dict = Depends(get_current_us
 
 
 @app.post("/api/robo/conversas/{cid}/responder")
-async def robo_responder(cid: str, req: RoboTextoRequest, user: dict = Depends(get_current_user)):
+async def robo_responder(cid: str, req: RoboTextoRequest, user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     if cid.startswith(caixa_de_entrada.PREFIXO_ENVIO):
         raise HTTPException(
@@ -1664,7 +1679,7 @@ async def robo_responder(cid: str, req: RoboTextoRequest, user: dict = Depends(g
             detail="Esta pessoa ainda não respondeu. Quando responder, a conversa se abre aqui e você pode escrever.",
         )
     try:
-        return await _com_o_chat_do_whatsapp(user.get("uid"), await robo_service.responder_como_humano(user.get("uid"), cid, req.texto))
+        return await _com_o_chat_do_whatsapp(_espaco(user), await robo_service.responder_como_humano(_espaco(user), cid, req.texto))
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except meta_canais.EnvioFalhou as exc:
@@ -1672,13 +1687,13 @@ async def robo_responder(cid: str, req: RoboTextoRequest, user: dict = Depends(g
 
 
 @app.post("/api/robo/conversas/{cid}/previa")
-async def robo_enviar_previa(cid: str, user: dict = Depends(get_current_user)):
+async def robo_enviar_previa(cid: str, user: dict = Depends(usuario_do_espaco)):
     """Cria a prévia do site deste lead (se ainda não existe) e manda o link na conversa."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     if cid.startswith(caixa_de_entrada.PREFIXO_ENVIO):
         raise HTTPException(status_code=409, detail="Esta pessoa ainda não respondeu: a prévia vai quando ela responder ou pelo disparo.")
     try:
-        return await _com_o_chat_do_whatsapp(user.get("uid"), await robo_service.enviar_previa(user.get("uid"), user.get("email", ""), cid))
+        return await _com_o_chat_do_whatsapp(_espaco(user), await robo_service.enviar_previa(_espaco(user), user.get("email", ""), cid))
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except meta_canais.EnvioFalhou as exc:
@@ -1686,11 +1701,11 @@ async def robo_enviar_previa(cid: str, user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/robo/previa")
-async def robo_previa_por_telefone(req: PreviaPorTelefone, user: dict = Depends(get_current_user)):
+async def robo_previa_por_telefone(req: PreviaPorTelefone, user: dict = Depends(usuario_do_espaco)):
     """Manda a prévia do site ao contato com este telefone (cria o site se ainda não existe), de qualquer tela."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     try:
-        return await robo_service.enviar_previa_por_telefone(user.get("uid"), user.get("email", ""), req.telefone, req.chat_id)
+        return await robo_service.enviar_previa_por_telefone(_espaco(user), user.get("email", ""), req.telefone, req.chat_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except meta_canais.EnvioFalhou as exc:
@@ -1698,7 +1713,7 @@ async def robo_previa_por_telefone(req: PreviaPorTelefone, user: dict = Depends(
 
 
 @app.post("/api/robo/testar")
-async def robo_testar(req: RoboTesteRequest, user: dict = Depends(get_current_user)):
+async def robo_testar(req: RoboTesteRequest, user: dict = Depends(usuario_do_espaco)):
     """Simulador: o robo responde sem Meta, sem envio e sem gravar.
 
     Serve para o dono ajustar as instrucoes antes de ligar o robo para
@@ -1706,7 +1721,7 @@ async def robo_testar(req: RoboTesteRequest, user: dict = Depends(get_current_us
     mesma chamada de IA.
     """
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    uid, email = user.get("uid"), user.get("email", "")
+    uid, email = _espaco(user), user.get("email", "")
     canal = await robo_store.canal_do_usuario(uid) or {}
     perfil = await get_profile(uid)
 
@@ -1771,10 +1786,10 @@ class TelegramConectarRequest(BaseModel):
 
 
 @app.post("/api/robo/telegram/conectar")
-async def telegram_conectar(req: TelegramConectarRequest, user: dict = Depends(get_current_user)):
+async def telegram_conectar(req: TelegramConectarRequest, user: dict = Depends(usuario_do_espaco)):
     """Liga o bot do usuário (criado no @BotFather) ao robô."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    uid = user.get("uid")
+    uid = _espaco(user)
     canal = await robo_conexao._canal(uid, user.get("email", ""))
     try:
         canal = await telegram_canal.conectar(canal, req.token, settings.APP_URL)
@@ -1785,9 +1800,9 @@ async def telegram_conectar(req: TelegramConectarRequest, user: dict = Depends(g
 
 
 @app.post("/api/robo/telegram/desconectar")
-async def telegram_desconectar(user: dict = Depends(get_current_user)):
+async def telegram_desconectar(user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    uid = user.get("uid")
+    uid = _espaco(user)
     canal = await robo_conexao._canal(uid, user.get("email", ""))
     canal = await telegram_canal.desconectar(canal)
     canal = await robo_store.substituir_canal(uid, canal)
@@ -1913,10 +1928,10 @@ def _exigir_banco_disponivel() -> None:
 
 
 @app.post("/api/robo/conector/gerar")
-async def conector_gerar(user: dict = Depends(get_current_user)):
+async def conector_gerar(user: dict = Depends(usuario_do_espaco)):
     """Cria (ou troca) a chave que liga o Conector do PC a esta conta. Aparece uma vez."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    uid = user.get("uid")
+    uid = _espaco(user)
     canal = await robo_conexao._canal(uid, user.get("email", ""))
     _exigir_banco_disponivel()
     antigo = canal.get("cw_hash")
@@ -1935,12 +1950,12 @@ async def conector_gerar(user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/robo/nuvem/ligar")
-async def nuvem_ligar(user: dict = Depends(get_current_user)):
+async def nuvem_ligar(user: dict = Depends(usuario_do_espaco)):
     """O WhatsApp da conta fica ligado na nuvem: nao depende do computador nem do celular do usuario."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     if not settings.WORKER_SECRET:
         raise HTTPException(status_code=409, detail="A conexão pela nuvem ainda não está ativada neste LeadSage.")
-    uid = user.get("uid")
+    uid = _espaco(user)
     canal = await robo_conexao._canal(uid, user.get("email", ""))
     _exigir_banco_disponivel()
     if not canal.get("nuvem_chave"):
@@ -1961,10 +1976,10 @@ async def nuvem_ligar(user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/robo/nuvem/desligar")
-async def nuvem_desligar(user: dict = Depends(get_current_user)):
+async def nuvem_desligar(user: dict = Depends(usuario_do_espaco)):
     """Desconecta o WhatsApp da nuvem e apaga a sessão guardada. É o único jeito de ele cair."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    uid = user.get("uid")
+    uid = _espaco(user)
     canal = await robo_conexao._canal(uid, user.get("email", ""))
     antigo = canal.get("cw_hash")
     canal.pop("nuvem_chave", None)
@@ -2106,9 +2121,9 @@ async def worker_sessoes(request: Request):
 
 
 @app.post("/api/robo/conector/revogar")
-async def conector_revogar(user: dict = Depends(get_current_user)):
+async def conector_revogar(user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    uid = user.get("uid")
+    uid = _espaco(user)
     canal = await robo_conexao._canal(uid, user.get("email", ""))
     antigo = canal.get("cw_hash")
     canal = await conector_whatsapp.revogar(canal)
@@ -2126,25 +2141,25 @@ class ConectorEnviar(BaseModel):
 
 
 @app.get("/api/robo/conector/fila")
-async def conector_fila(user: dict = Depends(get_current_user)):
+async def conector_fila(user: dict = Depends(usuario_do_espaco)):
     """Como esta o envio de WhatsApp: Conector online, quantas esperam, quanto saiu hoje."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    canal = await robo_store.canal_do_usuario(user.get("uid")) or {}
-    return await conector_whatsapp.estado_da_fila({**canal, "uid": user.get("uid")})
+    canal = await robo_store.canal_do_usuario(_espaco(user)) or {}
+    return await conector_whatsapp.estado_da_fila({**canal, "uid": _espaco(user)})
 
 
 @app.get("/api/robo/conector/saude")
-async def conector_saude(user: dict = Depends(get_current_user)):
+async def conector_saude(user: dict = Depends(usuario_do_espaco)):
     """Termometro de risco de banimento do numero conectado."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    canal = await robo_store.canal_do_usuario(user.get("uid")) or {}
-    return await conector_whatsapp.saude({**canal, "uid": user.get("uid")})
+    canal = await robo_store.canal_do_usuario(_espaco(user)) or {}
+    return await conector_whatsapp.saude({**canal, "uid": _espaco(user)})
 
 
 @app.post("/api/robo/fila/{item_id}/enviar-agora")
-async def fila_enviar_agora(item_id: str, user: dict = Depends(get_current_user)):
+async def fila_enviar_agora(item_id: str, user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    uid = user.get("uid")
+    uid = _espaco(user)
     if not await conector_whatsapp.enviar_agora(uid, item_id):
         raise HTTPException(status_code=404, detail="Esse item não está esperando para sair pelo WhatsApp.")
     canal = await robo_store.canal_do_usuario(uid) or {}
@@ -2152,10 +2167,10 @@ async def fila_enviar_agora(item_id: str, user: dict = Depends(get_current_user)
 
 
 @app.post("/api/robo/conector/enviar")
-async def conector_enviar(req: ConectorEnviar, user: dict = Depends(get_current_user)):
+async def conector_enviar(req: ConectorEnviar, user: dict = Depends(usuario_do_espaco)):
     """Uma mensagem escrita no editor, para sair pelo WhatsApp do usuário (pelo Conector)."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    uid = user.get("uid")
+    uid = _espaco(user)
     canal = await robo_store.canal_do_usuario(uid) or {}
     if not canal.get("cw_hash"):
         raise HTTPException(status_code=409, detail="Conecte o WhatsApp pelo computador antes (Robô → Canais).")
@@ -2220,10 +2235,10 @@ async def conector_espelho(req: ConectorEspelho, request: Request):
 
 
 @app.post("/api/robo/whats/teste")
-async def whats_teste(user: dict = Depends(get_current_user)):
+async def whats_teste(user: dict = Depends(usuario_do_espaco)):
     """Manda uma mensagem do numero conectado para ele mesmo: a prova de que o envio chega no WhatsApp de verdade."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    uid = user.get("uid")
+    uid = _espaco(user)
     canal = await robo_store.canal_do_usuario(uid) or {}
     numero = re.sub(r"\D", "", str(canal.get("cw_numero") or ""))
     if not canal.get("cw_hash") or len(numero) < 10:
@@ -2234,8 +2249,8 @@ async def whats_teste(user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/robo/whats/teste/{sid}")
-async def whats_teste_status(sid: str, user: dict = Depends(get_current_user)):
-    uid = user.get("uid")
+async def whats_teste_status(sid: str, user: dict = Depends(usuario_do_espaco)):
+    uid = _espaco(user)
     s = await conector_whatsapp._obter_saida(uid, sid)
     if not s:
         raise HTTPException(status_code=404, detail="Teste não encontrado.")
@@ -2244,10 +2259,10 @@ async def whats_teste_status(sid: str, user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/robo/whats/estado")
-async def whats_estado(user: dict = Depends(get_current_user)):
+async def whats_estado(user: dict = Depends(usuario_do_espaco)):
     """A conexao do WhatsApp vista de qualquer aparelho: QR code, codigo de pareamento, online."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    uid = user.get("uid")
+    uid = _espaco(user)
     canal = await robo_store.canal_do_usuario(uid) or {}
     estado = await espelho_whatsapp.ler_estado(uid)
     # pistas para a tela: ha quanto tempo o servico da nuvem/Conector avisou e ha quanto tempo o estado foi gravado
@@ -2265,10 +2280,10 @@ def token_do_chat_nuvem(uid: str, segredo: str, validade_s: int = 12 * 3600, ago
 
 
 @app.get("/api/robo/whats/acesso")
-async def whats_acesso(user: dict = Depends(get_current_user)):
+async def whats_acesso(user: dict = Depends(usuario_do_espaco)):
     """Endereco e token para ler as conversas direto do worker da nuvem (nao depende do banco). Vazio fora do modo nuvem."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    uid = user.get("uid")
+    uid = _espaco(user)
     canal = await robo_store.canal_do_usuario(uid) or {}
     if not settings.WORKER_SECRET or not canal.get("nuvem_chave"):
         return {"nuvem": False}
@@ -2278,10 +2293,10 @@ async def whats_acesso(user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/robo/conector/parear")
-async def conector_parear(req: WhatsParear, user: dict = Depends(get_current_user)):
+async def conector_parear(req: WhatsParear, user: dict = Depends(usuario_do_espaco)):
     """Conectar pelo numero do telefone: o codigo de 8 letras aparece na tela e se digita no WhatsApp."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    uid = user.get("uid")
+    uid = _espaco(user)
     canal = await robo_store.canal_do_usuario(uid) or {}
     if not canal.get("cw_hash"):
         raise HTTPException(status_code=409, detail="Gere a chave do Conector antes (Robô → Canais).")
@@ -2293,10 +2308,10 @@ async def conector_parear(req: WhatsParear, user: dict = Depends(get_current_use
 
 
 @app.get("/api/robo/whats/chats")
-async def whats_chats(user: dict = Depends(get_current_user)):
+async def whats_chats(user: dict = Depends(usuario_do_espaco)):
     """A lista de conversas do WhatsApp, lida do espelho (para quem nao esta no computador do Conector)."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
-    uid = user.get("uid")
+    uid = _espaco(user)
     await espelho_whatsapp.marcar_olhando(uid)
     chats, idade = await espelho_whatsapp.ler_chats(uid)
     canal = await robo_store.canal_do_usuario(uid) or {}
@@ -2304,23 +2319,23 @@ async def whats_chats(user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/robo/whats/chats/{chat_id}/mensagens")
-async def whats_mensagens(chat_id: str, user: dict = Depends(get_current_user)):
+async def whats_mensagens(chat_id: str, user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     if not espelho_whatsapp.chat_valido(chat_id):
         raise HTTPException(status_code=400, detail="Conversa inválida.")
-    uid = user.get("uid")
+    uid = _espaco(user)
     await espelho_whatsapp.marcar_olhando(uid, abrir=chat_id)
     mensagens, idade = await espelho_whatsapp.ler_mensagens(uid, chat_id)
     return {"mensagens": mensagens, "idade_s": idade}
 
 
 @app.post("/api/robo/whats/chats/{chat_id}/enviar")
-async def whats_enviar(chat_id: str, req: WhatsEnviar, user: dict = Depends(get_current_user)):
+async def whats_enviar(chat_id: str, req: WhatsEnviar, user: dict = Depends(usuario_do_espaco)):
     """Responder pelo celular: a mensagem vai para a fila e o Conector (no computador) envia."""
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     if not espelho_whatsapp.chat_valido(chat_id):
         raise HTTPException(status_code=400, detail="Conversa inválida.")
-    uid = user.get("uid")
+    uid = _espaco(user)
     canal = await robo_store.canal_do_usuario(uid) or {}
     if not canal.get("cw_hash"):
         raise HTTPException(status_code=409, detail="O WhatsApp pelo computador não está conectado.")
@@ -2477,7 +2492,7 @@ async def conector_mensagem(req: ConectorMensagem, request: Request):
 
 
 @app.get("/api/robo/meta/disponivel")
-async def meta_disponivel(user: dict = Depends(get_current_user)):
+async def meta_disponivel(user: dict = Depends(usuario_do_espaco)):
     """Diz a tela quais botoes mostrar. Sem app da Meta configurado no
     sistema, so o modo manual existe."""
     return {
@@ -2491,11 +2506,11 @@ async def meta_disponivel(user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/robo/meta/conectar")
-async def meta_conectar(user: dict = Depends(get_current_user)):
+async def meta_conectar(user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     if not meta_oauth.disponivel()["facebook"]:
         raise HTTPException(status_code=503, detail="A conexão com o Facebook ainda não foi ativada no sistema.")
-    return {"url": meta_oauth.url_de_login(user.get("uid"))}
+    return {"url": meta_oauth.url_de_login(_espaco(user))}
 
 
 @app.get("/api/robo/meta/retorno")
@@ -2529,10 +2544,10 @@ async def meta_retorno(request: Request):
 
 
 @app.post("/api/robo/meta/pagina")
-async def meta_escolher_pagina(req: MetaPaginaRequest, user: dict = Depends(get_current_user)):
+async def meta_escolher_pagina(req: MetaPaginaRequest, user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     try:
-        canal = await robo_conexao.escolher_pagina(user.get("uid"), req.page_id)
+        canal = await robo_conexao.escolher_pagina(_espaco(user), req.page_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except meta_oauth.MetaRecusou as exc:
@@ -2541,7 +2556,7 @@ async def meta_escolher_pagina(req: MetaPaginaRequest, user: dict = Depends(get_
 
 
 @app.post("/api/robo/meta/whatsapp")
-async def meta_conectar_whatsapp(req: MetaWhatsAppRequest, user: dict = Depends(get_current_user)):
+async def meta_conectar_whatsapp(req: MetaWhatsAppRequest, user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     if not meta_oauth.disponivel()["whatsapp"]:
         raise HTTPException(status_code=503, detail="A conexão do WhatsApp ainda não foi ativada no sistema.")
@@ -2549,15 +2564,15 @@ async def meta_conectar_whatsapp(req: MetaWhatsAppRequest, user: dict = Depends(
         dados = await meta_oauth.concluir_whatsapp(req.code, req.waba_id, req.phone_number_id)
     except meta_oauth.MetaRecusou as exc:
         raise HTTPException(status_code=502, detail=f"A Meta recusou: {exc}")
-    canal = await robo_conexao.conectar_whatsapp(user.get("uid"), user.get("email", ""), dados)
+    canal = await robo_conexao.conectar_whatsapp(_espaco(user), user.get("email", ""), dados)
     return robo_store.visao_publica(canal, settings.APP_URL)
 
 
 @app.post("/api/robo/meta/desconectar")
-async def meta_desconectar(req: MetaDesconectarRequest, user: dict = Depends(get_current_user)):
+async def meta_desconectar(req: MetaDesconectarRequest, user: dict = Depends(usuario_do_espaco)):
     await exigir_recurso(user, "robo_ia", "O robô de atendimento")
     try:
-        canal = await robo_conexao.desconectar(user.get("uid"), req.alvo)
+        canal = await robo_conexao.desconectar(_espaco(user), req.alvo)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return robo_store.visao_publica(canal, settings.APP_URL)
@@ -2675,7 +2690,7 @@ def raio_x_contexto(lead: Optional[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 @app.post("/api/raio-x")
-async def gerar_raio_x(req: RaioXRequest, user: dict = Depends(get_current_user)):
+async def gerar_raio_x(req: RaioXRequest, user: dict = Depends(usuario_do_espaco)):
     """O lead a fundo: Google Meu Negocio, site, Instagram e quem cuida.
 
     Cobra 1 credito na primeira vez e guarda por 7 dias: reabrir o lead
@@ -2692,7 +2707,7 @@ async def gerar_raio_x(req: RaioXRequest, user: dict = Depends(get_current_user)
     if await check_and_deduct_credits(uid, 1, email) is None:
         raise HTTPException(status_code=402, detail="Créditos insuficientes para o raio-x.")
 
-    canal = await robo_store.canal_do_usuario(uid) or {}
+    canal = await robo_store.canal_do_usuario(_espaco(user)) or {}
     perfil_rx = await get_profile(uid)
     canal = {**canal, "_remetente": perfil_rx.company_name or perfil_rx.name or "",
              "_produto": perfil_rx.product_description or ""}
@@ -2710,7 +2725,7 @@ async def gerar_raio_x(req: RaioXRequest, user: dict = Depends(get_current_user)
 
 
 @app.get("/api/imagens")
-async def imagens(nicho: str = "", termo: str = "", user: dict = Depends(get_current_user)):
+async def imagens(nicho: str = "", termo: str = "", user: dict = Depends(usuario_do_espaco)):
     """Fotos profissionais do ramo para montar o site. Sem custo de credito:
     sao bancos gratuitos, e foto e o que tira o site da cara de rascunho."""
     return await banco_imagens.buscar(nicho=nicho[:80], termo=termo[:80])
@@ -2751,14 +2766,14 @@ async def place_photo(name: str):
 @app.delete("/api/history/{search_id}")
 async def delete_search_history(
     search_id: str,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(usuario_do_espaco),
     db: AsyncSession = Depends(get_db),
 ):
     """Apaga uma busca do historico e os leads que vieram dela.
 
     O filtro por owner_uid impede apagar o historico de outro usuario.
     """
-    uid = user.get("uid")
+    uid = _espaco(user)
     result = await db.execute(
         select(DBSearchHistory).where(
             DBSearchHistory.id == search_id, DBSearchHistory.owner_uid == uid
@@ -2781,7 +2796,7 @@ async def delete_search_history(
 
 @app.delete("/api/history")
 async def clear_search_history(
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(usuario_do_espaco),
     db: AsyncSession = Depends(get_db),
 ):
     """Limpa o historico inteiro e os leads que vieram das buscas.
@@ -2789,7 +2804,7 @@ async def clear_search_history(
     Leads que a pessoa ja salvou em "Meus Leads" ficam no pipeline do
     servidor (que e separado) e nao sao tocados aqui.
     """
-    uid = user.get("uid")
+    uid = _espaco(user)
     historico = await db.execute(select(DBSearchHistory).where(DBSearchHistory.owner_uid == uid))
     entradas = historico.scalars().all()
     for entrada in entradas:

@@ -38,6 +38,8 @@ EDITABLE_FIELDS = (
 SYSTEM_FIELDS = ("plan", "plan_id", "sites_quota", "modos")
 
 
+from app.espaco import conta as _conta
+
 MODOS = ("agencia", "empresa")
 
 
@@ -82,6 +84,7 @@ def esquecer_perfil(uid: str) -> None:
 
 async def get_profile(uid: str) -> UserProfile:
     """Perfil salvo do usuario, ou os defaults quando ainda nao gravou nada."""
+    uid = _conta(uid)
     guardado = _PERFIS.get(uid)
     if guardado and time.monotonic() - guardado[0] < _PERFIS_TTL_S:
         return guardado[1].model_copy(deep=True)
@@ -124,6 +127,7 @@ async def get_profile(uid: str) -> UserProfile:
 
 
 async def save_profile(uid: str, payload: Dict[str, Any]) -> UserProfile:
+    uid = _conta(uid)
     esquecer_perfil(uid)
     data = _clean(payload)
 
@@ -161,6 +165,7 @@ def modos_permitidos(modos_gravados: Any, modo: str, acesso_total: bool) -> list
 
 async def liberar_modos(uid: str, modos: list) -> None:
     """Grava os modos liberados (compra ou criação da conta). Passa por fora de EDITABLE_FIELDS: o usuário não escolhe quais modos tem."""
+    uid = _conta(uid)
     esquecer_perfil(uid)
     dados = {"modos": [m for m in modos if m in MODOS]}
     if firestore_db is not None:
@@ -180,6 +185,7 @@ async def conceder_plano(uid: str, plano: str, sites: int, plan_id: str = "") ->
     Passa por fora de EDITABLE_FIELDS: estes campos existem justamente
     para nao serem editaveis pelo usuario.
     """
+    uid = _conta(uid)
     esquecer_perfil(uid)
     atual = await get_profile(uid)
     esquecer_perfil(uid)
