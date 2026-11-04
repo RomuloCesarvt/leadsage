@@ -73,3 +73,13 @@ def test_respeita_o_maximo_por_execucao_e_diz_quanto_falta(tmp_path):
         return r1, r2, total
     r1, r2, total = asyncio.run(roda())
     assert r1["robo"] == {"copiadas": 4, "faltam": 6} and r2["robo"]["faltam"] == 0 and total == 10
+
+
+def test_rota_do_cron_recusa_sem_o_segredo_e_aceita_com_ele(client, monkeypatch):
+    monkeypatch.delenv("CRON_SECRET", raising=False)
+    assert client.get("/api/sistema/sincronizar-bancos").status_code == 401                          # sem segredo configurado: nunca aberta
+    assert client.get("/api/sistema/sincronizar-bancos", headers={"Authorization": "Bearer qualquer"}).status_code == 401
+    monkeypatch.setenv("CRON_SECRET", "segredo-longo-de-teste")
+    assert client.get("/api/sistema/sincronizar-bancos", headers={"Authorization": "Bearer errado"}).status_code == 401
+    r = client.get("/api/sistema/sincronizar-bancos", headers={"Authorization": "Bearer segredo-longo-de-teste"})
+    assert r.status_code == 200 and r.json()["ok"] is True

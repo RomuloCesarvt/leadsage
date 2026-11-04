@@ -1414,6 +1414,21 @@ async def servico_retorno_avisado(vid: str, user: dict = Depends(usuario_do_espa
     return v
 
 
+@app.get("/api/sistema/sincronizar-bancos")
+async def sistema_sincronizar_bancos(request: Request):
+    """Copia do banco em uso para os bancos de reserva (rodada todo dia pelo cron da Vercel).
+
+    Só aceita o segredo do cron (`CRON_SECRET`, o mesmo que a Vercel manda em `Authorization: Bearer ...`). Sem o segredo configurado, recusa:
+    a rota nunca fica aberta."""
+    import hmac, os
+    esperado = (os.getenv("CRON_SECRET") or "").strip()
+    recebido = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
+    if not esperado or not hmac.compare_digest(recebido.encode(), esperado.encode()):
+        raise HTTPException(status_code=401, detail="Não autorizado.")
+    from app import sincronia
+    return await sincronia.sincronizar()
+
+
 @app.get("/api/robo/regua")
 async def robo_regua(user: dict = Depends(usuario_do_espaco)):
     """A régua de seguimentos: quem já recebeu a abordagem, em que passo está e quando sai o próximo (o robô faz sozinho)."""
