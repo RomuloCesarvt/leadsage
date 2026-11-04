@@ -371,8 +371,8 @@ def montar_prompt(
     limite_palavras = 45 if canal == "whatsapp" else 35
 
     historico = "\n".join(
-        f"{'CLIENTE' if m.get('de') == 'contato' else ('VOCÊ' if m.get('de') == 'robo' else quem.upper() + ' (humano)')}: {m.get('texto', '')}"
-        for m in mensagens[-30:]
+        f"{'CLIENTE' if m.get('de') == 'contato' else ('VOCÊ' if m.get('de') == 'robo' else quem.upper() + ' (humano)')}: {_cortar_fala(m.get('texto', ''))}"
+        for m in mensagens[-16:]
     )
 
     abertura = quem_fala or (f"{assistente}, da equipe de {quem}" if assistente else f"da equipe de {quem}")
@@ -690,6 +690,31 @@ _SE_DIZ_ROBO = _re.compile(
     r"assistente\s+virtual|assistente\s+digital|atendente\s+virtual|atendimento\s+(?:autom[aá]tico|virtual)|"
     r"\b(?:sou|somos)\s+(?:um|uma|o|a)?\s*(?:rob[oô]|bot|ia|intelig[eê]ncia\s+artificial|chatbot)\b|"
     r"\bsou\s+(?:um\s+)?assistente\b", _re.I)
+
+
+FALA_MAXIMA = 500
+
+
+def _cortar_fala(texto: str, limite: int = FALA_MAXIMA) -> str:
+    """Uma fala enorme (o menu de um atendimento automático, um texto colado) não pode encher o pedido à IA: fica o começo."""
+    t = str(texto or "")
+    return t if len(t) <= limite else t[:limite].rstrip() + " […]"
+
+
+# Seções que ajudam, mas não são indispensáveis: saem quando o pedido não cabe no limite dos motores gratuitos
+_SECOES_OPCIONAIS = ("COMO TRAZER A REUNIÃO", "SITES: O QUE UM ESPECIALISTA SABE", "PERSUASÃO: SÓ A LEGÍTIMA")
+
+
+def compactar(prompt: str, limite_objecoes: int = 1500) -> str:
+    """O mesmo prompt, mais curto (cerca de 25% menos): tira as seções opcionais e encurta a das objeções. Para quando o pedido completo não cabe."""
+    saida = prompt
+    for titulo in _SECOES_OPCIONAIS:
+        saida = _re.sub(rf"(?ms)^== {_re.escape(titulo)}[^\n]*==\n.*?(?=^== |\Z)", "", saida)
+
+    def curto(m):
+        corpo = m.group(0)
+        return corpo if len(corpo) <= limite_objecoes else corpo[:limite_objecoes].rsplit("\n", 1)[0] + "\n"
+    return _re.sub(r"(?ms)^== OBJEÇÕES[^\n]*==\n.*?(?=^== |\Z)", curto, saida)
 
 
 def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: List[Dict[str, Any]], lead: Optional[Dict[str, Any]] = None,

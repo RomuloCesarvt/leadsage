@@ -367,6 +367,22 @@ def decidir(
     # o preco cadastrado na oferta vale para o desconto e para o verificador
     cfg = ai_oferta.aplicar(cfg)
 
+    # Se os motores gratuitos recusam o pedido (grande demais para o limite do Groq, ou Gemini no limite do dia), tenta UMA vez com o prompt
+    # compacto: sem as seções opcionais. Antes a conversa ficava sem resposta ("a IA não respondeu") mesmo com o Groq livre.
+    from app.ai_client import AIIndisponivel
+    from app.ai_sdr import compactar
+    gerar_original = gerar_json
+    estado_compacto = {"ligado": False}
+
+    def gerar_json(prompt_: str):                                    # noqa: F811 (de propósito: o resto da função usa este nome)
+        try:
+            return gerar_original(compactar(prompt_) if estado_compacto["ligado"] else prompt_)
+        except AIIndisponivel:
+            if estado_compacto["ligado"]:
+                raise
+            estado_compacto["ligado"] = True
+            return gerar_original(compactar(prompt_))
+
     texto = ultima.get("texto", "")
 
     if pediu_para_sair(texto):
