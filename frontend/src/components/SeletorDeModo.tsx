@@ -17,7 +17,9 @@ export const SeletorDeModo: React.FC<{ aoTrocar?: () => void }> = ({ aoTrocar })
   const { user, setUser, setViewState } = useApp() as any;
   const [aviso, setAviso] = useState('');
   const atual = modoDaConta(user);
-  const liberados: string[] = Array.isArray(user?.modos) && user.modos.length ? user.modos : [atual];
+  // sem a lista do servidor (ele não respondeu: perfil provisório) não dá para saber o que a conta tem: não tranca, tenta e deixa o servidor decidir
+  const conhecidos = Array.isArray(user?.modos) && user.modos.length > 0 && !user?.semDados;
+  const liberados: string[] = conhecidos ? user.modos : ['agencia', 'empresa'];
 
   const escolher = async (id: ModoDaConta) => {
     if (id === atual) return;
@@ -27,8 +29,19 @@ export const SeletorDeModo: React.FC<{ aoTrocar?: () => void }> = ({ aoTrocar })
       aoTrocar?.();
       return;
     }
-    try { setAviso(''); setUser(await api.updateProfile({ modo: id })); setViewState('dashboard'); aoTrocar?.(); }
-    catch { setAviso('Não consegui trocar agora. Tente de novo.'); }
+    try {
+      setAviso('');
+      const salvo = await api.updateProfile({ modo: id });
+      // o servidor pode recusar (conta sem esse modo): vale o que ele devolveu
+      setUser(salvo);
+      if (salvo?.modo && salvo.modo !== id) { setAviso(`Sua conta não tem o modo ${id === 'empresa' ? 'Empresa' : 'Agência'}. Veja como liberar em Assinatura.`); return; }
+      setViewState('dashboard'); aoTrocar?.();
+    } catch {
+      // servidor fora do ar: troca só neste aparelho, para a pessoa não ficar travada; ao voltar, vale o que está gravado na conta
+      setUser({ ...user, modo: id });
+      setAviso('O servidor não respondeu: o modo foi trocado só neste aparelho por enquanto.');
+      setViewState('dashboard'); aoTrocar?.();
+    }
   };
 
   return (

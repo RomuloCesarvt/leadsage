@@ -60,3 +60,26 @@ export const entregasDoPlano = (p: PlanoMensal, modo: ModoDaConta): string[] => 
 };
 
 export const precoComRobo = (p: PlanoMensal): number => p.preco + (p.robo === 'incluso' ? 0 : ROBO_COMPLEMENTO);
+
+/** O que o LeadSage tem de diferente, por modo. Só o que o sistema faz de verdade hoje. */
+export const diferenciais = (modo: ModoDaConta): { titulo: string; texto: string }[] => {
+  const comuns = [
+    { titulo: 'Tudo num lugar só', texto: 'Achar o lead, abordar, conversar e acompanhar sem trocar de ferramenta.' },
+    { titulo: 'Cada mensagem é única', texto: 'A IA escreve com os dados reais do negócio (avaliações, ramo, cidade), nunca um texto genérico de disparo.' },
+    { titulo: 'O robô só promete o que você cadastrou', texto: 'Preço, prazo e garantia saem do seu cadastro. Ele não inventa valor nem desconto.' },
+    { titulo: 'Você assume e o robô para', texto: 'Respondeu uma conversa pelo WhatsApp? O robô pausa sozinho e só volta quando você mandar.' },
+    { titulo: 'Seguimento sem esforço', texto: 'Quem não respondeu recebe lembretes automáticos nos dias seguintes (2 e 5 dias úteis).' },
+    { titulo: 'IA que não para', texto: 'Vários motores de IA com troca automática: se um fica congestionado, outro assume.' },
+    { titulo: 'Pensado para o celular', texto: 'Funciona no celular, onde você realmente responde seus clientes.' },
+  ];
+  const agencia = [
+    { titulo: 'Prévia de site com a cara do lead', texto: 'Logo, cores e fotos do próprio negócio, para mostrar antes de vender.' },
+    { titulo: 'Raio-X de cada lead', texto: 'Presença online, avaliações e oportunidades, para chegar com um argumento de verdade.' },
+  ];
+  const empresa = [
+    { titulo: 'Orçamento sem erro de conta', texto: 'O robô entende o pedido e o total sai da sua tabela de preços, calculado pelo sistema.' },
+    { titulo: 'Agenda e retorno de manutenção', texto: 'Visitas marcadas e lembrete para oferecer a próxima limpeza no tempo certo.' },
+    { titulo: 'Abordagem sem papo de agência', texto: 'A conversa é sobre o seu serviço (instalação, limpeza, manutenção), sem site nem prévia.' },
+  ];
+  return [...(modo === 'empresa' ? empresa : agencia), ...comuns];
+};

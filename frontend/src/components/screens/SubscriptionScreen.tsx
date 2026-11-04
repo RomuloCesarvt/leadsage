@@ -3,7 +3,7 @@ import { api } from '../../services/api';
 import { Check, Zap, Crown, Flame } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { modoDaConta } from '../../lib/modoDaConta';
-import { COBRANCA_MENSAL_ATIVA, MODO_EXTRA, PLANOS_MENSAIS, ROBO_COMPLEMENTO, entregasDoPlano } from '../../data/planos';
+import { COBRANCA_MENSAL_ATIVA, MODO_EXTRA, diferenciais, PLANOS_MENSAIS, ROBO_COMPLEMENTO, entregasDoPlano } from '../../data/planos';
 
 export const SubscriptionScreen: React.FC = () => {
   const [comprando, setComprando] = useState<string | null>(null);
@@ -89,7 +89,19 @@ export const SubscriptionScreen: React.FC = () => {
             </div>
           ))}
         </div>
-        <p className="text-center text-xs text-slate-400 mt-5">
+        <div className="mt-10">
+          <h3 className="text-center text-xl font-black text-slate-800 mb-1">Por que o LeadSage</h3>
+          <p className="text-center text-sm text-slate-500 mb-5">O que você leva em qualquer plano{modo === 'empresa' ? ', pensado para quem vende o próprio serviço' : ''}.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {diferenciais(modo).map(d => (
+              <div key={d.titulo} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+                <p className="text-sm font-bold text-slate-800">{d.titulo}</p>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">{d.texto}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="text-center text-xs text-slate-400 mt-8">
           Quer os dois modos (Agência e Empresa)? O segundo modo custa R$ {MODO_EXTRA}/mês a mais. Leads e conversas extras podem ser comprados avulsos quando a cota acaba.
         </p>
       </div>
