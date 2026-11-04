@@ -6544,7 +6544,28 @@ var sugerirTemplate = (nicho) => {
 var CSS = `
 :root{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 html{-webkit-tap-highlight-color:transparent}
-body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;overflow-x:hidden}
+html,body{overflow-x:clip;max-width:100%}
+body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+/* palavra comprida (nome da empresa, e-mail, endere\xE7o) quebra em vez de alargar a coluna e empurrar a p\xE1gina para o lado */
+p,li,a,blockquote,address,dd,dt,figcaption,summary,label{overflow-wrap:anywhere}
+h1,h2,h3,h4{overflow-wrap:break-word;hyphens:auto}
+img,svg,video,iframe,table{max-width:100%}
+@media(max-width:700px){
+  /* t\xEDtulo de capa grande demais quebrava palavra no meio ("TRANSPAR\xCAN-CIA"): no celular a capa tem tamanho de celular */
+  h1{font-size:clamp(30px,9vw,52px)!important;line-height:1.08!important}
+  h2{font-size:clamp(24px,7.2vw,40px)!important;line-height:1.12!important}
+  /* a barra de baixo (Ligar/WhatsApp) j\xE1 cobre o gesto: o bot\xE3o redondo flutuante s\xF3 repetia e tampava o conte\xFAdo */
+  body:has(.acao-movel) :is(.zap,.zap-fixo,[class*="zap-flu"],[class*="wa-fix"]){display:none!important}
+  /* o quadradinho de iniciais da marca n\xE3o pode ser espremido pelo nome comprido (virava "M" em cima de "B") */
+  [class*="logo"],[class*="iniciais"],[class*="avatar"]{flex-shrink:0}
+  /* toda coluna de grade pode encolher; nada de dois lados lado a lado em tela de celular */
+  [class*="grid"],[class*="grade"],[class*="cols"]{min-width:0}
+}
+/* o dedo \xE9 mais largo que o mouse: alvo de toque de pelo menos 44 px nos links de rodap\xE9, menu e listas */
+@media(pointer:coarse){
+  :not(p,h1,h2,h3,h4,span,strong,em,b,i,small)>a{display:inline-flex;align-items:center;min-height:44px;min-width:44px}
+  .btn,button,summary{min-height:44px}
+}
 a,button,summary,label,.btn,[role=button]{touch-action:manipulation}
 h1,h2,h3{text-wrap:balance}
 p,li,figcaption{text-wrap:pretty}
@@ -6701,7 +6722,7 @@ var dadosDoLead = (lead) => {
   };
   return lead ? semearConteudo(base, { cores: true }) : base;
 };
-var MOTOR_VERSAO = "2026-11-04-acabamento-de-design";
+var MOTOR_VERSAO = "2026-11-04-celular-primeiro";
 var indiceEstavel2 = (texto, n) => {
   let h = 0;
   for (let i = 0; i < texto.length; i++) h = h * 31 + texto.charCodeAt(i) >>> 0;

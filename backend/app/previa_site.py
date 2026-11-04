@@ -20,7 +20,7 @@ from app.credit_system import acesso_total
 
 # Versao do motor de sites. Ao mudar o visual (cores, modelos, titulos), troque o valor: as previas ja criadas e
 # nunca editadas sao refeitas, com o mesmo link, na proxima vez que forem enviadas.
-MOTOR_VERSAO = "2026-11-04-acabamento-de-design"
+MOTOR_VERSAO = "2026-11-04-celular-primeiro"
 
 # o que o motor de sites sabe usar de um lead
 CAMPOS_DO_LEAD = (

@@ -73,7 +73,7 @@ export const dadosDoLead = (lead: any): SiteData => {
  * uma prévia quando a versão gravada nela é outra. Sem esta marca, todo site criado pelo Disparo era refeito de novo pelo servidor
  * ao preparar a mensagem (o dobro de tempo e de chamadas de IA).
  */
-export const MOTOR_VERSAO = '2026-11-04-acabamento-de-design';
+export const MOTOR_VERSAO = '2026-11-04-celular-primeiro';
 
 const indiceEstavel = (texto: string, n: number): number => {
   let h = 0;
