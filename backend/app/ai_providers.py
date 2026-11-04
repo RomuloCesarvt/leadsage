@@ -11,6 +11,12 @@ Cada um liga sozinho quando a chave existe no ambiente (Vercel > Environment Var
     CEREBRAS_API_KEY    cloud.cerebras.ai              (conferir as condições do plano gratuito)
     MISTRAL_API_KEY     console.mistral.ai             (plano gratuito "Experiment"; conferir as condições)
     OPENROUTER_API_KEY  openrouter.ai/keys             (modelos ":free", limite baixo)
+    SAMBANOVA_API_KEY   cloud.sambanova.ai/apis        (plano gratuito; conferir as condições)
+    NVIDIA_API_KEY      build.nvidia.com               (créditos gratuitos de desenvolvedor)
+
+Todos recebem o MESMO pedido: o mesmo prompt, a mesma instrução de sistema (SISTEMA_COMUM), a mesma temperatura, e a resposta
+passa pela mesma limpeza (sem blocos de raciocínio). O que muda de um motor para outro é só o modelo; por isso o texto que vai
+a um cliente só usa modelos grandes (e_pequeno), e a conversa não muda de tom quando um motor congestiona e outro assume.
 
 O modelo é escolhido a partir da lista que o próprio provedor devolve (GET /models), na ordem de
 preferência abaixo, para não quebrar quando um modelo sai do ar. Dá para forçar um modelo com
@@ -52,7 +58,36 @@ PROVEDORES: List[Dict[str, Any]] = [
         "env": "OPENROUTER_API_KEY",
         "preferidos": ["meta-llama/llama-3.3-70b-instruct:free", "openai/gpt-oss-120b:free", "qwen/qwen3.8-27b:free", "openai/gpt-oss-20b:free"],
     },
+    {
+        "nome": "sambanova",
+        "url": "https://api.sambanova.ai/v1",
+        "env": "SAMBANOVA_API_KEY",
+        "preferidos": ["gpt-oss-120b", "Meta-Llama-3.3-70B-Instruct", "Llama-3.3-70B-Instruct", "DeepSeek-V3.1"],
+    },
+    {
+        "nome": "nvidia",
+        "url": "https://integrate.api.nvidia.com/v1",
+        "env": "NVIDIA_API_KEY",
+        "preferidos": ["openai/gpt-oss-120b", "meta/llama-3.3-70b-instruct", "mistralai/mistral-large-2-instruct"],
+    },
 ]
+
+# Instrução igual para todos os motores: a mesma "cabeça" responde, não importa quem congestionou.
+SISTEMA_COMUM = (
+    "Você escreve em português do Brasil, com naturalidade, como uma pessoa. Siga EXATAMENTE as regras e o formato pedidos no "
+    "texto do usuário. Quando pedirem JSON, responda somente o JSON válido, sem comentários e sem cercas de código. "
+    "Não mostre raciocínio, não explique o que fez e não invente fatos que não estejam no texto."
+)
+TEMPERATURA_JSON = 0.4   # JSON com temperatura alta quebra no meio (vírgula faltando)
+TEMPERATURA_TEXTO = 0.7
+_BLOCO_PENSAMENTO = re.compile(r"<(think|thinking|reasoning)>.*?</\1>", re.S | re.I)
+
+
+def limpar_resposta(texto: str) -> str:
+    """Tira o raciocínio que alguns modelos (Qwen, DeepSeek) deixam na resposta: ninguém pode ver isso no WhatsApp."""
+    t = _BLOCO_PENSAMENTO.sub("", texto or "")
+    t = re.sub(r"^.*?</(?:think|thinking|reasoning)>", "", t, flags=re.S | re.I)   # abertura perdida: corta até o fechamento
+    return t.strip()
 
 _CACHE_MODELOS: Dict[str, Any] = {}
 _CACHE_TTL_S = 3600
@@ -135,8 +170,8 @@ def escolher_modelo(p: Dict[str, Any], disponiveis: List[str]) -> str:
 def _corpo(modelo: str, prompt: str, max_tokens: Optional[int], json_mode: bool, raciocinio_baixo: bool) -> Dict[str, Any]:
     corpo: Dict[str, Any] = {
         "model": modelo,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.4 if json_mode else 0.7,   # JSON com temperatura alta quebra no meio (vírgula faltando)
+        "messages": [{"role": "system", "content": SISTEMA_COMUM}, {"role": "user", "content": prompt}],
+        "temperature": TEMPERATURA_JSON if json_mode else TEMPERATURA_TEXTO,
     }
     if max_tokens:
         corpo["max_tokens"] = max_tokens
@@ -199,7 +234,7 @@ def chamar(p: Dict[str, Any], prompt: str, limite_s: float = 15.0, max_tokens: O
                 _CACHE_MODELOS.pop(p["nome"], None)  # o modelo saiu do ar: relê a lista na próxima
             raise ProvedorFalhou(f"{p['nome']} HTTP {r.status_code}: {r.text[:300]}", status=r.status_code, retry_after=r.headers.get("retry-after"))
         escolhas = (r.json().get("choices") or [])
-        texto = ((escolhas[0].get("message") or {}).get("content") or "").strip() if escolhas else ""
+        texto = limpar_resposta((escolhas[0].get("message") or {}).get("content") or "") if escolhas else ""
         if not texto:
             raise ProvedorFalhou(f"{p['nome']} devolveu resposta vazia")
         return texto

@@ -88,7 +88,9 @@ def _e_transitorio(erro: Exception) -> bool:
 
 
 def _config(limite_ms: int, max_tokens: Optional[int], com_thinking: bool) -> "types.GenerateContentConfig":
-    kw: Dict[str, Any] = {"http_options": types.HttpOptions(timeout=limite_ms)}
+    from app import ai_providers
+    # a mesma instrução de sistema dos outros motores: quem responde muda, o jeito de responder não
+    kw: Dict[str, Any] = {"http_options": types.HttpOptions(timeout=limite_ms), "system_instruction": ai_providers.SISTEMA_COMUM}
     if max_tokens:
         kw["max_output_tokens"] = max_tokens
     if not com_thinking:
@@ -109,7 +111,8 @@ def _tentar_modelo(client, model: str, prompt: str, limite_ms: int, max_tokens: 
             r = client.models.generate_content(model=model, contents=prompt, config=_config(limite_ms, max_tokens, True))
         else:
             raise
-    texto = (r.text or "").strip()
+    from app import ai_providers
+    texto = ai_providers.limpar_resposta(r.text or "")
     if not texto:
         raise RuntimeError(f"{model} devolveu resposta vazia")
     return texto

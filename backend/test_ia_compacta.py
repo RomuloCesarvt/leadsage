@@ -54,3 +54,14 @@ def test_fala_enorme_do_cliente_nao_enche_o_pedido():
     longa = [{"de": "contato" if i % 2 else "robo", "texto": f"fala {i}"} for i in range(40)]
     q = ai_sdr.montar_prompt(longa, "whatsapp", {"name": "R"}, {"ativo": True}, {"id": "L1", "name": "M"})
     assert "fala 39" in q and "fala 23" not in q                   # só as 16 últimas
+
+
+def test_todos_os_motores_recebem_a_mesma_instrucao_e_a_resposta_sai_limpa():
+    from app import ai_providers as ap
+    for json_mode, temp in ((True, ap.TEMPERATURA_JSON), (False, ap.TEMPERATURA_TEXTO)):
+        c = ap._corpo("qualquer", "oi", 100, json_mode, False)
+        assert c["messages"][0] == {"role": "system", "content": ap.SISTEMA_COMUM}
+        assert c["temperature"] == temp
+    assert ap.limpar_resposta("<think>vou pensar</think>\nOlá, tudo bem?") == "Olá, tudo bem?"
+    assert ap.limpar_resposta("raciocínio solto</think>Olá") == "Olá"
+    assert {"sambanova", "nvidia"} <= {p["nome"] for p in ap.PROVEDORES}

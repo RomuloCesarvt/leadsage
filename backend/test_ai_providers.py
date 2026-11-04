@@ -70,7 +70,7 @@ def test_chama_no_protocolo_da_openai(monkeypatch):
     assert json.loads(texto)["body"] == "Boa tarde!"
     corpo = chamadas[0]
     assert corpo["model"] == "llama-3.3-70b-versatile" and corpo["max_tokens"] == 300
-    assert corpo["messages"] == [{"role": "user", "content": "escreva"}]
+    assert corpo["messages"] == [{"role": "system", "content": ai_providers.SISTEMA_COMUM}, {"role": "user", "content": "escreva"}]
     assert corpo["response_format"] == {"type": "json_object"}
     assert "reasoning_effort" not in corpo       # so os modelos que pensam recebem o ajuste
 
