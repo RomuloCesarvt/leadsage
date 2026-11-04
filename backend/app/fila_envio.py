@@ -395,6 +395,86 @@ async def promover_seguimentos(uid: str, agora: Optional[datetime] = None) -> in
     return promovidos
 
 
+ROTULO_DO_PASSO = {1: "1º seguimento", 2: "Contato final"}
+
+
+async def regua(uid: str, agora: Optional[datetime] = None) -> Dict[str, Any]:
+    """Os leads que já receberam a abordagem e estão na régua de seguimentos: em que passo cada um está e quando sai o próximo.
+
+    Só leitura. Mostra o que o robô faz sozinho: abordagem enviada, 1º seguimento (2 dias úteis), contato final (5 dias úteis),
+    e o que cancelou a régua (a pessoa respondeu ou pediu para sair: aí o robô conduz a conversa)."""
+    agora = agora or datetime.now(timezone.utc)
+    itens = await listar(uid)
+    por_id = {i.get("id"): i for i in itens}
+    conversas: Dict[str, Dict[str, Any]] = {}
+    try:
+        for c in await robo_store.listar_conversas(uid):
+            if c.get("canal") == "whatsapp":
+                conversas[_chave_do_telefone(c.get("contato"))] = c
+    except Exception as exc:
+        print(f"Regua: nao leu as conversas: {type(exc).__name__}: {exc}")
+    etapas: Dict[str, str] = {}
+    try:
+        etapas = {p.get("id"): (p.get("etapa") or "Novo Lead") for p in await pipeline_store.listar(uid)}
+    except Exception as exc:
+        print(f"Regua: nao leu o pipeline: {type(exc).__name__}: {exc}")
+
+    linhas: List[Dict[str, Any]] = []
+    for item in itens:
+        agenda = item.get("agenda_seguimentos") or []
+        if not agenda or item.get("canal") != "whatsapp" or item.get("tipo") == "seguimento" or item.get("status") != "enviado":
+            continue
+        conv = conversas.get(_chave_do_telefone((item.get("contato") or {}).get("phone")))
+        respondeu = bool(conv and (conv.get("contatos") or 0) > 0)
+        optout = bool(conv and conv.get("optout"))
+        passos = [{"n": 0, "rotulo": "Abordagem", "estado": "enviado", "quando": item.get("enviado_em", "")}]
+        proxima = ""
+        for a in sorted(agenda, key=lambda x: int(x.get("n") or 0)):
+            n = int(a.get("n") or 0)
+            enviado = por_id.get(f"{item['id']}_s{n}") or {}
+            estado = str(a.get("estado") or "agendado")
+            if estado == "na_fila" and enviado.get("status") == "enviado":
+                estado = "enviado"
+            elif estado == "na_fila" and enviado.get("status") in ("pulado", "falhou"):
+                estado = "cancelado" if enviado.get("status") == "pulado" else "falhou"
+            quando = enviado.get("enviado_em") if estado == "enviado" else a.get("ate", "")
+            passos.append({"n": n, "rotulo": ROTULO_DO_PASSO.get(n, f"Seguimento {n}"), "estado": estado, "quando": quando or "", "texto": a.get("texto", "")})
+            if estado in ("agendado", "na_fila") and not proxima:
+                proxima = a.get("ate", "")
+        abertos = [p for p in passos[1:] if p["estado"] in ("agendado", "na_fila")]
+        if optout:
+            situacao, fase = "optout", "Pediu para não receber: régua encerrada"
+        elif respondeu:
+            situacao, fase = "respondeu", "Respondeu: o robô conduz a conversa"
+        elif abertos:
+            proximo = abertos[0]
+            situacao = "na_regua"
+            fase = f"{'Na fila para sair' if proximo['estado'] == 'na_fila' else 'Aguardando'}: {proximo['rotulo'].lower()}"
+        elif any(p["estado"] == "cancelado" for p in passos[1:]):
+            situacao, fase = "cancelada", "Régua cancelada"
+        else:
+            situacao, fase = "concluida", "Régua concluída: aguardando uma resposta tardia"
+        linhas.append({
+            "lead_id": item.get("lead_id", ""), "nome": item.get("nome", ""), "telefone": (item.get("contato") or {}).get("phone", ""),
+            "enviado_em": item.get("enviado_em", ""), "etapa": etapas.get(item.get("lead_id", ""), ""),
+            "situacao": situacao, "fase": fase, "proxima": proxima, "passos": passos,
+        })
+
+    ordem = {"na_regua": 0, "concluida": 1, "respondeu": 2, "cancelada": 3, "optout": 4}
+    linhas.sort(key=lambda r: (ordem.get(r["situacao"], 9), r["proxima"] or "9999", r["nome"]))
+    hoje = agora.strftime("%Y-%m-%d")
+    resumo = {
+        "na_regua": sum(1 for r in linhas if r["situacao"] == "na_regua"),
+        "saem_hoje": sum(1 for r in linhas if r["situacao"] == "na_regua" and (r["proxima"] or "9999")[:10] <= hoje),
+        "contato_final": sum(1 for r in linhas if r["situacao"] == "na_regua" and any(p["n"] == 2 and p["estado"] in ("agendado", "na_fila") for p in r["passos"])
+                             and all(p["estado"] == "enviado" for p in r["passos"] if p["n"] == 1)),
+        "concluidas": sum(1 for r in linhas if r["situacao"] == "concluida"),
+        "responderam": sum(1 for r in linhas if r["situacao"] == "respondeu"),
+        "total": len(linhas),
+    }
+    return {"leads": linhas[:300], "resumo": resumo, "dias_uteis": list(SEGUIMENTO_DIAS_UTEIS)}
+
+
 CARENCIA_DA_REGUA_S = 3 * 24 * 3600   # depois do último seguimento enviado, espera 3 dias por uma resposta tardia antes de o lead sair
 
 

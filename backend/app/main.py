@@ -1316,6 +1316,13 @@ async def fila_preparar(req: FilaPrepararRequest, user: dict = Depends(get_curre
         raise HTTPException(status_code=504, detail="O preparo demorou demais. Envie menos leads por vez.")
 
 
+@app.get("/api/robo/regua")
+async def robo_regua(user: dict = Depends(get_current_user)):
+    """A régua de seguimentos: quem já recebeu a abordagem, em que passo está e quando sai o próximo (o robô faz sozinho)."""
+    await exigir_recurso(user, "ia_abordagem", "O disparo")
+    return await fila_envio.regua(user.get("uid"))
+
+
 @app.get("/api/robo/fila")
 async def fila_listar(user: dict = Depends(get_current_user)):
     await exigir_recurso(user, "ia_abordagem", "O disparo")

@@ -684,3 +684,16 @@ export interface DesempenhoPorSegmento {
   destaques: { responde_mais: DestaqueDeSegmento | null; mais_interesse: DestaqueDeSegmento | null; mais_pedem_link: DestaqueDeSegmento | null };
   minimo_para_taxa: number;
 }
+
+
+/** A régua de seguimentos: onde cada lead está depois da abordagem (o robô faz sozinho). */
+export interface PassoDaRegua { n: number; rotulo: string; estado: 'enviado' | 'agendado' | 'na_fila' | 'cancelado' | 'falhou'; quando: string; texto?: string }
+export interface LeadNaRegua {
+  lead_id: string; nome: string; telefone: string; enviado_em: string; etapa: string;
+  situacao: 'na_regua' | 'concluida' | 'respondeu' | 'cancelada' | 'optout'; fase: string; proxima: string; passos: PassoDaRegua[];
+}
+export interface ReguaDeSeguimentos {
+  leads: LeadNaRegua[];
+  resumo: { na_regua: number; saem_hoje: number; contato_final: number; concluidas: number; responderam: number; total: number };
+  dias_uteis: number[];
+}

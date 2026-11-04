@@ -365,3 +365,39 @@ def test_preparar_pula_quem_ja_tem_conversa_mesmo_sem_envio_na_fila(com_robo, ro
     por = {x["lead_id"]: x for x in r["resultados"]}
     assert por["A"]["resultado"] == "ignorado" and "já há conversa" in por["A"]["motivo"]
     assert por["C"]["resultado"] != "ignorado"
+
+
+# ------------------------------------------------------------------ a régua de seguimentos (visão)
+def test_regua_mostra_o_passo_de_cada_lead(com_robo, rodar):
+    from datetime import datetime, timedelta, timezone
+    from app import robo_store
+    p = Pontas()
+    base = datetime(2026, 11, 2, 12, 0, tzinfo=timezone.utc)          # segunda
+    leads = [lead("A", phone="14998003784"), lead("B", phone="14997001122"), lead("C", phone="14996005533"), lead("D", phone="14995004411")]
+    for l in leads:
+        rodar(pipeline_store.registrar, UID, l, "", "salvo")
+    preparar(rodar, leads, p)
+    for i in ("A", "B", "C", "D"):
+        item = rodar(fila_envio.obter, UID, f"f_{i}")
+        item["seguimentos"] = [{"texto": "Passando para saber se viu a prévia."}, {"texto": "Último contato: sem pressão, a porta fica aberta."}]
+        item.update(status="enviado", enviado_em=base.isoformat())
+        fila_envio.agendar_seguimentos(item, base)
+        rodar(fila_envio._gravar, UID, item)
+    # B: o 1º seguimento já saiu; C: o lead respondeu; D: pediu para sair
+    b = rodar(fila_envio.obter, UID, "f_B")
+    b["agenda_seguimentos"][0]["estado"] = "na_fila"
+    rodar(fila_envio._gravar, UID, b)
+    rodar(fila_envio._gravar, UID, {"id": "f_B_s1", "lead_id": "B", "nome": "Padaria B", "canal": "whatsapp", "tipo": "seguimento", "status": "enviado",
+                                   "enviado_em": (base + timedelta(days=2)).isoformat(), "contato": {"phone": "14997001122"}, "texto": "x"})
+    for tel, extra in (("5514996005533", {"mensagens": [{"de": "robo", "texto": "oi"}, {"de": "contato", "texto": "pode mandar"}]}),
+                       ("5514995004411", {"optout": True, "mensagens": [{"de": "robo", "texto": "oi"}, {"de": "contato", "texto": "pare"}]})):
+        rodar(robo_store.salvar_conversa, UID, {"id": robo_store.id_da_conversa("whatsapp", tel), "canal": "whatsapp", "contato": tel,
+                                               "atualizado": "2026-11-03T10:00:00", **extra})
+    r = rodar(fila_envio.regua, UID, base + timedelta(days=3))
+    por = {x["lead_id"]: x for x in r["leads"]}
+    assert por["A"]["situacao"] == "na_regua" and "1º seguimento" in por["A"]["fase"]
+    assert [x["rotulo"] for x in por["A"]["passos"]] == ["Abordagem", "1º seguimento", "Contato final"]
+    assert por["B"]["situacao"] == "na_regua" and "contato final" in por["B"]["fase"] and por["B"]["passos"][1]["estado"] == "enviado"
+    assert por["C"]["situacao"] == "respondeu" and por["D"]["situacao"] == "optout"
+    assert r["resumo"]["na_regua"] == 2 and r["resumo"]["contato_final"] == 1 and r["resumo"]["responderam"] == 1 and r["resumo"]["total"] == 4
+    assert r["dias_uteis"] == [2, 5]

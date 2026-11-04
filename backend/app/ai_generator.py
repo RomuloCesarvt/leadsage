@@ -194,7 +194,8 @@ def _pedido_dos_seguimentos(req: PitchGenerationRequest) -> str:
     return (
         '\nInclua também "follow_ups": lista de 2 objetos {"quando" (ex.: "2 dias depois"), "objetivo" (uma frase), "texto" (até 40 palavras, '
         'mesmo canal)} para quem NÃO respondeu: sem repetir o argumento da abertura, com algo novo dos dados acima (outro gancho, outra avaliação, '
-        "o horário). NUNCA estatística de mercado, número de concorrente, percentual, preço ou prazo inventado."
+        "o horário). O 2º é o CONTATO FINAL: cordial, sem pressão, deixa a porta aberta e diz que não vai insistir. "
+        "NUNCA estatística de mercado, número de concorrente, percentual, preço ou prazo inventado."
     )
 
 
@@ -213,7 +214,8 @@ O PRODUTO: {(req.service_brief or req.user_product or "serviços digitais").stri
 {plano_de_aquecimento()}
 Cada uma tem no máximo 45 palavras, é no mesmo canal, não repete o argumento da primeira e traz algo novo
 tirado dos dados acima (outro gancho, outra avaliação, o horário). NUNCA estatística de mercado, número de
-concorrente, percentual de resultado, preço ou prazo inventado. Clichês proibidos: {lista_de_cliches()}.
+concorrente, percentual de resultado, preço ou prazo inventado. A segunda é o CONTATO FINAL: cordial, sem pressão,
+deixa a porta aberta e diz que não vai insistir. Clichês proibidos: {lista_de_cliches()}.
 
 RETORNO: JSON puro com a chave "follow_ups": lista de exatamente 2 objetos com "quando" (ex.: "3 dias depois"),
 "objetivo" (uma frase) e "texto" (a mensagem).

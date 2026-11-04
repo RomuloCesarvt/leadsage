@@ -18,6 +18,7 @@ import { WhatsAppIcon, InstagramIcon, LinkedInIcon } from './BrandIcons';
 import { ehSalvo } from '../lib/leadsSalvos';
 import { jaDisparado, ordenarCandidatos } from '../lib/ordemDaFila';
 import { sondar } from '../lib/sondagem';
+import { ReguaDeSeguimentos } from './ReguaDeSeguimentos';
 import { guardarSelecao, iniciarTrabalho, lerSelecao } from '../lib/trabalhoEmAndamento';
 import { montarPreviaDoLead } from './SiteBuilder';
 import { buscarFotos } from './BancoImagens';
@@ -691,6 +692,9 @@ export const FilaDeEnvio: React.FC = () => {
 
         {lista.map(item => <React.Fragment key={item.id}>{cartao(item)}</React.Fragment>)}
       </section>
+
+      {/* a régua de seguimentos: o que o robô faz sozinho depois da abordagem */}
+      <ReguaDeSeguimentos />
 
       {/* enviados */}
       {recentes.length > 0 && (

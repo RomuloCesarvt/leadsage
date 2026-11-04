@@ -1,5 +1,6 @@
 import type {
   DesempenhoPorSegmento,
+  ReguaDeSeguimentos,
   LeadSearchRequest,
   LeadSearchResponse,
   PitchGenerationRequest,
@@ -322,6 +323,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ mensagens: mensagens.map(m => ({ de: m.de, texto: m.texto })), canal }),
     });
+  },
+
+  async reguaDeSeguimentos(): Promise<ReguaDeSeguimentos> {
+    return await fetchWithToken('/robo/regua');
   },
 
   async segmentosDoDashboard(): Promise<DesempenhoPorSegmento> {
