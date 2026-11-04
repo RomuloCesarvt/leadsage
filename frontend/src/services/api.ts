@@ -35,7 +35,9 @@ import type {
   RaioX,
   ItemFila,
   ResumoFila,
-  ResultadoPreparo
+  ResultadoPreparo,
+  VisitaServico,
+  RetornoServico,
 } from '../types';
 import { auth } from '../lib/firebase';
 
@@ -541,6 +543,19 @@ export const api = {
     } catch {
       return { imagens: [], fonte: '' };
     }
+  },
+
+  async visitas(): Promise<{ visitas: VisitaServico[]; retornos: RetornoServico[] }> {
+    return await fetchWithToken('/servico/visitas');
+  },
+  async salvarVisita(dados: Partial<VisitaServico>, id?: string): Promise<VisitaServico> {
+    return await fetchWithToken(id ? `/servico/visitas/${id}` : '/servico/visitas', { method: id ? 'PUT' : 'POST', body: JSON.stringify(dados) });
+  },
+  async apagarVisita(id: string): Promise<void> {
+    await fetchWithToken(`/servico/visitas/${id}`, { method: 'DELETE' });
+  },
+  async retornoAvisado(id: string): Promise<VisitaServico> {
+    return await fetchWithToken(`/servico/visitas/${id}/retorno-avisado`, { method: 'POST' });
   },
 
   async meuPlano(): Promise<PlanoAtual> {

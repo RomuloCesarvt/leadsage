@@ -705,3 +705,23 @@ export interface ReguaDeSeguimentos {
   resumo: { na_regua: number; saem_hoje: number; contato_final: number; concluidas: number; responderam: number; total: number };
   dias_uteis: number[];
 }
+
+/** Modo empresa: uma visita agendada ou serviço realizado; serviço realizado vira retorno de manutenção. */
+export interface VisitaServico {
+  id: string;
+  cliente: string;
+  telefone: string;
+  servico: string;
+  aparelhos: string;
+  endereco: string;
+  data: string;
+  hora: string;
+  observacoes: string;
+  conversa_id: string;
+  status: 'agendada' | 'realizada' | 'cancelada';
+  retorno_meses: number;
+  realizada_em: string;
+  retorno_em: string;
+  retorno_avisado: boolean;
+}
+export interface RetornoServico extends VisitaServico { mensagem: string }

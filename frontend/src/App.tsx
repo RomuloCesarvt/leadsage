@@ -1,5 +1,6 @@
 import { AdminScreen } from './components/AdminScreen';
-import { telaVale } from './lib/modoDaConta';
+import { ehEmpresa, telaVale } from './lib/modoDaConta';
+import { VisitasScreen } from './components/screens/VisitasScreen';
 import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
@@ -83,6 +84,7 @@ const MainApp: React.FC = () => {
           {viewState === 'ai-outreach' && <AIOutreachScreen />}
           {viewState === 'conversas' && <ConversasScreen />}
           {viewState === 'fila' && <FilaScreen />}
+          {viewState === 'visitas' && ehEmpresa(user) && <VisitasScreen />}
           {viewState === 'robo' && <RoboScreen />}
           {viewState === 'proposals' && <ProposalsScreen />}
           {viewState === 'contracts' && <ContractsScreen />}

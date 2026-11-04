@@ -48,7 +48,7 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, acesso_total, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
-from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, abordagem_mestra, conector_whatsapp, caixa_de_entrada, ai_providers, espelho_whatsapp, previa_abertura, agentes, avisos
+from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, servico_local, abordagem_mestra, conector_whatsapp, caixa_de_entrada, ai_providers, espelho_whatsapp, previa_abertura, agentes, avisos
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote as _quote
 from app.ai_robo import decidir as robo_decidir
@@ -1316,6 +1316,68 @@ async def fila_preparar(req: FilaPrepararRequest, user: dict = Depends(get_curre
         )
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="O preparo demorou demais. Envie menos leads por vez.")
+
+
+class VisitaBody(BaseModel):
+    cliente: Optional[str] = None
+    telefone: Optional[str] = None
+    servico: Optional[str] = None
+    aparelhos: Optional[str] = None
+    endereco: Optional[str] = None
+    data: Optional[str] = None
+    hora: Optional[str] = None
+    observacoes: Optional[str] = None
+    conversa_id: Optional[str] = None
+    status: Optional[str] = None
+    retorno_meses: Optional[int] = None
+
+
+@app.get("/api/servico/visitas")
+async def servico_visitas(user: dict = Depends(get_current_user)):
+    """Modo empresa: as visitas agendadas e feitas, e os retornos de manutenção que já podem ser oferecidos (com a mensagem pronta)."""
+    uid = user.get("uid")
+    visitas = await servico_local.listar(uid)
+    canal_robo = await robo_store.canal_do_usuario(uid) or {}
+    perfil = await get_profile(uid)
+    empresa = identidade.da_conta(canal_robo, perfil)["empresa"] or perfil.company_name or ""
+    retornos = [{**v, "mensagem": servico_local.mensagem_de_retorno(v, empresa)} for v in servico_local.retornos_do_dia(visitas)]
+    return {"visitas": visitas, "retornos": retornos}
+
+
+@app.post("/api/servico/visitas")
+async def servico_visita_criar(body: VisitaBody, user: dict = Depends(get_current_user)):
+    try:
+        return await servico_local.salvar(user.get("uid"), body.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@app.put("/api/servico/visitas/{vid}")
+async def servico_visita_atualizar(vid: str, body: VisitaBody, user: dict = Depends(get_current_user)):
+    try:
+        return await servico_local.salvar(user.get("uid"), body.model_dump(exclude_none=True), vid)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Visita não encontrada.")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@app.delete("/api/servico/visitas/{vid}")
+async def servico_visita_apagar(vid: str, user: dict = Depends(get_current_user)):
+    await servico_local.apagar(user.get("uid"), vid)
+    return {"ok": True}
+
+
+@app.post("/api/servico/visitas/{vid}/retorno-avisado")
+async def servico_retorno_avisado(vid: str, user: dict = Depends(get_current_user)):
+    """A pessoa mandou (ou dispensou) o convite de retorno: some da lista."""
+    uid = user.get("uid")
+    v = next((x for x in await servico_local.listar(uid) if x.get("id") == vid), None)
+    if not v:
+        raise HTTPException(status_code=404, detail="Visita não encontrada.")
+    v["retorno_avisado"] = True
+    await robo_store._sql_put(f"visita:{uid}:{vid}", uid, servico_local.TIPO, v)
+    return v
 
 
 @app.get("/api/robo/regua")
