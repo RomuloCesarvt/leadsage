@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import { api } from '../../services/api';
 import { Check, Zap, Crown, Flame } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
+import { modoDaConta } from '../../lib/modoDaConta';
+import { COBRANCA_MENSAL_ATIVA, MODO_EXTRA, PLANOS_MENSAIS, ROBO_COMPLEMENTO, entregasDoPlano } from '../../data/planos';
 
 export const SubscriptionScreen: React.FC = () => {
   const [comprando, setComprando] = useState<string | null>(null);
   const [erro, setErro] = useState('');
+  const { user } = useApp() as any;
+  const modo = modoDaConta(user);
 
   // Os botoes nao tinham onClick: a tela anunciava preco e nao vendia.
   const comprar = async (planoId: string) => {
@@ -50,7 +55,48 @@ export const SubscriptionScreen: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 px-4">
+
+      {/* Planos mensais: o que cada um entrega, no idioma do modo da conta */}
+      <div className="px-4 mb-12">
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-black text-slate-800">Planos mensais</h2>
+          <p className="text-sm text-slate-500 mt-1">Você está no modo <b>{modo === 'empresa' ? 'Empresa' : 'Agência'}</b>: a lista de entregas abaixo é a do seu modo.</p>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {PLANOS_MENSAIS.map(p => (
+            <div key={p.id} className={`bg-white rounded-[2rem] p-7 flex flex-col relative border ${p.destaque ? 'border-2 border-blue-500 shadow-xl shadow-blue-500/10' : 'border-slate-100 shadow-sm'}`}>
+              {p.destaque && <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[11px] font-bold px-4 py-1.5 rounded-full">Mais escolhido</span>}
+              <h3 className={`font-black text-xl ${p.destaque ? 'text-blue-600' : 'text-slate-900'}`}>{p.nome}</h3>
+              <p className="text-sm text-slate-500 mt-1 mb-5">{p.chamada}</p>
+              <div className="flex items-end gap-1 mb-1">
+                <span className="text-lg font-bold text-slate-500 mb-1.5">R$</span>
+                <span className="text-6xl leading-none font-black tracking-tighter text-slate-900">{p.preco}</span>
+                <span className="text-sm font-bold text-slate-400 mb-1.5">/mês</span>
+              </div>
+              <p className="text-xs font-bold text-slate-400 mb-6">{p.leads.toLocaleString('pt-BR')} leads por mês{p.robo === 'complemento' ? ` · robô de atendimento +R$ ${ROBO_COMPLEMENTO}` : ' · robô incluso'}</p>
+              <ul className="space-y-3 mb-7 flex-1">
+                {entregasDoPlano(p, modo).map(t => (
+                  <li key={t} className="flex items-start gap-3 text-[14px] font-medium text-slate-600">
+                    <span className="w-5 h-5 mt-0.5 rounded-full bg-slate-100 flex items-center justify-center shrink-0"><Check className="w-3.5 h-3.5 text-slate-500" /></span>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+              <button disabled={!COBRANCA_MENSAL_ATIVA}
+                className={`w-full py-3.5 rounded-2xl text-sm font-bold transition-colors disabled:cursor-not-allowed ${p.destaque ? 'bg-blue-600 text-white disabled:opacity-60' : 'bg-slate-900 text-white disabled:opacity-60'}`}>
+                {COBRANCA_MENSAL_ATIVA ? `Assinar ${p.nome}` : 'Assinatura mensal em breve'}
+              </button>
+            </div>
+          ))}
+        </div>
+        <p className="text-center text-xs text-slate-400 mt-5">
+          Quer os dois modos (Agência e Empresa)? O segundo modo custa R$ {MODO_EXTRA}/mês a mais. Leads e conversas extras podem ser comprados avulsos quando a cota acaba.
+        </p>
+      </div>
+
+      <details className="px-4 mb-6">
+        <summary className="cursor-pointer text-sm font-bold text-slate-500 text-center mb-6 select-none">Planos vitalícios (vendas encerrando)</summary>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         
         {/* START */}
         <div className="bg-white rounded-[2rem] p-8 flex flex-col shadow-sm border border-slate-100 relative pt-12">
@@ -191,6 +237,7 @@ export const SubscriptionScreen: React.FC = () => {
         </div>
 
       </div>
+      </details>
 
     </div>
   );
