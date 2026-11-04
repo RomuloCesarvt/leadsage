@@ -414,15 +414,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Agência e empresa têm dados separados; nada de um aparece no outro.
   const modoEfetivo = modoDaConta(user);
   if (user) definirModoAtivo(modoEfetivo);       // já na renderização, antes dos efeitos das telas, para o primeiro pedido de cada tela ir com o modo certo
-  useEffect(() => {
-    if (!user?.id) return;
-    const espaco = espacoDoModo(user.id, modoEfetivo);
-    if (espaco === donoDosLeads) return;
-    setLeads(lerLeadsDoDono(espaco));
-    setDonoDosLeads(espaco);
+  const espacoAtual = user?.id ? espacoDoModo(user.id, modoEfetivo) : null;
+  if (espacoAtual && donoDosLeads && espacoAtual !== donoDosLeads) {
+    // A troca é feita AQUI, na renderização (o React refaz a conta na hora, antes de qualquer tela montar). Se fosse num efeito, a tela do
+    // pipeline que acabou de montar enviaria ao servidor, com o modo novo, os leads salvos do modo antigo.
+    const doModoNovo = lerLeadsDoDono(espacoAtual);
+    leadsRef.current = doModoNovo;
+    sincronizados.current = new Set();             // o que já foi enviado num espaço não vale no outro
+    setLeads(doModoNovo);
+    setDonoDosLeads(espacoAtual);
     setHistory([]);
-    api.getSearchHistory().then(setHistory).catch(() => { /* a lista chega no próximo carregamento */ });
-  }, [modoEfetivo, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }
+  const ultimoEspaco = useRef<string | null>(null);
+  useEffect(() => {
+    if (!espacoAtual) return;
+    if (ultimoEspaco.current && ultimoEspaco.current !== espacoAtual) {
+      api.getSearchHistory().then(setHistory).catch(() => { /* a lista chega no próximo carregamento */ });
+    }
+    ultimoEspaco.current = espacoAtual;
+  }, [espacoAtual]);
 
   return (
     <AppContext.Provider
