@@ -70,7 +70,7 @@ const MainApp: React.FC = () => {
         <Header toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
         {/* View Switcher */}
-        <main className="flex-1 w-full max-w-7xl mx-auto flex flex-col p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:p-6 transition-all duration-300">
+        <main key={ehEmpresa(user) ? 'empresa' : 'agencia'} className="flex-1 w-full max-w-7xl mx-auto flex flex-col p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:p-6 transition-all duration-300">
           
           {/* Principal */}
           {viewState === 'dashboard' && <DashboardScreen />}

@@ -66,6 +66,10 @@ if (
   );
 }
 
+/** O modo que o app está usando agora (agência ou empresa): vai em cada pedido para o servidor separar os dados de trabalho. */
+let modoAtivo = '';
+export const definirModoAtivo = (modo: string): void => { modoAtivo = modo === 'empresa' ? 'empresa' : modo === 'agencia' ? 'agencia' : ''; };
+
 async function fetchWithToken(endpoint: string, options: RequestInit = {}) {
   const user = auth.currentUser;
   let token = '';
@@ -76,6 +80,7 @@ async function fetchWithToken(endpoint: string, options: RequestInit = {}) {
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(modoAtivo ? { 'X-Modo': modoAtivo } : {}),
     ...options.headers,
   };
 
@@ -573,7 +578,7 @@ export const api = {
     const user = auth.currentUser;
     const token = user ? await user.getIdToken() : '';
     const resp = await fetch(`${API_BASE_URL}/leads/export`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(modoAtivo ? { 'X-Modo': modoAtivo } : {}) },
     });
     if (!resp.ok) {
       const erro = await resp.json().catch(() => ({}));

@@ -43,3 +43,6 @@ export const comModoLocal = <T extends { id?: string; modo?: string; modos?: str
   const sabe = Array.isArray(perfil.modos) && perfil.modos.length > 0 && !perfil.semDados;
   return !sabe || perfil.modos!.includes(local) ? { ...perfil, modo: local } : perfil;
 };
+
+/** A chave do espaço de trabalho de um modo: agência usa o uid de sempre (nada muda para quem já tem dados); empresa tem a sua. Igual ao servidor (espaco.py). */
+export const espacoDoModo = (uid: string, modo: ModoDaConta): string => (modo === 'empresa' ? `${uid}~empresa` : uid);

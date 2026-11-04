@@ -1,6 +1,6 @@
-import { comModoLocal, esquecerModoNovo, lerModoNovo } from '../lib/modoDaConta';
+import { comModoLocal, esquecerModoNovo, espacoDoModo, lerModoLocal, lerModoNovo, modoDaConta } from '../lib/modoDaConta';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { api } from '../services/api';
+import { api, definirModoAtivo } from '../services/api';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -149,7 +149,7 @@ function lerLeadsDoDono(uid: string): LeadItem[] {
   try {
     let bruto = localStorage.getItem(chaveDosLeads(uid));
     if (bruto === null) {
-      const antigo = localStorage.getItem('LEADSAGE_LEADS');
+      const antigo = uid.includes('~') ? null : localStorage.getItem('LEADSAGE_LEADS');   // a lista antiga é da agência: o espaço da empresa nasce vazio
       if (antigo !== null) {
         bruto = antigo;
         localStorage.setItem(chaveDosLeads(uid), antigo);
@@ -228,10 +228,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSessaoPerdida(null);
         lembrarSessao(currentUser.uid, currentUser.email);
         void pedirArmazenamentoDurável();   // o navegador não apaga o login quando faltar espaço
-        setLeads(lerLeadsDoDono(currentUser.uid));
-        setDonoDosLeads(currentUser.uid);
+        // o modo que a pessoa usava neste aparelho decide de qual espaço de trabalho abrir (o perfil do servidor confirma logo em seguida)
+        const modoDoAparelho = lerModoLocal(currentUser.uid) ?? 'agencia';
+        definirModoAtivo(modoDoAparelho);
+        setLeads(lerLeadsDoDono(espacoDoModo(currentUser.uid, modoDoAparelho)));
+        setDonoDosLeads(espacoDoModo(currentUser.uid, modoDoAparelho));
         // O app abre assim que o Firebase diz quem é (F5 não espera o servidor acordar); o perfil verdadeiro chega logo em seguida.
-        setUser(prev => (prev && prev.id === currentUser.uid ? prev : api.perfilProvisorio()));
+        setUser(prev => (prev && prev.id === currentUser.uid ? prev : comModoLocal(api.perfilProvisorio())));
         setAuthLoading(false);
         // Obter dados do perfil e créditos da API backend
         try {
@@ -406,6 +409,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!donoDosLeads) return;
     try { localStorage.setItem(chaveDosLeads(donoDosLeads), JSON.stringify(leads)); } catch { /* sem espaco ou bloqueado */ }
   }, [leads, donoDosLeads]);
+
+  // Trocou de modo (ou o perfil do servidor trouxe outro modo): os leads e o histórico passam a ser os do espaço do modo novo.
+  // Agência e empresa têm dados separados; nada de um aparece no outro.
+  const modoEfetivo = modoDaConta(user);
+  if (user) definirModoAtivo(modoEfetivo);       // já na renderização, antes dos efeitos das telas, para o primeiro pedido de cada tela ir com o modo certo
+  useEffect(() => {
+    if (!user?.id) return;
+    const espaco = espacoDoModo(user.id, modoEfetivo);
+    if (espaco === donoDosLeads) return;
+    setLeads(lerLeadsDoDono(espaco));
+    setDonoDosLeads(espaco);
+    setHistory([]);
+    api.getSearchHistory().then(setHistory).catch(() => { /* a lista chega no próximo carregamento */ });
+  }, [modoEfetivo, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <AppContext.Provider

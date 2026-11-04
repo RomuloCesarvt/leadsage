@@ -1,7 +1,7 @@
 /** Rodar: cd frontend && npx tsx src/lib/modoDaConta.test.ts */
 const memoria: Record<string, string> = {};
 (globalThis as any).localStorage = { getItem: (k: string) => memoria[k] ?? null, setItem: (k: string, v: string) => { memoria[k] = v; }, removeItem: (k: string) => { delete memoria[k]; } };
-import { comModoLocal, ehEmpresa, gravarModoLocal, modoDaConta, telaVale } from './modoDaConta';
+import { comModoLocal, ehEmpresa, espacoDoModo, gravarModoLocal, modoDaConta, telaVale } from './modoDaConta';
 
 let falhas = 0;
 const checar = (nome: string, ok: boolean) => { console.log(`  ${ok ? 'PASS ' : 'FALHA'} ${nome}`); if (!ok) falhas++; };
@@ -17,6 +17,8 @@ checar('escolha local vale quando o servidor devolve o modo antigo e não diz qu
 checar('escolha local vale quando a conta tem o modo', comModoLocal({ id: 'u1', modo: 'agencia', modos: ['agencia', 'empresa'] }).modo === 'empresa');
 checar('escolha local NÃO vale quando o servidor diz que a conta não tem o modo', comModoLocal({ id: 'u1', modo: 'agencia', modos: ['agencia'] }).modo === 'agencia');
 checar('sem escolha local, fica o que veio do servidor', comModoLocal({ id: 'u2', modo: 'agencia', modos: [] }).modo === 'agencia');
+
+checar('espaço: agência usa o uid de sempre (nada muda para quem já tem dados) e empresa tem o seu', espacoDoModo('u1', 'agencia') === 'u1' && espacoDoModo('u1', 'empresa') === 'u1~empresa');
 
 console.log(`\n=========== ${falhas === 0 ? 'TUDO PASSOU' : falhas + ' FALHARAM'} ===========`);
 if (falhas) process.exit(1);
