@@ -15,6 +15,7 @@ import { semearConteudo } from './semear';
 import { direcaoDeArte, ramoEfetivo } from './direcao-de-arte';
 import { limparNomeDaMarca } from './marca';
 import { SITE_TEMPLATES, sugerirTemplate } from './layouts';
+import { acabamento } from './acabamento';
 import { aplicarCopia, individualizar, variarCor } from './variedade';
 
 /**
@@ -72,7 +73,7 @@ export const dadosDoLead = (lead: any): SiteData => {
  * uma prévia quando a versão gravada nela é outra. Sem esta marca, todo site criado pelo Disparo era refeito de novo pelo servidor
  * ao preparar a mensagem (o dobro de tempo e de chamadas de IA).
  */
-export const MOTOR_VERSAO = '2026-11-01-identidade-e-nota-com-merito';
+export const MOTOR_VERSAO = '2026-11-04-acabamento-de-design';
 
 const indiceEstavel = (texto: string, n: number): number => {
   let h = 0;
@@ -139,6 +140,6 @@ export const montarPrevia = (lead: any, fotos: string[] = [], preferido = '', an
   // ao atualizar um site que já existe, mantém o modelo dele, desde que ainda combine com o ramo
   const atual = preferido ? SITE_TEMPLATES.find(t => t.nome === preferido || t.id === preferido) : undefined;
   const template = atual && direcaoDeArte(ramo, dados.empresa).modelos.includes(atual.id) ? atual : escolherTemplate(ramo, dados.empresa);
-  const html = template.render({ ...dados, selo: true });
+  const html = acabamento(template.render({ ...dados, selo: true }));
   return { company: dados.empresa, html, template: template.nome, lead_id: String(lead?.id || ''), builder_data: JSON.stringify({ ...dados, motor: MOTOR_VERSAO }) };
 };

@@ -22,7 +22,7 @@ for (const ramo of RAMOS) {
   checar(`${ramo}: tem o telefone e o endereço dela`, /wa\.me\/5514998005560|tel:\+5514998005560/.test(p.html) && p.html.includes('Rua Amando de Barros'));
   checar(`${ramo}: usa as fotos do banco de imagens`, p.html.includes('images.pexels.com/a.jpg'));
   checar(`${ramo}: traz o conteúdo do ramo (serviços)`, (JSON.parse(p.builder_data).servicos || []).filter((s: any) => s.titulo).length >= 3);
-  checar(`${ramo}: sem script e com selo do LeadSage`, !/<script(?![^>]*ld\+json)/i.test(p.html) && p.html.includes('selo-leadsage'));
+  checar(`${ramo}: sem script e com selo do LeadSage`, !/<script(?![^>]*(ld\+json|id="acabamento-js"))/i.test(p.html) && p.html.includes('selo-leadsage'));
   checar(`${ramo}: modelo e identificador guardados`, !!p.template && p.lead_id === 'L1');
 }
 
