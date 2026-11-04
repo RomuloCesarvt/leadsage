@@ -32,3 +32,29 @@ def test_acesso_total_troca_livremente(client, monkeypatch):
 def test_usuario_nao_se_concede_modos(client):
     client.put("/api/profile", json={"modo": "agencia", "modos": ["agencia", "empresa"]})
     assert client.get("/api/profile").json()["modos"] == ["agencia"]
+
+
+def test_modo_pega_mesmo_com_o_firestore_recusando_a_gravacao(client, monkeypatch):
+    """Cota do Firestore estourada: a gravação lá falha e a leitura ainda traz o perfil antigo de lá. O modo tem de valer mesmo assim."""
+    import app.profile_store as ps
+
+    class DocAntigo:
+        exists = True
+        def to_dict(self): return {"profile": {"name": "Carlos", "company_name": "Frio Total"}}
+
+    class Doc:
+        def get(self): return DocAntigo()
+        def set(self, *a, **k): raise RuntimeError("429 quota exceeded")
+
+    class Colecao:
+        def document(self, _): return Doc()
+
+    class Fs:
+        def collection(self, _): return Colecao()
+
+    monkeypatch.setattr(ps, "firestore_db", Fs())
+    from app.config import settings
+    monkeypatch.setattr(type(settings), "ilimitados_emails", property(lambda self: {"alice@example.com"}))
+    r = client.put("/api/profile", json={"modo": "empresa"})
+    assert r.status_code == 200 and r.json()["modo"] == "empresa"
+    assert client.get("/api/profile").json()["modo"] == "empresa"

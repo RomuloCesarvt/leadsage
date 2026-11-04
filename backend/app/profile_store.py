@@ -102,6 +102,16 @@ async def get_profile(uid: str) -> UserProfile:
             stored = await _load_sqlite(uid)
         except Exception as exc:
             print(f"Falha ao ler perfil no SQLite: {exc}")
+    elif veio_do_firestore:
+        # o modo e os modos liberados também são gravados no SQL: com a cota do Firestore estourada a gravação lá é recusada,
+        # e ler só dele devolveria o perfil antigo (a troca de modo nunca pegaria)
+        try:
+            no_sql = await _load_sqlite(uid) or {}
+            for chave in ("modo", "modos"):
+                if chave in no_sql:
+                    stored = {**stored, chave: no_sql[chave]}
+        except Exception as exc:
+            print(f"Falha ao ler o modo no SQLite: {exc}")
 
     profile = UserProfile(id=uid)
     if stored:
@@ -129,6 +139,11 @@ async def save_profile(uid: str, payload: Dict[str, Any]) -> UserProfile:
 
     if not written:
         await _save_sqlite(uid, data)
+    elif "modo" in data:
+        try:
+            await _save_sqlite(uid, {"modo": data["modo"]})
+        except Exception as exc:
+            print(f"Falha ao espelhar o modo no SQLite: {exc}")
 
     return await get_profile(uid)
 
@@ -151,10 +166,12 @@ async def liberar_modos(uid: str, modos: list) -> None:
     if firestore_db is not None:
         try:
             firestore_db.collection("users").document(uid).set({"profile": dados}, merge=True)
-            return
         except Exception as exc:
             print(f"Falha ao liberar modos no Firestore: {exc}")
-    await _save_sqlite(uid, dados)
+    try:
+        await _save_sqlite(uid, dados)             # sempre também no SQL: é de lá que a leitura confere os modos
+    except Exception as exc:
+        print(f"Falha ao liberar modos no SQLite: {exc}")
 
 
 async def conceder_plano(uid: str, plano: str, sites: int, plan_id: str = "") -> None:

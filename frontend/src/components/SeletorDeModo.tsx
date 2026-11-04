@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { Briefcase, Lock, Wrench } from 'lucide-react';
 import { api } from '../services/api';
 import { useApp } from '../context/AppContext';
-import { modoDaConta, type ModoDaConta } from '../lib/modoDaConta';
+import { gravarModoLocal, modoDaConta, type ModoDaConta } from '../lib/modoDaConta';
 
 const OPCOES: { id: ModoDaConta; nome: string; Icone: React.FC<{ className?: string }> }[] = [
   { id: 'agencia', nome: 'Agência', Icone: Briefcase },
@@ -29,15 +29,25 @@ export const SeletorDeModo: React.FC<{ aoTrocar?: () => void }> = ({ aoTrocar })
       aoTrocar?.();
       return;
     }
+    const nome = id === 'empresa' ? 'Empresa' : 'Agência';
     try {
       setAviso('');
       const salvo = await api.updateProfile({ modo: id });
-      // o servidor pode recusar (conta sem esse modo): vale o que ele devolveu
-      setUser(salvo);
-      if (salvo?.modo && salvo.modo !== id) { setAviso(`Sua conta não tem o modo ${id === 'empresa' ? 'Empresa' : 'Agência'}. Veja como liberar em Assinatura.`); return; }
+      const sabe = Array.isArray(salvo?.modos) && salvo.modos.length > 0;
+      if (salvo?.modo !== id && sabe && !salvo.modos!.includes(id)) {
+        // o servidor sabe quais modos a conta tem e este não é um deles
+        setUser(salvo);
+        setAviso(`Sua conta não tem o modo ${nome}. Veja como liberar em Assinatura.`);
+        return;
+      }
+      // pegou, ou o servidor não conseguiu gravar (banco ocupado): vale o que a pessoa escolheu, neste aparelho e na conta quando der
+      if (user?.id) gravarModoLocal(user.id, id);
+      setUser({ ...salvo, modo: id });
+      if (salvo?.modo !== id) setAviso('Modo trocado neste aparelho; o servidor ainda não gravou na conta.');
       setViewState('dashboard'); aoTrocar?.();
     } catch {
-      // servidor fora do ar: troca só neste aparelho, para a pessoa não ficar travada; ao voltar, vale o que está gravado na conta
+      // servidor fora do ar: troca só neste aparelho, para a pessoa não ficar travada
+      if (user?.id) gravarModoLocal(user.id, id);
       setUser({ ...user, modo: id });
       setAviso('O servidor não respondeu: o modo foi trocado só neste aparelho por enquanto.');
       setViewState('dashboard'); aoTrocar?.();

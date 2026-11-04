@@ -28,3 +28,18 @@ export const lerModoNovo = (): ModoDaConta | null => {
   } catch { return null; }
 };
 export const esquecerModoNovo = (): void => { try { localStorage.removeItem(CHAVE_PENDENTE); } catch { /* ok */ } };
+
+/** A última escolha da pessoa, guardada neste aparelho: se o servidor não gravou (cota, queda), o modo não volta sozinho para o antigo. */
+const chaveLocal = (uid: string) => `leadsage_modo_${uid}`;
+export const gravarModoLocal = (uid: string, modo: ModoDaConta): void => { try { localStorage.setItem(chaveLocal(uid), modo); } catch { /* sem armazenamento */ } };
+export const lerModoLocal = (uid: string): ModoDaConta | null => {
+  try { const v = localStorage.getItem(chaveLocal(uid)); return v === 'empresa' || v === 'agencia' ? v : null; } catch { return null; }
+};
+
+/** O perfil do servidor com a escolha local por cima, desde que a conta possa usar esse modo (ou o servidor não tenha dito quais tem). */
+export const comModoLocal = <T extends { id?: string; modo?: string; modos?: string[]; semDados?: boolean }>(perfil: T): T => {
+  const local = perfil?.id ? lerModoLocal(perfil.id) : null;
+  if (!local || perfil.modo === local) return perfil;
+  const sabe = Array.isArray(perfil.modos) && perfil.modos.length > 0 && !perfil.semDados;
+  return !sabe || perfil.modos!.includes(local) ? { ...perfil, modo: local } : perfil;
+};

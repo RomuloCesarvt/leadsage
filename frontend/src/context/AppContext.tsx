@@ -1,4 +1,4 @@
-import { esquecerModoNovo, lerModoNovo } from '../lib/modoDaConta';
+import { comModoLocal, esquecerModoNovo, lerModoNovo } from '../lib/modoDaConta';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { api } from '../services/api';
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -241,7 +241,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (pendente && !profile.semDados && !profile.modo) {
             try { profile = await api.updateProfile({ modo: pendente }); esquecerModoNovo(); } catch { /* tenta no próximo login */ }
           } else if (pendente && profile.modo) { esquecerModoNovo(); }
-          setUser(profile);
+          setUser(comModoLocal(profile));
           // o servidor não respondeu (banco ocupado): tenta de novo até o saldo e o plano verdadeiros chegarem
           if (profile.semDados) {
             let tentativas = 0;
@@ -250,7 +250,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               try {
                 const p = await api.getProfile();
                 if (p.semDados) { setTimeout(reler, 6000); return; }
-                setUser(p);
+                setUser(comModoLocal(p));
               } catch { setTimeout(reler, 6000); }
             };
             setTimeout(reler, 4000);
