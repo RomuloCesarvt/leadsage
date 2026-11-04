@@ -642,6 +642,13 @@ async def preparar_lote(
             saida.append({"lead_id": lid, "nome": nome, "resultado": "falhou", "espera_s": int(getattr(pronto, "espera_s", 0) or 0),
                           "motivo": f"não foi possível escrever a mensagem: {str(pronto)[:160]}"})
             continue
+        from app.ai_sdr import _SE_DIZ_ROBO
+        dito = _SE_DIZ_ROBO.search(f"{pronto.get('subject') or ''} {pronto.get('body') or ''}")
+        if dito:
+            # a abordagem nunca se apresenta como assistente virtual/robô/IA (isso derruba o número): a mensagem não entra na fila
+            saida.append({"lead_id": lid, "nome": nome, "resultado": "falhou", "espera_s": 3,
+                          "motivo": f"a mensagem se apresentava como \"{dito.group(0)}\": gere de novo"})
+            continue
         if canal == "whatsapp" and not (orcamento_s and time.monotonic() - inicio > orcamento_s * 0.55):
             pronto = await _diferenciar(gerar, lead, canal, pronto, usados)
             usados.append((pronto.get("body") or "").strip())

@@ -47,7 +47,7 @@ def test_o_robo_se_apresenta_com_a_identidade_da_pessoa():
 
 def test_sem_identidade_o_robo_continua_como_antes():
     p = montar_prompt(HIST, "whatsapp", {"company_name": "Padaria Alfa"}, {"ativo": True, "nome_assistente": "Ana"}, LEAD)
-    assert "Você é Ana, SDR de Padaria Alfa" in p
+    assert "Você é Ana, da equipe de Padaria Alfa" in p
 
 
 def test_a_abordagem_do_disparo_usa_o_nome_e_a_empresa_da_pessoa():
@@ -114,3 +114,21 @@ def test_sem_identidade_a_tela_que_manda_leadsage_cai_no_perfil(client, com_plan
     except Exception:
         pass
     assert visto["req"].sender_name == "Alice Corp" and not visto["req"].apresentacao
+
+
+# ----------------------------------------------- nunca se diz assistente virtual / robô / IA
+def test_resposta_que_se_diz_assistente_virtual_e_recusada():
+    from app.ai_sdr import problemas_da_resposta
+    ruim = ["Oi Alice, sou o assistente virtual da Seometria Marketing Digital. Posso te enviar a prévia?"]
+    assert any("assistente virtual" in e for e in problemas_da_resposta(ruim, {}, [], {}))
+    for ok in ["Oi Alice, aqui é o Rômulo da Seometria Marketing Digital. Posso te enviar a prévia?",
+               "Vi que vocês atendem empresas de inteligência artificial em Botucatu, parabéns!"]:
+        assert not any("assistente" in e or "robô" in e for e in problemas_da_resposta([ok], {}, [], {}))
+    for ruim in ["Sou um robô da equipe", "Sou uma IA, mas posso ajudar", "Este é um atendimento automático"]:
+        assert any("Nunca se apresente" in e for e in problemas_da_resposta([ruim], {}, [], {}))
+
+
+def test_prompt_nao_manda_o_robo_se_apresentar_como_assistente_virtual():
+    p = montar_prompt(HIST, "whatsapp", {"company_name": "Padaria Alfa"}, {"ativo": True}, LEAD)
+    assert "assistente virtual de" not in p.replace('NUNCA se apresente nem se descreva como "assistente virtual"', "")
+    assert "Você é da equipe de Padaria Alfa" in p or "da equipe de Padaria Alfa" in p

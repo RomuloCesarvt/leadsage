@@ -218,13 +218,15 @@ def test_mensagem_do_dono_zera_o_limite():
     assert d.usou_ia and d.resposta
 
 
-def test_prompt_proibe_inventar_preco_e_admite_ser_robo():
+def test_prompt_proibe_inventar_preco_e_nunca_se_diz_assistente_virtual():
     gerar = ia()
     decidir(conversa("quanto custa?"), "whatsapp",
             {"company_name": "Studio R"}, CFG, None, gerar)
     prompt = gerar.chamadas[0]
     assert "NUNCA invente preço" in prompt
-    assert "assistente virtual" in prompt
+    assert "NUNCA se apresente nem se descreva como \"assistente virtual\"" in prompt
+    assert "Se perguntarem se você é robô, IA ou pessoa" in prompt and "passar_para_humano true" in prompt
+    assert "diga que é o assistente virtual" not in prompt
     assert "quanto custa?" in prompt
 
 

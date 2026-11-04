@@ -55,7 +55,7 @@ Técnica de TODA objeção, em 2 ou 3 frases curtas: (1) acolha em meia frase, s
   olhada na prévia, sem compromisso? Se não fizer sentido, eu paro por aqui."
 - "Manda por e-mail" / "manda mais informação": mande o essencial em 2 linhas e o link do site que já foi preparado, se houver; não despeje um texto longo.
 - "Quem é você?" / "como conseguiu meu número?": transparência total — o número é o público do perfil
-  do Google do negócio, e você é assistente virtual de quem oferece o serviço.
+  do Google do negócio, e você faz parte da equipe de quem oferece o serviço. NUNCA diga que é assistente virtual, robô, bot ou IA.
 - "Preciso falar com meu sócio / marido / esposa": ótimo, quem decide precisa ver. Ofereça incluir a pessoa
   na conversa de 15 minutos ou mande o essencial para ela ver (link do site pronto). Pergunte o melhor horário para os dois.
 - "Já tentei e não deu resultado": valide sem criticar quem fez. Pergunte o que foi feito e o que faltou;
@@ -353,10 +353,10 @@ def montar_prompt(
     cfg = ai_oferta.aplicar(cfg)
     ident = identidade.da_conta(cfg, perfil)
     quem = ident["empresa"] or perfil.get("company_name") or perfil.get("name") or "a empresa"
-    assistente = cfg.get("nome_assistente") or "assistente virtual"
+    assistente = (cfg.get("nome_assistente") or "").strip()
     # a pessoa definiu quem fala: o robô se apresenta com o nome, o cargo e a empresa DELA (nunca com o nome do sistema)
-    quem_fala = (f"{ident['apresentacao']} (você se apresenta assim, em primeira pessoa; se perguntarem se é robô, diga que é o "
-                 f"assistente virtual de {quem})") if ident["configurada"] and ident["apresentacao"] else ""
+    quem_fala = (f"{ident['apresentacao']} (você se apresenta assim, em primeira pessoa, como uma pessoa da equipe; NUNCA diga que é "
+                 f"assistente virtual, robô, bot ou IA)") if ident["configurada"] and ident["apresentacao"] else ""
     oferta = perfil.get("product_description") or "serviços de presença digital (site, Google e redes sociais)"
     servico = ai_oferta.bloco_do_servico(cfg, lead)
     ramo = nicho_guia.bloco((lead or {}).get("niche"))
@@ -375,7 +375,7 @@ def montar_prompt(
         for m in mensagens[-30:]
     )
 
-    abertura = quem_fala or f"{assistente}, SDR de {quem}"
+    abertura = quem_fala or (f"{assistente}, da equipe de {quem}" if assistente else f"da equipe de {quem}")
     return f"""Você é {abertura}, conversando pelo {canal} com o dono de um negócio local.
 Agora é {_agora_brasil(agora)}.
 
@@ -457,7 +457,8 @@ e inventar justificativa (custo, margem, agenda cheia) — para negar um descont
   como uma pessoa escreve no {canal}. Uma pergunta por vez. Sem lista, sem "Prezado", no máximo 1 emoji.
 - Use o nome da pessoa quando souber. Espelhe o nível de formalidade dela.
 - NUNCA invente preço, prazo, garantia ou fato sobre o negócio. Se não souber, diga que confirma com o responsável.
-- Se perguntarem se você é robô: diga que é o assistente virtual de {quem}.
+- IDENTIDADE: você fala como uma pessoa da equipe de {quem}. NUNCA se apresente nem se descreva como "assistente virtual", "assistente", "robô", "bot", "IA", "inteligência artificial" ou "atendimento automático", em nenhuma mensagem (isso derruba o número). Apresente-se só pelo nome e pela empresa.
+- Se perguntarem se você é robô, IA ou pessoa: não afirme ser humano nem máquina. Diga com naturalidade que é da equipe de {quem} e que vai chamar o responsável para continuar a conversa, e marque passar_para_humano true (motivo: "perguntou se era robô").
 - VALORES (preço, renovação, domínio, custos): NUNCA cite por iniciativa sua. Só fale de dinheiro quando o cliente perguntar.
 - QUANDO PERGUNTAREM O PREÇO: nunca responda só com o número. Faça nesta ordem, em 2 ou 3 frases curtas:
   1) o benefício e o porquê faz sentido PARA O NEGÓCIO DELE (use o que ele disse e o dossiê: o cliente que procura no Google e não
@@ -685,10 +686,20 @@ def resolver_marcadores(textos: List[str], lead: Optional[Dict[str, Any]]) -> Li
     return [_re.sub(r"\[LINK[A-Z0-9_ ]{0,30}\]|\{\{\s*link[^}]{0,30}\}\}|\{link[a-z_]{0,20}\}|<LINK[A-Z_]{0,20}>", url, t, flags=_re.I) for t in textos]
 
 
+_SE_DIZ_ROBO = _re.compile(
+    r"assistente\s+virtual|assistente\s+digital|atendente\s+virtual|atendimento\s+(?:autom[aá]tico|virtual)|"
+    r"\b(?:sou|somos)\s+(?:um|uma|o|a)?\s*(?:rob[oô]|bot|ia|intelig[eê]ncia\s+artificial|chatbot)\b|"
+    r"\bsou\s+(?:um\s+)?assistente\b", _re.I)
+
+
 def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: List[Dict[str, Any]], lead: Optional[Dict[str, Any]] = None,
                           criando_previa: bool = False) -> List[str]:
     """`criando_previa`: o sistema vai criar o site agora e trocar [LINK_DA_PREVIA] pelo link; o marcador e a promessa do link valem."""
     erros: List[str] = []
+    # -1) o robô nunca se apresenta como assistente virtual/robô/IA: o número pode ser banido
+    se_diz_robo = _SE_DIZ_ROBO.search(" ".join(textos))
+    if se_diz_robo:
+        erros.append(f"Nunca se apresente como assistente virtual, robô, bot ou IA (apareceu \"{se_diz_robo.group(0)}\"): apresente-se só pelo nome e pela empresa, como uma pessoa da equipe.")
     # 0) a prévia nunca é "o site pronto" nem "o site profissional que preparei"
     falso = previa_honesta.erro_de_site_pronto(textos)
     if falso:

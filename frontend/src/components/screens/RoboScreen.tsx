@@ -191,7 +191,7 @@ const Simulador: React.FC = () => {
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm text-sm text-slate-600 space-y-3 h-fit">
         <h3 className="font-bold text-slate-800">O que testar</h3>
         <p>• <b>Preço:</b> o robô não pode inventar. Sem preço nas instruções, ele diz que vai confirmar e chama você.</p>
-        <p>• <b>“Você é um robô?”</b> Ele admite que é o assistente virtual.</p>
+        <p>• <b>“Você é um robô?”</b> Ele nunca se apresenta como assistente virtual, robô ou IA. Se perguntarem, diz que é da equipe e chama você para continuar.</p>
         <p>• <b>“Pare de mandar mensagem”</b>: encerra, e numa conversa real ele nunca mais escreve.</p>
         <p>• <b>Querer fechar</b>: ele passa para você.</p>
         <p className="text-xs text-slate-400 pt-2 border-t border-slate-100">
@@ -363,9 +363,9 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className={rotulo}>Nome do assistente</label>
+              <label className={rotulo}>Nome de quem conversa</label>
               <input value={form.nome_assistente || ''} onChange={e => mudar('nome_assistente', e.target.value)}
-                placeholder="Ex.: Ana, assistente do Studio R" className={campo} />
+                placeholder="Ex.: Ana, da equipe do Studio R" className={campo} />
             </div>
             <div>
               <label className={rotulo}>Objetivo da conversa</label>
