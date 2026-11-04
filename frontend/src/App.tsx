@@ -1,4 +1,5 @@
 import { AdminScreen } from './components/AdminScreen';
+import { telaVale } from './lib/modoDaConta';
 import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
@@ -85,11 +86,11 @@ const MainApp: React.FC = () => {
           {viewState === 'robo' && <RoboScreen />}
           {viewState === 'proposals' && <ProposalsScreen />}
           {viewState === 'contracts' && <ContractsScreen />}
-          {viewState === 'calculator' && <CalculatorScreen />}
+          {viewState === 'calculator' && telaVale('calculator', user) && <CalculatorScreen />}
 
           {/* Construtor */}
-          {viewState === 'create-site' && <SiteBuilder />}
-          {viewState === 'my-sites' && <MySitesScreen />}
+          {viewState === 'create-site' && telaVale('create-site', user) && <SiteBuilder />}
+          {viewState === 'my-sites' && telaVale('my-sites', user) && <MySitesScreen />}
 
           {/* Ajuda e Conta */}
           {viewState === 'tutorials' && <TutorialsScreen />}

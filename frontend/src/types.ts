@@ -255,6 +255,8 @@ export interface UserProfile {
   brand_contact?: string;
   sites_quota?: number;
   plan_id?: string;
+  /** como a conta usa o sistema: agência (sites, Google, marketing) ou empresa (vende o próprio serviço); vazio = conta antiga = agência */
+  modo?: 'agencia' | 'empresa' | '';
 }
 
 export interface SearchHistoryItem {
@@ -388,7 +390,7 @@ export interface PromocaoRobo {
 }
 
 export interface OfertaRobo {
-  servico: 'site' | 'gmn' | 'social' | 'trafego' | 'outro';
+  servico: 'site' | 'gmn' | 'social' | 'trafego' | 'ar' | 'outro';
   nome: string;
   preco: string | number;
   prazo_dias: string | number;
@@ -410,6 +412,12 @@ export interface OfertaRobo {
   dados_do_contrato?: string;
   /** o que o robô faz quando o lead diz "quero fechar": uma conversa (padrão) ou o checklist de Pix e material */
   fechamento?: 'conversa' | 'checklist';
+  /** serviço local (ar-condicionado): uma linha por serviço, "Limpeza de split 9 a 12 mil BTU: R$ 150" */
+  tabela_precos?: string;
+  regiao?: string;
+  visita?: 'gratis' | 'paga' | 'nao';
+  visita_preco?: string | number;
+  agenda?: string;
 }
 
 /** O que a tela recebe: os segredos so aparecem como "configurado". */

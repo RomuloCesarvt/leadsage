@@ -1,3 +1,4 @@
+import { esquecerModoNovo, lerModoNovo } from '../lib/modoDaConta';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { api } from '../services/api';
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -234,7 +235,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAuthLoading(false);
         // Obter dados do perfil e créditos da API backend
         try {
-          const profile = await api.getProfile();
+          let profile = await api.getProfile();
+          // conta nova que escolheu "agência" ou "empresa" na entrada e cujo perfil ainda não tem o modo: grava agora
+          const pendente = lerModoNovo();
+          if (pendente && !profile.semDados && !profile.modo) {
+            try { profile = await api.updateProfile({ modo: pendente }); esquecerModoNovo(); } catch { /* tenta no próximo login */ }
+          } else if (pendente && profile.modo) { esquecerModoNovo(); }
           setUser(profile);
           // o servidor não respondeu (banco ocupado): tenta de novo até o saldo e o plano verdadeiros chegarem
           if (profile.semDados) {

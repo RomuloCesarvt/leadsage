@@ -28,6 +28,7 @@ EDITABLE_FIELDS = (
     "avatar", "services", "niches", "regions", "preferred_channel",
     "monthly_goal", "language",
     "brand_logo", "brand_primary", "brand_accent", "brand_contact",
+    "modo",
 )
 
 
@@ -37,9 +38,15 @@ EDITABLE_FIELDS = (
 SYSTEM_FIELDS = ("plan", "plan_id", "sites_quota")
 
 
+MODOS = ("agencia", "empresa")
+
+
 def _clean(payload: Dict[str, Any], sistema: bool = False) -> Dict[str, Any]:
     permitidos = EDITABLE_FIELDS + (SYSTEM_FIELDS if sistema else ())
-    return {k: v for k, v in payload.items() if k in permitidos and v is not None}
+    limpo = {k: v for k, v in payload.items() if k in permitidos and v is not None}
+    if "modo" in limpo and limpo["modo"] not in MODOS + ("",):
+        del limpo["modo"]              # valor desconhecido nunca é gravado
+    return limpo
 
 
 async def _load_sqlite(uid: str) -> Optional[Dict[str, Any]]:

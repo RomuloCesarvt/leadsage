@@ -5,15 +5,25 @@ import { useApp } from '../../context/AppContext';
 import { Logo } from '../Logo';
 import { auth, db } from '../../lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { api } from '../../services/api';
+import { esquecerModoNovo, lembrarModoNovo, type ModoDaConta } from '../../lib/modoDaConta';
+import { Briefcase, Wrench } from 'lucide-react';
 
 
 export const LoginScreen: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [modo, setModo] = useState<ModoDaConta>('agencia');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { sessaoPerdida } = useApp() as any;
+
+  /** Conta nova: grava o modo escolhido. Se o servidor ainda não responder, fica guardado e o app aplica ao abrir. */
+  const gravarModoDaContaNova = async () => {
+    lembrarModoNovo(modo);
+    try { await api.updateProfile({ modo }); esquecerModoNovo(); } catch { /* o app tenta de novo ao carregar o perfil */ }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +36,8 @@ export const LoginScreen: React.FC = () => {
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
-        
+        void gravarModoDaContaNova();
+
         try {
           await setDoc(doc(db, "users", user.uid), {
             email: user.email,
@@ -71,6 +82,7 @@ export const LoginScreen: React.FC = () => {
       try {
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (!userDoc.exists()) {
+          void gravarModoDaContaNova();
           await setDoc(doc(db, "users", user.uid), {
             email: user.email,
             name: user.displayName,
@@ -145,6 +157,27 @@ export const LoginScreen: React.FC = () => {
             {error}
           </div>
         )}
+
+        <div className="mb-6">
+          <p className="text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wider">{isLogin ? 'Como você usa o LeadSage' : 'Como você vai usar o LeadSage?'}</p>
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Tipo de conta">
+            {([
+              { id: 'agencia', titulo: 'Sou agência', texto: 'Vendo sites, Google e marketing para outros negócios', Icone: Briefcase },
+              { id: 'empresa', titulo: 'Tenho uma empresa', texto: 'Vendo o meu próprio serviço (ex.: ar-condicionado)', Icone: Wrench },
+            ] as const).map(o => (
+              <button
+                key={o.id} type="button" role="radio" aria-checked={modo === o.id}
+                onClick={() => setModo(o.id)}
+                className={`text-left rounded-xl border p-3 transition-colors ${modo === o.id ? 'border-white bg-white/10 text-white' : 'border-zinc-800 text-zinc-400 hover:border-zinc-600'}`}
+              >
+                <o.Icone className="w-5 h-5 mb-1.5" />
+                <span className="block text-sm font-bold leading-tight">{o.titulo}</span>
+                <span className="block text-[11px] leading-snug mt-1 opacity-80">{o.texto}</span>
+              </button>
+            ))}
+          </div>
+          {isLogin && <p className="text-[11px] text-zinc-500 mt-2">Quem já tem conta entra do jeito que cadastrou. A escolha vale para contas novas.</p>}
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

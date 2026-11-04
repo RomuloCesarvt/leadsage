@@ -6,7 +6,9 @@
  * o preço cadastrado é o único valor que ele pode citar.
  */
 import React from 'react';
-import { Globe, MapPin, Share2, Megaphone, Sparkles, Info } from 'lucide-react';
+import { Globe, MapPin, Share2, Megaphone, Sparkles, Info, Wind } from 'lucide-react';
+import { useApp } from '../context/AppContext';
+import { ehEmpresa } from '../lib/modoDaConta';
 import type { OfertaRobo } from '../types';
 
 type Servico = OfertaRobo['servico'];
@@ -20,6 +22,8 @@ const SERVICOS: { id: Servico; nome: string; icone: React.FC<{ className?: strin
     inclui: 'Calendário de posts, criativos, legendas, publicação e relatório mensal.' },
   { id: 'trafego', nome: 'Anúncios', icone: Megaphone, nomePadrao: 'Gestão de anúncios',
     inclui: 'Criação e gestão de campanhas, públicos, criativos e relatório de resultados.' },
+  { id: 'ar', nome: 'Ar-condicionado', icone: Wind, nomePadrao: 'Instalação, limpeza e manutenção de ar-condicionado',
+    inclui: 'Instalação, higienização, manutenção preventiva e corretiva de aparelhos de ar-condicionado, com técnico qualificado.' },
   { id: 'outro', nome: 'Outro', icone: Sparkles, nomePadrao: '', inclui: '' },
 ];
 
@@ -27,6 +31,7 @@ const VAZIA: OfertaRobo = {
   servico: 'site', nome: '', preco: '', prazo_dias: '', inclui: '', nao_inclui: '', esboco: 'gratis',
   esboco_prazo: '', esboco_preco: '', pagamento: '', revisoes: '', garantia: '', diferenciais: '',
   pix_chave: '', pix_titular: '', pix_banco: '', sinal_percentual: '', itens_do_cliente: '', dados_do_contrato: '',
+  tabela_precos: '', regiao: '', visita: 'gratis', visita_preco: '', agenda: '',
 };
 
 const campo = 'w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500';
@@ -38,7 +43,12 @@ const brl = (v: string | number) => {
 };
 
 export const OfertaDoRobo: React.FC<{ valor?: Partial<OfertaRobo>; onChange: (o: OfertaRobo) => void }> = ({ valor, onChange }) => {
-  const o: OfertaRobo = { ...VAZIA, ...(valor || {}) };
+  const { user } = useApp() as any;
+  const empresa = ehEmpresa(user);
+  // conta empresa nasce vendendo o serviço local; conta agência não vê a opção de ar-condicionado
+  const o: OfertaRobo = { ...VAZIA, ...(empresa && !valor?.servico ? { servico: 'ar', nome: SERVICOS.find(x => x.id === 'ar')!.nomePadrao } : {}), ...(valor || {}) };
+  const opcoes = SERVICOS.filter(s => (empresa ? ['ar', 'outro'].includes(s.id) : s.id !== 'ar'));
+  const local = o.servico === 'ar';
   const set = <K extends keyof OfertaRobo>(k: K, v: OfertaRobo[K]) => onChange({ ...o, [k]: v });
 
   const escolher = (id: Servico) => {
@@ -69,7 +79,7 @@ export const OfertaDoRobo: React.FC<{ valor?: Partial<OfertaRobo>; onChange: (o:
       </p>
 
       <div className="flex flex-wrap gap-2 mb-5">
-        {SERVICOS.map(s => {
+        {opcoes.map(s => {
           const Icone = s.icone;
           return (
             <button key={s.id} type="button" onClick={() => escolher(s.id)}
@@ -95,22 +105,51 @@ export const OfertaDoRobo: React.FC<{ valor?: Partial<OfertaRobo>; onChange: (o:
           <label className={rotulo}>Prazo de entrega (dias)</label>
           <input inputMode="numeric" value={o.prazo_dias} onChange={e => set('prazo_dias', e.target.value)} placeholder="Ex.: 7" className={campo} />
         </div>
+        {local && (<>
+        <div className="md:col-span-3">
+          <label className={rotulo}>Tabela de preços (uma linha por serviço; o robô só cita estes valores)</label>
+          <textarea rows={5} value={o.tabela_precos || ''} onChange={e => set('tabela_precos', e.target.value)}
+            placeholder={'Limpeza de split 9 a 12 mil BTU: R$ 150\nInstalação de split: R$ 450\nCarga de gás: R$ 250'} className={`${campo} resize-none`} />
+        </div>
+        <div className="md:col-span-2">
+          <label className={rotulo}>Região atendida (fora dela o robô diz que não atende)</label>
+          <input value={o.regiao || ''} onChange={e => set('regiao', e.target.value)} placeholder="Ex.: Botucatu e cidades vizinhas até 40 km" className={campo} />
+        </div>
         <div>
+          <label className={rotulo}>Visita para orçamento</label>
+          <select value={o.visita || 'gratis'} onChange={e => set('visita', e.target.value as OfertaRobo['visita'])} className={campo}>
+            <option value="gratis">Grátis e sem compromisso</option>
+            <option value="paga">Paga</option>
+            <option value="nao">Não faço visita (orçamento por mensagem)</option>
+          </select>
+        </div>
+        {o.visita === 'paga' && (
+          <div>
+            <label className={rotulo}>Valor da visita (R$)</label>
+            <input inputMode="decimal" value={o.visita_preco ?? ''} onChange={e => set('visita_preco', e.target.value)} className={campo} />
+          </div>
+        )}
+        <div className={o.visita === 'paga' ? 'md:col-span-2' : 'md:col-span-3'}>
+          <label className={rotulo}>Dias e horários de atendimento (o robô oferece horários dentro disto)</label>
+          <input value={o.agenda || ''} onChange={e => set('agenda', e.target.value)} placeholder="Ex.: segunda a sábado, das 8h às 18h" className={campo} />
+        </div>
+        </>)}
+        {!local && (<div>
           <label className={rotulo}>Esboço antes de fechar</label>
           <select value={o.esboco} onChange={e => set('esboco', e.target.value as OfertaRobo['esboco'])} className={campo}>
             <option value="gratis">Grátis e sem compromisso</option>
             <option value="pago">Pago</option>
             <option value="nao">Não faço esboço</option>
           </select>
-        </div>
+        </div>)}
 
-        {o.esboco === 'gratis' && (
+        {!local && o.esboco === 'gratis' && (
           <div className="md:col-span-3">
             <label className={rotulo}>Em quanto tempo entrega o esboço</label>
             <input value={o.esboco_prazo} onChange={e => set('esboco_prazo', e.target.value)} placeholder="Ex.: em até 48 horas" className={campo} />
           </div>
         )}
-        {o.esboco === 'pago' && (
+        {!local && o.esboco === 'pago' && (
           <div className="md:col-span-3">
             <label className={rotulo}>Preço do esboço (R$)</label>
             <input inputMode="decimal" value={o.esboco_preco} onChange={e => set('esboco_preco', e.target.value)} className={campo} />
@@ -145,6 +184,7 @@ export const OfertaDoRobo: React.FC<{ valor?: Partial<OfertaRobo>; onChange: (o:
             placeholder="Só o que é verdade: o robô não inventa outros" className={campo} />
         </div>
 
+        {!local && (<>
         <div className="md:col-span-3 mt-2 pt-4 border-t border-slate-100">
           <h3 className="text-sm font-bold text-slate-800">Quando o lead diz “quero fechar”</h3>
           <p className="text-xs text-slate-500 mt-0.5">O robô só usa o que estiver cadastrado; o que faltar, ele avisa você.</p>
@@ -189,6 +229,12 @@ export const OfertaDoRobo: React.FC<{ valor?: Partial<OfertaRobo>; onChange: (o:
             placeholder={'Logo\nFotos do negócio\nTextos dos serviços\nAcesso ao Instagram'} className={`${campo} resize-none`} />
         </div>
         </>)}
+        </>)}
+        {local && (
+          <div className="md:col-span-3 p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-xs text-emerald-900 leading-relaxed">
+            Quando o cliente diz “quero contratar”, o robô pede o serviço, a quantidade e o tipo de aparelho, o endereço e o melhor dia e horário, e avisa você para confirmar a visita. Sem site, sem prévia.
+          </div>
+        )}
       </div>
 
       <div className="mt-5 p-3.5 rounded-xl bg-blue-50/70 border border-blue-100 text-[13px] text-blue-900 leading-relaxed flex gap-2.5">

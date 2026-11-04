@@ -244,6 +244,9 @@ class UserProfile(BaseModel):
     brand_contact: str = ""
     sites_quota: int = 0
     plan_id: str = "previa"
+    # Como a conta usa o sistema: "agencia" (vende sites, Google e marketing) ou "empresa" (vende o proprio servico, sem site).
+    # Vazio = conta antiga, que continua como agencia. Muda so a apresentacao (menus e oferta), nunca permissao.
+    modo: str = ""
 
 class SiteCopyRequest(BaseModel):
     """Conteudo do site escrito pela IA, a partir do lead ou do que o

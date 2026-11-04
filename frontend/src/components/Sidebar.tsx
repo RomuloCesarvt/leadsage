@@ -25,10 +25,12 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Logo } from './Logo';
+import { ehEmpresa } from '../lib/modoDaConta';
 
 export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> = ({ isOpen, toggleSidebar }) => {
   const { viewState, setViewState, user } = useApp() as any;
   const [admin, setAdmin] = useState(false);
+  const empresa = ehEmpresa(user);
   useEffect(() => { if (user) api.meuPlano().then(p => setAdmin(Boolean(p.admin))).catch(() => {}); }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const NavItem = ({ id, icon: Icon, label, disabled = false }: { id: string, icon: any, label: string, disabled?: boolean }) => (
@@ -87,15 +89,17 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> =
           <NavItem id="robo" icon={Bot} label="Robô de Atendimento" />
           <NavItem id="proposals" icon={FileText} label="Propostas" />
           <NavItem id="contracts" icon={ScrollText} label="Contratos" />
-          <NavItem id="calculator" icon={Calculator} label="Precificador" />
+          {!empresa && <NavItem id="calculator" icon={Calculator} label="Precificador" />}
         </div>
 
-        {/* Construtor Section */}
+        {/* Construtor Section (só agência: o modo empresa não vende site) */}
+        {!empresa && (
         <div className="space-y-1">
           <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Construtor</p>
           <NavItem id="create-site" icon={Globe} label="Criar Site" />
           <NavItem id="my-sites" icon={LayoutTemplate} label="Meus Sites" />
         </div>
+        )}
 
         {/* Ajuda & Conta Section */}
         <div className="space-y-1">

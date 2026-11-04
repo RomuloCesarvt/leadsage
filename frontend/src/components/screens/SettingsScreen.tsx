@@ -1,3 +1,4 @@
+import { modoDaConta } from '../../lib/modoDaConta';
 import React, { useState, useEffect } from 'react';
 import { Save, User, Target, Globe, Check, AlertCircle, Image as ImageIcon, Palette } from 'lucide-react';
 import { prepararImagem } from '../../lib/imagem';
@@ -192,6 +193,21 @@ export const SettingsScreen: React.FC = () => {
               <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
                 <Target className="w-5 h-5 text-blue-600" /> Preferências de Prospecção
               </h2>
+
+              <div className="mb-8 p-4 rounded-xl border border-slate-200 bg-slate-50">
+                <p className="text-sm font-bold text-slate-800">Como você usa o LeadSage</p>
+                <p className="text-xs text-slate-500 mt-0.5 mb-3">Muda os menus e o serviço que o robô vende. Seus leads e conversas continuam como estão.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {([['agencia', 'Sou agência', 'Vendo sites, Google e marketing para outros negócios'], ['empresa', 'Tenho uma empresa', 'Vendo o meu próprio serviço, sem site']] as const).map(([id, titulo, texto]) => (
+                    <button key={id} type="button" aria-pressed={modoDaConta(user) === id}
+                      onClick={async () => { try { setUser(await api.updateProfile({ modo: id })); } catch { /* mantém o modo atual */ } }}
+                      className={`text-left p-3 rounded-xl border-2 transition-colors ${modoDaConta(user) === id ? 'border-blue-500 bg-blue-50/60' : 'border-slate-200 hover:border-slate-300'}`}>
+                      <span className="block text-sm font-bold text-slate-800">{titulo}</span>
+                      <span className="block text-xs text-slate-500 mt-0.5">{texto}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <div className="space-y-6">
                 <div>
