@@ -55,6 +55,12 @@ def client():
     if os.path.exists(TEST_DB):
         os.remove(TEST_DB)
     CURRENT_UID["value"] = "alice"
+    profile_store._PERFIS.clear()          # o perfil e o canal do robô ficam na memória por alguns segundos: cada teste começa do zero
+    import app.robo_store as _robo_store
+    _robo_store._CANAIS.clear()
+    _robo_store._IMPORTADOS.clear(); _robo_store._IMPORTAR_DEPOIS.clear()
+    import app.pipeline_store as _pipeline_store
+    _pipeline_store._LISTA.clear()
     with TestClient(app) as c:
         yield c
     if os.path.exists(TEST_DB):

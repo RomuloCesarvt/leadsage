@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 
 from app.database import AsyncSessionLocal, DBDocument
+from app import robo_store
 from app.firebase_config import db as firestore_db
 
 KINDS = ("proposta", "contrato")
@@ -55,6 +56,42 @@ def _colecao(uid: str):
     return firestore_db.collection("users").document(uid).collection("documents")
 
 
+COLECAO = "documentos"
+
+
+async def _importar(uid: str) -> None:
+    """Copia os documentos antigos do Firestore para a tabela SQL, uma vez por usuário (nada é apagado lá).
+
+    Documento que já está no SQL só é trocado se o do Firestore for mais novo. Firestore sem cota: nada é marcado e tenta de novo depois."""
+    import time
+    try:
+        antigos = [dict(d.to_dict() or {}) for d in _colecao(uid).stream()]
+    except Exception as exc:
+        robo_store._FALHA[0] = time.monotonic()
+        robo_store.adiar_importacao(uid, COLECAO)
+        print(f"Importação dos documentos adiada (Firestore): {exc}")
+        return
+    campos = ("kind", "template_id", "title", "content", "fields", "lead_id", "created_at", "updated_at")
+    async with AsyncSessionLocal() as session:
+        for d in antigos:
+            if not d.get("id"):
+                continue
+            row = (await session.execute(select(DBDocument).where(DBDocument.id == d["id"], DBDocument.owner_uid == uid))).scalar_one_or_none()
+            if row is None:
+                session.add(DBDocument(owner_uid=uid, id=d["id"], **{k: d.get(k, "" if k != "fields" else {}) for k in campos}))
+            elif str(d.get("updated_at") or "") > str(row.updated_at or ""):
+                for k in campos:
+                    setattr(row, k, d.get(k, getattr(row, k)))
+        await session.commit()
+    await robo_store.marcar_importado(uid, COLECAO)
+
+
+async def _garantir_importado(uid: str) -> None:
+    """Com o Postgres no ar: traz os documentos antigos do Firestore uma única vez; depois o SQL é a única fonte."""
+    if firestore_db is not None and not await robo_store.sql_e_a_fonte(uid, COLECAO) and robo_store.pode_tentar_importar(uid, COLECAO):
+        await _importar(uid)
+
+
 async def create_document(
     uid: str,
     kind: str,
@@ -78,7 +115,7 @@ async def create_document(
         "updated_at": _agora(),
     }
 
-    if firestore_db is not None:
+    if firestore_db is not None and not robo_store._sql_primeiro():
         try:
             _colecao(uid).document(doc["id"]).set(doc)
             return doc
@@ -106,7 +143,7 @@ async def update_document(
         "updated_at": _agora(),
     }
 
-    if firestore_db is not None:
+    if firestore_db is not None and not robo_store._sql_primeiro():
         try:
             _colecao(uid).document(doc_id).set(mudanca, merge=True)
             return {**atual, **mudanca}
@@ -128,7 +165,9 @@ async def update_document(
 
 async def list_documents(uid: str, kind: Optional[str] = None) -> List[Dict[str, Any]]:
     """Lista sem o conteudo: a galeria nao precisa carregar cada texto."""
-    if firestore_db is not None:
+    if robo_store._sql_primeiro():
+        await _garantir_importado(uid)
+    elif firestore_db is not None:
         try:
             docs = _colecao(uid).stream()
             itens = [
@@ -151,7 +190,9 @@ async def list_documents(uid: str, kind: Optional[str] = None) -> List[Dict[str,
 
 
 async def get_document(uid: str, doc_id: str) -> Optional[Dict[str, Any]]:
-    if firestore_db is not None:
+    if robo_store._sql_primeiro():
+        await _garantir_importado(uid)
+    elif firestore_db is not None:
         try:
             snap = _colecao(uid).document(doc_id).get()
             if snap.exists:
@@ -168,7 +209,15 @@ async def get_document(uid: str, doc_id: str) -> Optional[Dict[str, Any]]:
 
 
 async def delete_document(uid: str, doc_id: str) -> bool:
-    if firestore_db is not None:
+    if robo_store._sql_primeiro():
+        await _garantir_importado(uid)
+        # se ainda não foi copiado (Firestore sem cota), apaga lá também, senão voltaria na cópia
+        if firestore_db is not None and not await robo_store.ja_importado(uid, COLECAO):
+            try:
+                _colecao(uid).document(doc_id).delete()
+            except Exception as exc:
+                print(f"Não apagou o documento no Firestore: {exc}")
+    elif firestore_db is not None:
         try:
             ref = _colecao(uid).document(doc_id)
             if ref.get().exists:

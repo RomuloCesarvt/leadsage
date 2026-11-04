@@ -74,8 +74,34 @@ async def _save_sqlite(uid: str, data: Dict[str, Any]) -> None:
         await session.commit()
 
 
+async def _importar(uid: str) -> None:
+    """Copia as integrações antigas do Firestore para o SQL, uma vez por usuário (o que já está no SQL manda; nada é apagado lá)."""
+    import time
+    from app import robo_store
+    try:
+        doc = firestore_db.collection("users").document(uid).get()
+        antigo = (doc.to_dict() or {}).get("integrations") if doc.exists else None
+    except Exception as exc:
+        robo_store._FALHA[0] = time.monotonic()
+        robo_store.adiar_importacao(uid, "integracoes")
+        print(f"Importação das integrações adiada (Firestore): {exc}")
+        return
+    if antigo:
+        await _save_sqlite(uid, {**dict(antigo), **(await _load_sqlite(uid) or {})})
+    await robo_store.marcar_importado(uid, "integracoes")
+
+
 async def get_integrations(uid: str) -> Dict[str, Any]:
     """Dados completos, com senha. Uso interno do dispatcher."""
+    from app import robo_store
+    if robo_store._sql_primeiro():
+        if firestore_db is not None and not await robo_store.sql_e_a_fonte(uid, "integracoes") and robo_store.pode_tentar_importar(uid, "integracoes"):
+            await _importar(uid)
+        try:
+            return await _load_sqlite(uid) or {}
+        except Exception as exc:
+            print(f"Falha ao ler integracoes no SQL: {exc}")
+            return {}
     if firestore_db is not None:
         try:
             doc = firestore_db.collection("users").document(uid).get()
@@ -103,8 +129,9 @@ async def save_integrations(uid: str, payload: Dict[str, Any]) -> Dict[str, Any]
     if not data.get("wa_token"):
         data.pop("wa_token", None)
 
+    from app import robo_store
     written = False
-    if firestore_db is not None:
+    if firestore_db is not None and not robo_store._sql_primeiro():
         try:
             firestore_db.collection("users").document(uid).set(
                 {"integrations": data}, merge=True

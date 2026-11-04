@@ -310,9 +310,7 @@ async def _listar_saida(uid: str) -> List[Dict[str, Any]]:
             return [d.to_dict() for d in q.stream()]
         except Exception as exc:
             print(f"Conector: falha ao listar a saída: {exc}")
-    async with AsyncSessionLocal() as s:
-        rows = (await s.execute(select(DBRobo).where(DBRobo.uid == uid, DBRobo.tipo == "saida"))).scalars().all()
-        return [i for i in (dict(r.data or {}) for r in rows) if i.get("status") in ABERTOS]
+    return await robo_store._sql_listar_abertos(uid, "saida", ABERTOS)   # filtrado no banco: o histórico de saídas só cresce
 
 
 async def _fila_whatsapp(uid: str) -> List[Dict[str, Any]]:
@@ -324,7 +322,7 @@ async def _fila_whatsapp(uid: str) -> List[Dict[str, Any]]:
             return [d.to_dict() for d in q.stream()]
         except Exception as exc:
             print(f"Conector: falha ao listar a fila de WhatsApp: {exc}")
-    return [i for i in await fila_envio.listar(uid) if i.get("canal") == "whatsapp" and i.get("status") in ABERTOS]
+    return await fila_envio.listar_abertos(uid, "whatsapp", ABERTOS)
 
 
 async def _obter_saida(uid: str, sid: str) -> Optional[Dict[str, Any]]:
@@ -462,8 +460,8 @@ async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Di
     pedidos = await espelho_whatsapp.pedidos_para_o_conector(uid, agora)
     return {
         "tarefas": saida, "frios_hoje": frios_hoje, "limite_frio": limite, "motivo_sem_frio": motivo_sem_frio,
-        # quanto o Conector espera antes de perguntar de novo: depressa só com conversa em andamento
-        "proxima_em": 3 if pedidos["remoto"] else (8 if (saida or quente) else 90),
+        # quanto o Conector espera antes de perguntar de novo: depressa só com conversa em andamento; parado, de 2 em 2 minutos (cada pergunta custa uma ida ao banco)
+        "proxima_em": 3 if pedidos["remoto"] else (8 if (saida or quente) else 120),
         **pedidos,
     }
 

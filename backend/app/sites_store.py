@@ -8,6 +8,7 @@ sites antigos, que passam para o SQL quando sao lidos.
 """
 import re
 import secrets
+from time import monotonic as time_monotonic
 import unicodedata
 import uuid
 from datetime import datetime
@@ -16,6 +17,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 
 from app.database import AsyncSessionLocal, DBSite
+from app import robo_store
 from app.firebase_config import db as firestore_db
 
 # Firestore recusa documentos acima de ~1 MB.
@@ -118,19 +120,21 @@ def _fs_ler(uid: str, site_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def _fs_listar(uid: str) -> List[Dict[str, Any]]:
+def _fs_listar(uid: str) -> Optional[List[Dict[str, Any]]]:
+    """Os sites do Firestore; None quando ele recusou a leitura (diferente de "não tem nenhum")."""
     if firestore_db is None:
         return []
     try:
         return [dict(d.to_dict() or {}) for d in _fs_sites(uid).stream()]
     except Exception as exc:
+        robo_store._FALHA[0] = time_monotonic()
         print(f"Firestore: não listou os sites: {type(exc).__name__}")
-        return []
+        return None
 
 
 def _fs_gravar(uid: str, site: Dict[str, Any], so_mudancas: Optional[Dict[str, Any]] = None) -> None:
-    """Cópia no Firestore (melhor esforço: falhar aqui não perde nada, o SQL já tem)."""
-    if firestore_db is None:
+    """Cópia no Firestore (melhor esforço: falhar aqui não perde nada, o SQL já tem). Com o Postgres no ar não copia: o Firestore tem cota."""
+    if firestore_db is None or robo_store._sql_primeiro():
         return
     try:
         ref = _fs_sites(uid).document(site["id"])
@@ -259,7 +263,18 @@ async def list_sites(uid: str) -> List[Dict[str, Any]]:
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(DBSite).where(DBSite.owner_uid == uid))
         itens = {r.id: _row_to_dict(r, include_html=False) for r in result.scalars().all()}
-    for s in _fs_listar(uid):
+    copiando = False                                          # esta chamada vai copiar os sites antigos do Firestore para o SQL?
+    if robo_store._sql_primeiro() and await robo_store.sql_e_a_fonte(uid, "sites"):
+        antigos: Optional[List[Dict[str, Any]]] = []         # já copiado: o Firestore nem é lido
+    elif robo_store._sql_primeiro() and not robo_store.pode_tentar_importar(uid, "sites"):
+        antigos = []                                         # tentou há pouco e ele recusou: espera
+    else:
+        antigos = _fs_listar(uid)
+        copiando = robo_store._sql_primeiro() and firestore_db is not None
+        if copiando and antigos is None:
+            robo_store.adiar_importacao(uid, "sites")
+            copiando = False
+    for s in (antigos or []):
         if s.get("id") and s["id"] not in itens:
             # site que só existia no Firestore: passa a morar no SQL (assim o link público dele abre mesmo sem o índice antigo)
             if str(s.get("html") or "").strip():
@@ -268,6 +283,8 @@ async def list_sites(uid: str) -> List[Dict[str, Any]]:
                 except Exception as exc:
                     print(f"Não copiou o site {s['id']} para o SQL: {type(exc).__name__}")
             itens[s["id"]] = {k: v for k, v in s.items() if k not in ("html", "builder_data")}
+    if copiando:
+        await robo_store.marcar_importado(uid, "sites")      # todos os sites antigos já estão no SQL: o Firestore não é mais lido
     return sorted(itens.values(), key=lambda s: s.get("created_at") or "", reverse=True)
 
 
@@ -297,7 +314,7 @@ async def delete_site(uid: str, site_id: str) -> bool:
             await session.delete(row)
             await session.commit()
             apagou = True
-    if firestore_db is not None:
+    if firestore_db is not None and not (robo_store._sql_primeiro() and await robo_store.ja_importado(uid, "sites")):
         try:
             ref = _fs_sites(uid).document(site_id)
             doc = ref.get()

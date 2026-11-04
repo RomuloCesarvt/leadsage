@@ -20,6 +20,7 @@ from sqlalchemy import select
 from app.database import AsyncSessionLocal, DBRobo
 from app.firebase_config import db as firestore_db
 from app import agentes
+from app import robo_store
 from app.robo_store import agora
 
 # Ordem das colunas. "Perdido" fica fora da fila: e saida, nao progresso.
@@ -83,8 +84,41 @@ def _doc(uid: str, lead_id: str):
     return firestore_db.collection("users").document(uid).collection("pipeline").document(lead_id)
 
 
+COLECAO = "pipeline"
+
+
+async def _importar(uid: str) -> Optional[List[Dict[str, Any]]]:
+    """Copia o pipeline antigo do Firestore para o SQL, uma vez por usuário (nada é apagado lá).
+
+    Cada item só entra se o SQL ainda não tem ou se o do Firestore é mais novo: o que já foi gravado no SQL enquanto o Firestore estava sem cota
+    não é sobrescrito. Se o Firestore recusar a leitura, nada é marcado e a tentativa se repete depois de alguns minutos."""
+    try:
+        itens = [d.to_dict() for d in firestore_db.collection("users").document(uid).collection("pipeline").stream()]
+    except Exception as exc:
+        robo_store._FALHA[0] = time.monotonic()
+        robo_store.adiar_importacao(uid, COLECAO)
+        print(f"Importação do pipeline adiada (Firestore): {exc}")
+        return None
+    for i in itens:
+        if not i.get("id"):
+            continue
+        atual = await robo_store._sql_get(_chave(uid, i["id"]))
+        if atual is None or str(i.get("atualizado") or "") > str(atual.get("atualizado") or ""):
+            await robo_store._sql_put(_chave(uid, i["id"]), uid, "pipeline", i)
+    await robo_store.marcar_importado(uid, COLECAO)
+    return itens
+
+
+async def _garantir_importado(uid: str) -> None:
+    """Com o Postgres no ar: traz o pipeline antigo do Firestore uma única vez; depois o SQL é a única fonte."""
+    if firestore_db is not None and not await robo_store.sql_e_a_fonte(uid, COLECAO) and robo_store.pode_tentar_importar(uid, COLECAO):
+        await _importar(uid)
+
+
 async def _ler(uid: str, lead_id: str) -> Optional[Dict[str, Any]]:
-    if firestore_db is not None:
+    if robo_store._sql_primeiro():
+        await _garantir_importado(uid)
+    elif firestore_db is not None:
         try:
             doc = _doc(uid, lead_id).get()
             return doc.to_dict() if doc.exists else None
@@ -109,7 +143,7 @@ def _esquecer_lista(uid: str) -> None:
 async def _gravar(uid: str, item: Dict[str, Any]) -> None:
     _esquecer_lista(uid)
     item["atualizado"] = agora()
-    if firestore_db is not None:
+    if firestore_db is not None and not robo_store._sql_primeiro():
         try:
             _doc(uid, item["id"]).set(item)
             return
@@ -132,7 +166,10 @@ async def listar(uid: str) -> List[Dict[str, Any]]:
         return [dict(i) for i in guardado[1]]
     itens: List[Dict[str, Any]] = []
     lido = False
-    if firestore_db is not None:
+    sql_principal = robo_store._sql_primeiro()
+    if sql_principal:
+        await _garantir_importado(uid)
+    elif firestore_db is not None:
         try:
             itens = [d.to_dict() for d in firestore_db.collection("users").document(uid).collection("pipeline").stream()]
             lido = True
@@ -142,6 +179,7 @@ async def listar(uid: str) -> List[Dict[str, Any]]:
         async with AsyncSessionLocal() as s:
             rows = (await s.execute(select(DBRobo).where(DBRobo.uid == uid, DBRobo.tipo == "pipeline"))).scalars().all()
             itens = [dict(r.data or {}) for r in rows]
+        lido = sql_principal          # com o Postgres como fonte, a leitura também pode ser guardada por alguns segundos
     for i in itens:
         i["etapa"] = etapa_valida(i.get("etapa", "")) or "Novo Lead"
     itens.sort(key=lambda i: i.get("atualizado") or "", reverse=True)
@@ -273,7 +311,8 @@ async def achar_por_telefone(uid: str, telefone: str) -> Optional[Dict[str, Any]
 
 async def apagar(uid: str, lead_id: str) -> None:
     _esquecer_lista(uid)
-    if firestore_db is not None:
+    # com o SQL como fonte o Firestore nem é tocado; se este usuário ainda não foi copiado de lá, apaga lá também (senão voltaria na cópia)
+    if firestore_db is not None and not (robo_store._sql_primeiro() and await robo_store.ja_importado(uid, COLECAO)):
         try:
             _doc(uid, lead_id).delete()
         except Exception as exc:

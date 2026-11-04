@@ -38,6 +38,7 @@ EDITABLE_FIELDS = (
 SYSTEM_FIELDS = ("plan", "plan_id", "sites_quota", "modos")
 
 
+from app import robo_store
 from app.espaco import conta as _conta
 
 MODOS = ("agencia", "empresa")
@@ -72,14 +73,36 @@ async def _save_sqlite(uid: str, data: Dict[str, Any]) -> None:
         await session.commit()
 
 
-# Quase toda rota le o perfil (plano, creditos). Guardado por alguns segundos
-# so quando a leitura veio do Firestore; gravar no processo o esquece.
+# Quase toda rota le o perfil (plano, creditos, modos). Guardado por alguns segundos, venha de onde vier (Firestore ou SQL);
+# gravar no processo o esquece. Outra instancia do servidor pode ver o valor antigo por ate _PERFIS_TTL_S segundos.
 _PERFIS: Dict[str, Any] = {}
 _PERFIS_TTL_S = 20
 
 
 def esquecer_perfil(uid: str) -> None:
     _PERFIS.pop(uid, None)
+
+
+COLECAO = "perfil"
+
+
+async def _importar(uid: str) -> None:
+    """Copia o perfil antigo do Firestore para o SQL, uma vez por usuário (nada é apagado lá).
+
+    O que já está no SQL manda (foi gravado depois, enquanto o Firestore estava sem cota). Se o Firestore recusar a leitura, nada é marcado e a
+    tentativa se repete depois de alguns minutos."""
+    try:
+        doc = firestore_db.collection("users").document(uid).get()
+        no_firestore = (doc.to_dict() or {}).get("profile") if doc.exists else None
+    except Exception as exc:
+        robo_store._FALHA[0] = time.monotonic()
+        robo_store.adiar_importacao(uid, COLECAO)
+        print(f"Importação do perfil adiada (Firestore): {exc}")
+        return
+    if no_firestore:
+        no_sql = await _load_sqlite(uid) or {}
+        await _save_sqlite(uid, {**_clean(no_firestore, sistema=True), **no_sql})
+    await robo_store.marcar_importado(uid, COLECAO)
 
 
 async def get_profile(uid: str) -> UserProfile:
@@ -90,38 +113,53 @@ async def get_profile(uid: str) -> UserProfile:
         return guardado[1].model_copy(deep=True)
     stored: Optional[Dict[str, Any]] = None
     veio_do_firestore = False
+    leu_ok = False                       # alguma leitura respondeu: só então vale guardar (falha de banco nunca vira "perfil vazio" na memória)
 
-    if firestore_db is not None:
-        try:
-            doc = firestore_db.collection("users").document(uid).get()
-            veio_do_firestore = True
-            if doc.exists:
-                stored = (doc.to_dict() or {}).get("profile")
-        except Exception as exc:
-            print(f"Falha ao ler perfil no Firestore: {exc}")
-
-    if stored is None:
+    sql_principal = robo_store._sql_primeiro()
+    if sql_principal:
+        # Postgres no ar: o SQL é a única fonte (o perfil antigo é copiado do Firestore uma vez e nunca mais lido de lá)
+        if firestore_db is not None and not await robo_store.sql_e_a_fonte(uid, COLECAO) and robo_store.pode_tentar_importar(uid, COLECAO):
+            await _importar(uid)
         try:
             stored = await _load_sqlite(uid)
+            # perfil ainda não copiado do Firestore (ele recusou a leitura): o que veio do SQL pode estar incompleto, então não é guardado na memória
+            leu_ok = firestore_db is None or await robo_store.ja_importado(uid, COLECAO)
         except Exception as exc:
-            print(f"Falha ao ler perfil no SQLite: {exc}")
-    elif veio_do_firestore:
-        # o modo e os modos liberados também são gravados no SQL: com a cota do Firestore estourada a gravação lá é recusada,
-        # e ler só dele devolveria o perfil antigo (a troca de modo nunca pegaria)
-        try:
-            no_sql = await _load_sqlite(uid) or {}
-            for chave in ("modo", "modos"):
-                if chave in no_sql:
-                    stored = {**stored, chave: no_sql[chave]}
-        except Exception as exc:
-            print(f"Falha ao ler o modo no SQLite: {exc}")
+            print(f"Falha ao ler perfil no SQL: {exc}")
+    else:
+        if firestore_db is not None:
+            try:
+                doc = firestore_db.collection("users").document(uid).get()
+                veio_do_firestore = True
+                leu_ok = True
+                if doc.exists:
+                    stored = (doc.to_dict() or {}).get("profile")
+            except Exception as exc:
+                print(f"Falha ao ler perfil no Firestore: {exc}")
+
+        if stored is None:
+            try:
+                stored = await _load_sqlite(uid)
+                leu_ok = True
+            except Exception as exc:
+                print(f"Falha ao ler perfil no SQLite: {exc}")
+        elif veio_do_firestore:
+            # o modo e os modos liberados também são gravados no SQL: com a cota do Firestore estourada a gravação lá é recusada,
+            # e ler só dele devolveria o perfil antigo (a troca de modo nunca pegaria)
+            try:
+                no_sql = await _load_sqlite(uid) or {}
+                for chave in ("modo", "modos"):
+                    if chave in no_sql:
+                        stored = {**stored, chave: no_sql[chave]}
+            except Exception as exc:
+                print(f"Falha ao ler o modo no SQLite: {exc}")
 
     profile = UserProfile(id=uid)
     if stored:
         # leitura: inclui os campos de sistema
         for key, value in _clean(stored, sistema=True).items():
             setattr(profile, key, value)
-    if veio_do_firestore:
+    if leu_ok:
         _PERFIS[uid] = (time.monotonic(), profile.model_copy(deep=True))
     return profile
 
@@ -132,7 +170,7 @@ async def save_profile(uid: str, payload: Dict[str, Any]) -> UserProfile:
     data = _clean(payload)
 
     written = False
-    if firestore_db is not None:
+    if firestore_db is not None and not robo_store._sql_primeiro():
         try:
             firestore_db.collection("users").document(uid).set(
                 {"profile": data}, merge=True
@@ -168,7 +206,7 @@ async def liberar_modos(uid: str, modos: list) -> None:
     uid = _conta(uid)
     esquecer_perfil(uid)
     dados = {"modos": [m for m in modos if m in MODOS]}
-    if firestore_db is not None:
+    if firestore_db is not None and not robo_store._sql_primeiro():
         try:
             firestore_db.collection("users").document(uid).set({"profile": dados}, merge=True)
         except Exception as exc:
@@ -193,7 +231,7 @@ async def conceder_plano(uid: str, plano: str, sites: int, plan_id: str = "") ->
     if plan_id:
         dados["plan_id"] = plan_id
 
-    if firestore_db is not None:
+    if firestore_db is not None and not robo_store._sql_primeiro():
         try:
             firestore_db.collection("users").document(uid).set(
                 {"profile": dados}, merge=True

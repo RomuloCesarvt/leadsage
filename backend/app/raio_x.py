@@ -308,28 +308,41 @@ async def pixels_no_tag_manager(gtm_ids: List[str]) -> Dict[str, bool]:
 # ------------------------------------------------------------- cache
 
 async def ler_cache(uid: str, place_id: str) -> Optional[Dict[str, Any]]:
-    from app.robo_store import _sql_get
+    from app.robo_store import _sql_get, _sql_primeiro, _sql_put
     from app.firebase_config import db as firestore_db
 
     dados = None
-    if firestore_db is not None:
-        try:
-            doc = firestore_db.collection("users").document(uid).collection("raio_x").document(place_id).get()
-            dados = doc.to_dict() if doc.exists else None
-        except Exception as exc:
-            print(f"Falha ao ler raio-x: {exc}")
-    if dados is None:
+    if _sql_primeiro():
+        # Postgres no ar: o SQL é a fonte. Só quando ele não tem este lugar tenta o Firestore (uma leitura de um documento, e é uma busca que
+        # custaria um crédito de qualquer jeito); o que achar lá passa a morar no SQL.
         dados = await _sql_get(f"raiox:{uid}:{place_id}")
+        if dados is None and firestore_db is not None:
+            try:
+                doc = firestore_db.collection("users").document(uid).collection("raio_x").document(place_id).get()
+                dados = doc.to_dict() if doc.exists else None
+                if dados:
+                    await _sql_put(f"raiox:{uid}:{place_id}", uid, "raiox", dados)
+            except Exception as exc:
+                print(f"Falha ao ler raio-x antigo: {exc}")
+    else:
+        if firestore_db is not None:
+            try:
+                doc = firestore_db.collection("users").document(uid).collection("raio_x").document(place_id).get()
+                dados = doc.to_dict() if doc.exists else None
+            except Exception as exc:
+                print(f"Falha ao ler raio-x: {exc}")
+        if dados is None:
+            dados = await _sql_get(f"raiox:{uid}:{place_id}")
     if dados and time.time() - dados.get("gerado_em_ts", 0) < VALIDADE_CACHE:
         return dados
     return None
 
 
 async def gravar_cache(uid: str, place_id: str, dados: Dict[str, Any]) -> None:
-    from app.robo_store import _sql_put
+    from app.robo_store import _sql_primeiro, _sql_put
     from app.firebase_config import db as firestore_db
 
-    if firestore_db is not None:
+    if firestore_db is not None and not _sql_primeiro():
         try:
             firestore_db.collection("users").document(uid).collection("raio_x").document(place_id).set(dados)
             return

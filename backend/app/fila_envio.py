@@ -164,6 +164,23 @@ async def listar(uid: str) -> List[Dict[str, Any]]:
     return itens
 
 
+_FILA_NO_SQL: set = set()   # quem já teve a fila antiga copiada do Firestore para o SQL (não confere de novo a cada pergunta do conector)
+
+
+async def listar_abertos(uid: str, canal: str, status: Any) -> List[Dict[str, Any]]:
+    """Os itens da fila de um canal em certos estados, sem baixar o histórico inteiro (o conector pergunta o dia todo).
+
+    Com o SQL como principal e a fila já copiada do Firestore, o filtro é feito no banco; no resto, o jeito completo de `listar`."""
+    estados = list(status)
+    if robo_store._sql_primeiro():
+        if firestore_db is None or uid in _FILA_NO_SQL:
+            return await robo_store._sql_listar_abertos(uid, "fila", estados, canal)
+        if await robo_store._sql_get(f"sistema:fila_quente:{uid}"):
+            _FILA_NO_SQL.add(uid)
+            return await robo_store._sql_listar_abertos(uid, "fila", estados, canal)
+    return [i for i in await listar(uid) if i.get("canal") == canal and i.get("status") in estados]
+
+
 def _hoje_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 

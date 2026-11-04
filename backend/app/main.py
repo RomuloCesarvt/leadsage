@@ -1883,7 +1883,7 @@ class ConectorResultado(BaseModel):
 # A chave e conferida a cada chamada do Conector; guardar o canal por alguns
 # segundos poupa leituras do Firestore (que cobra por documento lido).
 _CACHE_CONECTOR: Dict[str, Any] = {}
-_CACHE_CONECTOR_S = 15
+_CACHE_CONECTOR_S = 60      # o conector pergunta a cada 3 a 90 s: com 15 s a chave era relida no banco em quase toda pergunta
 
 
 async def _canal_do_conector(request: Request) -> Dict[str, Any]:

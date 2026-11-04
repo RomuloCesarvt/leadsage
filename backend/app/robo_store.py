@@ -66,6 +66,51 @@ def firestore_falhou_agora(janela_s: float = 15.0) -> bool:
     return time.monotonic() - _FALHA[0] < janela_s
 
 
+# ------------------------------------------------- Firestore -> SQL, uma vez por usuário e coleção
+#
+# Com o Postgres no ar, o SQL passa a ser a única fonte: o Firestore tem cota diária de leituras e escritas, e já respondeu 429. Cada coleção
+# antiga de um usuário é COPIADA para o SQL uma única vez (sem apagar nada no Firestore); depois disso nunca mais é lida nem gravada lá.
+# Este marcador diz "este usuário já foi copiado". Se a cópia falhar (Firestore sem cota), o marcador NÃO é gravado e o SQL segue sozinho
+# até a próxima tentativa, depois de alguns minutos.
+_IMPORTADOS: set = set()
+_IMPORTAR_DEPOIS: Dict[str, float] = {}
+REPETIR_IMPORTACAO_S = 60.0
+
+
+async def ja_importado(uid: str, colecao: str) -> bool:
+    chave = f"{colecao}:{uid}"
+    if chave in _IMPORTADOS:
+        return True
+    if await _sql_get(f"sistema:import:{colecao}:{uid}"):
+        _IMPORTADOS.add(chave)
+        return True
+    return False
+
+
+async def marcar_importado(uid: str, colecao: str) -> None:
+    await _sql_put(f"sistema:import:{colecao}:{uid}", uid, "sistema", {"em": agora()})
+    _IMPORTADOS.add(f"{colecao}:{uid}")
+
+
+def pode_tentar_importar(uid: str, colecao: str) -> bool:
+    """Depois de uma tentativa que falhou, espera alguns minutos antes de gastar outra leitura do Firestore."""
+    return time.monotonic() - _IMPORTAR_DEPOIS.get(f"{colecao}:{uid}", 0.0) >= REPETIR_IMPORTACAO_S and not firestore_falhou_agora()
+
+
+def adiar_importacao(uid: str, colecao: str) -> None:
+    _IMPORTAR_DEPOIS[f"{colecao}:{uid}"] = time.monotonic()
+
+
+async def sql_e_a_fonte(uid: str, colecao: str) -> bool:
+    """True quando esta coleção do usuário vive só no SQL: Postgres no ar e (sem Firestore, ou já copiada de lá)."""
+    if not _sql_primeiro():
+        return False
+    from app.firebase_config import db as _fs
+    if _fs is None:
+        return True
+    return await ja_importado(uid, colecao)
+
+
 def agora() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -100,6 +145,27 @@ async def _sql_listar(uid: str, tipo: str) -> List[Dict[str, Any]]:
             await s.execute(select(DBRobo).where(DBRobo.uid == uid, DBRobo.tipo == tipo))
         ).scalars().all()
         return [dict(r.data or {}) for r in rows]
+
+
+async def _sql_listar_abertos(uid: str, tipo: str, status: Any, canal: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Só as linhas em aberto (ex.: status pendente/enviando), filtradas NO BANCO.
+
+    O conector pergunta por tarefas o dia inteiro, e o histórico (tudo que já saiu) só cresce: ler todas as linhas do usuário para filtrar
+    em Python baixava o histórico inteiro a cada pergunta (tráfego e tempo de banco gastos à toa). Se o banco recusar o filtro por JSON,
+    cai no jeito antigo, que é mais lento mas sempre funciona.
+    """
+    estados = list(status)
+    try:
+        condicoes = [DBRobo.uid == uid, DBRobo.tipo == tipo, DBRobo.data["status"].as_string().in_(estados)]
+        if canal:
+            condicoes.append(DBRobo.data["canal"].as_string() == canal)
+        async with AsyncSessionLocal() as s:
+            rows = (await s.execute(select(DBRobo).where(*condicoes))).scalars().all()
+        return [dict(r.data or {}) for r in rows]
+    except Exception as exc:
+        print(f"Filtro no banco indisponível, lendo tudo ({type(exc).__name__}): {str(exc)[:100]}")
+        itens = await _sql_listar(uid, tipo)
+        return [i for i in itens if i.get("status") in estados and (not canal or i.get("canal") == canal)]
 
 
 def _sql_primeiro() -> bool:
@@ -176,7 +242,7 @@ async def canal_do_usuario(uid: str) -> Optional[Dict[str, Any]]:
     if guardado and time.monotonic() - guardado[0] < _CANAIS_TTL_S:
         return dict(guardado[1])
     canal = await _canal_do_usuario(uid)
-    if canal is not None and firestore_db is not None and not firestore_falhou_agora(2.0):
+    if canal is not None and not firestore_falhou_agora(2.0):       # guarda também quando o Firestore nem está ligado (SQL puro)
         _CANAIS[uid] = (time.monotonic(), dict(canal))
     return canal
 
@@ -589,6 +655,8 @@ async def substituir_canal(uid: str, canal: Dict[str, Any]) -> Dict[str, Any]:
             _FALHA[0] = time.monotonic()
             print(f"Falha ao gravar canal do robo: {exc}")
     await _sql_put(f"canal:{canal['gancho']}", uid, "canal", canal)
+    _CANAIS.pop(canal.get("uid", ""), None)
+    _CANAIS.pop(uid, None)
     return canal
 
 
