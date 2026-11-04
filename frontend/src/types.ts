@@ -257,6 +257,8 @@ export interface UserProfile {
   plan_id?: string;
   /** como a conta usa o sistema: agência (sites, Google, marketing) ou empresa (vende o próprio serviço); vazio = conta antiga = agência */
   modo?: 'agencia' | 'empresa' | '';
+  /** os modos que a conta pode usar (os dois para quem comprou ou tem acesso total) */
+  modos?: Array<'agencia' | 'empresa'>;
 }
 
 export interface SearchHistoryItem {

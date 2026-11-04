@@ -27,6 +27,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { Logo } from './Logo';
 import { ehEmpresa } from '../lib/modoDaConta';
+import { SeletorDeModo } from './SeletorDeModo';
 
 export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> = ({ isOpen, toggleSidebar }) => {
   const { viewState, setViewState, user } = useApp() as any;
@@ -115,6 +116,8 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleSidebar: () => void }> =
         </div>
 
       </div>
+
+      <SeletorDeModo aoTrocar={() => { if (window.innerWidth < 768 && isOpen) toggleSidebar(); }} />
     </aside>
   );
 };

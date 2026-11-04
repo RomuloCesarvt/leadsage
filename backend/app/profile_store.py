@@ -35,7 +35,7 @@ EDITABLE_FIELDS = (
 # Concedidos pela compra: sao LIDOS do armazenamento, mas nunca aceitos
 # vindos do usuario. Separar leitura de escrita e o ponto: filtrar os
 # dois lados faria a cota sumir logo apos ser concedida.
-SYSTEM_FIELDS = ("plan", "plan_id", "sites_quota")
+SYSTEM_FIELDS = ("plan", "plan_id", "sites_quota", "modos")
 
 
 MODOS = ("agencia", "empresa")
@@ -44,8 +44,9 @@ MODOS = ("agencia", "empresa")
 def _clean(payload: Dict[str, Any], sistema: bool = False) -> Dict[str, Any]:
     permitidos = EDITABLE_FIELDS + (SYSTEM_FIELDS if sistema else ())
     limpo = {k: v for k, v in payload.items() if k in permitidos and v is not None}
-    if "modo" in limpo and limpo["modo"] not in MODOS + ("",):
-        del limpo["modo"]              # valor desconhecido nunca é gravado
+    # modo vazio ou desconhecido nunca é gravado: salvar o perfil por outra tela (que manda modo "") não pode apagar o modo escolhido
+    if "modo" in limpo and limpo["modo"] not in MODOS:
+        del limpo["modo"]
     return limpo
 
 
@@ -130,6 +131,30 @@ async def save_profile(uid: str, payload: Dict[str, Any]) -> UserProfile:
         await _save_sqlite(uid, data)
 
     return await get_profile(uid)
+
+
+def modos_permitidos(modos_gravados: Any, modo: str, acesso_total: bool) -> list:
+    """Os modos que a conta pode usar: os dois para acesso total; senão os liberados (comprados ou escolhidos ao criar a conta).
+    Conta antiga, sem nada gravado, é agência."""
+    if acesso_total:
+        return list(MODOS)
+    gravados = [m for m in (modos_gravados or []) if m in MODOS]
+    if gravados:
+        return gravados
+    return [modo] if modo in MODOS else ["agencia"]
+
+
+async def liberar_modos(uid: str, modos: list) -> None:
+    """Grava os modos liberados (compra ou criação da conta). Passa por fora de EDITABLE_FIELDS: o usuário não escolhe quais modos tem."""
+    esquecer_perfil(uid)
+    dados = {"modos": [m for m in modos if m in MODOS]}
+    if firestore_db is not None:
+        try:
+            firestore_db.collection("users").document(uid).set({"profile": dados}, merge=True)
+            return
+        except Exception as exc:
+            print(f"Falha ao liberar modos no Firestore: {exc}")
+    await _save_sqlite(uid, dados)
 
 
 async def conceder_plano(uid: str, plano: str, sites: int, plan_id: str = "") -> None:

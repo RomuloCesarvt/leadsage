@@ -41,6 +41,7 @@ from app.dispatcher import OutreachDispatcher, DispatchError, DISPATCH_COST
 from app.credit_system import check_and_deduct_credits, get_user_balance
 import httpx
 from app.firebase_config import get_current_user, db as firestore_db
+from app import profile_store
 from app.profile_store import get_profile, save_profile
 from app.sites_store import (
     create_site, update_site, list_sites, get_site, delete_site, contar_sites,
@@ -185,6 +186,9 @@ def _identidade(profile: UserProfile, user: dict) -> UserProfile:
     else:
         profile.plan = plano_de(profile.plan_id or "previa")["nome"]
     profile.oculta_assinatura = (user.get("email") or "").strip().lower() in settings.sem_assinatura_emails
+    profile.modos = profile_store.modos_permitidos(profile.modos, profile.modo, acesso_total(user.get("email")))
+    if profile.modo and profile.modo not in profile.modos:
+        profile.modo = profile.modos[0]          # modo que a conta não tem mais: volta para um que ela tem
     return profile
 
 
@@ -205,7 +209,21 @@ async def update_user_profile(profile: UserProfile, user: dict = Depends(get_cur
     compartilhada por todos os usuarios.
     """
     uid = user.get("uid")
-    saved = await save_profile(uid, profile.model_dump())
+    corpo = profile.model_dump()
+    corpo.pop("modos", None)                       # nunca vem do usuário
+    pedido = corpo.pop("modo", "")
+    atual = await get_profile(uid)
+    total = acesso_total(user.get("email"))
+    if pedido in profile_store.MODOS:
+        permitidos = profile_store.modos_permitidos(atual.modos, atual.modo, total)
+        primeira_vez = not atual.modos and not atual.modo and not total      # conta nova escolhendo ao entrar
+        if primeira_vez:
+            await profile_store.liberar_modos(uid, [pedido])
+            corpo["modo"] = pedido
+        elif pedido in permitidos:
+            corpo["modo"] = pedido                  # troca entre modos que a conta tem
+        # senão: modo que ela não comprou, ignorado
+    saved = await save_profile(uid, corpo)
     balance = await get_user_balance(uid, user.get("email"))
     saved.credits = balance.get("credits", 0)
     return _identidade(saved, user)
