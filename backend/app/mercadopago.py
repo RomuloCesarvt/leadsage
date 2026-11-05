@@ -153,3 +153,74 @@ async def consultar_pagamento(token: str, payment_id: str) -> Dict[str, Any]:
         "valor_centavos": int(round(float(dados.get("transaction_amount") or 0) * 100)),
         "metodo": dados.get("payment_method_id", ""),
     }
+
+
+# ----------------------------------------------------------------------------------------------- assinatura (cobrança mensal)
+
+def _erro(resp, padrao: str) -> str:
+    try:
+        dados = resp.json() if resp.content else {}
+    except Exception:
+        dados = {}
+    return dados.get("message") or dados.get("error") or padrao
+
+
+async def criar_assinatura(
+    token: str, order_id: str, titulo: str, valor_centavos: int, url_retorno: str, url_webhook: str, email_comprador: str,
+) -> Dict[str, Any]:
+    """Cria a assinatura mensal (preapproval) e devolve o link em que o cliente autoriza o cartão.
+
+    `external_reference` carrega o nosso id de pedido, como na compra avulsa: por ele o webhook reencontra a assinatura."""
+    payload: Dict[str, Any] = {
+        "reason": titulo,
+        "external_reference": order_id,
+        "payer_email": email_comprador,
+        "back_url": f"{url_retorno}?assinatura={order_id}",
+        "notification_url": url_webhook,
+        "auto_recurring": {"frequency": 1, "frequency_type": "months", "transaction_amount": round(valor_centavos / 100, 2), "currency_id": "BRL"},
+        "status": "pending",
+    }
+    async with httpx.AsyncClient(timeout=25.0) as client:
+        resp = await client.post(f"{API}/preapproval", headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"}, json=payload)
+    if resp.status_code >= 400:
+        raise RuntimeError(f"Mercado Pago recusou a assinatura: {_erro(resp, 'erro desconhecido')}")
+    dados = resp.json() if resp.content else {}
+    return {"assinatura_id": dados.get("id", ""), "checkout_url": dados.get("init_point") or dados.get("sandbox_init_point", "")}
+
+
+async def consultar_assinatura(token: str, assinatura_id: str) -> Dict[str, Any]:
+    """O estado REAL da assinatura na API do MP (é isso que autoriza, nunca o corpo do webhook)."""
+    async with httpx.AsyncClient(timeout=25.0) as client:
+        resp = await client.get(f"{API}/preapproval/{assinatura_id}", headers={"Authorization": f"Bearer {token}"})
+    if resp.status_code >= 400:
+        raise RuntimeError(f"Mercado Pago: {_erro(resp, 'não foi possível consultar a assinatura')}")
+    dados = resp.json() if resp.content else {}
+    return {
+        "id": str(dados.get("id", "")), "status": dados.get("status", ""),          # authorized | paused | cancelled | pending
+        "order_id": dados.get("external_reference", ""),
+        "proximo_debito": str(dados.get("next_payment_date") or "")[:10],
+    }
+
+
+async def consultar_cobranca_da_assinatura(token: str, cobranca_id: str) -> Dict[str, Any]:
+    """Uma cobrança mensal da assinatura (evento `subscription_authorized_payment`): de qual assinatura é e se o pagamento foi aprovado."""
+    async with httpx.AsyncClient(timeout=25.0) as client:
+        resp = await client.get(f"{API}/authorized_payments/{cobranca_id}", headers={"Authorization": f"Bearer {token}"})
+    if resp.status_code >= 400:
+        raise RuntimeError(f"Mercado Pago: {_erro(resp, 'não foi possível consultar a cobrança')}")
+    dados = resp.json() if resp.content else {}
+    pagamento = dados.get("payment") or {}
+    return {
+        "id": str(dados.get("id", "")), "assinatura_id": str(dados.get("preapproval_id", "")),
+        "pagamento_id": str(pagamento.get("id", "")), "status": pagamento.get("status", "") or dados.get("status", ""),
+        "aprovado": pagamento.get("status") == "approved",
+        "valor_centavos": int(round(float(dados.get("transaction_amount") or 0) * 100)),
+    }
+
+
+async def cancelar_assinatura(token: str, assinatura_id: str) -> None:
+    async with httpx.AsyncClient(timeout=25.0) as client:
+        resp = await client.put(f"{API}/preapproval/{assinatura_id}", headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                                json={"status": "cancelled"})
+    if resp.status_code >= 400:
+        raise RuntimeError(f"Mercado Pago não cancelou a assinatura: {_erro(resp, 'erro desconhecido')}")

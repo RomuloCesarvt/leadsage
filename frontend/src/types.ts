@@ -259,6 +259,12 @@ export interface UserProfile {
   modo?: 'agencia' | 'empresa' | '';
   /** os modos que a conta pode usar (os dois para quem comprou ou tem acesso total) */
   modos?: Array<'agencia' | 'empresa'>;
+  /** assinatura mensal: validade da licença paga e estado da cobrança (vindos só do pagamento confirmado) */
+  licenca_ate?: string;
+  assinatura_id?: string;
+  assinatura_status?: 'authorized' | 'paused' | 'cancelled' | '';
+  assinatura_plano?: string;
+  licenca_expirada?: boolean;
 }
 
 export interface SearchHistoryItem {

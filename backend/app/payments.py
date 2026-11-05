@@ -139,10 +139,37 @@ PACKAGES: List[Dict[str, Any]] = [
 PLANO_PADRAO = "previa"
 
 
+# Planos MENSAIS (assinatura): a licença vale enquanto a cobrança do mês estiver em dia. `credits` e `sites` são a cota de CADA mês.
+# O robô de atendimento é complemento (+R$ 100): as variantes `_robo` somam o recurso `robo_ia`; a Escala já traz o robô.
+_RECURSOS_ESSENCIAL = ["publicar_site", "ia_abordagem", "pipeline", "recarga"]
+_RECURSOS_PROFISSIONAL = _RECURSOS_ESSENCIAL + ["exportar_leads", "marca_propria", "templates_premium"]
+
+
+def _mensal(id_: str, nome: str, leads: int, sites: int, centavos: int, recursos: List[str], paises: List[str], robo: bool) -> Dict[str, Any]:
+    return {
+        "id": id_, "tipo": "assinatura", "nome": nome, "credits": leads, "sites": sites, "amount_cents": centavos, "paises": paises,
+        "recursos": recursos, "robo": robo, "periodo_dias": 31,
+        "descricao": f"{leads} leads e {sites} sites por mês" + (", com o robô de atendimento." if robo else "."), "destaque": False,
+    }
+
+
+PLANOS_MENSAIS: List[Dict[str, Any]] = [
+    _mensal("m_essencial", "Essencial", 150, 10, 12000, _RECURSOS_ESSENCIAL, ["BR"], False),
+    _mensal("m_essencial_robo", "Essencial + Robô de IA", 150, 10, 22000, _RECURSOS_ESSENCIAL + ["robo_ia"], ["BR"], True),
+    _mensal("m_profissional", "Profissional", 1000, 50, 25000, _RECURSOS_PROFISSIONAL, ["BR", "PT", "US"], False),
+    _mensal("m_profissional_robo", "Profissional + Robô de IA", 1000, 50, 35000, _RECURSOS_PROFISSIONAL + ["robo_ia"], ["BR", "PT", "US"], True),
+    _mensal("m_escala", "Escala", 3000, 200, 49700, list(RECURSOS), ["BR", "PT", "US"], True),
+]
+
+
+def achar_plano_mensal(plan_id: str) -> Optional[Dict[str, Any]]:
+    return next((p for p in PLANOS_MENSAIS if p["id"] == plan_id), None)
+
+
 def plano_de(plan_id: str) -> Dict[str, Any]:
-    """Plano do usuario. Quem nunca comprou cai na Previa Gratuita."""
+    """Plano do usuario (vitalício antigo ou mensal). Quem nunca comprou cai na Previa Gratuita."""
     return next(
-        (p for p in PLANS if p["id"] == (plan_id or PLANO_PADRAO)),
+        (p for p in PLANS + PLANOS_MENSAIS if p["id"] == (plan_id or PLANO_PADRAO)),
         PLANS[0],
     )
 
@@ -155,7 +182,7 @@ def paises_do_plano(plan_id: str) -> List[str]:
     return plano_de(plan_id).get("paises", ["BR"])
 
 
-ITENS = PLANS + PACKAGES
+ITENS = PLANS + PACKAGES + PLANOS_MENSAIS
 
 STATUS_VALIDOS = ("pending", "paid", "failed", "expired")
 
@@ -173,6 +200,7 @@ def catalogo() -> Dict[str, List[Dict[str, Any]]]:
     return {
         "planos": [_com_preco(p) for p in PLANS],
         "recargas": [_com_preco(p) for p in PACKAGES],
+        "mensais": [_com_preco(p) for p in PLANOS_MENSAIS],
     }
 
 
@@ -315,3 +343,42 @@ async def marcar_falha(provider_ref: str, motivo: str = "") -> None:
         if pedido and pedido.status == "pending":
             pedido.status = "failed"
             await session.commit()
+
+
+async def registrar_cobranca_da_assinatura(order_id: str, pagamento_id: str) -> Dict[str, Any]:
+    """Uma cobrança mensal APROVADA de uma assinatura: credita os leads do mês e estende a licença em um mês. Idempotente por pagamento.
+
+    Chamado só pelo webhook, depois da assinatura conferida e da consulta ao Mercado Pago (o corpo do aviso nunca autoriza nada).
+    O mesmo aviso chega mais de uma vez (reenvio) e por dois caminhos (pagamento e cobrança da assinatura): cada pagamento vale uma vez só."""
+    from app import profile_store, robo_store
+
+    if not order_id or not pagamento_id:
+        return {"status": "ignorado", "motivo": "faltou o pedido ou o pagamento"}
+    chave = f"cobranca:{pagamento_id}"
+    if await robo_store._sql_get(chave):
+        return {"status": "ja_processado", "pagamento_id": pagamento_id}
+
+    async with AsyncSessionLocal() as session:
+        pedido = (await session.execute(select(DBOrder).where(DBOrder.id == order_id))).scalar_one_or_none()
+        if not pedido or pedido.tipo != "assinatura":
+            return {"status": "ignorado", "motivo": "pedido de assinatura nao encontrado"}
+        plano = achar_plano_mensal(pedido.package_id)
+        if not plano:
+            return {"status": "ignorado", "motivo": "plano mensal desconhecido"}
+        uid, assinatura_id = pedido.owner_uid, pedido.provider_ref or ""
+        if pedido.status != "paid":
+            pedido.status, pedido.paid_at, pedido.provider_event = "paid", _agora(), pagamento_id
+        await session.commit()
+
+    # marca antes de creditar: se algo falhar daqui em diante, o reenvio não credita duas vezes (e o erro aparece para o dono resolver)
+    await robo_store._sql_put(chave, uid, "sistema", {"order_id": order_id, "em": _agora()})
+    saldo = await add_credits(uid, plano["credits"], f"Assinatura: {plano['nome']}")
+    ate = await profile_store.ativar_licenca(uid, plano, assinatura_id)
+    return {"status": "creditado", "pagamento_id": pagamento_id, "plano": plano["id"], "credits": plano["credits"], "saldo": saldo, "licenca_ate": ate}
+
+
+async def dono_da_assinatura(assinatura_id: str) -> Optional[Dict[str, Any]]:
+    """O pedido de assinatura ligado a uma assinatura do Mercado Pago (`provider_ref`)."""
+    async with AsyncSessionLocal() as session:
+        pedido = (await session.execute(select(DBOrder).where(DBOrder.provider_ref == assinatura_id, DBOrder.tipo == "assinatura"))).scalars().first()
+        return _para_dict(pedido) | {"owner_uid": pedido.owner_uid} if pedido else None

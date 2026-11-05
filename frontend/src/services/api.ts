@@ -563,6 +563,16 @@ export const api = {
     return await fetchWithToken(`/servico/visitas/${id}/retorno-avisado`, { method: 'POST' });
   },
 
+  async assinaturaConfig(): Promise<{ ativo: boolean }> {
+    try { return await fetchWithToken('/assinatura/config'); } catch { return { ativo: false }; }
+  },
+  async assinar(planoId: string): Promise<{ checkout_url: string }> {
+    return await fetchWithToken('/assinaturas', { method: 'POST', body: JSON.stringify({ plano_id: planoId }) });
+  },
+  async cancelarAssinatura(): Promise<{ status: string; licenca_ate: string }> {
+    return await fetchWithToken('/assinaturas/cancelar', { method: 'POST' });
+  },
+
   async meuPlano(): Promise<PlanoAtual> {
     try {
       return await fetchWithToken('/plan');

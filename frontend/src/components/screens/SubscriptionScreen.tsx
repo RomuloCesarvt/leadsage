@@ -1,13 +1,53 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Check } from 'lucide-react';
+import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { modoDaConta } from '../../lib/modoDaConta';
-import { COBRANCA_MENSAL_ATIVA, MODO_EXTRA, diferenciais, PLANOS_MENSAIS, ROBO_COMPLEMENTO, entregasDoPlano, entregasDoRobo, precoComRobo } from '../../data/planos';
+import { MODO_EXTRA, diferenciais, idNoServidor, PLANOS_MENSAIS, ROBO_COMPLEMENTO, entregasDoPlano, entregasDoRobo, precoComRobo } from '../../data/planos';
 
 export const SubscriptionScreen: React.FC = () => {
-  const { user } = useApp() as any;
+  const { user, refreshUserData } = useApp() as any;
   const modo = modoDaConta(user);
   const [comRobo, setComRobo] = useState(false);
+  const [pagamentoAtivo, setPagamentoAtivo] = useState(false);     // o servidor diz se a cobrança mensal está configurada de verdade
+  const [abrindo, setAbrindo] = useState('');
+  const [aviso, setAviso] = useState('');
+  const voltouDoPagamento = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('assinatura');
+
+  useEffect(() => { api.assinaturaConfig().then(c => setPagamentoAtivo(Boolean(c.ativo))); }, []);
+
+  // voltou do Mercado Pago: a licença entra quando ele confirma (webhook). A tela confere o perfil algumas vezes até aparecer.
+  useEffect(() => {
+    if (!voltouDoPagamento) return;
+    setAviso('Pagamento recebido pelo Mercado Pago. Estamos confirmando; sua licença é liberada em instantes.');
+    let n = 0;
+    const t = setInterval(async () => {
+      n += 1;
+      try { await refreshUserData?.(); } catch { /* tenta de novo */ }
+      if (n >= 12) clearInterval(t);
+    }, 5000);
+    return () => clearInterval(t);
+  }, [voltouDoPagamento]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const assinar = async (id: string) => {
+    setAbrindo(id); setAviso('');
+    try {
+      const { checkout_url } = await api.assinar(id);
+      if (checkout_url) window.location.href = checkout_url;
+      else setAviso('Não foi possível abrir o pagamento. Nenhuma cobrança foi feita.');
+    } catch (e: any) { setAviso(e?.message || 'Não foi possível iniciar a assinatura.'); }
+    finally { setAbrindo(''); }
+  };
+
+  const cancelar = async () => {
+    if (!confirm('Cancelar a assinatura? Você continua com o plano até o fim do período já pago e não será cobrado de novo.')) return;
+    try { await api.cancelarAssinatura(); await refreshUserData?.(); setAviso('Assinatura cancelada. Seu plano vale até o fim do período pago.'); }
+    catch (e: any) { setAviso(e?.message || 'Não foi possível cancelar agora.'); }
+  };
+
+  const nomeDoPlano = PLANOS_MENSAIS.find(p => `m_${p.id}` === (user?.assinatura_plano || '').replace(/_robo$/, ''))?.nome;
+  const dataBr = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '');
+  const statusTexto: Record<string, string> = { authorized: 'Ativa', paused: 'Pausada', cancelled: 'Cancelada (vale até o fim do período pago)' };
 
   return (
     <div className="flex-1 flex flex-col h-full relative max-w-6xl mx-auto w-full pb-12 pt-8">
@@ -37,6 +77,24 @@ export const SubscriptionScreen: React.FC = () => {
           <h2 className="text-2xl font-black text-slate-800">Planos mensais</h2>
           <p className="text-sm text-slate-500 mt-1">Você está no modo <b>{modo === 'empresa' ? 'Empresa' : 'Agência'}</b>: a lista de entregas abaixo é a do seu modo.</p>
         </div>
+        {aviso && <div className="max-w-2xl mx-auto mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-sm font-semibold text-center">{aviso}</div>}
+        {user?.licenca_expirada && (
+          <div className="max-w-2xl mx-auto mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm font-semibold text-center">
+            Sua assinatura venceu e sua conta voltou para a Prévia. Seus dados estão guardados: assine de novo para recuperar tudo.
+          </div>
+        )}
+        {user?.assinatura_plano && !user?.licenca_expirada && (
+          <div className="max-w-2xl mx-auto mb-8 p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Sua assinatura</p>
+              <p className="text-lg font-black text-slate-800">{nomeDoPlano || user.assinatura_plano}{user.assinatura_plano.endsWith('_robo') ? ' + Robô de IA' : ''}</p>
+              <p className="text-sm text-slate-500">{statusTexto[user.assinatura_status || ''] || '—'} · licença válida até <b>{dataBr(user.licenca_ate)}</b></p>
+            </div>
+            {user.assinatura_status === 'authorized' && (
+              <button onClick={cancelar} className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:text-red-600 hover:border-red-200">Cancelar assinatura</button>
+            )}
+          </div>
+        )}
         <div className="flex justify-center mb-8">
           <div className="bg-slate-100 p-1 rounded-full flex items-center shadow-inner" role="radiogroup" aria-label="Robô de atendimento">
             <button type="button" role="radio" aria-checked={!comRobo} onClick={() => setComRobo(false)}
@@ -88,9 +146,9 @@ export const SubscriptionScreen: React.FC = () => {
                   <button type="button" onClick={() => setComRobo(true)} className="mt-3 text-xs font-bold text-blue-600 hover:underline">Ver preço com o robô de IA</button>
                 )}
               </div>
-              <button disabled={!COBRANCA_MENSAL_ATIVA}
+              <button disabled={!pagamentoAtivo || abrindo !== ''} onClick={() => void assinar(idNoServidor(p, comRobo))}
                 className={`w-full py-3.5 rounded-2xl text-sm font-bold transition-colors disabled:cursor-not-allowed ${p.destaque ? 'bg-blue-600 text-white disabled:opacity-60' : 'bg-slate-900 text-white disabled:opacity-60'}`}>
-                {COBRANCA_MENSAL_ATIVA ? `Assinar ${p.nome}${comRobo && p.robo === 'complemento' ? ' com robô' : ''}` : 'Assinatura mensal em breve'}
+                {!pagamentoAtivo ? 'Assinatura mensal em breve' : abrindo === idNoServidor(p, comRobo) ? 'Abrindo pagamento...' : `Assinar ${p.nome}${comRobo && p.robo === 'complemento' ? ' com robô' : ''}`}
               </button>
             </div>
           ))}

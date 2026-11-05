@@ -9,6 +9,7 @@ dev local. No Vercel o SQLite fica em /tmp e e efemero, por isso o
 Firestore e o caminho duravel.
 """
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 from sqlalchemy import select
@@ -35,7 +36,7 @@ EDITABLE_FIELDS = (
 # Concedidos pela compra: sao LIDOS do armazenamento, mas nunca aceitos
 # vindos do usuario. Separar leitura de escrita e o ponto: filtrar os
 # dois lados faria a cota sumir logo apos ser concedida.
-SYSTEM_FIELDS = ("plan", "plan_id", "sites_quota", "modos")
+SYSTEM_FIELDS = ("plan", "plan_id", "sites_quota", "modos", "licenca_ate", "assinatura_id", "assinatura_status", "assinatura_plano")
 
 
 from app import robo_store
@@ -84,6 +85,24 @@ def esquecer_perfil(uid: str) -> None:
 
 
 COLECAO = "perfil"
+
+TOLERANCIA_DA_LICENCA_DIAS = 3      # a cobrança do mês às vezes compensa com um ou dois dias de atraso: ninguém perde o acesso por isso
+
+
+def _aplicar_validade(profile: UserProfile) -> None:
+    """Assinatura vencida (e sem renovação) volta para a Prévia na leitura. Nada é apagado: pagou de novo, volta tudo.
+
+    Só vale para quem tem licença mensal (`licenca_ate`); o plano vitalício antigo não tem validade."""
+    if not (profile.licenca_ate and profile.assinatura_plano):
+        return
+    try:
+        ate = datetime.fromisoformat(profile.licenca_ate)
+    except ValueError:
+        return
+    if ate.tzinfo is None:
+        ate = ate.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > ate + timedelta(days=TOLERANCIA_DA_LICENCA_DIAS):
+        profile.plan_id, profile.plan, profile.licenca_expirada = "previa", "", True
 
 
 async def _importar(uid: str) -> None:
@@ -159,6 +178,7 @@ async def get_profile(uid: str) -> UserProfile:
         # leitura: inclui os campos de sistema
         for key, value in _clean(stored, sistema=True).items():
             setattr(profile, key, value)
+    _aplicar_validade(profile)
     if leu_ok:
         _PERFIS[uid] = (time.monotonic(), profile.model_copy(deep=True))
     return profile
@@ -217,7 +237,7 @@ async def liberar_modos(uid: str, modos: list) -> None:
         print(f"Falha ao liberar modos no SQLite: {exc}")
 
 
-async def conceder_plano(uid: str, plano: str, sites: int, plan_id: str = "") -> None:
+async def conceder_plano(uid: str, plano: str, sites: int, plan_id: str = "", extra: Optional[Dict[str, Any]] = None) -> None:
     """Aplica o plano comprado. Chamado apenas pela confirmacao de pagamento.
 
     Passa por fora de EDITABLE_FIELDS: estes campos existem justamente
@@ -230,6 +250,8 @@ async def conceder_plano(uid: str, plano: str, sites: int, plan_id: str = "") ->
     dados = {"plan": plano, "sites_quota": (atual.sites_quota or 0) + sites}
     if plan_id:
         dados["plan_id"] = plan_id
+    if extra:
+        dados.update(extra)
 
     if firestore_db is not None and not robo_store._sql_primeiro():
         try:
@@ -240,4 +262,40 @@ async def conceder_plano(uid: str, plano: str, sites: int, plan_id: str = "") ->
         except Exception as exc:
             print(f"Falha ao conceder plano no Firestore: {exc}")
 
+    await _save_sqlite(uid, dados)
+
+
+async def ativar_licenca(uid: str, plano: Dict[str, Any], assinatura_id: str, agora: Optional[datetime] = None) -> str:
+    """Um mês de licença a mais (a cobrança do mês foi aprovada). Devolve a nova data de validade (ISO).
+
+    Soma a partir do que sobrou da licença anterior (renovação antecipada não perde dia) ou de agora (licença vencida ou primeira)."""
+    uid = _conta(uid)
+    agora = agora or datetime.now(timezone.utc)
+    atual = await get_profile(uid)
+    base = agora
+    if atual.licenca_ate:
+        try:
+            ate_antigo = datetime.fromisoformat(atual.licenca_ate)
+            ate_antigo = ate_antigo if ate_antigo.tzinfo else ate_antigo.replace(tzinfo=timezone.utc)
+            base = max(agora, ate_antigo)
+        except ValueError:
+            pass
+    ate = (base + timedelta(days=int(plano.get("periodo_dias") or 31))).isoformat(timespec="seconds")
+    await conceder_plano(uid, plano["nome"], int(plano.get("sites") or 0), plano["id"], {
+        "licenca_ate": ate, "assinatura_id": assinatura_id, "assinatura_status": "authorized", "assinatura_plano": plano["id"],
+    })
+    return ate
+
+
+async def marcar_assinatura(uid: str, status: str) -> None:
+    """authorized | paused | cancelled: o estado que o Mercado Pago informou. Cancelada não derruba a licença já paga: ela vale até `licenca_ate`."""
+    uid = _conta(uid)
+    esquecer_perfil(uid)
+    dados = {"assinatura_status": status}
+    if firestore_db is not None and not robo_store._sql_primeiro():
+        try:
+            firestore_db.collection("users").document(uid).set({"profile": dados}, merge=True)
+            return
+        except Exception as exc:
+            print(f"Falha ao marcar a assinatura no Firestore: {exc}")
     await _save_sqlite(uid, dados)

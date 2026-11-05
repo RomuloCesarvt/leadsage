@@ -1,11 +1,10 @@
 /**
  * Os planos mensais e o que cada um entrega. Uma fonte só: a tela de Assinatura e os testes leem daqui.
  * Valores definidos pelo dono em 04/11/2026 (Essencial, Profissional, robô de atendimento e Escala); o modo extra é sugestão a confirmar.
- * A cobrança recorrente ainda não está ligada: enquanto `cobranca` for false a tela mostra "em breve" no botão.
+ * Quem diz se a cobrança está ativa é o servidor (GET /api/assinatura/config): sem o token do Mercado Pago o botão fica em "em breve".
  */
 import type { ModoDaConta } from '../lib/modoDaConta';
 
-export const COBRANCA_MENSAL_ATIVA = false;
 
 export interface PlanoMensal {
   id: 'essencial' | 'profissional' | 'escala';
@@ -65,6 +64,9 @@ export const entregasDoRobo = (p: PlanoMensal): string[] => [
   'Pausa sozinho quando você assume a conversa',
   `Até ${n(p.conversas)} conversas por mês`,
 ];
+
+/** O id do plano no servidor (payments.py): o Essencial e o Profissional têm uma variante com o robô; a Escala já o traz. */
+export const idNoServidor = (p: PlanoMensal, comRobo: boolean): string => `m_${p.id}${comRobo && p.robo === 'complemento' ? '_robo' : ''}`;
 
 export const precoComRobo = (p: PlanoMensal): number => p.preco + (p.robo === 'incluso' ? 0 : ROBO_COMPLEMENTO);
 

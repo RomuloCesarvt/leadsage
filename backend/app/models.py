@@ -249,6 +249,12 @@ class UserProfile(BaseModel):
     modo: str = ""
     # Os modos que a conta pode usar (liberados na criação ou comprados): derivado na leitura, nunca aceito do corpo do PUT.
     modos: List[str] = Field(default_factory=list)
+    # Assinatura mensal: a licença vale até `licenca_ate` (data ISO). Gravados só pelo pagamento confirmado (nunca pelo corpo do PUT).
+    licenca_ate: str = ""
+    assinatura_id: str = ""
+    assinatura_status: str = ""       # authorized | paused | cancelled | "" (sem assinatura)
+    assinatura_plano: str = ""        # id do plano mensal contratado
+    licenca_expirada: bool = False    # derivado na leitura: havia licença e ela venceu (a conta voltou para a Prévia)
 
 class SiteCopyRequest(BaseModel):
     """Conteudo do site escrito pela IA, a partir do lead ou do que o

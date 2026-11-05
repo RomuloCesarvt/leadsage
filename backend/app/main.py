@@ -56,9 +56,10 @@ from app.ai_robo import decidir as robo_decidir
 from app.payments import (
     catalogo, criar_pedido, obter_pedido, listar_pedidos,
     confirmar_pagamento, achar_pacote, vincular_cobranca,
-    tem_recurso, paises_do_plano, plano_de,
+    tem_recurso, paises_do_plano, plano_de, PLANOS_MENSAIS, achar_plano_mensal, dono_da_assinatura,
 )
 from app import mercadopago
+from app.database import AsyncSessionLocal
 from app.documents_store import (
     create_document, update_document, list_documents, get_document, delete_document,
 )
@@ -620,6 +621,81 @@ async def iniciar_compra(req: CheckoutRequest, user: dict = Depends(usuario_do_e
     return {"order": pedido, "checkout_url": cobranca["checkout_url"]}
 
 
+def _pagamento_ativo() -> bool:
+    return settings.PAYMENT_PROVIDER == "mercadopago" and bool(settings.MERCADOPAGO_TOKEN)
+
+
+async def _evento_de_assinatura(tipo: str, data_id: str) -> Dict[str, Any]:
+    """Aviso do Mercado Pago sobre uma assinatura. O estado real vem da API deles; o aviso só diz "olhe a assinatura X"."""
+    token = settings.MERCADOPAGO_TOKEN
+    try:
+        if "authorized_payment" in tipo:
+            cobranca = await mercadopago.consultar_cobranca_da_assinatura(token, data_id)
+            if not cobranca["aprovado"]:
+                return {"status": "ignorado", "motivo": f"cobranca {cobranca['status'] or 'sem status'}"}
+            assinatura = await mercadopago.consultar_assinatura(token, cobranca["assinatura_id"])
+            from app.payments import registrar_cobranca_da_assinatura
+            return await registrar_cobranca_da_assinatura(assinatura["order_id"], cobranca["pagamento_id"])
+        assinatura = await mercadopago.consultar_assinatura(token, data_id)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    pedido = await dono_da_assinatura(assinatura["id"])
+    if not pedido:
+        return {"status": "ignorado", "motivo": "assinatura sem pedido"}
+    if assinatura["status"] in ("authorized", "paused", "cancelled"):
+        await profile_store.marcar_assinatura(pedido["owner_uid"], assinatura["status"])
+    return {"status": "atualizado", "assinatura": assinatura["status"]}
+
+
+class AssinaturaRequest(BaseModel):
+    plano_id: str
+
+
+@app.get("/api/assinatura/config")
+async def assinatura_config():
+    """A tela só liga os botões de assinar quando o pagamento está configurado de verdade (token do Mercado Pago na Vercel)."""
+    return {"ativo": _pagamento_ativo(), "planos": [{"id": p["id"], "preco_centavos": p["amount_cents"]} for p in PLANOS_MENSAIS]}
+
+
+@app.post("/api/assinaturas")
+async def assinar(req: AssinaturaRequest, user: dict = Depends(usuario_do_espaco)):
+    """Cria o pedido da assinatura e devolve o link em que o cliente autoriza a cobrança mensal. NÃO libera nada: a licença só entra pelo webhook."""
+    plano = achar_plano_mensal(req.plano_id)
+    if not plano:
+        raise HTTPException(status_code=400, detail="Plano mensal desconhecido.")
+    if not _pagamento_ativo():
+        raise HTTPException(status_code=503, detail="A cobrança mensal ainda não está ativa. Nenhuma cobrança foi feita.")
+    email = (user.get("email") or "").strip()
+    if not email:
+        raise HTTPException(status_code=400, detail="Sua conta não tem e-mail: o Mercado Pago exige um para a assinatura.")
+    pedido = await criar_pedido(user.get("uid"), plano["id"], "mercadopago")
+    try:
+        cobranca = await mercadopago.criar_assinatura(
+            token=settings.MERCADOPAGO_TOKEN, order_id=pedido["id"], titulo=f"LeadSage — {plano['nome']} (mensal)", valor_centavos=plano["amount_cents"],
+            url_retorno=f"{settings.APP_URL}/", url_webhook=f"{settings.APP_URL}/api/webhooks/pagamento", email_comprador=email,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    await vincular_cobranca(pedido["id"], "mercadopago", cobranca["assinatura_id"])
+    return {"order": pedido, "checkout_url": cobranca["checkout_url"]}
+
+
+@app.post("/api/assinaturas/cancelar")
+async def cancelar_assinatura(user: dict = Depends(usuario_do_espaco)):
+    """Cancela a cobrança dos próximos meses. A licença já paga continua valendo até a data de validade."""
+    perfil = await get_profile(user.get("uid"))
+    if not perfil.assinatura_id or perfil.assinatura_status == "cancelled":
+        raise HTTPException(status_code=404, detail="Você não tem uma assinatura ativa para cancelar.")
+    if not _pagamento_ativo():
+        raise HTTPException(status_code=503, detail="O pagamento não está configurado.")
+    try:
+        await mercadopago.cancelar_assinatura(settings.MERCADOPAGO_TOKEN, perfil.assinatura_id)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    await profile_store.marcar_assinatura(user.get("uid"), "cancelled")
+    return {"status": "cancelada", "licenca_ate": perfil.licenca_ate}
+
+
 @app.get("/api/orders")
 async def meus_pedidos(user: dict = Depends(usuario_do_espaco)):
     return await listar_pedidos(user.get("uid"))
@@ -660,9 +736,10 @@ async def webhook_pagamento(request: Request):
         or evento.get("id")
         or ""
     )
-    tipo = request.query_params.get("type") or evento.get("type") or evento.get("action", "")
-    if "payment" not in str(tipo):
-        return {"status": "ignorado", "motivo": "evento nao e de pagamento"}
+    tipo = request.query_params.get("type") or evento.get("type") or evento.get("topic") or evento.get("action", "")
+    eh_assinatura = "subscription" in str(tipo) or "preapproval" in str(tipo)
+    if "payment" not in str(tipo) and not eh_assinatura:
+        return {"status": "ignorado", "motivo": "evento nao e de pagamento nem de assinatura"}
 
     if not mercadopago.assinatura_confere(
         x_signature=request.headers.get("x-signature", ""),
@@ -672,6 +749,9 @@ async def webhook_pagamento(request: Request):
     ):
         raise HTTPException(status_code=401, detail="Assinatura invalida.")
 
+    if eh_assinatura:
+        return await _evento_de_assinatura(str(tipo), data_id)
+
     try:
         pagamento = await mercadopago.consultar_pagamento(settings.MERCADOPAGO_TOKEN, data_id)
     except Exception as e:
@@ -679,6 +759,14 @@ async def webhook_pagamento(request: Request):
 
     if not pagamento["aprovado"]:
         return {"status": "ignorado", "motivo": f"pagamento {pagamento['status']}"}
+
+    # cobrança mensal de uma assinatura chegando como "pagamento": o pedido é de assinatura, então renova a licença (uma vez por pagamento)
+    from app.payments import registrar_cobranca_da_assinatura
+    from app.database import DBOrder as _DBOrder
+    async with AsyncSessionLocal() as _s:
+        _p = (await _s.execute(select(_DBOrder).where(_DBOrder.id == pagamento["order_id"]))).scalar_one_or_none() if pagamento["order_id"] else None
+    if _p is not None and _p.tipo == "assinatura":
+        return await registrar_cobranca_da_assinatura(pagamento["order_id"], pagamento["id"])
 
     return await confirmar_pagamento(
         provider_ref=pagamento["id"],

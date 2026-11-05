@@ -1,5 +1,5 @@
 /** Rodar: cd frontend && npx tsx src/data/planos.test.ts */
-import { COBRANCA_MENSAL_ATIVA, PLANOS_MENSAIS, entregasDoPlano, entregasDoRobo, precoComRobo } from './planos';
+import { PLANOS_MENSAIS, entregasDoPlano, entregasDoRobo, idNoServidor, precoComRobo } from './planos';
 
 let falhas = 0;
 const checar = (nome: string, ok: boolean) => { console.log(`  ${ok ? 'PASS ' : 'FALHA'} ${nome}`); if (!ok) falhas++; };
@@ -13,7 +13,7 @@ checar('agência vê sites; empresa não vê site e vê orçamento e visitas',
   entregasDoPlano(ess, 'empresa').some(t => t.includes('Orçamento automático')) && entregasDoPlano(ess, 'empresa').some(t => t.includes('visitas')));
 checar('cada plano maior entrega mais', pro.leads > ess.leads && esc.leads > pro.leads && pro.sites > ess.sites && esc.sites > pro.sites);
 checar('a escada de preço empurra do Essencial para o Profissional (mais de 6x os leads por menos de 2,2x o preço)', pro.leads / ess.leads > 6 && pro.preco / ess.preco < 2.2);
-checar('cobrança recorrente ainda desligada (botões "em breve")', COBRANCA_MENSAL_ATIVA === false);
+checar('ids dos planos batem com os do servidor (payments.py)', idNoServidor(ess, false) === 'm_essencial' && idNoServidor(ess, true) === 'm_essencial_robo' && idNoServidor(pro, true) === 'm_profissional_robo' && idNoServidor(esc, true) === 'm_escala' && idNoServidor(esc, false) === 'm_escala');
 
 checar('a lista do plano NÃO traz o robô (ele é um bloco à parte)', PLANOS_MENSAIS.every(p => (['agencia', 'empresa'] as const).every(m => !entregasDoPlano(p, m).some(t => /rob[ôo]/i.test(t)))));
 checar('o robô lista o que faz e o limite de conversas de cada plano', entregasDoRobo(ess).some(t => t.includes('150 conversas')) && entregasDoRobo(pro).some(t => t.includes('1.000 conversas')) && entregasDoRobo(esc).some(t => t.includes('3.000 conversas')));
