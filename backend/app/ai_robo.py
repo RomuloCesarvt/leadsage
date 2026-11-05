@@ -289,7 +289,8 @@ def pediu_o_link(texto: str) -> bool:
 _AFIRMA = re.compile(
     r"^(?:(?:oi|ola|opa|bom dia|boa tarde|boa noite|tudo bem|e ai|tudo bom)\b[ ]*)*"
     r"(?:(?:sim|pode sim|pode mandar|pode enviar|pode ser|pode|claro|com certeza|certo|ok|okay|beleza|blz|manda|mande|mandar|envia|envie|enviar|quero ver|quero sim|quero|"
-    r"bora|vamos|positivo|ta bom|tá bom|fechado|por favor|gostaria|aceito|isso|uhum|aham|tudo certo)\b[ ]*)+$")
+    r"bora|vamos|positivo|ta bom|tá bom|fechado|por favor|gostaria|aceito|isso|uhum|aham|tudo certo|"
+    r"pode fazer|pode montar|pode criar|pode preparar|pode seguir|pode comecar|pode começar|pode iniciar|vamos ver|to dentro|tô dentro|estou dentro|vou querer)\b[ ]*)+$")
 _OFERTA_DE_PREVIA = re.compile(r"\b(previa|site|link|esboco|modelo|layout|ideia|mostrar|exemplo|projeto)\b")
 
 
@@ -425,7 +426,12 @@ def decidir(
 
     # "Quero fechar": o robo entrega o checklist do fechamento (valor, Pix, contrato, material) em vez de perguntar de novo.
     # Sai de codigo, so com o que o dono cadastrou; uma vez por conversa, e uma pessoa assume para confirmar o pagamento.
-    if (fechamento.quer_fechar(texto) and not objecao_de_preco(texto) and not (sdr or {}).get("fechamento_enviado")):
+    # O aceite de ver a prévia ("pode fazer", "pode seguir", "to dentro" depois de "quer que eu monte uma prévia?") vem ANTES: não é pedido de fechamento.
+    # E sem ele ter visto o site, só um pedido explícito ("quero fechar", "onde pago", "manda o Pix") dispara o checklist: fechar cedo espanta quem ainda está conhecendo.
+    aceite_da_previa = not ai_oferta.sem_previa(cfg) and aceitou_a_previa(mensagens, lead)
+    previa_vista = bool((sdr or {}).get("previa_enviada")) or _ja_mandou_o_link(mensagens, lead) or ai_oferta.sem_previa(cfg)
+    if (fechamento.quer_fechar(texto) and not objecao_de_preco(texto) and not (sdr or {}).get("fechamento_enviado")
+            and not aceite_da_previa and (previa_vista or fechamento.quer_fechar_forte(texto))):
         montar_f = fechamento.montar_visita if ai_oferta.sem_previa(cfg) else fechamento.montar
         mensagens_f, pendencias = montar_f(cfg, lead, (sdr or {}).get("dados", {}).get("nome", "") if isinstance((sdr or {}).get("dados"), dict) else "")
         return Decisao(
@@ -434,7 +440,7 @@ def decidir(
         )
 
     # Aceitou a prévia ("pode", "manda"): o link sai agora, sem depender da IA (nem de cota dela).
-    if not ai_oferta.sem_previa(cfg) and aceitou_a_previa(mensagens, lead):
+    if aceite_da_previa:
         nome = (((sdr or {}).get("dados") or {}).get("nome") or "").strip().split(" ")[0]
         textos = [f"Perfeito{', ' + nome if nome else ''}! Aqui está a prévia: [LINK_DA_PREVIA]",
                   "Lembrando que é uma *prévia*, uma primeira ideia com fotos e textos de exemplo: no site de verdade entram as suas fotos e informações, e o layout "

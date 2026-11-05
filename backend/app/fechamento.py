@@ -19,6 +19,15 @@ _FECHAR = (
     r"(aceito|aprovado|aprovei)\b", r"\bbora (fechar|comecar|contratar)", r"vamos que vamos", r"pode mandar (o )?(contrato|pix|dados)",
 )
 _FECHAR_RE = re.compile("|".join(f"(?:{p})" for p in _FECHAR))
+# Intenção EXPLÍCITA de fechar/pagar/contratar. As outras frases de _FECHAR ("pode fazer", "pode seguir", "pode começar", "aceito", "to dentro",
+# "quero o site") também são o que o lead diz quando só ACEITA VER a prévia ("quer que eu monte uma?" -> "pode fazer"): sozinhas, antes de ele ter visto
+# o site, não são pedido de fechamento.
+_FORTE = (
+    r"quero fechar", r"vamos fechar", r"pode fechar", r"podemos fechar", r"vamos (la|nessa|sim)\b.*\b(fechar|contratar)",
+    r"quero (contratar|assinar)", r"vamos contratar", r"como (faco|fazemos|eu faco) (pra|para) (fechar|contratar|pagar)", r"onde (eu )?pago",
+    r"manda (o )?(pix|a chave|os dados)", r"qual (o )?pix", r"pode mandar (o )?(contrato|pix|dados)", r"\bbora (fechar|contratar)",
+)
+_FORTE_RE = re.compile("|".join(f"(?:{p})" for p in _FORTE))
 # "nao quero fechar", "ainda nao vou fechar": a negacao nao e fechamento
 _NEGA_RE = re.compile(r"\b(nao|nunca|jamais|ainda nao|talvez|quem sabe|se eu)\b[^.!?]{0,20}\b(fechar|contratar|comecar|querer|quero|vou|fechado)")
 
@@ -35,6 +44,14 @@ def quer_fechar(texto: str) -> bool:
     if _NEGA_RE.search(t):
         return False
     return bool(_FECHAR_RE.search(t))
+
+
+def quer_fechar_forte(texto: str) -> bool:
+    """Pediu para fechar/pagar/contratar com todas as letras (não só um "pode fazer" que também aceita ver a prévia)."""
+    t = _normal(texto)
+    if not t or len(t.split()) > 40 or _NEGA_RE.search(t):
+        return False
+    return bool(_FORTE_RE.search(t))
 
 
 def _brl(v: float) -> str:

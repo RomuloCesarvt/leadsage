@@ -370,11 +370,16 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
             <div>
               <label className={rotulo}>Objetivo da conversa</label>
               <select value={form.objetivo || 'agendar'} onChange={e => mudar('objetivo', e.target.value)} className={campo}>
-                <option value="agendar">Marcar uma conversa</option>
+                <option value="agendar">Marcar uma conversa (recomendado)</option>
                 <option value="site">Mostrar o site que já fiz para ele</option>
                 <option value="qualificar">Entender se tem interesse</option>
-                <option value="vender">Fechar a venda pela conversa</option>
+                <option value="vender">Levar até a venda (mais direto)</option>
               </select>
+              <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">
+                {(form.objetivo || 'agendar') === 'vender'
+                  ? 'Mais direto: o robô conduz até a venda, mas só fala de valor e de fechamento quando o cliente pedir. Para quem ainda está conhecendo, "Marcar uma conversa" costuma funcionar melhor.'
+                  : 'Em qualquer objetivo o robô primeiro entende, mostra o site e ouve a opinião. Valor e fechamento só entram quando o cliente pede.'}
+              </p>
             </div>
             <div>
               <label className={rotulo}>Link para agendar (opcional)</label>

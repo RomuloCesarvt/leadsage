@@ -27,7 +27,7 @@ import re as _re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from app import agentes, ai_oferta, identidade, nicho_guia, playbook_vendas, previa_honesta, quem_fala
+from app import agentes, ai_oferta, fechamento, identidade, nicho_guia, playbook_vendas, previa_honesta, quem_fala
 from app.playbook_sites import FALA_DO_ROBO_SOBRE_SITES
 
 ETAPAS = ("abertura", "descoberta", "diagnostico", "proposta", "objecao", "agendamento", "fechamento", "perdido")
@@ -367,7 +367,7 @@ def montar_prompt(
         "agendar": "marcar uma conversa de 15 minutos com o responsável (ligação ou vídeo)",
         "site": "fazer a pessoa abrir a prévia (uma primeira ideia do site, não o site final) feita para o negócio dela e ouvir a opinião",
         "qualificar": "entender se há interesse, quem decide, a dor e o momento — e só então propor a conversa",
-        "vender": "fechar a venda pela conversa, dentro do catálogo e das condições autorizadas",
+        "vender": "levar até a venda, dentro do catálogo e das condições autorizadas, mas só fechar quando o cliente demonstrar prontidão; antes disso, descobrir, mostrar e convidar para uma conversa",
     }.get(cfg.get("objetivo") or "agendar", "marcar uma conversa com o responsável")
     desconto = int(cfg.get("desconto_maximo") or 0)
     limite_palavras = 45 if canal == "whatsapp" else 35
@@ -380,7 +380,7 @@ def montar_prompt(
     reuniao_padrao = f"""== COMO TRAZER A REUNIÃO (o que separa SDR de atendente) ==
 1. Responda PRIMEIRO o que a pessoa perguntou, em uma frase; só depois conduza. Quem pergunta e não recebe resposta desconfia.
 2. Termine cada mensagem com UM próximo passo, no formato mais fácil de aceitar: pergunta de sim/não ou escolha entre duas opções.
-3. Regra dos 3 turnos: até a 3ª resposta do cliente já deve existir um convite concreto ({"fechar" if vender else "uma conversa de 15 minutos"} ou ver o material). Descoberta longa cansa e esfria.
+3. Regra dos 3 turnos: até a 3ª resposta do cliente já deve existir um convite concreto (uma conversa de 15 minutos ou ver o material). Descoberta longa cansa e esfria.
 4. Sinal de compra (perguntou preço, prazo, "como funciona", "quero ver", elogiou, disse que precisa): PARE de qualificar e proponha o horário agora.
 5. URGÊNCIA DA REUNIÃO: a conversa é no PRÓXIMO DIA ÚTIL. {prazo_da_reuniao(agora)}
    Convide com dois horários concretos NESSE MESMO dia (ex.: "amanhã, quinta, às 10h ou às 15h"), fora do horário de pico do ramo.
@@ -426,6 +426,15 @@ def montar_prompt(
     if local:
         meta = "levar a pessoa a pedir um orçamento ou agendar uma visita técnica sem compromisso, e combinar o melhor dia e horário"
     abertura = quem_fala or (f"{assistente}, da equipe de {quem}" if assistente else f"da equipe de {quem}")
+    objeto_ritmo = "o serviço e o orçamento" if local else "a prévia do site"
+    ritmo = f"""== RITMO: NÃO ACELERE (o que mais espanta o lead) ==
+Quem recebe sua mensagem ainda está conhecendo: muitas vezes nem sabe se quer comprar. A ordem é sempre esta, uma etapa por vez, e só avance quando a anterior aconteceu:
+1) entender (uma pergunta);  2) mostrar {objeto_ritmo};  3) ouvir a opinião dele;  4) convidar para uma conversa curta, para mostrar como poderia melhorar;
+5) SÓ quando ELE sinalizar que quer (pede preço, prazo, como paga, ou diz "quero fechar") falar de valor e de fechamento.
+PROIBIDO antes do passo 5: citar valor, promoção, Pix, sinal, forma de pagamento, contrato, "fechar" ou "garantir", e empurrar decisão. Responder a uma pergunta de preço dele é permitido
+(benefício antes do número). "Pode", "ok", "gostei", "quero ver" significam interesse em VER, não em comprar: mostre e pergunte o que achou.
+O objetivo marcado pelo dono é o ponto de CHEGADA da conversa, nunca o ponto de partida.
+"""
     prompt = f"""Você é {abertura}, conversando pelo {canal} com o dono de um negócio local.
 Agora é {_agora_brasil(agora)}.
 
@@ -441,6 +450,7 @@ Instruções do dono: {cfg.get('instrucoes') or '(nenhuma)'}
 == SEU OBJETIVO ==
 {meta}.
 
+{ritmo}
 == DOSSIÊ DESTE NEGÓCIO (use; é o que torna a conversa única) ==
 {_formatar_dossie(lead, raio)}
 
@@ -459,7 +469,7 @@ Avance uma etapa por vez: abertura → descoberta → diagnóstico → proposta 
   o que incomoda, se já tentou algo antes e se há prazo ou orçamento. Não pergunte o que o dossiê já responde.
 - Diagnóstico: devolva UM fato específico do dossiê que conecte com a dor dita por ele. Concreto, verificável.
 - Proposta: o que muda para o negócio dele, não a lista técnica do serviço.
-- {"Fechamento: confirme escopo, preço do catálogo e forma de pagamento; ao aceitar, passe para o humano formalizar." if vender else "Agendamento: proponha dois horários concretos (ou o link), evitando o pico do negócio dele (padaria cedo, restaurante no almoço e no jantar, comércio no sábado). Confirmado o horário, passe para o humano."}
+- {"Fechamento (SÓ depois de ELE pedir preço, prazo ou para fechar; antes disso, mostre e convide para a conversa): confirme escopo, preço do catálogo e forma de pagamento; ao aceitar, passe para o humano formalizar." if vender else "Agendamento: proponha dois horários concretos (ou o link), evitando o pico do negócio dele (padaria cedo, restaurante no almoço e no jantar, comércio no sábado). Confirmado o horário, passe para o humano."}
 - Lead frio que só respondeu "oi": devolva com o gancho mais forte do dossiê e uma pergunta.
 
 {conducao}
@@ -468,7 +478,7 @@ Avance uma etapa por vez: abertura → descoberta → diagnóstico → proposta 
 {playbook_vendas.METODO}
 == OBJEÇÕES: O QUE REALMENTE TRAVA E COMO RESPONDER ==
 {objecoes}
-{_bloco_do_gancho(mensagens, cfg, lead, ident)}{playbook_vendas.bloco_do_momento(ultima_do_cliente(mensagens), sdr, vender, _quem_assume(ident)) if not objecao_de_preco(ultima_do_cliente(mensagens)) else ""}
+{_bloco_do_gancho(mensagens, cfg, lead, ident)}{playbook_vendas.bloco_do_momento(ultima_do_cliente(mensagens), sdr, vender and fechamento.quer_fechar_forte(ultima_do_cliente(mensagens)), _quem_assume(ident)) if not objecao_de_preco(ultima_do_cliente(mensagens)) else ""}
 == PERSUASÃO: SÓ A LEGÍTIMA ==
 Use: prova social com dados REAIS do dossiê (a nota dele, as avaliações dele); aversão à perda (o cliente que
 procura e cai no concorrente); reciprocidade (o site/diagnóstico já feito para ele); pequenos sins antes do pedido
@@ -798,6 +808,27 @@ def compactar(prompt: str, limite_objecoes: int = 1500) -> str:
     return _re.sub(r"(?ms)^== OBJEÇÕES[^\n]*==\n.*?(?=^== |\Z)", curto, saida)
 
 
+# O robô puxando o fechamento sem o lead ter pedido: fala de Pix, sinal, contrato ou "fechar" quando ele nem tocou no assunto (valor por iniciativa já é barrado em forma_do_preco). É o que espanta quem
+# ainda está conhecendo o serviço. Vale para a resposta do modelo; as mensagens de código (promoção cadastrada, fechamento a pedido) não passam por aqui.
+_PUXA_FECHAMENTO = _re.compile(
+    r"\b(pix|chave pix|sinal de|sinal para|forma de pagamento|formas de pagamento|contrato|fechar (o |a )?(neg[oó]cio|venda|pedido|agora|hoje|conosco|comigo)|"
+    r"vamos fechar|podemos fechar|fecharmos|assinar|garantir (a |sua )?(vaga|promo))", _re.I)
+_LEAD_FALOU_DE_VALOR = _re.compile(
+    r"\b(quanto|valor|valores|pre[cç]o|custa|custo|investimento|pix|pagamento|pagar|parcel\w*|contrato|or[cç]amento|fechar|fechado|contratar|assinar|desconto|promo\w*|"
+    r"come[cç]ar|prazo|proposta)\b", _re.I)
+
+
+def puxou_o_fechamento(textos: List[str], mensagens: List[Dict[str, Any]]) -> Optional[str]:
+    """A resposta fala de Pix/contrato/"fechar"/valor sem o lead ter tocado nesse assunto nas últimas falas dele? Devolve o trecho, ou None."""
+    achou = _PUXA_FECHAMENTO.search(" ".join(textos))
+    if not achou:
+        return None
+    dele = " ".join(m.get("texto", "") for m in mensagens[-6:] if m.get("de") == "contato")
+    if _LEAD_FALOU_DE_VALOR.search(dele) or fechamento.quer_fechar_forte(dele):
+        return None
+    return achou.group(0)
+
+
 def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: List[Dict[str, Any]], lead: Optional[Dict[str, Any]] = None,
                           criando_previa: bool = False) -> List[str]:
     """`criando_previa`: o sistema vai criar o site agora e trocar [LINK_DA_PREVIA] pelo link; o marcador e a promessa do link valem."""
@@ -806,6 +837,11 @@ def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: Lis
     se_diz_robo = _SE_DIZ_ROBO.search(" ".join(textos))
     if se_diz_robo:
         erros.append(f"Nunca se apresente como assistente virtual, robô, bot ou IA (apareceu \"{se_diz_robo.group(0)}\"): apresente-se só pelo nome e pela empresa, como uma pessoa da equipe.")
+    # -0.5) fechamento puxado cedo demais: o lead ainda está conhecendo e nem falou de preço, Pix ou contrato
+    puxou = puxou_o_fechamento(textos, mensagens)
+    if puxou:
+        erros.append(f"Você puxou o fechamento (\"{puxou}\") sem o cliente ter perguntado de valor, pagamento ou contrato: ele ainda está conhecendo. Tire isso: mostre a prévia, ouça a opinião "
+                     "ou convide para uma conversa curta. Só fale de valor e de fechamento quando ELE pedir.")
     # 0) a prévia nunca é "o site pronto" nem "o site profissional que preparei"
     falso = previa_honesta.erro_de_site_pronto(textos)
     if falso:
