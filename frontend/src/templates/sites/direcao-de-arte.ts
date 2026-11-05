@@ -48,7 +48,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Morango', primaria: '#be185d', destaque: '#fbbf77' },
       { nome: 'Baunilha', primaria: '#a16207', destaque: '#f59e0b' },
     ],
-    modelos: ['forno', 'aurora', 'editorial', 'noir'], fonte: 'artesanal', fonteSerifa: 'artesanal', fonteSans: 'amigavel',
+    modelos: ['forno', 'aurora', 'editorial', 'noir', 'papel'], fonte: 'artesanal', fonteSerifa: 'artesanal', fonteSans: 'amigavel',
   },
   {
     id: 'comida', nome: 'Restaurante, pizza e lanche', palavras: ['restaurante', 'pizz', 'lanch', 'hamburg', 'bistro', 'churrasc', 'marmit', 'sushi', 'japones', 'comida', 'gastronom', 'bar ', 'boteco', 'petisc', 'rotisser'],
@@ -59,7 +59,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Pimenta', primaria: '#9b1c1c', destaque: '#f2b134' },
       { nome: 'Mostarda', primaria: '#b45309', destaque: '#fbbf24' },
     ],
-    modelos: ['mesa', 'aurora', 'editorial', 'noir'], fonte: 'artesanal', fonteSerifa: 'editorial', fonteSans: 'forte',
+    modelos: ['mesa', 'aurora', 'editorial', 'noir', 'papel'], fonte: 'artesanal', fonteSerifa: 'editorial', fonteSans: 'forte',
   },
   {
     id: 'barbearia', nome: 'Barbearia e tatuagem', palavras: ['barbear', 'tatuag', 'tattoo', 'piercing'],
@@ -69,7 +69,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Navalha', primaria: '#2b0f0f', destaque: '#e11d48' },
       { nome: 'Ouro velho', primaria: '#232323', destaque: '#d4af37' },
     ],
-    modelos: ['estudio', 'portfolio', 'noir', 'neon'], fonte: 'forte', fonteSerifa: 'editorial', fonteSans: 'forte',
+    modelos: ['estudio', 'portfolio', 'noir', 'neon', 'palco'], fonte: 'forte', fonteSerifa: 'editorial', fonteSans: 'forte',
   },
   {
     id: 'estetica', nome: 'Estética, beleza e bem-estar', palavras: ['estetica', 'harmoniz', 'spa', 'massagem', 'depila', 'sobrancelha', 'maquiag', 'salao', 'cabelei', 'beleza', 'manicure', 'unha', 'cilios', 'podolog', 'bem-estar', 'bem estar'],
@@ -80,7 +80,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Nude', primaria: '#a1695a', destaque: '#d9b99b' },
       { nome: 'Sálvia', primaria: '#5f7a6a', destaque: '#e6c79c' },
     ],
-    modelos: ['ritual', 'fragrancia', 'natural', 'noir', 'editorial', 'clinica', 'estudio'], fonte: 'luxo', fonteSerifa: 'luxo', fonteSans: 'moderna',
+    modelos: ['ritual', 'fragrancia', 'natural', 'noir', 'editorial', 'clinica', 'estudio', 'papel'], fonte: 'luxo', fonteSerifa: 'luxo', fonteSans: 'moderna',
   },
   {
     id: 'odonto', nome: 'Odontologia', palavras: ['odonto', 'dentist', 'ortodont', 'implante', 'sorriso'],
@@ -101,7 +101,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Lavanda', primaria: '#6b5b95', destaque: '#e6c79c' },
       { nome: 'Terracota suave', primaria: '#a1695a', destaque: '#8fb8a8' },
     ],
-    modelos: ['natural', 'escritorio', 'clinica', 'classico', 'editorial'], fonte: 'elegante', fonteSerifa: 'elegante', fonteSans: 'moderna',
+    modelos: ['natural', 'escritorio', 'clinica', 'classico', 'editorial', 'papel'], fonte: 'elegante', fonteSerifa: 'elegante', fonteSans: 'moderna',
   },
   {
     id: 'saude', nome: 'Saúde e clínicas', palavras: ['clinic', 'medic', 'saude', 'fisio', 'nutri', 'laborat', 'farmac', 'oftalm', 'ortoped', 'pediatr', 'quiropr', 'dermat', 'cardio', 'exame', 'hospital', 'gastro', 'ginecolog', 'urolog', 'endocrin', 'neurolog', 'otorrino', 'reumat', 'pneumo', 'oncolog', 'proctolog', 'hematolog', 'nefrolog', 'angiolog', 'alergist', 'imunolog', 'infectolog', 'mastolog', 'geriatr', 'obstetr', 'anestesi', 'cirurg', 'doutor', 'doutora', 'dr ', 'dra ', 'posto de saude', 'ambulatorio', 'vacina', 'reabilit', 'ultrassom', 'diagnost', 'olhos', 'consultorio', 'centro medico', 'pronto atend', 'pronto socorro', 'check up', 'checkup', 'clinico'],
@@ -112,7 +112,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Menta', primaria: '#0f766e', destaque: '#84cc16' },
       { nome: 'Céu', primaria: '#2563eb', destaque: '#06b6d4' },
     ],
-    modelos: ['clinica', 'natural', 'noir', 'editorial'], fonte: 'moderna', fonteSerifa: 'sobria', fonteSans: 'moderna',
+    modelos: ['clinica', 'natural', 'noir', 'editorial', 'papel'], fonte: 'moderna', fonteSerifa: 'sobria', fonteSans: 'moderna',
   },
   {
     id: 'juridico', nome: 'Advocacia, contabilidade e consultoria', palavras: ['advoga', 'advoca', 'juridic', 'contab', 'contador', 'seguro', 'consult', 'despachante', 'cartorio', 'notari'],
@@ -123,7 +123,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Grafite', primaria: '#2c3340', destaque: '#c0a062' },
       { nome: 'Bordô', primaria: '#5b1a2b', destaque: '#c8a35f' },
     ],
-    modelos: ['classico', 'escritorio', 'premio', 'noir', 'editorial'], fonte: 'sobria', fonteSerifa: 'sobria', fonteSans: 'moderna',
+    modelos: ['classico', 'escritorio', 'premio', 'noir', 'editorial', 'papel'], fonte: 'sobria', fonteSerifa: 'sobria', fonteSans: 'moderna',
   },
   {
     id: 'imoveis', nome: 'Imobiliária e corretagem', palavras: ['imobili', 'corretor', 'incorpor', 'locacao', 'condominio'],
@@ -133,7 +133,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Grafite e areia', primaria: '#3b3a36', destaque: '#c8a97e' },
       { nome: 'Musgo', primaria: '#3f4d3a', destaque: '#d2b48c' },
     ],
-    modelos: ['arquitetura', 'escritorio', 'classico', 'fintech'], fonte: 'editorial', fonteSerifa: 'editorial', fonteSans: 'moderna',
+    modelos: ['arquitetura', 'escritorio', 'classico', 'fintech', 'papel'], fonte: 'editorial', fonteSerifa: 'editorial', fonteSans: 'moderna',
   },
   {
     id: 'arquitetura', nome: 'Arquitetura, interiores e obras', palavras: ['arquitet', 'decoracao', 'interior', 'paisag', 'construtora', 'marcenar', 'movel', 'moveis', 'planejad', 'engenhar'],
@@ -143,7 +143,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Azul profundo', primaria: '#13405b', destaque: '#d6a03c' },
       { nome: 'Musgo', primaria: '#3f4d3a', destaque: '#d2b48c' },
     ],
-    modelos: ['arquitetura', 'planta', 'noir', 'escritorio', 'portfolio'], fonte: 'editorial', fonteSerifa: 'editorial', fonteSans: 'moderna',
+    modelos: ['arquitetura', 'planta', 'noir', 'escritorio', 'portfolio', 'papel'], fonte: 'editorial', fonteSerifa: 'editorial', fonteSans: 'moderna',
   },
   {
     id: 'oficina', nome: 'Mecânica, obras e indústria', palavras: ['mecan', 'oficina', 'auto pecas', 'autopecas', 'funilar', 'eletric', 'encanad', 'pintor', 'serralher', 'vidrac', 'material de constru', 'constru', 'reforma', 'industri', 'logistic', 'transport', 'guincho', 'borrachar', 'ar condicionado', 'refrigera'],
@@ -165,7 +165,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Neon', primaria: '#6d28d9', destaque: '#22d3ee' },
       { nome: 'Fogo', primaria: '#ea580c', destaque: '#fde047' },
     ],
-    modelos: ['impacto', 'neon', 'vibrante', 'estudio', 'noir'], fonte: 'forte', fonteSerifa: 'editorial', fonteSans: 'forte',
+    modelos: ['impacto', 'neon', 'vibrante', 'estudio', 'noir', 'palco'], fonte: 'forte', fonteSerifa: 'editorial', fonteSans: 'forte',
   },
   {
     id: 'educacao', nome: 'Escola, cursos e idiomas', palavras: ['escola', 'curso', 'idioma', 'infantil', 'creche', 'coaching', 'faculdade', 'reforco', 'musica', 'ingles', 'colegio'],
@@ -176,7 +176,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Verde aprender', primaria: '#059669', destaque: '#f97316' },
       { nome: 'Coral', primaria: '#e11d48', destaque: '#38bdf8' },
     ],
-    modelos: ['vibrante', 'campus'], fonte: 'amigavel', fonteSerifa: 'artesanal', fonteSans: 'amigavel',
+    modelos: ['vibrante', 'campus', 'palco'], fonte: 'amigavel', fonteSerifa: 'artesanal', fonteSans: 'amigavel',
   },
   {
     id: 'moda', nome: 'Joalheria, moda e presentes', palavras: ['joalher', 'perfum', 'boutique', 'moda', 'roupa', 'brinqued', 'presente', 'calcado', 'bolsa', 'oculos', 'relojo', 'loja de'],
@@ -187,7 +187,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Esmeralda', primaria: '#0b3d2e', destaque: '#d4b062' },
       { nome: 'Rosa antigo', primaria: '#6b3a4a', destaque: '#e7c9a9' },
     ],
-    modelos: ['fragrancia', 'estudio', 'noir', 'editorial', 'portfolio'], fonte: 'luxo', fonteSerifa: 'luxo', fonteSans: 'moderna',
+    modelos: ['fragrancia', 'estudio', 'noir', 'editorial', 'portfolio', 'papel', 'palco'], fonte: 'luxo', fonteSerifa: 'luxo', fonteSans: 'moderna',
   },
   {
     id: 'natureza', nome: 'Agro, jardim e produtos naturais', palavras: ['agro', 'rural', 'jardin', 'floricult', 'planta', 'organic', 'natural', 'horta', 'fazenda', 'viveiro', 'flores', 'floraria'],
@@ -197,7 +197,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Oliva', primaria: '#55612a', destaque: '#e3b04b' },
       { nome: 'Mata', primaria: '#166534', destaque: '#a3e635' },
     ],
-    modelos: ['agro', 'fragrancia', 'editorial'], fonte: 'artesanal', fonteSerifa: 'artesanal', fonteSans: 'moderna',
+    modelos: ['agro', 'fragrancia', 'editorial', 'papel'], fonte: 'artesanal', fonteSerifa: 'artesanal', fonteSans: 'moderna',
   },
   {
     id: 'tecnologia', nome: 'Tecnologia, software e marketing', palavras: ['tecnolog', 'software', 'sistema', 'aplicativo', 'marketing', 'agencia', 'startup', 'informatica', 'ti ', 'desenvolvimento', 'design', 'coworking', 'telecom', 'internet'],
@@ -207,7 +207,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Elétrico', primaria: '#2d3a8c', destaque: '#00b8a9' },
       { nome: 'Violeta', primaria: '#7c3aed', destaque: '#f472b6' },
     ],
-    modelos: ['fintech', 'b2b', 'bento', 'campus', 'portfolio'], fonte: 'tecnologica', fonteSerifa: 'editorial', fonteSans: 'tecnologica',
+    modelos: ['fintech', 'b2b', 'bento', 'campus', 'portfolio', 'palco'], fonte: 'tecnologica', fonteSerifa: 'editorial', fonteSans: 'tecnologica',
   },
   {
     id: 'turismo', nome: 'Hotel, pousada e turismo', palavras: ['hote', 'pousada', 'turismo', 'viagem', 'hostel', 'resort', 'camping', 'chale', 'hospedagem', 'passeio'],
@@ -217,7 +217,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Profundo', primaria: '#0c4a6e', destaque: '#fcd34d' },
       { nome: 'Ilha', primaria: '#0e7490', destaque: '#fb923c' },
     ],
-    modelos: ['editorial', 'noir'], fonte: 'elegante', fonteSerifa: 'elegante', fonteSans: 'moderna',
+    modelos: ['editorial', 'noir', 'papel', 'palco'], fonte: 'elegante', fonteSerifa: 'elegante', fonteSans: 'moderna',
   },
   {
     id: 'eventos', nome: 'Eventos, festas e fotografia', palavras: ['evento', 'festa', 'buffet', 'fotograf', 'cerimonial', 'casamento', 'decoracao de festa', 'dj', 'noturna', 'balada', 'espaco de eventos', 'game'],
@@ -227,7 +227,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Roxo festa', primaria: '#581c87', destaque: '#f0abfc' },
       { nome: 'Vinho', primaria: '#7f1d1d', destaque: '#fcd34d' },
     ],
-    modelos: ['estudio', 'neon', 'portfolio', 'editorial'], fonte: 'editorial', fonteSerifa: 'editorial', fonteSans: 'forte',
+    modelos: ['estudio', 'neon', 'portfolio', 'editorial', 'papel', 'palco'], fonte: 'editorial', fonteSerifa: 'editorial', fonteSans: 'forte',
   },
   {
     id: 'veiculos', nome: 'Veículos e concessionárias', palavras: ['concession', 'veiculo', 'carro', 'moto', 'seminovo', 'automov', 'locadora', 'estetica automotiva', 'lava jato'],
@@ -237,7 +237,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Azul noite', primaria: '#0f1f3d', destaque: '#94a3b8' },
       { nome: 'Preto e âmbar', primaria: '#18181b', destaque: '#f59e0b' },
     ],
-    modelos: ['showroom', 'noir'], fonte: 'forte', fonteSerifa: 'editorial', fonteSans: 'forte',
+    modelos: ['showroom', 'noir', 'palco'], fonte: 'forte', fonteSerifa: 'editorial', fonteSans: 'forte',
   },
   {
     id: 'financeiro', nome: 'Finanças e crédito', palavras: ['credito', 'financ', 'emprestimo', 'investiment', 'cambio', 'consorcio', 'cooperativa', 'banco', 'cobranca'],
@@ -246,7 +246,7 @@ const SEGMENTOS: Segmento[] = [
       { nome: 'Esmeralda', primaria: '#0a6b52', destaque: '#f2b705' },
       { nome: 'Azul banco', primaria: '#0b3b8c', destaque: '#38bdf8' },
     ],
-    modelos: ['credito', 'fintech', 'premio'], fonte: 'moderna', fonteSerifa: 'sobria', fonteSans: 'moderna',
+    modelos: ['credito', 'fintech', 'premio', 'palco'], fonte: 'moderna', fonteSerifa: 'sobria', fonteSans: 'moderna',
   },
   {
     id: 'limpeza', nome: 'Limpeza e serviços domésticos', palavras: ['limpeza', 'lavanderia', 'dedetiz', 'higieniz', 'diarista', 'conservadora', 'piscina', 'chaveiro', 'mudanca'],
