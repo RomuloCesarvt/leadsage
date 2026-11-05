@@ -343,7 +343,7 @@ def respostas_seguidas_do_robo(mensagens: List[Dict[str, Any]]) -> int:
     return n
 
 
-from app import ai_oferta, fechamento, identidade  # noqa: E402
+from app import ai_oferta, fechamento, identidade, playbook_vendas  # noqa: E402
 from app.ai_sdr import forma_do_preco, gancho_de_preco, montar_prompt, normalizar, objecao_de_preco, problemas_da_resposta, resolver_marcadores  # noqa: E402
 
 
@@ -433,7 +433,9 @@ def decidir(
     if (fechamento.quer_fechar(texto) and not objecao_de_preco(texto) and not (sdr or {}).get("fechamento_enviado")
             and not aceite_da_previa and (previa_vista or fechamento.quer_fechar_forte(texto))):
         montar_f = fechamento.montar_visita if ai_oferta.sem_previa(cfg) else fechamento.montar
-        mensagens_f, pendencias = montar_f(cfg, lead, (sdr or {}).get("dados", {}).get("nome", "") if isinstance((sdr or {}).get("dados"), dict) else "")
+        nome_f = (sdr or {}).get("dados", {}).get("nome", "") if isinstance((sdr or {}).get("dados"), dict) else ""
+        mensagens_f, pendencias = (montar_f(cfg, lead, nome_f) if ai_oferta.sem_previa(cfg)
+                                   else montar_f(cfg, lead, nome_f, bool((sdr or {}).get("promo_enviada"))))
         return Decisao(
             mensagens=mensagens_f, resposta=mensagens_f[0], passar_para_humano=True, motivo=fechamento.motivo_para_o_dono(pendencias, cfg),
             sdr={**(sdr or {}), "etapa": "fechamento", "temperatura": "quente", "fechamento_enviado": True, "fechamento_pendencias": pendencias},
@@ -448,10 +450,15 @@ def decidir(
         textos = resolver_marcadores(textos, lead)
         criar = not ((lead or {}).get("site_publicado") or "").strip()
         novo_sdr = {**(sdr or {}), "etapa": "diagnostico", "temperatura": "morno"}
-        if ai_oferta.promocao_ativa(cfg) and not novo_sdr.get("promo_enviada"):
-            textos.append(ai_oferta.mensagem_da_promocao(cfg, lead))
-            novo_sdr["promo_enviada"] = True
         return Decisao(resposta="\n\n".join(textos), mensagens=textos, sdr=novo_sdr, criar_previa=criar)
+
+    # Estilo comercial: o valor NÃO sai junto com o link. Só depois de a pessoa ver a prévia e reagir bem ("gostei", "ficou ótimo")
+    # é que o aviso da promoção sai, em código, com o preço e os itens que o dono cadastrou (uma vez por conversa).
+    if (ai_oferta.promocao_ativa(cfg) and previa_vista and not (sdr or {}).get("promo_enviada")
+            and not (sdr or {}).get("fechamento_enviado") and playbook_vendas.gostou_da_previa(texto)):
+        textos = ["Que bom que gostou! 🙌", ai_oferta.mensagem_da_promocao(cfg, lead)]
+        return Decisao(resposta="\n\n".join(textos), mensagens=textos,
+                       sdr={**(sdr or {}), "etapa": "proposta", "temperatura": "quente", "promo_enviada": True})
 
     prompt = montar_prompt(mensagens, canal, perfil, cfg, lead, raio=raio, sdr=sdr)
     n = normalizar(gerar_json(prompt), sdr)
@@ -530,13 +537,6 @@ def decidir(
         elif calc["fora_da_tabela"]:
             humano = True
             n["motivo"] = n["motivo"] or f"pediu algo fora da tabela ({', '.join(calc['fora_da_tabela'])[:80]}) — passe o valor"
-
-    # Estilo comercial: a previa foi enviada agora, entao o aviso da promocao vai logo atras do link (uma vez por conversa).
-    # Sai de codigo, com o preco e os itens que o dono cadastrou.
-    if (ai_oferta.promocao_ativa(cfg) and not (n["sdr"].get("promo_enviada") or (sdr or {}).get("promo_enviada"))
-            and (criar_previa or _tem_link(n["mensagens"])) and not humano):
-        n["mensagens"] = [*n["mensagens"], ai_oferta.mensagem_da_promocao(cfg, lead)]
-        n["sdr"] = {**n["sdr"], "promo_enviada": True}
 
     return Decisao(
         resposta="\n\n".join(n["mensagens"]),

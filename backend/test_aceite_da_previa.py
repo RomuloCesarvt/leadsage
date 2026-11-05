@@ -23,10 +23,10 @@ def test_sem_site_criado_o_servico_cria_a_previa_e_troca_o_marcador():
     assert d.criar_previa and "[LINK_DA_PREVIA]" in d.mensagens[0]
 
 
-def test_no_estilo_comercial_a_promocao_vem_logo_depois():
+def test_no_estilo_comercial_o_valor_nao_vai_junto_com_o_link():
     cfg = {"estilo": "comercial", "promocao": {"ativa": True, "preco": "600", "inclui": "Hospedagem por 1 ano"}, "oferta": {"servico": "site"}}
     d = _decidir([("robo", OFERTA), ("contato", "pode mandar")], cfg=cfg)
-    assert "R$ 600" in d.mensagens[-1] and d.sdr["promo_enviada"] is True
+    assert "R$ 600" not in "\n".join(d.mensagens) and not d.sdr.get("promo_enviada")
 
 
 def test_nao_confunde_outras_respostas():

@@ -72,7 +72,7 @@ def _itens_do_cliente(oferta: Dict[str, Any]) -> List[str]:
     return padrao.get(oferta.get("servico"), ["O material e as informações do seu negócio"])
 
 
-def montar_conversa(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]], nome: str = "") -> Tuple[List[str], List[str]]:
+def montar_conversa(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]], nome: str = "", sdr_promo_enviada: bool = False) -> Tuple[List[str], List[str]]:
     """Fechamento em forma de CONVERSA: deixa claro que o que ele viu e uma previa e convida para mostrar como pode ficar melhor.
 
     Sem Pix, sem lista de documentos: pagamento e contrato se acertam depois, na conversa, com uma pessoa."""
@@ -85,7 +85,7 @@ def montar_conversa(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]], nome: s
     if ai_oferta.promocao_ativa(cfg):
         promo = ai_oferta.normalizar_promocao(cfg.get("promocao"))
         itens = ai_oferta._itens(promo["inclui"])
-        m1 += f"\n\nE a condição que te passei continua: *{ai_oferta._brl(promo['preco'])}*" + (f", com {'; '.join(i[0].lower() + i[1:] for i in itens)}." if itens else ".")
+        m1 += f"\n\nE a condição {'que te passei continua' if sdr_promo_enviada else 'é'}: *{ai_oferta._brl(promo['preco'])}*" + (f", com {'; '.join(i[0].lower() + i[1:] for i in itens)}." if itens else ".")
     pergunta = "Que tal uma conversa rápida (uns 15 minutinhos) para eu te mostrar como ele pode ficar ainda melhor e acertar os detalhes com você?"
     agenda = (cfg.get("link_agenda") or "").strip()
     m2 = pergunta + (f" Pode escolher o melhor horário por aqui: {agenda}" if agenda else " Qual dia e horário ficam bons para você?")
@@ -114,11 +114,11 @@ def montar_visita(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]], nome: str
     return [m1, m2], []
 
 
-def montar(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]], nome: str = "") -> Tuple[List[str], List[str]]:
+def montar(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]], nome: str = "", sdr_promo_enviada: bool = False) -> Tuple[List[str], List[str]]:
     """(mensagens, pendencias_do_dono). Pendencias: o que o dono ainda nao cadastrou e uma pessoa precisa passar."""
     oferta = ai_oferta.normalizar(cfg.get("oferta") or {})
     if oferta["fechamento"] != "checklist":
-        return montar_conversa(cfg, lead, nome)
+        return montar_conversa(cfg, lead, nome, sdr_promo_enviada)
     if ai_oferta.promocao_ativa(cfg):
         # fecha-se pelo preco e pelos itens que foram anunciados na promocao
         promo = ai_oferta.normalizar_promocao(cfg.get("promocao"))

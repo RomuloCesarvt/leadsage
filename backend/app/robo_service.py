@@ -722,15 +722,6 @@ async def enviar_previa(uid: str, email: str, cid: str, enviar: Optional[Enviar]
     conversa["precisa_humano"] = False
     conversa["motivo"] = ""
     conversa.setdefault("sdr", {})["previa_enviada"] = url
-    # estilo comercial: a promoção vai logo atrás da prévia, uma vez por conversa
-    if ai_oferta.promocao_ativa(cfg) and not conversa["sdr"].get("promo_enviada"):
-        promo = ai_oferta.mensagem_da_promocao(cfg, lead)
-        try:
-            promo_id = await enviar(conversa["canal"], conversa["contato"], promo, {**cfg, "uid": uid})
-            conversa["mensagens"].append({"de": "robo", "texto": promo, "em": robo_store.agora(), "meta_id": promo_id})
-            conversa["sdr"]["promo_enviada"] = True
-        except meta_canais.EnvioFalhou as exc:
-            print(f"Promoção não enviada: {exc}")
     conversa["atualizado"] = robo_store.agora()
     await robo_store.salvar_conversa(uid, conversa)
     return conversa
@@ -774,19 +765,6 @@ async def enviar_previa_por_telefone(uid: str, email: str, telefone: str, chat_i
         conversa["precisa_humano"] = False
         conversa["motivo"] = ""
         conversa.setdefault("sdr", {})["previa_enviada"] = url
-    # estilo comercial: a promoção vai logo atrás da prévia, uma vez por conversa
-    if ai_oferta.promocao_ativa(cfg) and not ((conversa or {}).get("sdr") or {}).get("promo_enviada"):
-        promo = ai_oferta.mensagem_da_promocao(cfg, lead)
-        try:
-            if enviar is None and not (cfg.get("wa_token") and cfg.get("wa_phone_id")) and cfg.get("cw_hash"):
-                promo_id = await enfileirar_resposta(cfg, telefone, promo, chat_id)
-            else:
-                promo_id = await (enviar or meta_canais.enviar)("whatsapp", telefone, promo, cfg)
-            if conversa:
-                conversa["mensagens"].append({"de": "robo", "texto": promo, "em": robo_store.agora(), "meta_id": promo_id})
-                conversa["sdr"]["promo_enviada"] = True
-        except meta_canais.EnvioFalhou as exc:
-            print(f"Promoção não enviada: {exc}")
     if conversa:
         await robo_store.salvar_conversa(uid, conversa)
     return {"url": url, "texto": texto, "nome": nome}

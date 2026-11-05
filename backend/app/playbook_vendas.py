@@ -66,6 +66,21 @@ def cortina_de_fumaca(texto: str) -> bool:
     return bool(t) and len(t.split()) <= 40 and bool(_FUMACA_RE.search(t))
 
 
+_GOSTOU = re.compile(
+    r"\b(gostei|gostamos|curti|curtimos|adorei|amei|"
+    r"ficou (muito |bem |super )?(bom|boa|bonito|bonita|lindo|linda|legal|otimo|otima|show|top|profissional|incrivel|perfeito|perfeita)|"
+    r"achei (muito |bem |super )?(bom|boa|bonito|bonita|lindo|linda|legal|otimo|otima|interessante|show|top|profissional|incrivel)|"
+    r"(muito|bem|super) (bom|bonito|lindo|legal|otimo|top|interessante)|"
+    r"(show|top|legal|bacana|excelente|perfeito|maravilhoso|incrivel|lindo|bonito)( demais)?)\b")
+_NAO_GOSTOU = re.compile(r"\b(nao|nem|pouco|sem)\b.{0,15}\b(gostei|curti|ficou|achei|bom|bonito|legal|interess\w*)")
+
+
+def gostou_da_previa(texto: str) -> bool:
+    """Reação positiva curta à prévia ("gostei", "ficou ótimo", "achei muito bom"). Negações ("não gostei") e textos longos não contam."""
+    t = _normal(texto)
+    return bool(t) and len(t.split()) <= 25 and "?" not in t and bool(_GOSTOU.search(t)) and not _NAO_GOSTOU.search(t) and " mas " not in f" {t} "
+
+
 def sinal_de_compra(texto: str) -> bool:
     """Prazo, forma de pagamento, "gostei", "quero": a hora de parar de argumentar e facilitar o sim."""
     t = _normal(texto)

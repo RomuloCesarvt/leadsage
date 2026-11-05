@@ -403,7 +403,7 @@ def bloco_do_servico(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]]) -> str
         promo_txt = f"""
 
 == ESTILO COMERCIAL E PROMOÇÃO ATIVA ==
-PROMOÇÃO REAL: {nome} por {_brl(p['preco'])}, com: {itens}.{(' Válida ' + p['validade'] + '.') if p['validade'] else ''} O aviso dela sai automático depois do link da prévia (não o escreva nem repita); depois, cite só este preço e estes itens.
+PROMOÇÃO REAL: {nome} por {_brl(p['preco'])}, com: {itens}.{(' Válida ' + p['validade'] + '.') if p['validade'] else ''} O aviso dela sai automático quando o cliente reagir bem à prévia ("gostei"); NÃO o cite por iniciativa nem mande valor junto com o link. Depois de enviado, cite só este preço e estes itens.
 Tom entusiasmado e direto, com benefício concreto, e rumo a uma CONVERSA em que você mostra como melhorar o site: sem empurrar pagamento nem pedir Pix, documentos ou material. Lembre que o que ele viu é uma PRÉVIA (entram as fotos dele e o layout pode mudar).
 Nunca invente escassez, desconto, brinde ou prazo. O endereço é .vercel.app (sem custo de domínio): diga com clareza se perguntarem. "Quero fechar" tem resposta automática."""
     return f"""== O SERVIÇO QUE VOCÊ VENDE AGORA (fatos do dono; fora disso não existe) ==

@@ -76,3 +76,12 @@ def test_so_estas_frases_sao_pedido_explicito_de_fechamento():
         assert fechamento.quer_fechar_forte(t), t
     for t in ["pode fazer", "pode seguir", "pode começar", "aceito", "to dentro", "quero o site", "gostei", "quero ver"]:
         assert not fechamento.quer_fechar_forte(t), t
+
+
+def test_promocao_so_depois_de_gostar_da_previa():
+    from app import playbook_vendas
+    assert playbook_vendas.gostou_da_previa("Gostei!")
+    assert playbook_vendas.gostou_da_previa("ficou ótimo")
+    assert not playbook_vendas.gostou_da_previa("não gostei")
+    assert not playbook_vendas.gostou_da_previa("legal, mas não é meu estilo")
+    assert not playbook_vendas.gostou_da_previa("quanto custa?")

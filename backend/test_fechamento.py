@@ -50,12 +50,19 @@ def _decidir_com_modelo(cfg, resposta_do_modelo, sdr=None):
 MODELO_COM_LINK = {"mensagens": ["Claro! Aqui está a prévia: https://x.vercel.app/s/maria"], "etapa": "proposta", "passar_para_humano": False}
 
 
-def test_previa_enviada_no_estilo_comercial_traz_a_promocao_com_os_itens_exatos():
+def test_previa_enviada_no_estilo_comercial_nao_traz_o_valor_junto():
     d = _decidir_com_modelo(CFG_COMERCIAL, MODELO_COM_LINK)
-    assert len(d.mensagens) == 2 and "https://x.vercel.app/s/maria" in d.mensagens[0]
-    promo = d.mensagens[1]
+    assert len(d.mensagens) == 1 and "R$ 600" not in d.mensagens[0]
+    assert not d.sdr.get("promo_enviada")
+
+
+def test_depois_de_gostar_da_previa_sai_a_promocao_com_os_itens_exatos():
+    msgs = [{"de": "robo", "texto": "Aqui está a prévia: https://x.vercel.app/s/maria"}, {"de": "contato", "texto": "Gostei!"}]
+    d = ai_robo.decidir(msgs, "whatsapp", {"name": "Rômulo"}, CFG_COMERCIAL, {"id": "L1", "name": "Maria", "site_publicado": "https://x.vercel.app/s/maria"},
+                        lambda _: {}, None, {"previa_enviada": "https://x.vercel.app/s/maria"})
+    promo = d.mensagens[-1]
     assert "R$ 600" in promo and "Hospedagem por 1 ano" in promo and "sem custo de domínio" in promo and "Manutenção" in promo
-    assert d.sdr["promo_enviada"] is True
+    assert d.sdr["promo_enviada"] is True and not d.usou_ia
 
 
 def test_promocao_sai_uma_vez_so_e_so_no_estilo_comercial():
@@ -86,7 +93,8 @@ def test_quero_fechar_por_padrao_vira_conversa_e_deixa_claro_que_e_previa():
 
 
 def test_aviso_da_promocao_explica_que_e_previa_e_convida_para_conversa():
-    d = _decidir_com_modelo(CFG_COMERCIAL, MODELO_COM_LINK)
-    promo = d.mensagens[1]
+    msgs = [{"de": "robo", "texto": "Aqui está a prévia: https://x.vercel.app/s/maria"}, {"de": "contato", "texto": "gostei"}]
+    d = ai_robo.decidir(msgs, "whatsapp", {"name": "Rômulo"}, CFG_COMERCIAL, {"id": "L1", "name": "Maria"}, lambda _: {}, None, {"previa_enviada": "x"})
+    promo = d.mensagens[-1]
     assert "prévia" in promo and "suas fotos" in promo and "layout" in promo and "conversa rápida" in promo
     assert "quero fechar" not in promo
