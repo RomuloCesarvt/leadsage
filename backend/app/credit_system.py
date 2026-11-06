@@ -17,11 +17,16 @@ class BancoDeCreditosIndisponivel(RuntimeError):
     que o de servir buscas pagas de graca para qualquer visitante."""
 
 
-from app.espaco import conta as _conta
 
 
 # Teste grátis de quem cria a conta: 10 leads, sem cartão. Mais que isso só com assinatura (tela Assinatura).
 SALDO_INICIAL = 10
+
+
+def saldo_inicial(carteira: str) -> int:
+    """Cada modo tem a sua carteira ("<uid>" = agência, "<uid>~empresa" = empresa). A de agência nasce com o teste grátis;
+    a de empresa nasce zerada (o teste dela é dado na criação da conta, escolhendo "empresa", ou comprando um plano)."""
+    return 0 if "~" in str(carteira) else SALDO_INICIAL
 
 
 def _sem_banco() -> None:
@@ -58,7 +63,7 @@ async def _sql_garantir(s, uid: str) -> DBCredito:
     """A linha de creditos do usuario; a primeira vez nasce com o saldo inicial."""
     linha = (await s.execute(select(DBCredito).where(DBCredito.uid == uid))).scalar_one_or_none()
     if linha is None:
-        linha = DBCredito(uid=uid, credits=SALDO_INICIAL, role="user", created_at=datetime.now().isoformat())
+        linha = DBCredito(uid=uid, credits=saldo_inicial(uid), role="user", created_at=datetime.now().isoformat())
         s.add(linha)
         await s.flush()
     return linha
@@ -125,7 +130,6 @@ async def check_and_deduct_credits(
     Admins e contas de acesso total (por e-mail ou pelo papel no Firestore) nao consomem creditos.
     Returns the new balance or None if insufficient credits.
     """
-    uid = _conta(uid)
     if acesso_total(email):
         return UNLIMITED
 
@@ -143,10 +147,10 @@ async def check_and_deduct_credits(
         # Criar documento mock se não existir
         user_ref.set({
             "role": "user",
-            "credits": SALDO_INICIAL,
+            "credits": saldo_inicial(uid),
             "createdAt": datetime.now().isoformat()
         })
-        user_data = {"role": "user", "credits": SALDO_INICIAL}
+        user_data = {"role": "user", "credits": saldo_inicial(uid)}
     else:
         user_data = user_doc.to_dict()
 
@@ -171,7 +175,6 @@ async def check_and_deduct_credits(
     return new_credits
 
 async def get_user_balance(uid: str, email: Optional[str] = None) -> Dict[str, Any]:
-    uid = _conta(uid)
     if acesso_total(email):
         return {"credits": UNLIMITED, "history": [], "is_admin": is_admin(email)}
 
@@ -197,7 +200,6 @@ async def get_user_balance(uid: str, email: Optional[str] = None) -> Dict[str, A
     return {"credits": credits, "history": history}
 
 async def add_credits(uid: str, amount: int, reason: str = "Recarga de Créditos (Pix/Cartão)") -> int:
-    uid = _conta(uid)
     if _sql_principal():
         return await _sql_somar(uid, amount, reason)
 
@@ -228,7 +230,6 @@ async def add_credits(uid: str, amount: int, reason: str = "Recarga de Créditos
 
 async def e_ilimitado(uid: str) -> bool:
     """O admin liberou creditos infinitos para este usuario?"""
-    uid = _conta(uid)
     if _sql_principal():
         async with AsyncSessionLocal() as s:
             linha = (await s.execute(select(DBCredito).where(DBCredito.uid == uid))).scalar_one_or_none()
@@ -246,7 +247,6 @@ async def e_ilimitado(uid: str) -> bool:
 
 async def definir_ilimitado(uid: str, ativo: bool, por: str = "") -> None:
     """Liga ou desliga os creditos infinitos de um usuario (so o admin chama)."""
-    uid = _conta(uid)
     if _sql_principal():
         async with AsyncSessionLocal() as s:
             linha = await _sql_garantir(s, uid)
@@ -263,3 +263,25 @@ async def definir_ilimitado(uid: str, ativo: bool, por: str = "") -> None:
         "description": f"Créditos infinitos {'liberados' if ativo else 'retirados'} por {por}",
         "amount": 0, "type": "credit", "timestamp": datetime.now().isoformat(),
     })
+
+
+async def conceder_teste_gratis(carteira: str, motivo: str = "Teste grátis") -> int:
+    """Dá o saldo do teste grátis à carteira, uma vez: se ela já tem movimento, não faz nada. Devolve o saldo."""
+    if _sql_principal():
+        async with AsyncSessionLocal() as s:
+            linha = (await s.execute(select(DBCredito).where(DBCredito.uid == carteira))).scalar_one_or_none()
+            if linha is not None:
+                return linha.credits or 0
+            linha = DBCredito(uid=carteira, credits=SALDO_INICIAL, role="user", created_at=datetime.now().isoformat())
+            s.add(linha)
+            s.add(_historico(carteira, motivo, SALDO_INICIAL, "credit"))
+            await s.commit()
+            return SALDO_INICIAL
+    if db is None:
+        _sem_banco()
+        return UNLIMITED
+    ref = db.collection("users").document(carteira)
+    if ref.get().exists:
+        return (ref.get().to_dict() or {}).get("credits", 0)
+    ref.set({"role": "user", "credits": SALDO_INICIAL, "createdAt": datetime.now().isoformat()})
+    return SALDO_INICIAL

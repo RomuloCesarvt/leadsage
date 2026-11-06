@@ -430,6 +430,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!espacoAtual) return;
     if (ultimoEspaco.current && ultimoEspaco.current !== espacoAtual) {
       api.getSearchHistory().then(setHistory).catch(() => { /* a lista chega no próximo carregamento */ });
+      // cada modo tem a sua carteira de leads: o saldo mostrado passa a ser o do modo novo
+      api.getCreditBalance().then((b: any) => setUser(u => (u && typeof b?.credits === 'number' ? { ...u, credits: b.credits } : u))).catch(() => { /* o saldo atualiza na próxima ação */ });
     }
     ultimoEspaco.current = espacoAtual;
   }, [espacoAtual]);

@@ -38,7 +38,8 @@ from app.ai_generator import AIGenerator
 from app.ai_site import gerar_conteudo_de_site
 from app.ai_docs import gerar_documento
 from app.dispatcher import OutreachDispatcher, DispatchError, DISPATCH_COST
-from app.credit_system import check_and_deduct_credits, get_user_balance
+from app.credit_system import check_and_deduct_credits, conceder_teste_gratis, get_user_balance
+from app.espaco import do_modo as _do_modo
 import httpx
 from app.firebase_config import get_current_user, db as firestore_db
 from app import profile_store
@@ -212,7 +213,7 @@ def _identidade(profile: UserProfile, user: dict) -> UserProfile:
 async def get_user_profile(user: dict = Depends(usuario_do_espaco)):
     uid = user.get("uid")
     profile = await get_profile(uid)
-    balance = await get_user_balance(uid, user.get("email"))
+    balance = await get_user_balance(_espaco(user), user.get("email"))
     profile.credits = balance.get("credits", 0)
     return _identidade(profile, user)
 
@@ -231,17 +232,21 @@ async def update_user_profile(profile: UserProfile, user: dict = Depends(usuario
     pedido = corpo.pop("modo", "")
     atual = await get_profile(uid)
     total = acesso_total(user.get("email"))
+    primeira_vez_empresa = False
     if pedido in profile_store.MODOS:
         permitidos = profile_store.modos_permitidos(atual.modos, atual.modo, total)
         primeira_vez = not atual.modos and not atual.modo and not total      # conta nova escolhendo ao entrar
         if primeira_vez:
             await profile_store.liberar_modos(uid, [pedido])
             corpo["modo"] = pedido
+            primeira_vez_empresa = pedido == "empresa"
         elif pedido in permitidos:
             corpo["modo"] = pedido                  # troca entre modos que a conta tem
         # senão: modo que ela não comprou, ignorado
+    if primeira_vez_empresa:
+        await conceder_teste_gratis(_do_modo(uid, "empresa"), "Teste grátis (LS Empresa)")
     saved = await save_profile(uid, corpo)
-    balance = await get_user_balance(uid, user.get("email"))
+    balance = await get_user_balance(_espaco(user), user.get("email"))
     saved.credits = balance.get("credits", 0)
     return _identidade(saved, user)
 
@@ -500,11 +505,11 @@ async def dispatch_outreach(
     "Enviado" de qualquer jeito.
     """
     await exigir_recurso(user, "ia_abordagem", "O disparo")
-    uid = user.get("uid")
+    uid = _espaco(user)
     email = user.get("email")
     balance = await get_user_balance(uid, email)
     current_credits = balance.get("credits", 0)
-    config = await get_integrations(uid)
+    config = await get_integrations(user.get("uid"))
 
     try:
         response = await OutreachDispatcher.dispatch_message(req, current_credits, config)
@@ -573,7 +578,7 @@ async def update_integrations(
 
 @app.get("/api/credits/balance")
 async def get_credits_balance(user: dict = Depends(usuario_do_espaco)):
-    return await get_user_balance(user.get("uid"), user.get("email"))
+    return await get_user_balance(_espaco(user), user.get("email"))
 
 @app.get("/api/packages")
 def listar_pacotes():
@@ -590,7 +595,7 @@ async def iniciar_compra(req: CheckoutRequest, user: dict = Depends(usuario_do_e
     vez de liberar de graca.
     """
     try:
-        pedido = await criar_pedido(user.get("uid"), req.package_id, settings.PAYMENT_PROVIDER)
+        pedido = await criar_pedido(_espaco(user), req.package_id, settings.PAYMENT_PROVIDER)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -668,7 +673,7 @@ async def assinar(req: AssinaturaRequest, user: dict = Depends(usuario_do_espaco
     email = (user.get("email") or "").strip()
     if not email:
         raise HTTPException(status_code=400, detail="Sua conta não tem e-mail: o Mercado Pago exige um para a assinatura.")
-    pedido = await criar_pedido(user.get("uid"), plano["id"], "mercadopago")
+    pedido = await criar_pedido(_espaco(user), plano["id"], "mercadopago")
     try:
         cobranca = await mercadopago.criar_assinatura(
             token=settings.MERCADOPAGO_TOKEN, order_id=pedido["id"], titulo=f"LeadSage — {plano['nome']} (mensal)", valor_centavos=plano["amount_cents"],
@@ -2807,7 +2812,7 @@ async def gerar_raio_x(req: RaioXRequest, user: dict = Depends(usuario_do_espaco
         if guardado:
             return {**guardado, "do_cache": True}
 
-    if await check_and_deduct_credits(uid, 1, email) is None:
+    if await check_and_deduct_credits(_espaco(user), 1, email) is None:
         raise HTTPException(status_code=402, detail="Créditos insuficientes para o raio-x.")
 
     canal = await robo_store.canal_do_usuario(_espaco(user)) or {}
