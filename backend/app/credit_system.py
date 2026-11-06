@@ -20,6 +20,10 @@ class BancoDeCreditosIndisponivel(RuntimeError):
 from app.espaco import conta as _conta
 
 
+# Teste grátis de quem cria a conta: 10 leads, sem cartão. Mais que isso só com assinatura (tela Assinatura).
+SALDO_INICIAL = 10
+
+
 def _sem_banco() -> None:
     if settings.CREDITO_SEM_BANCO:
         return
@@ -54,7 +58,7 @@ async def _sql_garantir(s, uid: str) -> DBCredito:
     """A linha de creditos do usuario; a primeira vez nasce com o saldo inicial."""
     linha = (await s.execute(select(DBCredito).where(DBCredito.uid == uid))).scalar_one_or_none()
     if linha is None:
-        linha = DBCredito(uid=uid, credits=50, role="user", created_at=datetime.now().isoformat())
+        linha = DBCredito(uid=uid, credits=SALDO_INICIAL, role="user", created_at=datetime.now().isoformat())
         s.add(linha)
         await s.flush()
     return linha
@@ -139,10 +143,10 @@ async def check_and_deduct_credits(
         # Criar documento mock se não existir
         user_ref.set({
             "role": "user",
-            "credits": 50,
+            "credits": SALDO_INICIAL,
             "createdAt": datetime.now().isoformat()
         })
-        user_data = {"role": "user", "credits": 50}
+        user_data = {"role": "user", "credits": SALDO_INICIAL}
     else:
         user_data = user_doc.to_dict()
 
