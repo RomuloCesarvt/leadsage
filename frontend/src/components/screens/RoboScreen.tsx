@@ -21,8 +21,6 @@ import { DisparoWhatsApp } from '../DisparoWhatsApp';
 import { Balao } from '../conversaUi';
 import { OfertaDoRobo } from '../OfertaDoRobo';
 import { AbordagemDoRobo } from '../AbordagemDoRobo';
-import { CriativoDoRobo } from '../CriativoDoRobo';
-import { ehEmpresa } from '../../lib/modoDaConta';
 import type {
   RoboConfig, RoboConfigEntrada, RoboMensagem,
 } from '../../types';
@@ -209,7 +207,6 @@ const Simulador: React.FC = () => {
 const VAZIO: Partial<RoboConfigEntrada> = {};
 
 const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: string) => void }> = ({ parte, onBloqueio }) => {
-  const { user } = useApp() as any;
   const [cfg, setCfg] = useState<RoboConfig | null>(null);
   const [form, setForm] = useState<Partial<RoboConfigEntrada>>(VAZIO);
   const [estado, setEstado] = useState<'idle' | 'salvando' | 'salvo' | 'erro'>('idle');
@@ -336,8 +333,6 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
         <AbordagemDoRobo estilo={form.estilo as any} promocao={form.promocao} onEstilo={e => mudar('estilo', e)} onPromocao={p => mudar('promocao', p)} />
 
         <OfertaDoRobo valor={form.oferta} onChange={o => mudar('oferta', o)} />
-
-        <CriativoDoRobo empresa={ehEmpresa(user)} />
 
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-5">

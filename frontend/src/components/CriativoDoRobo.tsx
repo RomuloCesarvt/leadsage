@@ -27,7 +27,7 @@ const prepararImagem = async (arquivo: File): Promise<{ dados: string; mime: str
   return { dados: c.toDataURL('image/jpeg', 0.86), mime: 'image/jpeg' };
 };
 
-export const CriativoDoRobo: React.FC<{ empresa?: boolean }> = ({ empresa }) => {
+export const CriativoDoRobo: React.FC<{ empresa?: boolean; contexto?: 'disparo' | 'robo' }> = ({ empresa, contexto = 'disparo' }) => {
   const [c, setC] = useState<CriativoInfo | null>(null);
   const [legenda, setLegenda] = useState('');
   const [ocupado, setOcupado] = useState(false);
@@ -48,7 +48,7 @@ export const CriativoDoRobo: React.FC<{ empresa?: boolean }> = ({ empresa }) => 
       if (!ehPdf && !arquivo.type.startsWith('image/')) throw new Error('Use uma imagem (JPG, PNG, WEBP) ou um PDF.');
       if (ehPdf && arquivo.size > MAX_PDF) throw new Error('O PDF passa de 3 MB. Comprima e tente de novo.');
       const { dados, mime } = ehPdf ? { dados: await lerComoDataUrl(arquivo), mime: 'application/pdf' } : await prepararImagem(arquivo);
-      const salvo = await api.criativoSalvar({ nome: arquivo.name, mime, dados, legenda, usos: c?.usos });
+      const salvo = await api.criativoSalvar({ nome: arquivo.name, mime, dados, legenda, usos: c?.usos ?? { abordagem: contexto === 'disparo', promocao: true } });
       setC(salvo);
     } catch (e: any) {
       setErro(e?.message || 'Não foi possível salvar o criativo.');
@@ -73,9 +73,9 @@ export const CriativoDoRobo: React.FC<{ empresa?: boolean }> = ({ empresa }) => 
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-      <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-1"><ImagePlus className="w-5 h-5 text-blue-600" /> Criativo da promoção</h2>
+      <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-1"><ImagePlus className="w-5 h-5 text-blue-600" /> Criativo do disparo</h2>
       <p className="text-sm text-slate-500 mb-4">
-        Suba um flyer, card ou PDF{empresa ? ' da sua promoção' : ''}. O robô manda junto com {empresa ? 'o orçamento' : 'o aviso da promoção'}, e você também pode enviar com um clique em qualquer conversa.
+        Coloque aqui o flyer, card ou PDF{empresa ? ' da sua promoção' : ''}. O sistema envia sozinho junto com cada mensagem de WhatsApp do disparo (a mensagem vira a legenda), sem você fazer mais nada. O robô também o manda junto com {empresa ? 'o orçamento' : 'o aviso da promoção'}.
       </p>
 
       {!existe ? (
@@ -112,11 +112,11 @@ export const CriativoDoRobo: React.FC<{ empresa?: boolean }> = ({ empresa }) => 
           </div>
           <label className="flex items-start gap-2.5 cursor-pointer">
             <input type="checkbox" checked={!!c?.usos?.promocao} onChange={e => opcao({ usos: { promocao: e.target.checked } })} className="mt-0.5 w-4 h-4 accent-blue-600" />
-            <span className="text-sm text-slate-700"><b>O robô envia junto com {empresa ? 'o orçamento' : 'o aviso da promoção'}</b> <span className="text-slate-500">(uma vez por conversa)</span></span>
+            <span className="text-sm text-slate-700"><b>O robô envia junto com {empresa ? 'o orçamento' : 'o aviso da promoção'}</b> <span className="text-slate-500">(uma vez por conversa, quando o lead responde)</span></span>
           </label>
           <label className="flex items-start gap-2.5 cursor-pointer">
             <input type="checkbox" checked={!!c?.usos?.abordagem} onChange={e => opcao({ usos: { abordagem: e.target.checked } })} className="mt-0.5 w-4 h-4 accent-blue-600" />
-            <span className="text-sm text-slate-700"><b>Enviar na primeira mensagem (abordagem do WhatsApp)</b> <span className="text-slate-500">— pelo Conector; a mensagem vira a legenda</span></span>
+            <span className="text-sm text-slate-700"><b>Enviar junto com cada mensagem do disparo no WhatsApp</b> <span className="text-slate-500">(sai pelo Conector, no ritmo de sempre)</span></span>
           </label>
         </div>
       )}
