@@ -40,6 +40,7 @@ from app.ai_docs import gerar_documento
 from app.dispatcher import OutreachDispatcher, DispatchError, DISPATCH_COST
 from app.credit_system import check_and_deduct_credits, conceder_teste_gratis, get_user_balance
 from app.espaco import do_modo as _do_modo
+from app import criativo as criativo_mod
 import httpx
 from app.firebase_config import get_current_user, db as firestore_db
 from app import profile_store
@@ -1788,6 +1789,82 @@ async def robo_responder(cid: str, req: RoboTextoRequest, user: dict = Depends(u
         )
     try:
         return await _com_o_chat_do_whatsapp(_espaco(user), await robo_service.responder_como_humano(_espaco(user), cid, req.texto))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except meta_canais.EnvioFalhou as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+class CriativoRequest(BaseModel):
+    nome: str = Field(default="criativo", max_length=120)
+    mime: str = Field(max_length=60)
+    dados: str = Field(max_length=5_000_000)       # base64 (até ~3 MB de arquivo)
+    legenda: str = Field(default="", max_length=600)
+    usos: Dict[str, bool] = Field(default_factory=dict)
+
+
+class CriativoOpcoes(BaseModel):
+    legenda: Optional[str] = Field(default=None, max_length=600)
+    usos: Optional[Dict[str, bool]] = None
+
+
+@app.get("/api/robo/criativo")
+async def criativo_ver(user: dict = Depends(usuario_do_espaco)):
+    return criativo_mod.publico(await criativo_mod.obter(_espaco(user)))
+
+
+@app.put("/api/robo/criativo")
+async def criativo_salvar(req: CriativoRequest, user: dict = Depends(usuario_do_espaco)):
+    try:
+        return criativo_mod.publico(await criativo_mod.salvar(_espaco(user), req.nome, req.mime, req.dados, req.legenda, req.usos))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.patch("/api/robo/criativo")
+async def criativo_opcoes(req: CriativoOpcoes, user: dict = Depends(usuario_do_espaco)):
+    c = await criativo_mod.atualizar_opcoes(_espaco(user), req.legenda, req.usos)
+    if not c:
+        raise HTTPException(status_code=404, detail="Nenhum criativo cadastrado.")
+    return criativo_mod.publico(c)
+
+
+@app.delete("/api/robo/criativo")
+async def criativo_remover(user: dict = Depends(usuario_do_espaco)):
+    await criativo_mod.remover(_espaco(user))
+    return {"existe": False}
+
+
+@app.get("/api/criativo/{token}")
+async def criativo_arquivo(token: str):
+    """Público de propósito: o WhatsApp e a Meta buscam o arquivo por aqui. O código no endereço é impossível de adivinhar."""
+    achado = await criativo_mod.arquivo_por_token(token)
+    if not achado:
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado.")
+    dados, mime, nome = achado
+    return Response(content=dados, media_type=mime, headers={"Cache-Control": "public, max-age=3600", "Content-Disposition": f'inline; filename="{nome}"'})
+
+
+@app.post("/api/robo/conversas/{cid}/criativo")
+async def robo_enviar_criativo(cid: str, user: dict = Depends(usuario_do_espaco)):
+    """Manda o criativo cadastrado (flyer, card de promoção) nesta conversa."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    if cid.startswith(caixa_de_entrada.PREFIXO_ENVIO):
+        raise HTTPException(status_code=409, detail="Esta pessoa ainda não respondeu: o criativo vai quando ela responder ou pela abordagem.")
+    try:
+        return await _com_o_chat_do_whatsapp(_espaco(user), await robo_service.enviar_criativo(_espaco(user), cid))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except meta_canais.EnvioFalhou as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.post("/api/robo/criativo/enviar")
+async def robo_criativo_por_telefone(req: PreviaPorTelefone, user: dict = Depends(usuario_do_espaco)):
+    """Manda o criativo cadastrado ao contato com este telefone, de qualquer tela."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    try:
+        return await robo_service.enviar_criativo_por_telefone(_espaco(user), req.telefone, req.chat_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except meta_canais.EnvioFalhou as exc:

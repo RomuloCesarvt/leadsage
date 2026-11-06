@@ -9,6 +9,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Check, CheckCheck, ChevronLeft, Clock, Power, RefreshCw, Search, Send, UserRound, Wifi } from 'lucide-react';
 import { api } from '../services/api';
+import { useApp } from '../context/AppContext';
+import { ehEmpresa } from '../lib/modoDaConta';
 import { conectorLocal, versaoAntiga, type ChatWhats, type EstadoConector, type FonteLista, type MensagemWhats } from '../lib/conectorLocal';
 import { whats } from '../lib/whats';
 import { sondar } from '../lib/sondagem';
@@ -241,6 +243,25 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
   const naoLidasTotal = chatsComRobo.filter(c => !c.grupo).reduce((n, c) => n + (c.naoLidas ? 1 : 0), 0);
 
   const [enviandoPrevia, setEnviandoPrevia] = useState(false);
+  const { user: usuarioDaConta } = useApp() as any;
+  const ehEmpresaDaConta = ehEmpresa(usuarioDaConta);
+  const [temCriativo, setTemCriativo] = useState(false);
+  const [enviandoCriativo, setEnviandoCriativo] = useState(false);
+  useEffect(() => { api.criativoVer().then(r => setTemCriativo(!!r.existe)).catch(() => setTemCriativo(false)); }, [aberto?.id]);
+  const mandarCriativo = async () => {
+    if (!aberto) return;
+    if (!window.confirm(`Enviar o criativo da promoção para ${aberto.nome} agora?`)) return;
+    setEnviandoCriativo(true);
+    setErro('');
+    try {
+      await api.criativoPorTelefone(aberto.telefone, aberto.id);
+      setAviso('Criativo enviado.');
+    } catch (e: any) {
+      setErro(e?.message || 'Não foi possível enviar o criativo.');
+    } finally {
+      setEnviandoCriativo(false);
+    }
+  };
   const mandarPrevia = async () => {
     if (!aberto) return;
     if (!window.confirm(`Criar a prévia do site de ${aberto.nome} (se ainda não existe) e enviar o link agora?`)) return;
@@ -484,7 +505,13 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
                 <p className="font-bold text-base text-slate-800 truncate">{aberto.nome}</p>
                 <p className="text-xs text-slate-500">{aberto.grupo ? 'Grupo' : aberto.telefone ? `+${aberto.telefone}` : ''}</p>
               </div>
-              {!aberto.grupo && aberto.telefone && (
+              {!aberto.grupo && aberto.telefone && temCriativo && (
+                <button onClick={mandarCriativo} disabled={enviandoCriativo} title="Envia o flyer ou card da promoção cadastrado no Robô"
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-60 whitespace-nowrap">
+                  {enviandoCriativo ? 'Enviando…' : 'Enviar criativo'}
+                </button>
+              )}
+              {!aberto.grupo && aberto.telefone && !ehEmpresaDaConta && (
                 <button onClick={mandarPrevia} disabled={enviandoPrevia} title="Cria a prévia do site deste lead (se não existe) e envia o link"
                   className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-60 whitespace-nowrap">
                   {enviandoPrevia ? 'Enviando…' : 'Enviar prévia'}

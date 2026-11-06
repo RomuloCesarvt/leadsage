@@ -13,7 +13,7 @@ import hashlib
 import hmac
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -141,22 +141,22 @@ ERROS_META = {
 }
 
 
-async def enviar(canal: str, contato: str, texto: str, cfg: Dict[str, Any]) -> str:
-    """Envia a resposta pelo canal de origem. Devolve o id da Meta."""
+async def enviar(canal: str, contato: str, texto: str, cfg: Dict[str, Any], midia: Optional[Dict[str, str]] = None) -> str:
+    """Envia a resposta pelo canal de origem. Devolve o id da Meta. `midia` ({url, mime, nome}): arquivo que vai junto, com o texto de legenda."""
     texto = (texto or "").strip()
     if not texto:
         raise EnvioFalhou("Mensagem vazia.")
 
     if canal == "telegram":
         from app import telegram_canal
-        return await telegram_canal.enviar(contato, texto, cfg)
+        return await telegram_canal.enviar(contato, f"{texto}\n{midia['url']}" if midia else texto, cfg)
 
     if canal == "whatsapp":
         token, origem = cfg.get("wa_token"), cfg.get("wa_phone_id")
         if not (token and origem) and cfg.get("cw_hash"):
             # sem a API oficial, mas com o Conector: a resposta sai pelo WhatsApp do PC
             from app import conector_whatsapp
-            return await conector_whatsapp.enfileirar_resposta(cfg, contato, texto)
+            return await conector_whatsapp.enfileirar_resposta(cfg, contato, texto, midia=midia)
         if not (token and origem):
             raise EnvioFalhou("WhatsApp não conectado.")
         url = f"{GRAPH}/{origem}/messages"
@@ -166,6 +166,12 @@ async def enviar(canal: str, contato: str, texto: str, cfg: Dict[str, Any]) -> s
             "type": "text",
             "text": {"preview_url": True, "body": texto[:4096]},
         }
+        if midia:
+            if midia["mime"] == "application/pdf":
+                payload.update({"type": "document", "document": {"link": midia["url"], "filename": midia.get("nome") or "promocao.pdf", "caption": texto[:1024]}})
+            else:
+                payload.update({"type": "image", "image": {"link": midia["url"], "caption": texto[:1024]}})
+            payload.pop("text", None)
     elif canal in ("messenger", "instagram"):
         token, origem = cfg.get("page_token"), cfg.get("page_id")
         if not (token and origem):

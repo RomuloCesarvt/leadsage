@@ -317,6 +317,22 @@ export const api = {
     });
   },
 
+  async criativoVer(): Promise<CriativoInfo> {
+    return await fetchWithToken('/robo/criativo');
+  },
+  async criativoSalvar(p: { nome: string; mime: string; dados: string; legenda?: string; usos?: Record<string, boolean> }): Promise<CriativoInfo> {
+    return await fetchWithToken('/robo/criativo', { method: 'PUT', body: JSON.stringify(p) });
+  },
+  async criativoOpcoes(p: { legenda?: string; usos?: Record<string, boolean> }): Promise<CriativoInfo> {
+    return await fetchWithToken('/robo/criativo', { method: 'PATCH', body: JSON.stringify(p) });
+  },
+  async criativoRemover(): Promise<CriativoInfo> {
+    return await fetchWithToken('/robo/criativo', { method: 'DELETE' });
+  },
+  async criativoPorTelefone(telefone: string, chatId = ''): Promise<{ texto: string; nome: string }> {
+    return await fetchWithToken('/robo/criativo/enviar', { method: 'POST', body: JSON.stringify({ telefone, chat_id: chatId }) });
+  },
+
   async roboPreviaPorTelefone(telefone: string, chatId = ''): Promise<{ url: string; texto: string; nome: string }> {
     return await fetchWithToken('/robo/previa', { method: 'POST', body: JSON.stringify({ telefone, chat_id: chatId }) });
   },
@@ -700,3 +716,14 @@ export const api = {
     }
   }
 };
+
+
+export interface CriativoInfo {
+  existe: boolean;
+  nome?: string;
+  mime?: string;
+  bytes?: number;
+  url?: string;
+  legenda?: string;
+  usos?: { promocao?: boolean; abordagem?: boolean };
+}

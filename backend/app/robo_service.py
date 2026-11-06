@@ -608,12 +608,23 @@ async def _processar(
 
     # Uma ou duas mensagens curtas, enviadas em sequencia — como uma
     # pessoa escreve. A resposta fixa de saida vem em `resposta`.
-    for texto in textos:
+    anexo = None
+    if getattr(decisao, "criativo", False) and not (conversa.get("sdr") or {}).get("criativo_enviado"):
         try:
-            meta_id = await enviar(msg.canal, msg.contato, texto, cfg)
+            from app import criativo
+            anexo = await criativo.para_promocao(uid)
+        except Exception as exc:
+            print(f"Criativo não anexado: {type(exc).__name__}: {exc}")
+    for i, texto in enumerate(textos):
+        try:
+            com_anexo = bool(anexo) and i == len(textos) - 1
+            meta_id = await (enviar(msg.canal, msg.contato, texto, cfg, midia=anexo) if com_anexo else enviar(msg.canal, msg.contato, texto, cfg))
             conversa["mensagens"].append({
                 "de": "robo", "texto": texto, "em": robo_store.agora(), "meta_id": meta_id,
+                **({"anexo": anexo.get("nome", "criativo")} if com_anexo else {}),
             })
+            if com_anexo:
+                conversa.setdefault("sdr", {})["criativo_enviado"] = True
         except meta_canais.EnvioFalhou as exc:
             _marcar(conversa, f"a resposta não foi entregue: {exc}")
             return await salvar()
@@ -914,3 +925,44 @@ async def responder_pendentes(
         "tentar_de_novo": bool(ultima_conversa.get("falhas_ia")) and not ultima_conversa.get("precisa_humano"),
         "silencio": ultima_conversa.get("silencio", ""),
     }
+
+
+async def enviar_criativo(uid: str, cid: str, legenda: str = "", enviar: Optional[Enviar] = None) -> Dict[str, Any]:
+    """O dono manda o criativo (flyer, card) para esta conversa, com um clique. O robô continua como estava."""
+    from app import criativo
+    conversa = await robo_store.obter_conversa(uid, cid)
+    if not conversa:
+        raise LookupError("Conversa não encontrada.")
+    c = await criativo.obter(uid)
+    if not c or not c.get("b64"):
+        raise LookupError("Você ainda não enviou um criativo. Cadastre em Robô > Criativo.")
+    cfg = await robo_store.canal_do_usuario(uid) or {}
+    texto = (legenda or c.get("legenda") or "Olha só essa condição especial 👇").strip()
+    enviar = enviar or meta_canais.enviar
+    meta_id = await enviar(conversa["canal"], conversa["contato"], texto, cfg, midia=criativo.midia(c))
+    conversa["mensagens"].append({"de": "voce", "texto": texto, "em": robo_store.agora(), "meta_id": meta_id, "anexo": c.get("nome", "criativo")})
+    conversa["atualizado"] = robo_store.agora()
+    await robo_store.salvar_conversa(uid, conversa)
+    return conversa
+
+
+async def enviar_criativo_por_telefone(uid: str, telefone: str, chat_id: str = "", enviar: Optional[Enviar] = None) -> Dict[str, Any]:
+    """Manda o criativo (flyer, card) ao contato com este telefone, de qualquer tela que mostre o contato."""
+    from app import criativo
+    from app.conector_whatsapp import enfileirar_resposta
+
+    c = await criativo.obter(uid)
+    if not c or not c.get("b64"):
+        raise LookupError("Você ainda não enviou um criativo. Cadastre em Robô > Criativo.")
+    cfg = {**(await robo_store.canal_do_usuario(uid) or {}), "uid": uid}
+    texto = (c.get("legenda") or "Olha só essa condição especial 👇").strip()
+    midia = criativo.midia(c)
+    if enviar is None and not (cfg.get("wa_token") and cfg.get("wa_phone_id")) and cfg.get("cw_hash"):
+        meta_id = await enfileirar_resposta(cfg, telefone, texto, chat_id, midia=midia)
+    else:
+        meta_id = await (enviar or meta_canais.enviar)("whatsapp", telefone, texto, cfg, midia=midia)
+    conversa = await robo_store.obter_conversa(uid, robo_store.id_da_conversa("whatsapp", telefone))
+    if conversa:
+        conversa["mensagens"].append({"de": "voce", "texto": texto, "em": robo_store.agora(), "meta_id": meta_id, "anexo": c.get("nome", "criativo")})
+        await robo_store.salvar_conversa(uid, conversa)
+    return {"texto": texto, "nome": c.get("nome", "")}

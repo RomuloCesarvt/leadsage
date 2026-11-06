@@ -113,6 +113,8 @@ class Decisao:
     automatica: bool = False
     # o lead aceitou a previa e ela ainda nao existe: o servico cria o site e troca [LINK_DA_PREVIA] pelo link
     criar_previa: bool = False
+    # o criativo do dono (flyer, card) vai junto com a ÚLTIMA mensagem, se ele ligou o uso em promoções
+    criativo: bool = False
 
 
 def _normal(texto: str) -> str:
@@ -458,7 +460,7 @@ def decidir(
             and not (sdr or {}).get("fechamento_enviado") and playbook_vendas.gostou_da_previa(texto)):
         textos = ["Que bom que gostou! 🙌", ai_oferta.mensagem_da_promocao(cfg, lead)]
         return Decisao(resposta="\n\n".join(textos), mensagens=textos,
-                       sdr={**(sdr or {}), "etapa": "proposta", "temperatura": "quente", "promo_enviada": True})
+                       sdr={**(sdr or {}), "etapa": "proposta", "temperatura": "quente", "promo_enviada": True}, criativo=True)
 
     prompt = montar_prompt(mensagens, canal, perfil, cfg, lead, raio=raio, sdr=sdr)
     n = normalizar(gerar_json(prompt), sdr)
@@ -503,6 +505,7 @@ def decidir(
             return Decisao(passar_para_humano=True, usou_ia=True, sdr=n["sdr"],
                            motivo="a resposta do robô não passou na conferência (" + restantes[0][:110] + ") — responda você")
     humano = n["passar_para_humano"]
+    anexar_criativo = False
 
     # Reclamou de preço ("estou sem condições", "tá caro"): o gancho vai e uma PESSOA assume para passar o valor. O modelo às vezes
     # esquece de marcar a passagem ou devolve vazio; isto é regra de código, não de prompt.
@@ -534,6 +537,7 @@ def decidir(
         if calc["linhas"] and not calc["fora_da_tabela"] and not (sdr or {}).get("orcamento_enviado") == calc["total"]:
             n["mensagens"] = [*n["mensagens"], ai_oferta.mensagem_do_orcamento(oferta, calc)]
             n["sdr"] = {**n["sdr"], "orcamento_enviado": calc["total"]}
+            anexar_criativo = True
         elif calc["fora_da_tabela"]:
             humano = True
             n["motivo"] = n["motivo"] or f"pediu algo fora da tabela ({', '.join(calc['fora_da_tabela'])[:80]}) — passe o valor"
@@ -546,4 +550,5 @@ def decidir(
         usou_ia=True,
         sdr=n["sdr"],
         criar_previa=criar_previa,
+        criativo=anexar_criativo and not humano,
     )

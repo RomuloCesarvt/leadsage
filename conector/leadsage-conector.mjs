@@ -152,7 +152,7 @@ export async function enviarPendentes(ls, wa, aviso = log, dorme = dormir) {
   for (const tarefa of t.dados.tarefas || []) {
     // respira antes de cada mensagem; resposta a quem acabou de escrever sai logo (o indicador de digitação já deu o tempo)
     await dorme(tarefa.tipo === 'resposta' ? 200 + Math.floor(Math.random() * 500) : 1000 + Math.floor(Math.random() * 2000));
-    const r = await wa.enviar(tarefa.contato, tarefa.texto, atrasoHumano(tarefa.digitando_ms), tarefa.chat_id || '');
+    const r = await wa.enviar(tarefa.contato, tarefa.texto, atrasoHumano(tarefa.digitando_ms), tarefa.chat_id || '', tarefa.midia || null);
     if (r.ok) {
       enviadas++;
       await ls.resultado(tarefa.id, true);
@@ -555,7 +555,7 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
   const navegador = acharNavegador();
   if (!navegador) throw new Error('Não achei o Microsoft Edge nem o Google Chrome neste computador. Instale um deles e abra de novo.');
   const { default: pkg } = await import('whatsapp-web.js');
-  const { Client, LocalAuth } = pkg;
+  const { Client, LocalAuth, MessageMedia } = pkg;
   const client = new Client({
     authStrategy: new LocalAuth({ dataPath: join(AQUI, 'sessao') }),
     // conectar pelo numero do telefone: o WhatsApp devolve um codigo para digitar no proprio celular (sem 2o aparelho)
@@ -619,7 +619,7 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
   await client.initialize();
 
   return {
-    async enviar(telefone, texto, digitandoMs, chatId = '') {
+    async enviar(telefone, texto, digitandoMs, chatId = '', midia = null) {
       try {
         // Quem já escreveu para nós tem o id da conversa guardado: responde para ele, sem procurar o número.
         // Para número novo (abordagem), confere se existe no WhatsApp: número inválido é sinal ruim para a conta.
@@ -635,7 +635,13 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
         if (!digitando.ativo(telefone)) await estado('typing');
         await dormir(digitando.restante(telefone, digitandoMs));
         envios.registrar(texto);
-        await client.sendMessage(id._serialized, texto);
+        if (midia && midia.url) {
+          // flyer, card ou PDF do dono: vai como imagem/documento e o texto vira a legenda
+          const arquivo = await MessageMedia.fromUrl(midia.url, { unsafeMime: true, filename: midia.nome || undefined });
+          await client.sendMessage(id._serialized, arquivo, { caption: texto, sendMediaAsDocument: midia.mime === 'application/pdf' });
+        } else {
+          await client.sendMessage(id._serialized, texto);
+        }
         await digitando.parar(telefone);
         await estado('stop');
         return { ok: true };

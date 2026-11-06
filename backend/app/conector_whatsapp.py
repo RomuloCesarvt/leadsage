@@ -337,7 +337,7 @@ async def _obter_saida(uid: str, sid: str) -> Optional[Dict[str, Any]]:
         return dict(row.data or {}) if row else None
 
 
-async def enfileirar_resposta(cfg: Dict[str, Any], contato: str, texto: str, chat_id: str = "") -> str:
+async def enfileirar_resposta(cfg: Dict[str, Any], contato: str, texto: str, chat_id: str = "", midia: Optional[Dict[str, str]] = None) -> str:
     """Uma resposta (do robô ou do dono) que o Conector vai enviar. Devolve o id."""
     if not cfg.get("cw_hash"):
         raise EnvioFalhou("WhatsApp pelo computador não conectado.")
@@ -350,6 +350,7 @@ async def enfileirar_resposta(cfg: Dict[str, Any], contato: str, texto: str, cha
         "status": "pendente", "criado": robo_store.agora(), "tentativas": 0, "chat_id": chat_id or "",
         # duas respostas criadas no mesmo segundo precisam sair na ordem em que foram escritas
         "seq": time.time_ns(),
+        **({"midia": midia} if midia else {}),
     })
     return sid
 
@@ -409,7 +410,8 @@ async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Di
             s["status"], s["enviando_em"] = "enviando", agora.isoformat()
             await _gravar(uid, s)
             saida.append({"id": s["id"], "tipo": "resposta", "contato": s["contato"], "texto": s["texto"],
-                          "chat_id": s.get("chat_id", ""), "digitando_ms": _digitando_ms(s["texto"])})
+                          "chat_id": s.get("chat_id", ""), "digitando_ms": _digitando_ms(s["texto"]),
+                          **({"midia": s["midia"]} if s.get("midia") else {})})
 
     await _promover_seguimentos_vencidos(uid)
     itens = await _fila_whatsapp(uid)
@@ -449,9 +451,15 @@ async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Di
             canal["cw_frio_dia"], canal["cw_frio_n"] = hoje, frios_hoje + 1
             agendar_proxima_fria(canal, agora, frios_hoje + 1)
             texto = i["texto"]  # sem aviso de "responda SAIR": parece disparo em massa; quem pede para sair e atendido pelo robo
+            anexo = None
+            try:
+                from app import criativo
+                anexo = await criativo.para_abordagem(uid)      # o flyer da empresa vai junto, se o dono ligou
+            except Exception as exc:
+                print(f"Conector: criativo não anexado: {type(exc).__name__}: {exc}")
             saida.append({"id": f"fila:{i['id']}", "tipo": "abordagem",
                           "contato": telefone_whatsapp(i["contato"]["phone"]), "texto": texto,
-                          "digitando_ms": _digitando_ms(texto)})
+                          "digitando_ms": _digitando_ms(texto), **({"midia": anexo} if anexo else {})})
 
     ativo_recente = _ler_data(canal.get("cw_atividade"))
     quente = bool(ativo_recente and (agora - ativo_recente).total_seconds() < 180)
