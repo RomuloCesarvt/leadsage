@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { HelpCircle, ChevronDown, MessageCircle, Mail, Search } from 'lucide-react';
+import { HelpCircle, ChevronDown, MessageCircle, Search } from 'lucide-react';
+
+/** O contato do suporte: toda a ajuda do LeadSage vai para este WhatsApp (DDI 55 + DDD 14). */
+export const WHATSAPP_SUPORTE = '5514991884926';
 
 const FAQ_ITEMS = [
   {
@@ -36,7 +39,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Como cancelo minha assinatura?',
-    a: 'Os planos do LeadSage são vitalícios, ou seja, pagamento único sem mensalidade. Após a compra, o acesso é seu para sempre. Créditos adicionais podem ser adquiridos separadamente.'
+    a: 'A assinatura é mensal. Para cancelar, abra a tela Assinatura e use a opção de cancelar: a cobrança dos próximos meses é interrompida e o acesso continua até o fim do período já pago. Se precisar de ajuda, chame o suporte pelo WhatsApp (14) 99188-4926.'
   },
   {
     q: 'Posso usar em equipe?',
@@ -111,9 +114,9 @@ export const HelpScreen: React.FC = () => {
       {/* Contact Section */}
       <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
         <h3 className="font-bold text-slate-800 text-lg mb-6 text-center">Ainda precisa de ajuda?</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <a 
-            href="https://wa.me/5514999999999" 
+            href={`https://wa.me/${WHATSAPP_SUPORTE}?text=${encodeURIComponent("Olá! Preciso de ajuda com o LeadSage.")}`}
             target="_blank" 
             rel="noopener noreferrer"
             className="flex items-center gap-4 p-5 rounded-xl border border-slate-200 hover:border-green-300 hover:bg-green-50/50 transition-all"
@@ -123,19 +126,7 @@ export const HelpScreen: React.FC = () => {
             </div>
             <div>
               <h4 className="font-bold text-slate-700 text-sm">WhatsApp</h4>
-              <p className="text-xs text-slate-500">Atendimento de Seg-Sex, 9h-18h</p>
-            </div>
-          </a>
-          <a 
-            href="mailto:suporte@leadsage.ai"
-            className="flex items-center gap-4 p-5 rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all"
-          >
-            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
-              <Mail className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <h4 className="font-bold text-slate-700 text-sm">E-mail</h4>
-              <p className="text-xs text-slate-500">suporte@leadsage.ai</p>
+              <p className="text-xs text-slate-500">Fale direto com o suporte: (14) 99188-4926</p>
             </div>
           </a>
         </div>
