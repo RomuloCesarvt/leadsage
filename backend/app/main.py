@@ -41,6 +41,7 @@ from app.dispatcher import OutreachDispatcher, DispatchError, DISPATCH_COST
 from app.credit_system import check_and_deduct_credits, conceder_teste_gratis, get_user_balance
 from app.espaco import do_modo as _do_modo
 from app import criativo as criativo_mod
+from app import score_ar
 import httpx
 from app.firebase_config import get_current_user, db as firestore_db
 from app import profile_store
@@ -299,6 +300,9 @@ async def search_leads(request: Request, req: LeadSearchRequest, user: dict = De
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    if user.get("modo") == "empresa":
+        score_ar.aplicar(leads)          # modo empresa: chance de virar cliente de ar-condicionado, não lacuna digital
 
     search_id = f"sch_{uuid.uuid4().hex[:8]}"
     total_cost = len(leads)
