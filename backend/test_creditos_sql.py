@@ -23,14 +23,14 @@ def sql_principal(client, monkeypatch):
 
 
 def test_primeiro_uso_nasce_com_saldo_e_cobra(rodar):
-    assert rodar(cs.check_and_deduct_credits, "u1", 2) == 48
+    assert rodar(cs.check_and_deduct_credits, "u1", 2) == 8
     saldo = rodar(cs.get_user_balance, "u1")
-    assert saldo["credits"] == 48
+    assert saldo["credits"] == 8
     assert saldo["history"][0]["amount"] == -2 and saldo["history"][0]["type"] == "debit"
 
 
 def test_saldo_insuficiente_recusa_sem_mexer(rodar):
-    assert rodar(cs.check_and_deduct_credits, "u2", 50) == 0
+    assert rodar(cs.check_and_deduct_credits, "u2", 10) == 0
     assert rodar(cs.check_and_deduct_credits, "u2", 1) is None
     assert rodar(cs.get_user_balance, "u2")["credits"] == 0
 

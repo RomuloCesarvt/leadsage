@@ -7,7 +7,7 @@ import { auth, db } from '../../lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { api } from '../../services/api';
 import { esquecerModoNovo, lembrarModoNovo, type ModoDaConta } from '../../lib/modoDaConta';
-import { Briefcase, Wrench } from 'lucide-react';
+import { Briefcase, Check, Gift, Wrench } from 'lucide-react';
 
 
 export const LoginScreen: React.FC = () => {
@@ -111,7 +111,7 @@ export const LoginScreen: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#000000] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[#050505] border border-[#18181b] rounded-2xl p-8 shadow-2xl">
+      <div className="w-full max-w-lg bg-[#050505] border border-[#18181b] rounded-2xl p-8 shadow-2xl">
         <div className="flex items-center justify-center mb-8">
           <Logo size={38} fundo="escuro" texto="text-2xl" />
         </div>
@@ -120,7 +120,7 @@ export const LoginScreen: React.FC = () => {
           {isLogin ? 'Bem-vindo de volta' : 'Crie sua conta'}
         </h2>
         <p className="text-sm text-zinc-500 mb-6 text-center">
-          {isLogin ? 'Entre para continuar prospectando com IA.' : 'Experimente grátis o futuro da prospecção.'}
+          {isLogin ? 'Entre para continuar prospectando com IA.' : 'Escolha como vai usar e comece em poucos segundos.'}
         </p>
 
         {/* Google Login Button */}
@@ -158,26 +158,46 @@ export const LoginScreen: React.FC = () => {
           </div>
         )}
 
-        <div className="mb-6">
-          <p className="text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wider">{isLogin ? 'Como você usa o LeadSage' : 'Como você vai usar o LeadSage?'}</p>
-          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Tipo de conta">
-            {([
-              { id: 'agencia', titulo: 'Sou agência', texto: 'Vendo sites, Google e marketing para outros negócios', Icone: Briefcase },
-              { id: 'empresa', titulo: 'Tenho uma empresa', texto: 'Vendo o meu próprio serviço (ex.: ar-condicionado)', Icone: Wrench },
-            ] as const).map(o => (
-              <button
-                key={o.id} type="button" role="radio" aria-checked={modo === o.id}
-                onClick={() => setModo(o.id)}
-                className={`text-left rounded-xl border p-3 transition-colors ${modo === o.id ? 'border-white bg-white/10 text-white' : 'border-zinc-800 text-zinc-400 hover:border-zinc-600'}`}
-              >
-                <o.Icone className="w-5 h-5 mb-1.5" />
-                <span className="block text-sm font-bold leading-tight">{o.titulo}</span>
-                <span className="block text-[11px] leading-snug mt-1 opacity-80">{o.texto}</span>
-              </button>
-            ))}
+        {!isLogin && (
+          <div className="mb-6">
+            <p className="text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wider">Como você vai usar o LeadSage?</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup" aria-label="Tipo de conta">
+              {([
+                { id: 'agencia', titulo: 'LS Agência', texto: 'Vendo sites, Google e marketing para outros negócios', itens: ['Busca de leads por nicho e cidade', 'Prévia de site pronta para cada lead', 'Abordagem e robô no WhatsApp'], Icone: Briefcase },
+                { id: 'empresa', titulo: 'LS Empresa', texto: 'Vendo o meu próprio serviço, como ar-condicionado', itens: ['Clientes da sua região, sem precisar de site', 'Orçamento calculado pela sua tabela', 'Robô que agenda visita'], Icone: Wrench },
+              ] as const).map(o => {
+                const ativo = modo === o.id;
+                return (
+                  <button
+                    key={o.id} type="button" role="radio" aria-checked={ativo}
+                    onClick={() => setModo(o.id)}
+                    className={`relative text-left rounded-2xl border p-4 transition-all duration-200 active:scale-[0.98] ${ativo ? 'border-white bg-white/[0.07] shadow-[0_0_0_1px_rgba(255,255,255,0.5),0_8px_30px_-12px_rgba(255,255,255,0.25)]' : 'border-zinc-800 hover:border-zinc-600 hover:bg-white/[0.02]'}`}
+                  >
+                    <span className={`absolute top-3 right-3 w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${ativo ? 'bg-white border-white text-black' : 'border-zinc-700 text-transparent'}`}>
+                      <Check className="w-3 h-3" strokeWidth={3} />
+                    </span>
+                    <span className={`inline-flex w-9 h-9 rounded-xl items-center justify-center mb-3 transition-colors ${ativo ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-300'}`}>
+                      <o.Icone className="w-[18px] h-[18px]" />
+                    </span>
+                    <span className="block text-[15px] font-bold leading-tight text-white">{o.titulo}</span>
+                    <span className="block text-xs leading-snug mt-1 text-zinc-400">{o.texto}</span>
+                    <ul className="mt-3 space-y-1">
+                      {o.itens.map(i => (
+                        <li key={i} className={`flex items-start gap-1.5 text-[11px] leading-snug ${ativo ? 'text-zinc-200' : 'text-zinc-500'}`}>
+                          <Check className="w-3 h-3 mt-px shrink-0 text-emerald-400" strokeWidth={3} />{i}
+                        </li>
+                      ))}
+                    </ul>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3.5 py-2.5">
+              <Gift className="w-4 h-4 text-emerald-400 shrink-0" />
+              <p className="text-xs text-emerald-200 leading-snug"><strong className="font-bold">Teste grátis com 10 leads</strong>, sem cartão. Quando quiser mais, é só fazer o upgrade na sua conta.</p>
+            </div>
           </div>
-          {isLogin && <p className="text-[11px] text-zinc-500 mt-2">Quem já tem conta entra do jeito que cadastrou. A escolha vale para contas novas.</p>}
-        </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
