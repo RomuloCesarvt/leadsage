@@ -25,11 +25,31 @@ const GARANTIAS: { id: string; rotulo: string; detalhe?: string }[] = [
   { id: 'alteracoes', rotulo: 'Alterações incluídas', detalhe: 'Quantas / até quando? Ex.: 2 rodadas em 30 dias' },
 ];
 
+const MOMENTOS_EMPRESA: { id: string; titulo: string; texto: string }[] = [
+  { id: 'so_se_perguntar', titulo: 'Só se o cliente perguntar', texto: 'O robô não puxa o assunto e responde com clareza quando perguntarem. É o jeito mais seguro.' },
+  { id: 'primeira_sem_numero', titulo: 'Na primeira mensagem, sem número', texto: 'Abre falando do orçamento claro e sem surpresa. O valor só vem depois, calculado pela sua tabela de preços.' },
+  { id: 'apos_resposta', titulo: 'Depois que o cliente responder', texto: 'A primeira mensagem é leve e curiosa; o assunto do valor entra na primeira resposta.' },
+];
+
+const GARANTIAS_EMPRESA: { id: string; rotulo: string; detalhe?: string }[] = [
+  { id: 'orcamento_sem_compromisso', rotulo: 'Orçamento sem compromisso' },
+  { id: 'valor_combinado', rotulo: 'Valor combinado antes de começar, sem taxa escondida' },
+  { id: 'visita_gratis', rotulo: 'Visita técnica sem custo' },
+  { id: 'garantia_servico', rotulo: 'Garantia do serviço', detalhe: 'Por quanto tempo? Ex.: 90 dias' },
+  { id: 'pecas_garantia', rotulo: 'Peças com garantia', detalhe: 'Ex.: 6 meses' },
+  { id: 'paga_depois', rotulo: 'Pagamento só depois do serviço feito' },
+  { id: 'horario', rotulo: 'Atendimento no horário combinado', detalhe: 'Ex.: janela de 2 horas' },
+];
+
 const PADRAO: ValorDoRobo = { momentos: ['apos_gostei'], garantias: {}, detalhes: {} };
 const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '—');
 
-export const MomentoDoValor: React.FC<{ valor?: ValorDoRobo; onChange: (v: ValorDoRobo) => void }> = ({ valor, onChange }) => {
-  const v: ValorDoRobo = { ...PADRAO, ...(valor || {}), momentos: valor?.momentos?.length ? valor.momentos : PADRAO.momentos };
+export const MomentoDoValor: React.FC<{ valor?: ValorDoRobo; onChange: (v: ValorDoRobo) => void; empresa?: boolean }> = ({ valor, onChange, empresa }) => {
+  // cada modo tem os seus momentos e as suas garantias: empresa não vende site (não há prévia nem hospedagem)
+  const momentos = empresa ? MOMENTOS_EMPRESA : MOMENTOS;
+  const garantias = empresa ? GARANTIAS_EMPRESA : GARANTIAS;
+  const validos = (valor?.momentos || []).filter(m => momentos.some(x => x.id === m));
+  const v: ValorDoRobo = { ...PADRAO, ...(valor || {}), momentos: validos.length ? validos : [momentos[0].id] };
   const [painel, setPainel] = useState<PainelDoMomento[] | null>(null);
 
   useEffect(() => { api.painelDoValor().then(r => setPainel(r.momentos)).catch(() => setPainel([])); }, []);
@@ -44,11 +64,11 @@ export const MomentoDoValor: React.FC<{ valor?: ValorDoRobo; onChange: (v: Valor
     <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm" data-testid="momento-do-valor">
       <h2 className="text-lg font-bold text-slate-800 mb-1 flex items-center gap-2"><Scale className="w-5 h-5 text-blue-600" /> Quando falar de valor?</h2>
       <p className="text-sm text-slate-500 mb-4">
-        A IA monta a abordagem e as respostas de acordo com o momento que você marcar. Marque <b>dois</b> para comparar: os leads são divididos entre eles e o painel mostra qual funciona melhor.
+        A IA monta a abordagem e as respostas de acordo com o momento que você marcar. Marque <b>dois</b> para comparar: os leads {empresa ? 'são' : 'são'} divididos entre eles e o painel mostra qual funciona melhor.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3" role="group" aria-label="Momento de falar de valor">
-        {MOMENTOS.map(m => {
+        {momentos.map(m => {
           const ativo = v.momentos.includes(m.id);
           const letra = ab && ativo ? (v.momentos.indexOf(m.id) === 0 ? 'A' : 'B') : '';
           return (
@@ -73,7 +93,7 @@ export const MomentoDoValor: React.FC<{ valor?: ValorDoRobo; onChange: (v: Valor
         <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-600" /> Garantias que são verdadeiras no seu serviço</h3>
         <p className="text-xs text-slate-500 mb-3">O robô só promete o que estiver marcado aqui. Marque apenas o que você realmente cumpre.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
-          {GARANTIAS.map(g => (
+          {garantias.map(g => (
             <div key={g.id}>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={!!v.garantias[g.id]} onChange={e => onChange({ ...v, garantias: { ...v.garantias, [g.id]: e.target.checked } })} className="w-4 h-4 accent-emerald-600" />

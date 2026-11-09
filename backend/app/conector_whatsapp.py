@@ -456,8 +456,7 @@ async def tarefas(canal: Dict[str, Any], agora: Optional[datetime] = None) -> Di
                 from app import ai_oferta, card_promocao, criativo
                 if ai_oferta.card_na_abordagem(canal) and i.get("tipo") != "seguimento":
                     # o card da promoção (arte do ramo do lead, com o valor e o nome da empresa) vai na primeira mensagem
-                    promo = ai_oferta.normalizar_promocao(canal.get("promocao"))
-                    anexo = card_promocao.midia_do_card(card_promocao.ramo_do_lead(i.get("ramo", ""), i.get("nome", "")), card_promocao.preco_texto(promo["preco"]), i.get("nome", ""), promo["arte"])
+                    anexo = card_promocao.midia_da_promocao(canal, i.get("nome", ""), i.get("ramo", ""))
                     i["card_enviado"] = True                 # o robô sabe que a promoção já foi apresentada (não repete depois do "gostei")
                     await fila_envio._gravar(uid, i)
                 else:

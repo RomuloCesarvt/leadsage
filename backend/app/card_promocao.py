@@ -12,7 +12,7 @@ import io
 import os
 import re
 import unicodedata
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import quote
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -91,24 +91,24 @@ def _chave() -> bytes:
     return hashlib.sha256(("card-promocao|" + (settings.WORKER_SECRET or settings.PAYMENT_WEBHOOK_SECRET or settings.META_APP_SECRET or "leadsage")).encode()).digest()
 
 
-def _assinar(ramo: str, preco: str, empresa: str, arte: int = 1) -> str:
-    return hmac.new(_chave(), f"{ramo}|{preco}|{empresa}|{arte}".encode(), hashlib.sha256).hexdigest()[:24]
+def _assinar(ramo: str, preco: str, empresa: str, arte: int = 1, titulo: str = "", itens: str = "") -> str:
+    return hmac.new(_chave(), f"{ramo}|{preco}|{empresa}|{arte}|{titulo}|{itens}".encode(), hashlib.sha256).hexdigest()[:24]
 
 
-def assinatura_valida(ramo: str, preco: str, empresa: str, sig: str, arte: int = 1) -> bool:
-    return hmac.compare_digest(_assinar(ramo, preco, empresa, arte), sig or "")
+def assinatura_valida(ramo: str, preco: str, empresa: str, sig: str, arte: int = 1, titulo: str = "", itens: str = "") -> bool:
+    return hmac.compare_digest(_assinar(ramo, preco, empresa, arte, titulo, itens), sig or "")
 
 
-def url_do_card(ramo: str, preco: str, empresa: str = "", arte: int = 1) -> str:
+def url_do_card(ramo: str, preco: str, empresa: str = "", arte: int = 1, titulo: str = "", itens: str = "") -> str:
     """O endereço público do PNG deste card (o WhatsApp e a Meta buscam a imagem por ele)."""
     empresa = (empresa or "").strip()[:40]
     preco = str(preco).strip()[:12]
     return (f"{settings.APP_URL.rstrip('/')}/api/card-promocao.png?ramo={quote(ramo)}&preco={quote(preco)}"
-            f"&empresa={quote(empresa)}&arte={int(arte)}&sig={_assinar(ramo, preco, empresa, arte)}")
+            f"&empresa={quote(empresa)}&arte={int(arte)}&titulo={quote(titulo)}&itens={quote(itens)}&sig={_assinar(ramo, preco, empresa, arte, titulo, itens)}")
 
 
-def midia_do_card(ramo: str, preco: str, empresa: str = "", arte: int = 1) -> Dict[str, str]:
-    return {"url": url_do_card(ramo, preco, empresa, arte), "mime": "image/png", "nome": "promocao.png"}
+def midia_do_card(ramo: str, preco: str, empresa: str = "", arte: int = 1, titulo: str = "", itens: str = "") -> Dict[str, str]:
+    return {"url": url_do_card(ramo, preco, empresa, arte, titulo, itens), "mime": "image/png", "nome": "promocao.png"}
 
 
 # ---------------------------------------------------------------- desenho
@@ -645,8 +645,150 @@ def _vinheta_s(img: Image.Image, topo: int, base: int) -> None:
     img.alpha_composite(sombra)
 
 
-def gerar(ramo: str, preco: str, empresa: str = "", arte: int = 1) -> bytes:
-    """O card: sobre a foto do ramo (3 estilos de arte) quando há placa; senão o card desenhado pelo sistema."""
+def gerar(ramo: str, preco: str, empresa: str = "", arte: int = 1, titulo: str = "", itens: str = "") -> bytes:
+    """O card: do SERVIÇO da empresa (ramo "servico": título e itens vêm do cadastro), sobre a foto do ramo (3 estilos de arte) quando há placa,
+    ou o card desenhado pelo sistema."""
+    if ramo == "servico":
+        return _gerar_servico(preco, titulo, [i for i in itens.split("|") if i.strip()], arte if arte in ARTES else 1)
     if tem_placa(ramo):
         return _gerar_sobre_placa(ramo, preco, empresa, arte if arte in ARTES else 1)
     return _gerar_desenhado(ramo, preco, empresa)
+
+
+# ---------------------------------------------------------------- card do SERVIÇO (modo empresa)
+
+def _ar_condicionado(img: Image.Image, cx: int, cy: int, larg: int) -> None:
+    """Um split de parede desenhado (corpo branco, aleta, luz de funcionamento) com o ar frio saindo, no tamanho `larg`."""
+    alt = int(larg * 0.30)
+    x0, y0 = cx - larg // 2, cy - alt // 2
+    sombra = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ImageDraw.Draw(sombra).rounded_rectangle([x0 + 10 * S, y0 + 30 * S, x0 + larg + 10 * S, y0 + alt + 30 * S], radius=int(alt * 0.28), fill=(0, 0, 0, 140))
+    img.alpha_composite(sombra.filter(ImageFilter.GaussianBlur(26 * S)))
+    corpo = _gradiente(larg, alt, (252, 253, 255, 255), (214, 222, 236, 255))
+    img.alpha_composite(_arredonda(corpo, int(alt * 0.28)), (x0, y0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([x0, y0, x0 + larg, y0 + alt], radius=int(alt * 0.28), outline=(255, 255, 255, 255), width=2 * S)
+    # aleta (saída de ar) e detalhes
+    ay = y0 + int(alt * 0.68)
+    d.rounded_rectangle([x0 + int(larg * 0.06), ay, x0 + int(larg * 0.94), ay + int(alt * 0.16)], radius=int(alt * 0.08), fill=(168, 180, 202, 255))
+    d.rounded_rectangle([x0 + int(larg * 0.08), y0 + int(alt * 0.16), x0 + int(larg * 0.92), y0 + int(alt * 0.22)], radius=3 * S, fill=(200, 209, 226, 255))
+    d.ellipse([x0 + int(larg * 0.86), y0 + int(alt * 0.36), x0 + int(larg * 0.86) + 14 * S, y0 + int(alt * 0.36) + 14 * S], fill=(64, 224, 255, 255))
+    d.text((x0 + int(larg * 0.08), y0 + int(alt * 0.36)), "22°", font=_g("Inter-800.ttf", int(alt * 0.2)), fill=(96, 112, 140, 255), anchor="lm")
+    # ar frio: três ondas suaves descendo da aleta
+    ar = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    da = ImageDraw.Draw(ar)
+    for k, desl in enumerate((-0.28, 0.0, 0.28)):
+        for j in range(6):
+            yy = ay + int(alt * 0.2) + j * int(alt * 0.22)
+            xx = cx + int(larg * desl) + int(((-1) ** j) * 10 * S * (j % 3))
+            raio = int(alt * (0.08 + 0.05 * j))
+            da.ellipse([xx - raio, yy - raio // 2, xx + raio, yy + raio // 2], outline=(150, 230, 255, max(20, 150 - j * 24)), width=3 * S)
+    img.alpha_composite(ar.filter(ImageFilter.GaussianBlur(2 * S)))
+
+
+def _gerar_servico(preco: str, titulo: str, itens: List[str], arte: int) -> bytes:
+    """O card do serviço que a EMPRESA vende (ex.: limpeza de ar-condicionado): título, valor, o que está incluso e o botão."""
+    titulo = (titulo or "Seu serviço").strip()[:60]
+    itens = (itens or ["Atendimento rápido", "Orçamento sem compromisso", "Garantia no serviço", "Equipe de confiança"])[:4]
+    while len(itens) < 4 and len(itens) > 0:
+        itens = itens + [itens[len(itens) % len(itens)]]
+    inteiro, cent = _preco_partes(preco)
+    cor, cor2 = (170, 232, 255), (30, 130, 200)
+    W, H = L * S, A * S
+    img = _gradiente(W, H, (6, 24, 52, 255), (10, 58, 98, 255))
+    _brilho(img, int(W * 0.8), int(H * 0.12), 520 * S, (60, 170, 255, 255), 120)
+    _brilho(img, int(W * 0.1), int(H * 0.95), 520 * S, (40, 200, 220, 255), 70)
+    d = ImageDraw.Draw(img)
+    branco = (255, 255, 255, 255)
+    serif, serif_i = "PlayfairDisplay-SemiBold.ttf", "PlayfairDisplay-SemiBoldItalic.ttf"
+
+    def titulo_em_linhas(tam: int, y: int, centro: bool = True) -> int:
+        f = _g("PlayfairDisplay-ExtraBold.ttf", tam * S)
+        linhas = _quebra(d, titulo, f, (L - 150) * S)[:2]
+        for i, linha in enumerate(linhas):
+            _tx(d, (L * S // 2 if centro else 64 * S, (y + i * int(tam * 1.05)) * S), linha, font=f, fill=branco, anchor="ms" if centro else "ls")
+        return y + (len(linhas) - 1) * int(tam * 1.05)
+
+    if arte == 1:
+        ultimo = titulo_em_linhas(100, 172)
+        _tx(d, (L * S // 2, (ultimo + 100) * S), "em promoção", font=_g(serif_i, 92 * S), fill=tuple(int(c * 0.4 + 255 * 0.6) for c in cor) + (255,), anchor="ms")
+        topo = ultimo + 132
+        f_v, f_rs, f_c = _g("PlayfairDisplay-ExtraBold.ttf", 120 * S), _g("PlayfairDisplay-ExtraBold.ttf", 58 * S), _g("PlayfairDisplay-ExtraBold.ttf", 56 * S)
+        w = int(d.textlength("R$ ", font=f_rs) + d.textlength(inteiro, font=f_v) + d.textlength("," + cent, font=f_c))
+        lf = max(w, int(d.textlength("condição especial", font=_g("Inter-600.ttf", 30 * S)))) + 130 * S
+        x0 = (W - lf) // 2
+        y0, y1 = topo * S, (topo + 210) * S
+        img.alpha_composite(_arredonda(_gradiente(lf, y1 - y0, (8, 20, 56, 246), (6, 16, 46, 246)), 28 * S), (x0, y0))
+        d = ImageDraw.Draw(img)
+        d.rounded_rectangle([x0, y0, x0 + lf, y1], radius=28 * S, outline=OURO_ESCURO + (255,), width=4 * S)
+        d.rounded_rectangle([x0 + 9 * S, y0 + 9 * S, x0 + lf - 9 * S, y1 - 9 * S], radius=22 * S, outline=OURO_CLARO + (150,), width=2 * S)
+        x = (W - w) // 2
+        x += _ouro(img, (x, y0 + 150 * S), "R$ ", f_rs)
+        x += _ouro(img, (x, y0 + 150 * S), inteiro, f_v)
+        _ouro(img, (x, y0 + 150 * S), "," + cent, f_c)
+        d = ImageDraw.Draw(img)
+        _centro(d, y1 - 22 * S, "condição especial", _g("Inter-600.ttf", 30 * S), branco)
+        _ar_condicionado(img, W // 2, (topo + 395) * S, 640 * S)
+    elif arte == 2:
+        d.rounded_rectangle([(L - 560) * S // 2, 70 * S, (L + 560) * S // 2, 128 * S], radius=29 * S, outline=OURO_ESCURO + (255,), width=3 * S, fill=(6, 16, 40, 150))
+        _tx(d, (L * S // 2, 100 * S), "CONDIÇÃO ESPECIAL", font=_g("Inter-800.ttf", 26 * S), fill=OURO_CLARO + (255,), anchor="mm")
+        ultimo = titulo_em_linhas(72, 232)
+        f_v, f_rs = _g("PlayfairDisplay-ExtraBold.ttf", 230 * S), _g("PlayfairDisplay-ExtraBold.ttf", 74 * S)
+        w = int(d.textlength("R$ ", font=f_rs) + d.textlength(inteiro, font=f_v))
+        x = (W - w) // 2
+        base = (ultimo + 220) * S
+        x += _ouro(img, (x, base - 30 * S), "R$ ", f_rs)
+        _ouro(img, (x, base), inteiro, f_v)
+        d = ImageDraw.Draw(img)
+        _centro(d, base + 52 * S, "valor combinado antes, sem surpresa", _g("Inter-700.ttf", 34 * S), branco)
+        _ar_condicionado(img, W // 2, (ultimo + 480) * S, 600 * S)
+    else:
+        ultimo = titulo_em_linhas(88, 168, centro=False)
+        _tx(d, (64 * S, (ultimo + 68) * S), "em promoção", font=_g(serif_i, 70 * S), fill=tuple(int(c * 0.4 + 255 * 0.6) for c in cor) + (255,), anchor="ls")
+        cx, cy, rr = 850 * S, 250 * S, 150 * S
+        luz = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        ImageDraw.Draw(luz).ellipse([cx - rr, cy - rr + 14 * S, cx + rr, cy + rr + 14 * S], fill=(0, 0, 0, 150))
+        img.alpha_composite(luz.filter(ImageFilter.GaussianBlur(16 * S)))
+        selo = _gradiente(rr * 2, rr * 2, OURO_CLARO + (255,), OURO_ESCURO + (255,))
+        m = Image.new("L", selo.size, 0)
+        ImageDraw.Draw(m).ellipse([0, 0, rr * 2 - 1, rr * 2 - 1], fill=255)
+        img.paste(selo, (cx - rr, cy - rr), m)
+        d = ImageDraw.Draw(img)
+        d.ellipse([cx - rr + 12 * S, cy - rr + 12 * S, cx + rr - 12 * S, cy + rr - 12 * S], outline=(110, 74, 16, 255), width=3 * S)
+        tinta = (58, 38, 6, 255)
+        d.text((cx, cy - 86 * S), "POR APENAS", font=_g("Inter-800.ttf", 24 * S), fill=tinta, anchor="mm")
+        d.text((cx, cy - 8 * S), "R$" + inteiro, font=_g("PlayfairDisplay-ExtraBold.ttf", (82 if len(inteiro) <= 3 else 62) * S), fill=tinta, anchor="mm")
+        d.text((cx, cy + 74 * S), "condição", font=_g("Inter-800.ttf", 26 * S), fill=tinta, anchor="mm")
+        d.text((cx, cy + 104 * S), "especial", font=_g("Inter-800.ttf", 26 * S), fill=tinta, anchor="mm")
+        _ar_condicionado(img, W // 2, 760 * S, 620 * S)
+
+    # o que está incluso: quatro itens em fileira (ícones de traço dourados) e o botão
+    y_it = 1000 if arte != 3 else 1000
+    sombra = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ImageDraw.Draw(sombra).rectangle([0, (y_it - 24) * S, W, (y_it + 190) * S], fill=(4, 12, 30, 150))
+    img.alpha_composite(sombra.filter(ImageFilter.GaussianBlur(30 * S)))
+    d = ImageDraw.Draw(img)
+    f = _g("Inter-700.ttf", 26 * S)
+    larg_col = (L - 80) // 4
+    for k, item in enumerate(itens[:4]):
+        cxk = (40 + larg_col * k + larg_col // 2) * S
+        _icone(d, [0, 1, 2, 3][k], cxk, (y_it + 34) * S, 34 * S, OURO_CLARO + (255,))
+        for i, linha in enumerate(_quebra(d, item, f, (larg_col - 6) * S)[:3]):
+            _tx(d, (cxk, (y_it + 96 + i * 32) * S), linha, font=f, fill=branco, anchor="mm")
+    _botao_whats(img, cor, cor2, 1214, "Chame no WhatsApp")
+    saida = img.convert("RGB").resize((L, A), Image.LANCZOS)
+    buf = io.BytesIO()
+    saida.save(buf, "PNG", optimize=True)
+    return buf.getvalue()
+
+
+def midia_da_promocao(cfg: Dict[str, Any], nome_do_lead: str = "", ramo_do_lead_txt: str = "", place_types: Optional[List[str]] = None) -> Dict[str, str]:
+    """O card da promoção para este lead: do SERVIÇO da empresa (modo empresa) ou do ramo do lead (modo agência), com o valor e a arte escolhidos."""
+    from app import ai_oferta
+    promo = ai_oferta.normalizar_promocao(cfg.get("promocao"))
+    preco = preco_texto(promo["preco"])
+    if ai_oferta.sem_previa(cfg):
+        oferta = ai_oferta.normalizar(cfg.get("oferta") or {})
+        titulo = (promo["servico"] or oferta["nome"] or "Seu serviço")[:60]
+        return midia_do_card("servico", preco, nome_do_lead, promo["arte"], titulo, ai_oferta.itens_do_card(cfg))
+    return midia_do_card(ramo_do_lead(ramo_do_lead_txt, nome_do_lead, place_types), preco, nome_do_lead, promo["arte"])

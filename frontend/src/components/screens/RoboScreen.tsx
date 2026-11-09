@@ -22,6 +22,8 @@ import { Balao } from '../conversaUi';
 import { OfertaDoRobo } from '../OfertaDoRobo';
 import { AbordagemDoRobo } from '../AbordagemDoRobo';
 import { MomentoDoValor } from '../MomentoDoValor';
+import { PromocaoDoServico } from '../PromocaoDoServico';
+import { ehEmpresa } from '../../lib/modoDaConta';
 import type {
   RoboConfig, RoboConfigEntrada, RoboMensagem,
 } from '../../types';
@@ -121,6 +123,7 @@ export const RoboScreen: React.FC = () => {
 // ================================================================ simulador
 
 const Simulador: React.FC = () => {
+  const { user } = useApp() as any;
   const [msgs, setMsgs] = useState<RoboMensagem[]>([]);
   const [texto, setTexto] = useState('');
   const [pensando, setPensando] = useState(false);
@@ -162,7 +165,7 @@ const Simulador: React.FC = () => {
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2 bg-slate-50/50">
           {!msgs.length && (
             <p className="text-sm text-slate-400 text-center mt-16">
-              Experimente: “Oi, vi sua mensagem. Quanto custa um site?”
+              Experimente: “Oi, vi sua mensagem. Quanto custa {ehEmpresa(user) ? 'a limpeza de um ar-condicionado' : 'um site'}?”
             </p>
           )}
           {msgs.map((m, i) => <Balao key={i} m={m} />)}
@@ -208,6 +211,8 @@ const Simulador: React.FC = () => {
 const VAZIO: Partial<RoboConfigEntrada> = {};
 
 const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: string) => void }> = ({ parte, onBloqueio }) => {
+  const { user } = useApp() as any;
+  const empresa = ehEmpresa(user);          // cada modo tem as suas opções: empresa não vende site, prévia nem hospedagem
   const [cfg, setCfg] = useState<RoboConfig | null>(null);
   const [form, setForm] = useState<Partial<RoboConfigEntrada>>(VAZIO);
   const [estado, setEstado] = useState<'idle' | 'salvando' | 'salvo' | 'erro'>('idle');
@@ -331,9 +336,11 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
           </label>
         </div>
 
-        <MomentoDoValor valor={form.valor} onChange={v => mudar('valor', v)} />
+        <MomentoDoValor valor={form.valor} onChange={v => mudar('valor', v)} empresa={empresa} />
 
-        <AbordagemDoRobo estilo={form.estilo as any} promocao={form.promocao} onEstilo={e => mudar('estilo', e)} onPromocao={p => mudar('promocao', p)} />
+        {empresa
+          ? <PromocaoDoServico promocao={form.promocao} servicoPadrao={(form.oferta as any)?.nome || ''} onPromocao={p => mudar('promocao', p)} />
+          : <AbordagemDoRobo estilo={form.estilo as any} promocao={form.promocao} onEstilo={e => mudar('estilo', e)} onPromocao={p => mudar('promocao', p)} />}
 
         <OfertaDoRobo valor={form.oferta} onChange={o => mudar('oferta', o)} />
 
@@ -372,16 +379,16 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
             </div>
             <div>
               <label className={rotulo}>Objetivo da conversa</label>
-              <select value={form.objetivo || 'agendar'} onChange={e => mudar('objetivo', e.target.value)} className={campo}>
-                <option value="agendar">Marcar uma conversa (recomendado)</option>
-                <option value="site">Mostrar o site que já fiz para ele</option>
-                <option value="qualificar">Entender se tem interesse</option>
-                <option value="vender">Levar até a venda (mais direto)</option>
+              <select value={empresa && form.objetivo === 'site' ? 'agendar' : (form.objetivo || 'agendar')} onChange={e => mudar('objetivo', e.target.value)} className={campo}>
+                <option value="agendar">{empresa ? 'Marcar uma visita (recomendado)' : 'Marcar uma conversa (recomendado)'}</option>
+                {!empresa && <option value="site">Mostrar o site que já fiz para ele</option>}
+                <option value="qualificar">{empresa ? 'Entender o que o cliente precisa' : 'Entender se tem interesse'}</option>
+                <option value="vender">{empresa ? 'Levar até o orçamento e o fechamento (mais direto)' : 'Levar até a venda (mais direto)'}</option>
               </select>
               <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">
                 {(form.objetivo || 'agendar') === 'vender'
                   ? 'Mais direto: o robô conduz até a venda, mas só fala de valor e de fechamento quando o cliente pedir. Para quem ainda está conhecendo, "Marcar uma conversa" costuma funcionar melhor.'
-                  : 'Em qualquer objetivo o robô primeiro entende, mostra o site e ouve a opinião. Valor e fechamento só entram quando o cliente pede.'}
+                  : (empresa ? 'Em qualquer objetivo o robô primeiro entende o problema do cliente e só depois propõe a visita. Valor e fechamento só entram quando o cliente pede.' : 'Em qualquer objetivo o robô primeiro entende, mostra o site e ouve a opinião. Valor e fechamento só entram quando o cliente pede.')}
               </p>
             </div>
             <div>

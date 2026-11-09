@@ -83,3 +83,35 @@ def test_o_card_usa_o_valor_cadastrado_no_robo_sem_errar_a_casa_decimal():
 
 def test_valor_vindo_da_tela_com_ponto_decimal():
     assert c._preco_partes("1249.9") == ("1.249", "90") and c._preco_partes("347.0") == ("347", "00") and c._preco_partes("1.249") == ("1.249", "00")
+
+
+CFG_EMPRESA = {"oferta": {"servico": "ar", "nome": "Limpeza de ar-condicionado", "ativa": True},
+               "promocao": {"ativa": True, "preco": "120", "inclui": "Higienização completa\nVisita técnica sem custo", "servico": "Limpeza de ar-condicionado", "card_na_abordagem": True}}
+
+
+def test_empresa_card_e_aviso_sao_do_servico_e_nao_de_site():
+    from app import ai_oferta
+    assert ai_oferta.promocao_do_servico(CFG_EMPRESA) and ai_oferta.card_na_abordagem(CFG_EMPRESA)
+    msg = ai_oferta.mensagem_da_promocao(CFG_EMPRESA)
+    assert "Limpeza de ar-condicionado" in msg and "R$ 120" in msg and "Higienização completa" in msg and "prévia" not in msg.lower() and "site" not in msg.lower()
+    midia = c.midia_da_promocao(CFG_EMPRESA, "Cliente X")
+    assert "ramo=servico" in midia["url"] and "titulo=Limpeza" in midia["url"] and "preco=120&" in midia["url"]
+    png = c.gerar("servico", "120", "X", 2, "Limpeza de ar-condicionado", "Higienização completa|Visita técnica sem custo")
+    assert Image.open(io.BytesIO(png)).size == (1080, 1350)
+    # assinatura cobre o título: não dá para trocar o serviço do endereço
+    url = c.url_do_card("servico", "120", "X", 1, "Limpeza", "a|b")
+    sig = url.split("sig=")[1]
+    assert c.assinatura_valida("servico", "120", "X", sig, 1, "Limpeza", "a|b") and not c.assinatura_valida("servico", "120", "X", sig, 1, "Instalação", "a|b")
+
+
+def test_empresa_aceitou_ouvir_a_condicao_recebe_o_card_do_servico():
+    msgs = [{"de": "robo", "texto": "Posso te mandar a condição especial que estamos fazendo?"}, {"de": "contato", "texto": "pode sim"}]
+    d = ai_robo.decidir(msgs, "whatsapp", {"name": "Rômulo"}, CFG_EMPRESA, {"id": "L1", "name": "Maria"}, lambda _: {}, None, None)
+    assert d.card and not d.criar_previa and "R$ 120" in d.resposta and "prévia" not in d.resposta.lower()
+
+
+def test_garantias_e_momentos_do_empresa_sao_do_servico():
+    from app import valor_momento as v
+    cfg = {**CFG_EMPRESA, "valor": {"momentos": ["apos_gostei"], "garantias": {"visita_gratis": True, "hospedagem": True}}}
+    assert v.momentos_do(cfg) == ["so_se_perguntar"]
+    assert v.garantias_marcadas(cfg) == ["visita técnica sem custo"]        # hospedagem é de agência e não vale aqui

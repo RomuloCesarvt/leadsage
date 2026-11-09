@@ -318,10 +318,10 @@ export const api = {
   },
 
   /** O card da promoção como o lead vai receber (imagem gerada pelo servidor), pronto para usar em <img src>. */
-  async cardDaPromocao(ramo: string, preco: string, empresa: string, arte = 1): Promise<string> {
+  async cardDaPromocao(ramo: string, preco: string, empresa: string, arte = 1, extra: { titulo?: string; itens?: string } = {}): Promise<string> {
     const user = auth.currentUser;
     const token = user ? await user.getIdToken() : '';
-    const q = new URLSearchParams({ ramo, preco, empresa, arte: String(arte) });
+    const q = new URLSearchParams({ ramo, preco, empresa, arte: String(arte), titulo: extra.titulo || '', itens: extra.itens || '' });
     const r = await fetch(`${API_BASE_URL}/robo/promocao/card?${q}`, {
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(modoAtivo ? { 'X-Modo': modoAtivo } : {}) },
     });

@@ -33,7 +33,38 @@ GARANTIAS: Dict[str, str] = {
     "dominio": "domínio incluso",
     "alteracoes": "alterações incluídas",
 }
-COM_DETALHE = ("hospedagem", "dominio", "alteracoes")
+
+# O modo empresa (quem presta o serviço, como ar-condicionado) não vende site: o momento e as garantias são outros.
+MOMENTOS_EMPRESA: Dict[str, Dict[str, str]] = {
+    "primeira_sem_numero": {"nome": "Na primeira mensagem, sem número",
+                            "texto": "Abre falando do orçamento claro e sem surpresa. O valor só vem depois, calculado pela sua tabela."},
+    "apos_resposta": {"nome": "Depois que o cliente responder",
+                      "texto": "A primeira mensagem é leve e curiosa; o assunto do valor entra na primeira resposta."},
+    "so_se_perguntar": {"nome": "Só se o cliente perguntar",
+                        "texto": "O robô não puxa o assunto e responde com clareza quando perguntarem. É o jeito mais seguro."},
+}
+PADRAO_EMPRESA = "so_se_perguntar"
+
+GARANTIAS_EMPRESA: Dict[str, str] = {
+    "orcamento_sem_compromisso": "orçamento sem compromisso",
+    "valor_combinado": "valor combinado antes de começar, sem taxa escondida",
+    "visita_gratis": "visita técnica sem custo",
+    "garantia_servico": "garantia do serviço",
+    "pecas_garantia": "peças com garantia",
+    "paga_depois": "pagamento só depois do serviço feito",
+    "horario": "atendimento no horário combinado",
+}
+COM_DETALHE_EMPRESA = ("garantia_servico", "pecas_garantia", "horario")
+COM_DETALHE = ("hospedagem", "dominio", "alteracoes") + COM_DETALHE_EMPRESA
+
+
+def _empresa(cfg: Dict[str, Any]) -> bool:
+    """O robô é de quem presta o serviço (sem site nem prévia), não de agência."""
+    try:
+        from app import ai_oferta
+        return bool(ai_oferta.sem_previa(cfg or {}))
+    except Exception:
+        return False
 
 
 def normalizar(d: Any) -> Dict[str, Any]:
@@ -44,13 +75,18 @@ def normalizar(d: Any) -> Dict[str, Any]:
     det = d.get("detalhes") if isinstance(d.get("detalhes"), dict) else {}
     return {
         "momentos": momentos,
-        "garantias": {k: bool(g.get(k)) for k in GARANTIAS},
+        "garantias": {k: bool(g.get(k)) for k in [*GARANTIAS, *GARANTIAS_EMPRESA]},
         "detalhes": {k: str(det.get(k) or "").strip()[:80] for k in COM_DETALHE},
     }
 
 
 def momentos_do(cfg: Dict[str, Any]) -> List[str]:
-    return normalizar((cfg or {}).get("valor"))["momentos"]
+    ms = normalizar((cfg or {}).get("valor"))["momentos"]
+    if _empresa(cfg):
+        # no modo empresa não existe prévia nem preço único: o que sobrou da agência vira o equivalente seguro
+        ms = list(dict.fromkeys({"primeira_com_valor": "primeira_sem_numero"}.get(m, m) for m in ms if m in MOMENTOS_EMPRESA or m == "primeira_com_valor"))
+        ms = ms or [PADRAO_EMPRESA]
+    return ms
 
 
 def escolher(cfg: Dict[str, Any], lead_id: str) -> str:
@@ -76,7 +112,7 @@ def _preco(cfg: Dict[str, Any]) -> str:
 def garantias_marcadas(cfg: Dict[str, Any]) -> List[str]:
     v = normalizar((cfg or {}).get("valor"))
     saida = []
-    for k, rotulo in GARANTIAS.items():
+    for k, rotulo in (GARANTIAS_EMPRESA if _empresa(cfg) else GARANTIAS).items():
         if v["garantias"].get(k):
             extra = v["detalhes"].get(k, "") if k in COM_DETALHE else ""
             saida.append(f"{rotulo} ({extra})" if extra else rotulo)
@@ -90,8 +126,17 @@ _NARRATIVA = (
 )
 
 
+_NARRATIVA_EMPRESA = (
+    "NARRATIVA DO VALOR: muita gente adia a instalação ou a manutenção do ar-condicionado por medo do preço e de um orçamento que vira surpresa "
+    "depois. A proposta é o oposto: valor claro e combinado ANTES de começar, sem susto. Diga isso de forma humana, curta e sem tom de propaganda; "
+    "é conversa, não panfleto. Não cite número: o valor sai da tabela de preços do dono, calculado quando o cliente pedir orçamento."
+)
+
+
 def bloco(momento: str, cfg: Dict[str, Any], fase: str) -> str:
     """A instrução para a IA: em que momento o valor entra e o que pode ser dito. `fase`: "abordagem" (1ª mensagem) ou "robo" (respostas)."""
+    if _empresa(cfg):
+        return _bloco_empresa(momento if momento in MOMENTOS_EMPRESA else PADRAO_EMPRESA, cfg, fase)
     if momento not in MOMENTOS:
         momento = PADRAO
     preco = _preco(cfg)
@@ -157,3 +202,26 @@ async def painel(uid: str) -> List[Dict[str, Any]]:
         if sdr.get("fechamento_enviado"):
             linhas[m]["pediram_fechar"] += 1
     return [l for l in linhas.values() if l["enviados"] or l["responderam"]]
+
+
+def _bloco_empresa(momento: str, cfg: Dict[str, Any], fase: str) -> str:
+    garantias = garantias_marcadas(cfg)
+    g_txt = ("GARANTIAS que você PODE citar (e só estas; o dono confirmou que são verdadeiras): " + "; ".join(garantias) + ".") if garantias else \
+        "O dono NÃO marcou nenhuma garantia: não prometa garantia, visita sem custo nem orçamento sem compromisso."
+    cab = f"== MOMENTO DE FALAR DE VALOR (escolha do dono): {MOMENTOS_EMPRESA[momento]['nome']} =="
+    if fase == "abordagem":
+        if momento == "primeira_sem_numero":
+            regra = ("Nesta PRIMEIRA mensagem, abra com a dor do orçamento surpresa e apresente a proposta de valor claro, combinado antes. NÃO cite número "
+                     "nem faixa de preço.\n" + _NARRATIVA_EMPRESA + "\nTermine com UMA pergunta leve (por exemplo, se quer um orçamento).")
+        elif momento == "apos_resposta":
+            regra = "Nesta PRIMEIRA mensagem NÃO fale de preço nem de valor. Seja leve e curioso; o assunto do valor entra só depois que ele responder."
+        else:
+            regra = "NÃO fale de preço nem de valor em nenhum ponto da mensagem. Só se ele perguntar (depois) o robô responde."
+        return f"{cab}\n{regra}\n{g_txt if momento == 'primeira_sem_numero' else ''}".strip()
+    if momento == "primeira_sem_numero":
+        regra = "A primeira mensagem falou de valor claro e combinado antes, sem número. Se ele pedir o valor, calcule pela tabela de preços do dono, sem pegadinha."
+    elif momento == "apos_resposta":
+        regra = "Na SUA PRIMEIRA RESPOSTA a ele, traga o assunto do valor: a dor do orçamento surpresa e a proposta de valor claro, combinado antes.\n" + _NARRATIVA_EMPRESA
+    else:
+        regra = "NÃO puxe o assunto de valor. Só responda sobre preço quando ele perguntar, de forma clara e pela tabela de preços do dono."
+    return f"{cab}\n{regra}\n{g_txt}".strip()

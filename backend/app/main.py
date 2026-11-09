@@ -1882,35 +1882,38 @@ async def robo_enviar_criativo(cid: str, user: dict = Depends(usuario_do_espaco)
 _CARDS: Dict[str, bytes] = {}
 
 
-def _card_em_cache(ramo: str, preco: str, empresa: str, arte: int = 1) -> bytes:
-    chave = f"{ramo}|{preco}|{empresa}|{arte}"
+def _card_em_cache(ramo: str, preco: str, empresa: str, arte: int = 1, titulo: str = "", itens: str = "") -> bytes:
+    chave = f"{ramo}|{preco}|{empresa}|{arte}|{titulo}|{itens}"
     if chave not in _CARDS:
         if len(_CARDS) >= 60:
             _CARDS.pop(next(iter(_CARDS)))
-        _CARDS[chave] = card_promocao.gerar(ramo, preco, empresa, arte)
+        _CARDS[chave] = card_promocao.gerar(ramo, preco, empresa, arte, titulo, itens)
     return _CARDS[chave]
 
 
 @app.get("/api/card-promocao.png")
-async def card_da_promocao(ramo: str, preco: str, sig: str, empresa: str = "", arte: int = 1):
+async def card_da_promocao(ramo: str, preco: str, sig: str, empresa: str = "", arte: int = 1, titulo: str = "", itens: str = ""):
     """O card da promoção (PNG). Público de propósito: o WhatsApp e a Meta buscam a imagem por aqui; o endereço é assinado pelo sistema."""
-    if not card_promocao.assinatura_valida(ramo, preco, empresa, sig, arte):
+    if not card_promocao.assinatura_valida(ramo, preco, empresa, sig, arte, titulo, itens):
         raise HTTPException(status_code=403, detail="Endereço inválido.")
-    png = await asyncio.get_running_loop().run_in_executor(None, _card_em_cache, ramo, preco, empresa, arte)
+    png = await asyncio.get_running_loop().run_in_executor(None, _card_em_cache, ramo, preco, empresa, arte, titulo, itens)
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/api/robo/promocao/card")
-async def card_de_exemplo(ramo: str = "padrao", preco: str = "347", empresa: str = "Sua Empresa", arte: int = 1, user: dict = Depends(usuario_do_espaco)):
+async def card_de_exemplo(ramo: str = "padrao", preco: str = "347", empresa: str = "Sua Empresa", arte: int = 1, titulo: str = "", itens: str = "",
+                          user: dict = Depends(usuario_do_espaco)):
     """Prévia do card na tela do robô: mostra como a promoção vai chegar ao lead."""
-    ramo = ramo if ramo in card_promocao.RAMOS else "padrao"
-    png = await asyncio.get_running_loop().run_in_executor(None, _card_em_cache, ramo, preco[:12], empresa[:40], arte if arte in (1, 2, 3) else 1)
+    ramo = ramo if (ramo in card_promocao.RAMOS or ramo == "servico") else "padrao"
+    png = await asyncio.get_running_loop().run_in_executor(None, _card_em_cache, ramo, preco[:12], empresa[:40], arte if arte in (1, 2, 3) else 1, titulo[:60], itens[:260])
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "private, max-age=300"})
 
 
 @app.get("/api/robo/promocao/artes")
 async def artes_do_card(ramo: str = "padrao", user: dict = Depends(usuario_do_espaco)):
     """Quantos estilos de arte existem para este ramo (3 quando há foto do ramo; 1 no card desenhado pelo sistema)."""
+    if ramo == "servico":
+        return {"quantidade": 3, "com_foto": False}
     ramo = ramo if ramo in card_promocao.RAMOS else "padrao"
     return {"quantidade": card_promocao.artes_disponiveis(ramo), "com_foto": card_promocao.tem_placa(ramo)}
 

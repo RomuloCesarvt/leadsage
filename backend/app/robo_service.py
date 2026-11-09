@@ -622,10 +622,9 @@ async def _processar(
     anexo = None
     if getattr(decisao, "card", False):
         try:
-            from app import card_promocao, ai_oferta as _oferta
-            promo = _oferta.normalizar_promocao(cfg.get("promocao"))
+            from app import card_promocao
             empresa = (lead or {}).get("company") or (lead or {}).get("name") or conversa.get("nome") or ""
-            anexo = card_promocao.midia_do_card(card_promocao.ramo_do_lead((lead or {}).get("niche", ""), empresa, (lead or {}).get("place_types")), card_promocao.preco_texto(promo["preco"]), empresa, promo["arte"])
+            anexo = card_promocao.midia_da_promocao(cfg, empresa, (lead or {}).get("niche", ""), (lead or {}).get("place_types"))
         except Exception as exc:
             print(f"Card da promoção não anexado: {type(exc).__name__}: {exc}")
     elif getattr(decisao, "criativo", False) and not (conversa.get("sdr") or {}).get("criativo_enviado"):

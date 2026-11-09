@@ -455,6 +455,14 @@ def decidir(
         )
 
     # Aceitou a prévia ("pode", "manda"): o link sai agora, sem depender da IA (nem de cota dela).
+    # Modo empresa com promoção do serviço: quando o cliente aceita ouvir a condição, sai o aviso com o card (código, sem depender da IA)
+    if (ai_oferta.promocao_do_servico(cfg) and not (sdr or {}).get("promo_enviada") and (sdr or {}).get("momento_valor") != "so_se_perguntar_nunca"
+            and aceitou_a_previa(mensagens, lead, True)):
+        nome = (((sdr or {}).get("dados") or {}).get("nome") or "").strip().split(" ")[0]
+        textos = [f"Perfeito{', ' + nome if nome else ''}! Separei uma condição especial para você 👇", ai_oferta.mensagem_da_promocao(cfg, lead)]
+        return Decisao(resposta="\n\n".join(textos), mensagens=textos, card=True,
+                       sdr={**(sdr or {}), "etapa": "proposta", "temperatura": "quente", "promo_enviada": True})
+
     if aceite_da_previa and card_so and not (sdr or {}).get("promo_enviada"):
         # promoção só com card: no lugar da prévia, sai a condição (texto + card com o preço), sem depender da IA
         nome = (((sdr or {}).get("dados") or {}).get("nome") or "").strip().split(" ")[0]

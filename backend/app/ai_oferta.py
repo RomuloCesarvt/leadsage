@@ -192,6 +192,8 @@ def normalizar_promocao(d: Any) -> Dict[str, Any]:
         "card_na_abordagem": bool(d.get("card_na_abordagem")),
         # qual dos 3 estilos de arte do card (1 faixa de valor, 2 valor gigante, 3 selo)
         "arte": d.get("arte") if d.get("arte") in (1, 2, 3) else 1,
+        # modo empresa: o serviço em promoção (ex.: "Limpeza de ar-condicionado"), que dá o título do card e do aviso
+        "servico": _texto(d.get("servico"), 60),
     }
 
 
@@ -199,6 +201,17 @@ def promocao_ativa(cfg: Dict[str, Any]) -> bool:
     """Promocao so vale no estilo comercial, ligada e com preco: sem preco o robo nao tem o que anunciar."""
     p = normalizar_promocao(cfg.get("promocao"))
     return estilo(cfg) == "comercial" and p["ativa"] and p["preco"] > 0 and not sem_previa(cfg)
+
+
+def promocao_do_servico(cfg: Dict[str, Any]) -> bool:
+    """Modo empresa: promoção de um serviço (com card), ligada e com valor. Não depende de estilo nem de prévia (empresa não tem prévia)."""
+    p = normalizar_promocao(cfg.get("promocao"))
+    return sem_previa(cfg) and p["ativa"] and p["preco"] > 0
+
+
+def itens_do_card(cfg: Dict[str, Any]) -> str:
+    """Os itens do card do serviço, no formato do endereço (separados por |): o que o dono marcou como incluso."""
+    return "|".join(i[:46] for i in _itens(normalizar_promocao(cfg.get("promocao"))["inclui"])[:4])
 
 
 def formato_da_promocao(cfg: Dict[str, Any]) -> str:
@@ -211,7 +224,7 @@ def usa_card(cfg: Dict[str, Any]) -> bool:
 
 
 def card_na_abordagem(cfg: Dict[str, Any]) -> bool:
-    return usa_card(cfg) and normalizar_promocao(cfg.get("promocao"))["card_na_abordagem"]
+    return (usa_card(cfg) or promocao_do_servico(cfg)) and normalizar_promocao(cfg.get("promocao"))["card_na_abordagem"]
 
 
 def so_card(cfg: Dict[str, Any]) -> bool:
@@ -227,6 +240,17 @@ def mensagem_da_promocao(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]] = N
     """O aviso da promocao, montado em codigo com o que o dono cadastrou (preco e itens exatos)."""
     p = normalizar_promocao(cfg.get("promocao"))
     oferta = normalizar(cfg.get("oferta") or {})
+    if sem_previa(cfg):
+        # modo empresa: o serviço que a empresa vende (sem prévia de site)
+        nome = (p["servico"] or oferta["nome"] or "O serviço").strip()
+        linhas = [f"🔥 *Condição especial!* {nome} por apenas *{_brl(p['preco'])}*."]
+        itens = _itens(p["inclui"])
+        if itens:
+            linhas.append("Já está incluso:\n" + "\n".join(f"✅ {i}" for i in itens))
+        if p["validade"]:
+            linhas.append(f"Condição válida {p['validade'].rstrip('.')}.")
+        linhas.append(p["chamada"] or "Posso agendar uma visita para você? 🙂")
+        return "\n\n".join(linhas)
     servico = (oferta["nome"] or "site").strip()
     linhas = [f"🔥 *Promoção imperdível!* O {servico.lower() if servico.lower().startswith('site') else servico} sai por apenas *{_brl(p['preco'])}*."]
     itens = _itens(p["inclui"])
@@ -421,6 +445,15 @@ def bloco_do_servico(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]]) -> str
         regra_esboco = "ESBOÇO: não há esboço antes de fechar. Não prometa. Mostre valor com exemplos e o diagnóstico."
 
     promo_txt = ""
+    if promocao_do_servico(cfg):
+        p = normalizar_promocao(cfg.get("promocao"))
+        itens = "; ".join(_itens(p["inclui"])) or "o que estiver nos fatos acima"
+        promo_txt = f"""
+
+== PROMOÇÃO DO SERVIÇO ATIVA ==
+PROMOÇÃO REAL: {(p['servico'] or nome)} por {_brl(p['preco'])}, com: {itens}.{(' Válida ' + p['validade'] + '.') if p['validade'] else ''}
+O aviso dela, com um card, sai AUTOMÁTICO quando o cliente aceitar ouvir a condição. Convide assim, sem citar o valor por iniciativa: "Posso te mandar a condição especial que estamos fazendo?".
+Nunca invente desconto, brinde, prazo nem escassez: só vale o que está aqui."""
     if promocao_ativa(cfg) and o["servico"] != "ar":
         p = normalizar_promocao(cfg.get("promocao"))
         itens = "; ".join(_itens(p["inclui"])) or "o que estiver nos fatos acima"

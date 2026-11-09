@@ -402,6 +402,8 @@ export interface PromocaoRobo {
   card_na_abordagem?: boolean;
   /** estilo de arte do card (1 faixa de valor, 2 valor gigante, 3 selo) */
   arte?: 1 | 2 | 3;
+  /** modo empresa: o serviço em promoção (título do card e do aviso) */
+  servico?: string;
 }
 
 export interface OfertaRobo {
