@@ -609,7 +609,15 @@ async def _processar(
     # Uma ou duas mensagens curtas, enviadas em sequencia — como uma
     # pessoa escreve. A resposta fixa de saida vem em `resposta`.
     anexo = None
-    if getattr(decisao, "criativo", False) and not (conversa.get("sdr") or {}).get("criativo_enviado"):
+    if getattr(decisao, "card", False):
+        try:
+            from app import card_promocao, ai_oferta as _oferta
+            promo = _oferta.normalizar_promocao(cfg.get("promocao"))
+            empresa = (lead or {}).get("company") or (lead or {}).get("name") or conversa.get("nome") or ""
+            anexo = card_promocao.midia_do_card(card_promocao.ramo_do_lead((lead or {}).get("niche", ""), empresa, (lead or {}).get("place_types")), str(promo["preco"]), empresa)
+        except Exception as exc:
+            print(f"Card da promoção não anexado: {type(exc).__name__}: {exc}")
+    elif getattr(decisao, "criativo", False) and not (conversa.get("sdr") or {}).get("criativo_enviado"):
         try:
             from app import criativo
             anexo = await criativo.para_promocao(uid)

@@ -186,6 +186,8 @@ def normalizar_promocao(d: Any) -> Dict[str, Any]:
         "inclui": _texto(d.get("inclui"), 500),     # um item por linha: hospedagem, dominio, manutencao...
         "validade": _texto(d.get("validade"), 80),  # opcional ("ate 30/11"); vazio = nao cita prazo
         "chamada": _texto(d.get("chamada"), 160),   # a pergunta final; vazio = a padrao
+        # o que acompanha a promoção: só a prévia do site (padrão antigo), só o card da promoção, ou os dois
+        "formato": d.get("formato") if d.get("formato") in ("previa", "card", "ambos") else "previa",
     }
 
 
@@ -193,6 +195,20 @@ def promocao_ativa(cfg: Dict[str, Any]) -> bool:
     """Promocao so vale no estilo comercial, ligada e com preco: sem preco o robo nao tem o que anunciar."""
     p = normalizar_promocao(cfg.get("promocao"))
     return estilo(cfg) == "comercial" and p["ativa"] and p["preco"] > 0 and not sem_previa(cfg)
+
+
+def formato_da_promocao(cfg: Dict[str, Any]) -> str:
+    """previa | card | ambos (só vale com a promoção ativa)."""
+    return normalizar_promocao(cfg.get("promocao"))["formato"] if promocao_ativa(cfg) else "previa"
+
+
+def usa_card(cfg: Dict[str, Any]) -> bool:
+    return formato_da_promocao(cfg) in ("card", "ambos")
+
+
+def so_card(cfg: Dict[str, Any]) -> bool:
+    """Promoção com card NO LUGAR da prévia: o robô não oferece nem cria prévia do site."""
+    return formato_da_promocao(cfg) == "card"
 
 
 def _itens(texto: str) -> List[str]:
@@ -400,10 +416,15 @@ def bloco_do_servico(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]]) -> str
     if promocao_ativa(cfg) and o["servico"] != "ar":
         p = normalizar_promocao(cfg.get("promocao"))
         itens = "; ".join(_itens(p["inclui"])) or "o que estiver nos fatos acima"
+        aviso_da_promo = (
+            "Nesta promoção NÃO há prévia do site: não ofereça, não prometa nem crie prévia. Quando o cliente quiser conhecer a condição (ou aceitar ouvir), "
+            "a promoção sai AUTOMÁTICA, com um card; convide-o assim: \"Posso te mandar a condição especial que estamos fazendo?\". Não cite o valor por iniciativa."
+            if so_card(cfg) else
+            'O aviso dela sai automático quando o cliente reagir bem à prévia ("gostei"); NÃO o cite por iniciativa nem mande valor junto com o link.')
         promo_txt = f"""
 
 == ESTILO COMERCIAL E PROMOÇÃO ATIVA ==
-PROMOÇÃO REAL: {nome} por {_brl(p['preco'])}, com: {itens}.{(' Válida ' + p['validade'] + '.') if p['validade'] else ''} O aviso dela sai automático quando o cliente reagir bem à prévia ("gostei"); NÃO o cite por iniciativa nem mande valor junto com o link. Depois de enviado, cite só este preço e estes itens.
+PROMOÇÃO REAL: {nome} por {_brl(p['preco'])}, com: {itens}.{(' Válida ' + p['validade'] + '.') if p['validade'] else ''} {aviso_da_promo} Depois de enviado, cite só este preço e estes itens.
 Tom entusiasmado e direto, com benefício concreto, e rumo a uma CONVERSA em que você mostra como melhorar o site: sem empurrar pagamento nem pedir Pix, documentos ou material. Lembre que o que ele viu é uma PRÉVIA (entram as fotos dele e o layout pode mudar).
 Nunca invente escassez, desconto, brinde ou prazo. O endereço é .vercel.app (sem custo de domínio): diga com clareza se perguntarem. "Quero fechar" tem resposta automática."""
     return f"""== O SERVIÇO QUE VOCÊ VENDE AGORA (fatos do dono; fora disso não existe) ==

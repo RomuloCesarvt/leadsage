@@ -3,8 +3,9 @@
  * que depois da prévia anuncia a promoção cadastrada aqui. O aviso sai pronto, com o preço e os itens que estiverem nesta tela:
  * o robô não inventa preço, brinde nem prazo.
  */
-import React from 'react';
-import { Compass, Flame, Check, Info } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Compass, Flame, Check, Info, ImageIcon, Loader2 } from 'lucide-react';
+import { api } from '../services/api';
 import type { PromocaoRobo } from '../types';
 
 type Estilo = 'consultiva' | 'comercial';
@@ -15,7 +16,20 @@ const PROMOCAO_PADRAO: PromocaoRobo = {
   inclui: 'Hospedagem por 1 ano inclusa\nSem custo de domínio (o site fica em um endereço .vercel.app)\nManutenção do site inclusa',
   validade: '',
   chamada: '',
+  formato: 'ambos',
 };
+
+const RAMOS_DO_CARD: [string, string, string][] = [
+  ['dentista', 'Dentistas', 'Sorriso Claro'], ['estetica', 'Clínicas de estética', 'Aura Estética'], ['advocacia', 'Advogados', 'Silva e Prado'],
+  ['oficina', 'Oficinas mecânicas', 'Auto Center Rocha'], ['pet', 'Pet shops', 'Amigo Fiel'], ['barbearia', 'Barbearias', 'Navalha de Ouro'],
+  ['academia', 'Academias', 'Força Total'], ['restaurante', 'Restaurantes', 'Sabor da Casa'], ['padrao', 'Outros ramos', 'Sua Empresa'],
+];
+
+const FORMATOS: { id: 'previa' | 'card' | 'ambos'; titulo: string; texto: string }[] = [
+  { id: 'ambos', titulo: 'Prévia + card', texto: 'Manda a prévia do site e, quando o lead gostar, a promoção com o card.' },
+  { id: 'card', titulo: 'Só o card', texto: 'Sem prévia: o robô oferece a condição e manda a promoção com o card.' },
+  { id: 'previa', titulo: 'Só a prévia', texto: 'Como era: prévia do site e, quando gostar, a promoção em texto.' },
+];
 
 const campo = 'w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500';
 const rotulo = 'block text-xs font-bold text-slate-600 mb-1.5';
@@ -31,7 +45,7 @@ export const AbordagemDoRobo: React.FC<{
   onEstilo: (e: Estilo) => void;
   onPromocao: (p: PromocaoRobo) => void;
 }> = ({ estilo = 'consultiva', promocao, onEstilo, onPromocao }) => {
-  const p: PromocaoRobo = { ...PROMOCAO_PADRAO, ...(promocao || {}), ativa: promocao?.ativa ?? false };
+  const p: PromocaoRobo = { ...PROMOCAO_PADRAO, ...(promocao || {}), ativa: promocao?.ativa ?? false, formato: promocao?.formato ?? 'previa' };
   const set = <K extends keyof PromocaoRobo>(k: K, v: PromocaoRobo[K]) => onPromocao({ ...p, [k]: v });
 
   const escolher = (e: Estilo) => {
@@ -41,6 +55,27 @@ export const AbordagemDoRobo: React.FC<{
   };
 
   const itens = p.inclui.split('\n').map(i => i.trim()).filter(Boolean);
+
+  const formato = p.formato ?? 'previa';
+  const comCard = formato === 'card' || formato === 'ambos';
+  const [ramoCard, setRamoCard] = useState('dentista');
+  const [imagemCard, setImagemCard] = useState('');
+  const [montandoCard, setMontandoCard] = useState(false);
+  const precoCard = String(p.preco || '').replace(/[^\d.,]/g, '');
+  useEffect(() => {
+    if (estilo !== 'comercial' || !comCard || !precoCard) { setImagemCard(''); return; }
+    let vivo = true;
+    let url = '';
+    setMontandoCard(true);
+    const espera = setTimeout(() => {
+      const empresa = RAMOS_DO_CARD.find(r => r[0] === ramoCard)?.[2] || 'Sua Empresa';
+      api.cardDaPromocao(ramoCard, precoCard, empresa)
+        .then(u => { url = u; if (vivo) setImagemCard(u); else URL.revokeObjectURL(u); })
+        .catch(() => { if (vivo) setImagemCard(''); })
+        .finally(() => { if (vivo) setMontandoCard(false); });
+    }, 500);
+    return () => { vivo = false; clearTimeout(espera); if (url) URL.revokeObjectURL(url); };
+  }, [estilo, comCard, precoCard, ramoCard]);
 
   const Opcao: React.FC<{ id: Estilo; titulo: string; texto: string; Icone: React.FC<{ className?: string }> }> = ({ id, titulo, texto, Icone }) => (
     <button type="button" onClick={() => escolher(id)} aria-pressed={estilo === id}
@@ -75,7 +110,7 @@ export const AbordagemDoRobo: React.FC<{
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className={rotulo}>Valor promocional (R$)</label>
-              <input inputMode="decimal" value={p.preco} onChange={e => set('preco', e.target.value)} placeholder="Ex.: 600" className={campo} />
+              <input inputMode="decimal" value={p.preco} onChange={e => set('preco', e.target.value)} placeholder="Ex.: 347" className={campo} />
             </div>
             <div className="md:col-span-2">
               <label className={rotulo}>Validade (opcional)</label>
@@ -91,10 +126,42 @@ export const AbordagemDoRobo: React.FC<{
             </div>
           </div>
 
+          <div>
+            <label className={rotulo}>O que acompanha a promoção</label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2" role="radiogroup" aria-label="Formato da promoção">
+              {FORMATOS.map(f => (
+                <button key={f.id} type="button" role="radio" aria-checked={formato === f.id} onClick={() => set('formato', f.id)}
+                  className={`text-left p-3 rounded-xl border-2 transition-colors ${formato === f.id ? 'border-blue-500 bg-blue-50/60' : 'border-slate-200 hover:border-slate-300'}`}>
+                  <span className="block text-sm font-bold text-slate-800">{f.titulo}</span>
+                  <span className="block text-xs text-slate-500 mt-0.5 leading-snug">{f.texto}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {comCard && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+              <div className="flex flex-wrap items-center gap-3 mb-3">
+                <span className="text-sm font-bold text-slate-700 flex items-center gap-1.5"><ImageIcon className="w-4 h-4 text-blue-600" /> O card que o lead recebe</span>
+                <select value={ramoCard} onChange={e => setRamoCard(e.target.value)} className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg" aria-label="Ramo do exemplo">
+                  {RAMOS_DO_CARD.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
+                </select>
+              </div>
+              <p className="text-xs text-slate-500 mb-3 leading-relaxed">O sistema monta sozinho um card para cada lead, com o ramo dele, o nome da empresa dele e o valor acima. Não precisa subir arquivo.</p>
+              <div className="flex justify-center">
+                {imagemCard
+                  ? <img src={imagemCard} alt="Exemplo do card da promoção" className="w-full max-w-[320px] rounded-xl shadow-md border border-slate-200" />
+                  : <div className="w-full max-w-[320px] aspect-[4/5] rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center text-xs text-slate-500 gap-2">
+                      {montandoCard ? <><Loader2 className="w-4 h-4 animate-spin" /> Montando o card…</> : 'Informe o valor para ver o card'}
+                    </div>}
+              </div>
+            </div>
+          )}
+
           <div className="p-3.5 rounded-xl bg-orange-50/70 border border-orange-100 text-[13px] text-orange-950 leading-relaxed flex gap-2.5">
             <Info className="w-4 h-4 shrink-0 mt-0.5" />
             <div>
-              <b>Logo depois do link da prévia, o robô manda:</b>
+              <b>{formato === 'card' ? 'Quando o lead quiser conhecer a condição, o robô manda (junto com o card):' : 'Depois que o lead gostar da prévia, o robô manda' + (comCard ? ' (junto com o card):' : ':')}</b>
               <div className="mt-1.5 whitespace-pre-line">
                 🔥 Promoção imperdível! O site sai por apenas {brl(p.preco) || 'R$ …'}.{itens.length ? '\nJá está incluso:\n' + itens.map(i => `✅ ${i}`).join('\n') : ''}
                 {p.validade ? `\nCondição válida ${p.validade}.` : ''}

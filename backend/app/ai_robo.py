@@ -115,6 +115,8 @@ class Decisao:
     criar_previa: bool = False
     # o criativo do dono (flyer, card) vai junto com a ÚLTIMA mensagem, se ele ligou o uso em promoções
     criativo: bool = False
+    # o card da promoção (arte com o preço, feita pelo sistema) vai junto com a ÚLTIMA mensagem
+    card: bool = False
 
 
 def _normal(texto: str) -> str:
@@ -296,7 +298,10 @@ _AFIRMA = re.compile(
 _OFERTA_DE_PREVIA = re.compile(r"\b(previa|site|link|esboco|modelo|layout|ideia|mostrar|exemplo|projeto)\b")
 
 
-def aceitou_a_previa(mensagens: List[Dict[str, Any]], lead: Optional[Dict[str, Any]] = None) -> bool:
+_OFERTA_DE_CONDICAO = re.compile(r"\b(condicao|promocao|valor|valores|proposta|oferta|preco|card)\b")
+
+
+def aceitou_a_previa(mensagens: List[Dict[str, Any]], lead: Optional[Dict[str, Any]] = None, card_so: bool = False) -> bool:
     """O lead respondeu "pode", "pode sim", "manda" a uma fala NOSSA que oferecia a prévia/o link: é um aceite, o link vai na hora.
 
     Conferido em código porque a IA (principalmente quando cai para um modelo menor) já respondeu "como posso ajudar?" a um "pode"."""
@@ -315,7 +320,12 @@ def aceitou_a_previa(mensagens: List[Dict[str, Any]], lead: Optional[Dict[str, A
     if not _AFIRMA.match(dele):
         return False
     nossa = next((m for m in reversed(falas[: len(falas) - len(fim)]) if m.get("de") in ("robo", "voce")), None)
-    if not nossa or not _OFERTA_DE_PREVIA.search(_normal(nossa.get("texto", ""))):
+    if not nossa:
+        return False
+    oferta = _normal(nossa.get("texto", ""))
+    if card_so:
+        return bool(_OFERTA_DE_CONDICAO.search(oferta))      # promoção com card: o aceite é de ouvir a condição, não de ver o site
+    if not _OFERTA_DE_PREVIA.search(oferta):
         return False
     return not _ja_mandou_o_link(mensagens, lead)
 
@@ -430,7 +440,8 @@ def decidir(
     # Sai de codigo, so com o que o dono cadastrou; uma vez por conversa, e uma pessoa assume para confirmar o pagamento.
     # O aceite de ver a prévia ("pode fazer", "pode seguir", "to dentro" depois de "quer que eu monte uma prévia?") vem ANTES: não é pedido de fechamento.
     # E sem ele ter visto o site, só um pedido explícito ("quero fechar", "onde pago", "manda o Pix") dispara o checklist: fechar cedo espanta quem ainda está conhecendo.
-    aceite_da_previa = not ai_oferta.sem_previa(cfg) and aceitou_a_previa(mensagens, lead)
+    card_so = ai_oferta.so_card(cfg)
+    aceite_da_previa = not ai_oferta.sem_previa(cfg) and aceitou_a_previa(mensagens, lead, card_so)
     previa_vista = bool((sdr or {}).get("previa_enviada")) or _ja_mandou_o_link(mensagens, lead) or ai_oferta.sem_previa(cfg)
     if (fechamento.quer_fechar(texto) and not objecao_de_preco(texto) and not (sdr or {}).get("fechamento_enviado")
             and not aceite_da_previa and (previa_vista or fechamento.quer_fechar_forte(texto))):
@@ -444,7 +455,14 @@ def decidir(
         )
 
     # Aceitou a prévia ("pode", "manda"): o link sai agora, sem depender da IA (nem de cota dela).
-    if aceite_da_previa:
+    if aceite_da_previa and card_so and not (sdr or {}).get("promo_enviada"):
+        # promoção só com card: no lugar da prévia, sai a condição (texto + card com o preço), sem depender da IA
+        nome = (((sdr or {}).get("dados") or {}).get("nome") or "").strip().split(" ")[0]
+        textos = [f"Perfeito{', ' + nome if nome else ''}! Separei uma condição especial para vocês 👇", ai_oferta.mensagem_da_promocao(cfg, lead)]
+        return Decisao(resposta="\n\n".join(textos), mensagens=textos, card=True,
+                       sdr={**(sdr or {}), "etapa": "proposta", "temperatura": "quente", "promo_enviada": True})
+
+    if aceite_da_previa and not card_so:
         nome = (((sdr or {}).get("dados") or {}).get("nome") or "").strip().split(" ")[0]
         textos = [f"Perfeito{', ' + nome if nome else ''}! Aqui está a prévia: [LINK_DA_PREVIA]",
                   "Lembrando que é uma *prévia*, uma primeira ideia com fotos e textos de exemplo: no site de verdade entram as suas fotos e informações, e o layout "
@@ -456,11 +474,12 @@ def decidir(
 
     # Estilo comercial: o valor NÃO sai junto com o link. Só depois de a pessoa ver a prévia e reagir bem ("gostei", "ficou ótimo")
     # é que o aviso da promoção sai, em código, com o preço e os itens que o dono cadastrou (uma vez por conversa).
-    if (ai_oferta.promocao_ativa(cfg) and previa_vista and not (sdr or {}).get("promo_enviada")
+    if (ai_oferta.promocao_ativa(cfg) and (previa_vista or card_so) and not (sdr or {}).get("promo_enviada")
             and not (sdr or {}).get("fechamento_enviado") and playbook_vendas.gostou_da_previa(texto)):
         textos = ["Que bom que gostou! 🙌", ai_oferta.mensagem_da_promocao(cfg, lead)]
         return Decisao(resposta="\n\n".join(textos), mensagens=textos,
-                       sdr={**(sdr or {}), "etapa": "proposta", "temperatura": "quente", "promo_enviada": True}, criativo=True)
+                       sdr={**(sdr or {}), "etapa": "proposta", "temperatura": "quente", "promo_enviada": True}, criativo=True,
+                       card=ai_oferta.usa_card(cfg))
 
     prompt = montar_prompt(mensagens, canal, perfil, cfg, lead, raio=raio, sdr=sdr)
     n = normalizar(gerar_json(prompt), sdr)
@@ -492,7 +511,7 @@ def decidir(
     n["mensagens"] = resolver_marcadores(n["mensagens"], lead)
     # o cliente aceitou e nao ha previa: o servico vai criar o site e trocar o marcador (vale so quando o modelo avisou)
     criar_previa = (bool(n.get("enviar_previa")) and not ((lead or {}).get("site_publicado") or "").strip()
-                    and not ai_oferta.sem_previa(cfg))                    # ar-condicionado: nunca existe prévia para criar
+                    and not ai_oferta.sem_previa(cfg) and not card_so)    # ar-condicionado e promoção só com card: nunca há prévia para criar
     erros = problemas_da_resposta(n["mensagens"], cfg, mensagens, lead or {}, criar_previa) + forma_do_preco(n["mensagens"], mensagens)
     if erros:
         correcao = (prompt + "\n\n== SUA RESPOSTA ANTERIOR FOI RECUSADA ==\n"

@@ -395,6 +395,8 @@ export interface PromocaoRobo {
   inclui: string;
   validade: string;
   chamada: string;
+  /** o que acompanha a promoção: só a prévia do site, só o card, ou os dois */
+  formato?: 'previa' | 'card' | 'ambos';
 }
 
 export interface OfertaRobo {

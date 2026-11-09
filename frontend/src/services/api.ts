@@ -317,6 +317,18 @@ export const api = {
     });
   },
 
+  /** O card da promoção como o lead vai receber (imagem gerada pelo servidor), pronto para usar em <img src>. */
+  async cardDaPromocao(ramo: string, preco: string, empresa: string): Promise<string> {
+    const user = auth.currentUser;
+    const token = user ? await user.getIdToken() : '';
+    const q = new URLSearchParams({ ramo, preco, empresa });
+    const r = await fetch(`${API_BASE_URL}/robo/promocao/card?${q}`, {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(modoAtivo ? { 'X-Modo': modoAtivo } : {}) },
+    });
+    if (!r.ok) throw new Error('Não foi possível montar o card agora.');
+    return URL.createObjectURL(await r.blob());
+  },
+
   async criativoVer(): Promise<CriativoInfo> {
     return await fetchWithToken('/robo/criativo');
   },
