@@ -13,7 +13,7 @@ from app import robo_store
 from app.database import AsyncSessionLocal, DBRobo
 from app.firebase_config import db as firestore_db
 
-_UID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+_UID_RE = re.compile(r"^[A-Za-z0-9_~-]{1,140}$")   # "~" separa a conta do modo (uid~empresa): o espaço da empresa também guarda a sessão do WhatsApp
 
 
 def uid_valido(uid: str) -> bool:
