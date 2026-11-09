@@ -11,6 +11,16 @@ import type { PromocaoRobo } from '../types';
 const campo = 'w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500';
 const rotulo = 'block text-xs font-bold text-slate-600 mb-1.5';
 
+// Sugestões de "o que está incluso" conforme o serviço. São só um começo: o dono confere e edita para o que ele realmente entrega.
+const SUGESTOES: { quando: RegExp; itens: string[] }[] = [
+  { quando: /instala/i, itens: ['Instalação completa e testada', 'Visita para avaliar o local', 'Garantia na instalação', 'Atendimento no horário combinado'] },
+  { quando: /limpeza|higieni/i, itens: ['Higienização completa', 'Visita técnica sem custo', 'Garantia no serviço', 'Atendimento no horário combinado'] },
+  { quando: /manuten|revis/i, itens: ['Revisão completa do aparelho', 'Checagem de gás e filtros', 'Garantia no serviço', 'Atendimento no horário combinado'] },
+  { quando: /conserto|reparo/i, itens: ['Diagnóstico do problema', 'Peças com garantia', 'Garantia no serviço', 'Atendimento rápido'] },
+  { quando: /venda|aparelho|equipamento/i, itens: ['Aparelhos das melhores marcas', 'Instalação com especialista', 'Garantia do fabricante', 'Condições de pagamento'] },
+];
+const ehSugestao = (texto: string) => !texto.trim() || SUGESTOES.some(x => x.itens.join('\n') === texto.trim());
+
 const PADRAO: PromocaoRobo = {
   ativa: false, preco: '', inclui: 'Higienização completa\nVisita técnica sem custo\nGarantia no serviço\nAtendimento no horário combinado',
   validade: '', chamada: '', formato: 'card', card_na_abordagem: false, arte: 1, servico: '',
@@ -25,6 +35,12 @@ export const PromocaoDoServico: React.FC<{ promocao?: Partial<PromocaoRobo>; ser
   const p: PromocaoRobo = { ...PADRAO, ...(promocao || {}), ativa: promocao?.ativa ?? false };
   const set = <K extends keyof PromocaoRobo>(k: K, v: PromocaoRobo[K]) => onPromocao({ ...p, [k]: v });
   const nome = (p.servico || servicoPadrao || 'Seu serviço').trim();
+  // trocou o serviço: os itens sugeridos acompanham (só se o dono ainda não escreveu os dele)
+  useEffect(() => {
+    const achada = SUGESTOES.find(x => x.quando.test(nome));
+    if (achada && ehSugestao(p.inclui) && p.inclui.trim() !== achada.itens.join('\n')) onPromocao({ ...p, inclui: achada.itens.join('\n') });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nome]);
   const itens = p.inclui.split('\n').map(i => i.trim()).filter(Boolean);
   const precoCard = String(p.preco || '').replace(/[^\d.,]/g, '');
 
@@ -68,7 +84,7 @@ export const PromocaoDoServico: React.FC<{ promocao?: Partial<PromocaoRobo>; ser
           <input inputMode="decimal" value={p.preco} onChange={e => set('preco', e.target.value)} placeholder="Ex.: 120" className={campo} />
         </div>
         <div className="md:col-span-3">
-          <label className={rotulo}>O que está incluso (um item por linha; os 4 primeiros vão no card)</label>
+          <label className={rotulo}>O que está incluso (um item por linha; os 4 primeiros vão no card, cada um com o ícone do que ele diz)</label>
           <textarea rows={4} value={p.inclui} onChange={e => set('inclui', e.target.value)} className={`${campo} resize-none`} />
         </div>
         <div className="md:col-span-1">

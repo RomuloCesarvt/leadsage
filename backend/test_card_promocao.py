@@ -115,3 +115,9 @@ def test_garantias_e_momentos_do_empresa_sao_do_servico():
     cfg = {**CFG_EMPRESA, "valor": {"momentos": ["apos_gostei"], "garantias": {"visita_gratis": True, "hospedagem": True}}}
     assert v.momentos_do(cfg) == ["so_se_perguntar"]
     assert v.garantias_marcadas(cfg) == ["visita técnica sem custo"]        # hospedagem é de agência e não vale aqui
+
+
+def test_o_icone_de_cada_item_combina_com_o_que_ele_diz():
+    assert c._icone_para("Higienização completa") == 8 and c._icone_para("Garantia de 90 dias") == 2 and c._icone_para("Atendimento no horário combinado") == 4
+    assert c._icone_para("Agendamento pelo WhatsApp") == 0 and c._icone_para("Perfeito no celular") == 3 and c._icone_para("Instalação completa") == 6
+    assert c._icone_para("Qualquer coisa") == 10          # sem palavra conhecida: um visto neutro

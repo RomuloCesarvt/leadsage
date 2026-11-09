@@ -496,8 +496,33 @@ def _vidro(img: Image.Image, caixa, raio: int, borda=(236, 196, 104), alfa: int 
     d.rounded_rectangle([x0, y0, x1, y1], radius=raio, outline=borda + (255,), width=2 * S)
 
 
+# palavras (sem acento) -> ícone: o desenho de cada item combina com o que ele diz
+ICONES: List[Tuple[Tuple[str, ...], int]] = [
+    (("garantia", "seguro", "protegid", "sem taxa", "sem surpresa", "sem pegadinha", "sem compromisso"), 2),
+    (("whatsapp", "agend", "marcar", "chame", "mensagem", "conversa", "contato direto"), 0),
+    (("celular", "mobile", "app"), 3),
+    (("horario", "prazo", "rapid", "urgen", "pontual", "24h", "tempo", "hoje"), 4),
+    (("localiza", "maps", "regiao", "bairro", "perto", "endereco", "domicilio", "visita"), 5),
+    (("peca", "conserto", "reparo", "manutenc", "instala", "montagem", "tecnic", "mecanic", "ferrament"), 6),
+    (("ar-condicionado", "ar condicionado", "gelad", "frio", "climatiz", "refriger", "gas "), 7),
+    (("limpeza", "higieniz", "esteriliz", "desinfec", "lavagem", "estetic", "brilho", "polimento"), 8),
+    (("valor", "preco", "pagamento", "orcamento", "parcela", "desconto", "pix", "sem custo", "gratis", "gratuit"), 9),
+    (("avalia", "estrela", "nota", "google", "depoimento", "reputac"), 1),
+    (("foto", "galeria", "portfolio", "antes e depois", "resultado", "projeto", "obra", "cardapio", "catalogo"), 11),
+]
+
+
+def _icone_para(texto: str) -> int:
+    t = _sem_acento(texto)
+    for palavras, ico in ICONES:
+        if any(p in t for p in palavras):
+            return ico
+    return 10
+
+
 def _icone(d: ImageDraw.ImageDraw, tipo: int, cx: int, cy: int, r: int, cor) -> None:
-    """Quatro ícones de traço: conversa, estrela, escudo com visto e celular."""
+    """Ícones de traço: 0 conversa, 1 estrela, 2 escudo com visto, 3 celular, 4 relógio, 5 local, 6 ferramenta, 7 floco de neve, 8 brilho, 9 etiqueta de preço, 10 visto, 11 imagem."""
+    import math
     w = max(2, int(r * 0.1))
     if tipo == 0:
         d.ellipse([cx - r, cy - r, cx + r, cy + r * 0.9], outline=cor, width=w)
@@ -505,7 +530,6 @@ def _icone(d: ImageDraw.ImageDraw, tipo: int, cx: int, cy: int, r: int, cor) -> 
         d.arc([cx - r * 0.45, cy - r * 0.45, cx + r * 0.45, cy + r * 0.35], 200, 340, fill=cor, width=w)
     elif tipo == 1:
         pts = []
-        import math
         for k in range(10):
             ang = -math.pi / 2 + k * math.pi / 5
             rad = r * (1.0 if k % 2 == 0 else 0.42)
@@ -514,9 +538,45 @@ def _icone(d: ImageDraw.ImageDraw, tipo: int, cx: int, cy: int, r: int, cor) -> 
     elif tipo == 2:
         d.polygon([(cx, cy - r), (cx + r * 0.85, cy - r * 0.55), (cx + r * 0.75, cy + r * 0.35), (cx, cy + r), (cx - r * 0.75, cy + r * 0.35), (cx - r * 0.85, cy - r * 0.55)], outline=cor, width=w)
         d.line([(cx - r * 0.35, cy), (cx - r * 0.05, cy + r * 0.3), (cx + r * 0.4, cy - r * 0.25)], fill=cor, width=w, joint="curve")
-    else:
+    elif tipo == 3:
         d.rounded_rectangle([cx - r * 0.55, cy - r, cx + r * 0.55, cy + r], radius=int(r * 0.22), outline=cor, width=w)
         d.line([(cx - r * 0.15, cy + r * 0.72), (cx + r * 0.15, cy + r * 0.72)], fill=cor, width=w)
+    elif tipo == 4:
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=cor, width=w)
+        d.line([(cx, cy - r * 0.6), (cx, cy), (cx + r * 0.45, cy + r * 0.25)], fill=cor, width=w, joint="curve")
+    elif tipo == 5:
+        d.arc([cx - r * 0.8, cy - r, cx + r * 0.8, cy + r * 0.6], 150, 390, fill=cor, width=w)
+        d.line([(cx - r * 0.72, cy + r * 0.12), (cx, cy + r), (cx + r * 0.72, cy + r * 0.12)], fill=cor, width=w, joint="curve")
+        d.ellipse([cx - r * 0.28, cy - r * 0.5, cx + r * 0.28, cy + r * 0.06], outline=cor, width=w)
+    elif tipo == 6:
+        d.line([(cx - r * 0.75, cy + r * 0.75), (cx + r * 0.2, cy - r * 0.2)], fill=cor, width=w * 2)
+        d.ellipse([cx - r * 0.05, cy - r * 0.95, cx + r * 0.85, cy - r * 0.05], outline=cor, width=w)
+        d.line([(cx + r * 0.3, cy - r * 0.5), (cx + r * 0.85, cy - r * 0.95)], fill=cor, width=w)
+    elif tipo == 7:
+        for k in range(3):
+            ang = k * math.pi / 3
+            dx, dy = r * math.cos(ang), r * math.sin(ang)
+            d.line([(cx - dx, cy - dy), (cx + dx, cy + dy)], fill=cor, width=w)
+            for sg in (-1, 1):
+                bx, by = cx + sg * dx * 0.68, cy + sg * dy * 0.68
+                for da in (-0.55, 0.55):
+                    d.line([(bx, by), (bx + sg * r * 0.3 * math.cos(ang + da), by + sg * r * 0.3 * math.sin(ang + da))], fill=cor, width=max(2, w - 1))
+    elif tipo == 8:
+        def estrela4(x, y, rr):
+            return [(x, y - rr), (x + rr * 0.22, y - rr * 0.22), (x + rr, y), (x + rr * 0.22, y + rr * 0.22), (x, y + rr), (x - rr * 0.22, y + rr * 0.22), (x - rr, y), (x - rr * 0.22, y - rr * 0.22)]
+        d.polygon(estrela4(cx - r * 0.1, cy + r * 0.1, r * 0.95), outline=cor, width=w)
+        d.polygon(estrela4(cx + r * 0.62, cy - r * 0.68, r * 0.38), outline=cor, width=max(2, w - 1))
+    elif tipo == 9:
+        d.polygon([(cx - r * 0.95, cy - r * 0.1), (cx - r * 0.1, cy - r * 0.95), (cx + r * 0.95, cy - r * 0.95), (cx + r * 0.95, cy + r * 0.1), (cx + r * 0.1, cy + r * 0.95)], outline=cor, width=w)
+        d.ellipse([cx + r * 0.35, cy - r * 0.62, cx + r * 0.68, cy - r * 0.29], outline=cor, width=w)
+        d.text((cx - r * 0.15, cy + r * 0.05), "R$", font=_g("Inter-800.ttf", int(r * 0.62)), fill=cor, anchor="mm")
+    elif tipo == 11:
+        d.rounded_rectangle([cx - r, cy - r * 0.75, cx + r, cy + r * 0.75], radius=int(r * 0.18), outline=cor, width=w)
+        d.line([(cx - r * 0.8, cy + r * 0.5), (cx - r * 0.2, cy - r * 0.1), (cx + r * 0.15, cy + r * 0.3), (cx + r * 0.4, cy), (cx + r * 0.8, cy + r * 0.5)], fill=cor, width=w, joint="curve")
+        d.ellipse([cx + r * 0.3, cy - r * 0.55, cx + r * 0.6, cy - r * 0.25], outline=cor, width=w)
+    else:
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=cor, width=w)
+        d.line([(cx - r * 0.45, cy), (cx - r * 0.1, cy + r * 0.38), (cx + r * 0.5, cy - r * 0.3)], fill=cor, width=w, joint="curve")
 
 
 def _beneficios(img: Image.Image, itens: List[str], cor, y: int) -> None:
@@ -529,7 +589,7 @@ def _beneficios(img: Image.Image, itens: List[str], cor, y: int) -> None:
     larg_col = (L - 2 * 40) // 4
     for k, item in enumerate(itens[:4]):
         cx = (40 + larg_col * k + larg_col // 2) * S
-        _icone(d, k, cx, (y + 36) * S, 36 * S, OURO_CLARO + (255,))
+        _icone(d, _icone_para(item), cx, (y + 36) * S, 36 * S, OURO_CLARO + (255,))
         for i, linha in enumerate(_quebra(d, item, f, (larg_col - 6) * S)[:3]):
             _tx(d, (cx, (y + 100 + i * 33) * S), linha, font=f, fill=(255, 255, 255, 255), anchor="mm")
 
@@ -868,7 +928,7 @@ def _gerar_servico(preco: str, titulo: str, itens: List[str], arte: int) -> byte
     larg_col = (L - 80) // 4
     for k, item in enumerate(itens[:4]):
         cxk = (40 + larg_col * k + larg_col // 2) * S
-        _icone(d, [0, 1, 2, 3][k], cxk, (y_it + 34) * S, 34 * S, OURO_CLARO + (255,))
+        _icone(d, _icone_para(item), cxk, (y_it + 34) * S, 34 * S, OURO_CLARO + (255,))
         for i, linha in enumerate(_quebra(d, item, f, (larg_col - 6) * S)[:3]):
             _tx(d, (cxk, (y_it + 96 + i * 32) * S), linha, font=f, fill=branco, anchor="mm")
     _botao_whats(img, cor, cor2, 1214, "Chame no WhatsApp")
