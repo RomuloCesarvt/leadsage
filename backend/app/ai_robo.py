@@ -475,6 +475,7 @@ def decidir(
     # Estilo comercial: o valor NÃO sai junto com o link. Só depois de a pessoa ver a prévia e reagir bem ("gostei", "ficou ótimo")
     # é que o aviso da promoção sai, em código, com o preço e os itens que o dono cadastrou (uma vez por conversa).
     if (ai_oferta.promocao_ativa(cfg) and (previa_vista or card_so) and not (sdr or {}).get("promo_enviada")
+            and (sdr or {}).get("momento_valor") != "so_se_perguntar"
             and not (sdr or {}).get("fechamento_enviado") and playbook_vendas.gostou_da_previa(texto)):
         textos = ["Que bom que gostou! 🙌", ai_oferta.mensagem_da_promocao(cfg, lead)]
         return Decisao(resposta="\n\n".join(textos), mensagens=textos,
@@ -512,14 +513,14 @@ def decidir(
     # o cliente aceitou e nao ha previa: o servico vai criar o site e trocar o marcador (vale so quando o modelo avisou)
     criar_previa = (bool(n.get("enviar_previa")) and not ((lead or {}).get("site_publicado") or "").strip()
                     and not ai_oferta.sem_previa(cfg) and not card_so)    # ar-condicionado e promoção só com card: nunca há prévia para criar
-    erros = problemas_da_resposta(n["mensagens"], cfg, mensagens, lead or {}, criar_previa) + forma_do_preco(n["mensagens"], mensagens)
+    erros = problemas_da_resposta(n["mensagens"], cfg, mensagens, lead or {}, criar_previa, (sdr or {}).get("momento_valor", "")) + forma_do_preco(n["mensagens"], mensagens)
     if erros:
         correcao = (prompt + "\n\n== SUA RESPOSTA ANTERIOR FOI RECUSADA ==\n"
                     + "\n".join(f"- {e}" for e in erros)
                     + "\nReescreva sem isso. Para negar algo, basta dizer que não é possível.")
         n = normalizar(gerar_json(correcao), sdr)
         n["mensagens"] = resolver_marcadores(n["mensagens"], lead)
-        restantes = problemas_da_resposta(n["mensagens"], cfg, mensagens, lead or {}, criar_previa)
+        restantes = problemas_da_resposta(n["mensagens"], cfg, mensagens, lead or {}, criar_previa, (sdr or {}).get("momento_valor", ""))
         if restantes:
             return Decisao(passar_para_humano=True, usou_ia=True, sdr=n["sdr"],
                            motivo="a resposta do robô não passou na conferência (" + restantes[0][:110] + ") — responda você")

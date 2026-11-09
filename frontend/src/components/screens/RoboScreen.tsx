@@ -21,6 +21,7 @@ import { DisparoWhatsApp } from '../DisparoWhatsApp';
 import { Balao } from '../conversaUi';
 import { OfertaDoRobo } from '../OfertaDoRobo';
 import { AbordagemDoRobo } from '../AbordagemDoRobo';
+import { MomentoDoValor } from '../MomentoDoValor';
 import type {
   RoboConfig, RoboConfigEntrada, RoboMensagem,
 } from '../../types';
@@ -226,7 +227,7 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
           meu_nome: c.meu_nome, meu_cargo: c.meu_cargo, minha_empresa: c.minha_empresa,
           catalogo: c.catalogo, faq: c.faq, desconto_maximo: c.desconto_maximo || 0, condicao_especial: c.condicao_especial || '',
           oferta: c.oferta || {},
-          estilo: (c.estilo || 'consultiva') as any, promocao: c.promocao || {},
+          estilo: (c.estilo || 'consultiva') as any, promocao: c.promocao || {}, valor: (c as any).valor,
           wa_phone_id: c.wa_phone_id, page_id: c.page_id, ig_id: c.ig_id,
         });
       })
@@ -329,6 +330,8 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
             <input type="checkbox" checked={!!form.ativo} onChange={e => ligarDesligar(e.target.checked)} className="w-10 h-5 accent-blue-600" aria-label="Ligar o robô" />
           </label>
         </div>
+
+        <MomentoDoValor valor={form.valor} onChange={v => mudar('valor', v)} />
 
         <AbordagemDoRobo estilo={form.estilo as any} promocao={form.promocao} onEstilo={e => mudar('estilo', e)} onPromocao={p => mudar('promocao', p)} />
 

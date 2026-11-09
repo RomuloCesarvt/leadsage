@@ -27,7 +27,7 @@ import re as _re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from app import agentes, ai_oferta, fechamento, identidade, nicho_guia, playbook_vendas, previa_honesta, quem_fala
+from app import agentes, ai_oferta, fechamento, identidade, nicho_guia, playbook_vendas, previa_honesta, quem_fala, valor_momento
 from app.playbook_sites import FALA_DO_ROBO_SOBRE_SITES
 
 ETAPAS = ("abertura", "descoberta", "diagnostico", "proposta", "objecao", "agendamento", "fechamento", "perdido")
@@ -441,6 +441,7 @@ Agora é {_agora_brasil(agora)}.
 == O QUE {quem.upper()} VENDE ==
 {oferta}
 {servico}
+{valor_momento.bloco((sdr or {}).get("momento_valor") or valor_momento.escolher(cfg, str((lead or {}).get("id", ""))), cfg, "robo")}
 {f"Catálogo e preços (só estes existem):{chr(10)}{cfg['catalogo']}" if cfg.get('catalogo') else "Não há catálogo de preços: NUNCA diga valores; diga que depende do escopo e proponha a conversa."}
 {f"Perguntas frequentes (respostas oficiais):{chr(10)}{cfg['faq']}" if cfg.get('faq') else ""}
 {_regra_de_desconto(cfg)}
@@ -656,7 +657,7 @@ def normalizar(dados: Dict[str, Any], anterior: Optional[Dict[str, Any]] = None)
             "reuniao": _texto(dados.get("reuniao"), 80) or anterior.get("reuniao", ""),
             "entendi": _texto(dados.get("entendi"), 200),
             # marcas do codigo (nao do modelo): o que ja foi entregue nesta conversa nao se repete
-            **{k: anterior[k] for k in ("promo_enviada", "fechamento_enviado", "fechamento_pendencias", "previa_enviada", "orcamento_enviado") if anterior.get(k)},
+            **{k: anterior[k] for k in ("promo_enviada", "fechamento_enviado", "fechamento_pendencias", "previa_enviada", "orcamento_enviado", "momento_valor", "momento_da_abordagem") if anterior.get(k)},
         },
         "automatica": bool(dados.get("automatica")) or dados.get("tipo") == "automatica",
         "enviar_previa": bool(dados.get("enviar_previa")),
@@ -718,6 +719,9 @@ def valores_permitidos(cfg: Dict[str, Any], mensagens: List[Dict[str, Any]]) -> 
     base = [_num(v) for v in _VALOR.findall(cfg.get("catalogo") or "")]
     desconto = int(cfg.get("desconto_maximo") or 0)
     permitidos = list(base) + valores_da_oferta(cfg)
+    promo = cfg.get("promocao") if isinstance(cfg.get("promocao"), dict) else {}
+    if promo.get("ativa"):
+        permitidos.append(_num(str(promo.get("preco") or "0")))          # o valor da promoção que o dono cadastrou
     for v in base:
         permitidos += [round(v * (1 - d / 100), 2) for d in range(1, desconto + 1)]
     for m in mensagens:
@@ -830,7 +834,7 @@ def puxou_o_fechamento(textos: List[str], mensagens: List[Dict[str, Any]]) -> Op
 
 
 def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: List[Dict[str, Any]], lead: Optional[Dict[str, Any]] = None,
-                          criando_previa: bool = False) -> List[str]:
+                          criando_previa: bool = False, momento: str = "") -> List[str]:
     """`criando_previa`: o sistema vai criar o site agora e trocar [LINK_DA_PREVIA] pelo link; o marcador e a promessa do link valem."""
     erros: List[str] = []
     # -1) o robô nunca se apresenta como assistente virtual/robô/IA: o número pode ser banido
@@ -872,7 +876,9 @@ def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: Lis
             if _re.search(r"\b(segue|aqui est[aá])\b[^.?!]{0,25}\blink\b", t, _re.I) and url not in t and "http" not in t.lower():
                 erros.append(f'você disse "segue o link" sem colocar o link: cole a URL completa {url}')
                 break
-    if any(m.get("de") == "contato" for m in mensagens) and not cliente_perguntou_de_valor(mensagens):
+    # o dono escolheu falar de valor já na abordagem ou na primeira resposta: aí o valor sem pergunta é permitido (só o da promoção, conferido abaixo)
+    valor_liberado = momento in ("primeira_com_valor", "primeira_sem_numero", "apos_resposta")
+    if any(m.get("de") == "contato" for m in mensagens) and not cliente_perguntou_de_valor(mensagens) and not valor_liberado:
         for t in textos:
             if _VALOR.search(t):
                 erros.append("você citou valor sem o cliente ter perguntado de preço ou custo: só fale de valores se ele perguntar")

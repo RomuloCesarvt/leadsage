@@ -377,6 +377,12 @@ async def _incluir_abordagem(uid: str, conversa: Dict[str, Any], lead: Optional[
     ]
     if previas:
         conversa["mensagens"] = previas + conversa["mensagens"]
+    momentos = [i.get("momento") for i in enviadas if i.get("momento")]
+    if momentos:
+        conversa.setdefault("sdr", {})["momento_valor"] = momentos[-1]       # o momento com que este lead foi abordado (alimenta o painel de comparação)
+        conversa["sdr"]["momento_da_abordagem"] = True
+        if momentos[-1] == "primeira_com_valor":
+            conversa["sdr"]["promo_enviada"] = True       # o valor já foi dito na abordagem: o aviso da promoção não o repete
     if any(i.get("card_enviado") for i in enviadas):
         conversa.setdefault("sdr", {})["promo_enviada"] = True      # o card com o valor já foi na abordagem: não se repete
 
@@ -458,6 +464,9 @@ async def _processar(
     # o que o proprio WhatsApp ja mostra neste chat (a oferta da previa, a apresentacao) entra primeiro: sem isso um "pode" do lead fica sem pergunta
     _semear_do_whatsapp(conversa, contexto)
     await _incluir_abordagem(uid, conversa, lead, msg)
+    if not (conversa.get("sdr") or {}).get("momento_valor"):
+        from app import valor_momento
+        conversa.setdefault("sdr", {})["momento_valor"] = valor_momento.escolher(cfg, str((lead or {}).get("id") or conversa.get("lead_id") or ""))
 
     async def salvar() -> Dict[str, Any]:
         conversa.pop("respondendo", None)

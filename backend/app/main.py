@@ -43,6 +43,7 @@ from app.espaco import do_modo as _do_modo
 from app import criativo as criativo_mod
 from app import score_ar
 from app import card_promocao
+from app import valor_momento
 import httpx
 from app.firebase_config import get_current_user, db as firestore_db
 from app import profile_store
@@ -1106,6 +1107,8 @@ class RoboConfigRequest(BaseModel):
     # como o robo aborda: consultiva (padrao) ou comercial (anuncia a promocao depois da previa)
     estilo: Optional[str] = Field(default=None, max_length=20)
     promocao: Optional[Dict[str, Any]] = None
+    # o momento de falar de valor e as garantias (valor_momento.py)
+    valor: Optional[Dict[str, Any]] = None
 
 
 class PreviaPorTelefone(BaseModel):
@@ -1162,6 +1165,8 @@ async def robo_salvar_config(req: RoboConfigRequest, user: dict = Depends(usuari
         raise HTTPException(status_code=400, detail="Estilo de abordagem inválido.")
     if "promocao" in dados:
         dados["promocao"] = ai_oferta.normalizar_promocao(dados["promocao"])
+    if "valor" in dados:
+        dados["valor"] = valor_momento.normalizar(dados["valor"])
     canal = await robo_store.salvar_canal(_espaco(user), user.get("email", ""), dados)
     if canal.get("cw_hash"):
         # o Conector guarda o canal por alguns segundos; ligar o robo tem de valer na hora
@@ -1391,6 +1396,7 @@ async def _funcoes_da_fila(user: dict):
         posicao[0] += 1
         lead = dict(lead)
         retomada = lead.pop("_retomada", None)
+        momento = valor_momento.escolher(canal_robo, str(lead.get("id", "")))        # o momento de falar de valor deste lead (A/B se o dono marcou dois)
         previa = "nenhuma" if ai_oferta.sem_previa(canal_robo) else await _previa_do_lead(uid, str(lead.get("id", "")), sites_do_usuario)
         if previa == "criada":
             # prévia feita por uma versão antiga do motor de sites: refeita (mesmo link) antes de o link seguir na mensagem
@@ -1404,14 +1410,14 @@ async def _funcoes_da_fila(user: dict):
                                    com_seguimentos=(canal == "whatsapp"),
                                    evitar=evitar or [], variacao=variacao,
                                    custom_instructions=_instrucao_de_retomada(retomada),
-                                   service_brief=abordagem_mestra.produto(canal_robo, lead, produto)),
+                                   service_brief=abordagem_mestra.produto(canal_robo, lead, produto) + "\n\n" + valor_momento.bloco(momento, canal_robo, "abordagem")),
             api_key=settings.GEMINI_API_KEY,
         )
         url = ""
         if previa == "criada":
             slug = next((s.get("slug") for s in sites_do_usuario if s.get("lead_id") == str(lead.get("id", "")) and s.get("slug")), "")
             url = f"{settings.APP_URL}/s/{slug}" if slug else ""
-        return {"subject": pitch.subject, "body": pitch.body, "hook": pitch.hook, "previa": previa, "previa_url": url,
+        return {"subject": pitch.subject, "body": pitch.body, "hook": pitch.hook, "previa": previa, "previa_url": url, "momento": momento,
                 "follow_ups": [dict(f) for f in (pitch.follow_ups or []) if isinstance(f, dict)]}
 
     async def enviar(lead: Dict[str, Any], assunto: str, corpo: str) -> str:
@@ -1891,6 +1897,13 @@ async def card_de_exemplo(ramo: str = "padrao", preco: str = "347", empresa: str
     ramo = ramo if ramo in card_promocao.RAMOS else "padrao"
     png = await asyncio.get_running_loop().run_in_executor(None, _card_em_cache, ramo, preco[:12], empresa[:40])
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "private, max-age=300"})
+
+
+@app.get("/api/robo/valor/painel")
+async def painel_do_valor(user: dict = Depends(usuario_do_espaco)):
+    """Compara em que momento falar de valor funciona melhor (por abordagem enviada)."""
+    await exigir_recurso(user, "robo_ia", "O robô de atendimento")
+    return {"momentos": await valor_momento.painel(_espaco(user))}
 
 
 @app.post("/api/robo/criativo/enviar")

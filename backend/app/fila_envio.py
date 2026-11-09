@@ -774,6 +774,7 @@ async def preparar_lote(
             "previa": pronto.get("previa") or "",
             "previa_url": pronto.get("previa_url") or "",
             "seguimentos": pronto.get("follow_ups") or [],
+            "momento": pronto.get("momento") or "",       # em que momento esta abordagem fala de valor (para comparar o que funciona)
             "ramo": str(lead.get("niche") or lead.get("role") or "")[:80],
             "nota": lead.get("rating"), "avaliacoes": lead.get("rating_count"),
             "contato": {"email": lead.get("email") or "", "phone": lead.get("phone") or "",

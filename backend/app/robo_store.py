@@ -50,6 +50,8 @@ CAMPOS_CANAL = (
     "oferta",
     # como o robo aborda (consultiva | comercial) e a promocao que o estilo comercial anuncia
     "estilo", "promocao",
+    # em que momento o robô fala de valor (e as garantias que o dono confirmou): valor_momento.py
+    "valor",
     # preenchidos pela conexao com um clique (app do LeadSage)
     "page_nome", "ig_usuario", "waba_id", "wa_pin",
 )
@@ -326,6 +328,8 @@ def visao_publica(canal: Optional[Dict[str, Any]], url_base: str) -> Dict[str, A
     saida["oferta"] = c.get("oferta") or {}
     saida["promocao"] = c.get("promocao") or {}
     saida["estilo"] = c.get("estilo") or "consultiva"
+    from app import valor_momento
+    saida["valor"] = valor_momento.normalizar(c.get("valor"))
     for segredo in SEGREDOS:
         saida[f"tem_{segredo}"] = bool(c.get(segredo))
     saida["webhook_url"] = f"{url_base}/api/robo/webhook/{c['gancho']}" if c.get("gancho") else ""

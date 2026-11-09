@@ -329,6 +329,10 @@ export const api = {
     return URL.createObjectURL(await r.blob());
   },
 
+  async painelDoValor(): Promise<{ momentos: PainelDoMomento[] }> {
+    return await fetchWithToken('/robo/valor/painel');
+  },
+
   async criativoVer(): Promise<CriativoInfo> {
     return await fetchWithToken('/robo/criativo');
   },
@@ -738,4 +742,15 @@ export interface CriativoInfo {
   url?: string;
   legenda?: string;
   usos?: { promocao?: boolean; abordagem?: boolean };
+}
+
+
+export interface PainelDoMomento {
+  momento: string;
+  nome: string;
+  enviados: number;
+  responderam: number;
+  gostaram: number;
+  pararam: number;
+  pediram_fechar: number;
 }

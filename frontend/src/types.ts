@@ -386,6 +386,7 @@ export interface RoboConfigEntrada {
   /** como o robô aborda: consultiva (padrão) ou comercial (anuncia a promoção depois da prévia) */
   estilo: 'consultiva' | 'comercial';
   promocao: Partial<PromocaoRobo>;
+  valor?: ValorDoRobo;
 }
 
 export interface PromocaoRobo {
@@ -737,3 +738,11 @@ export interface VisitaServico {
   retorno_avisado: boolean;
 }
 export interface RetornoServico extends VisitaServico { mensagem: string }
+
+
+/** Em que momento o robô fala de valor (e as garantias que o dono confirmou). Dois momentos marcados = teste A/B. */
+export interface ValorDoRobo {
+  momentos: string[];
+  garantias: Record<string, boolean>;
+  detalhes: Record<string, string>;
+}
