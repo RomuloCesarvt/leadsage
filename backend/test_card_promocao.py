@@ -69,3 +69,17 @@ def test_assinatura_inclui_a_arte():
     url = c.url_do_card("barbearia", "347", "X", 2)
     sig = url.split("sig=")[1]
     assert c.assinatura_valida("barbearia", "347", "X", sig, 2) and not c.assinatura_valida("barbearia", "347", "X", sig, 3)
+
+
+def test_o_card_usa_o_valor_cadastrado_no_robo_sem_errar_a_casa_decimal():
+    from app import ai_oferta
+    for digitado, esperado in [("347", ("347", "00")), ("347,00", ("347", "00")), ("1.249,90", ("1.249", "90")), ("599,9", ("599", "90")), ("R$ 1200", ("1.200", "00"))]:
+        guardado = ai_oferta.normalizar_promocao({"ativa": True, "preco": digitado})["preco"]       # o robô guarda um número (347.0)
+        assert c._preco_partes(c.preco_texto(guardado)) == esperado, digitado
+    # e o endereço do card leva o valor certo
+    url = c.url_do_card("barbearia", c.preco_texto(499.0), "X", 1)
+    assert "preco=499&" in url
+
+
+def test_valor_vindo_da_tela_com_ponto_decimal():
+    assert c._preco_partes("1249.9") == ("1.249", "90") and c._preco_partes("347.0") == ("347", "00") and c._preco_partes("1.249") == ("1.249", "00")

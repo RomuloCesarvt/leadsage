@@ -171,12 +171,21 @@ def _quebra(d: ImageDraw.ImageDraw, txt: str, fonte, larg: int) -> List[str]:
     return linhas
 
 
+def preco_texto(valor) -> str:
+    """O valor da promoção (número guardado pelo robô) em texto para o card: 347.0 -> "347"; 1249.9 -> "1249,90"."""
+    try:
+        v = float(valor)
+    except (TypeError, ValueError):
+        return str(valor or "0")
+    return str(int(v)) if v == int(v) else f"{v:.2f}".replace(".", ",")
+
+
 def _preco_partes(preco: str) -> Tuple[str, str]:
     """"347" -> ("347", "00"); "1.249,90" -> ("1.249", "90")."""
     p = re.sub(r"[^\d.,]", "", str(preco or "")) or "0"
     if "," in p:
         inteiro, cent = p.rsplit(",", 1)
-    elif re.search(r"\.\d{2}$", p) and p.count(".") == 1:
+    elif re.search(r"\.\d{1,2}$", p) and p.count(".") == 1:
         inteiro, cent = p.rsplit(".", 1)
     else:
         inteiro, cent = p, "00"
