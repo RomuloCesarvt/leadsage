@@ -376,9 +376,16 @@ def _gerar_desenhado(ramo: str, preco: str, empresa: str = "") -> bytes:
 # Cada ramo pode ter uma PLACA: a foto de fundo (cenário do ramo, notebook e celular com o site, espaço livre no alto), feita uma vez
 # com IA de imagem e guardada em `placas/<ramo>.jpg`. O sistema escreve por cima o texto e o valor, com 3 estilos de arte para escolher.
 def _tx(d: ImageDraw.ImageDraw, xy, txt: str, font=None, fill=(255, 255, 255, 255), anchor: str = "la") -> None:
-    """Texto sobre a foto: leve contorno escuro nos textos claros, para ler sobre qualquer ponto da imagem."""
+    """Texto sobre a foto: sombra suave atrás (nada de contorno duro), para ler sobre qualquer ponto da imagem."""
     claro = sum(fill[:3]) > 330
-    d.text(xy, txt, font=font, fill=fill, anchor=anchor, stroke_width=(S if claro else 0), stroke_fill=(0, 0, 0, 110))
+    img = getattr(d, "_image", None)
+    if claro and img is not None:
+        x0, y0, x1, y1 = d.textbbox(xy, txt, font=font, anchor=anchor)
+        pad = 24 * S
+        camada = Image.new("RGBA", (x1 - x0 + 2 * pad, y1 - y0 + 2 * pad), (0, 0, 0, 0))
+        ImageDraw.Draw(camada).text((xy[0] - x0 + pad, xy[1] - y0 + pad + 3 * S), txt, font=font, fill=(0, 0, 0, 175), anchor=anchor)
+        img.alpha_composite(camada.filter(ImageFilter.GaussianBlur(5 * S)), (max(0, x0 - pad), max(0, y0 - pad)))
+    d.text(xy, txt, font=font, fill=fill, anchor=anchor)
 
 
 PASTA_PLACAS = os.path.join(os.path.dirname(__file__), "placas")
@@ -449,7 +456,7 @@ def _centro(d: ImageDraw.ImageDraw, y: int, txt: str, fonte, cor, ancora: str = 
     return int(d.textlength(txt, font=fonte))
 
 
-OURO_CLARO, OURO_ESCURO = (250, 232, 170), (196, 146, 52)
+OURO_CLARO, OURO_ESCURO = (255, 236, 150), (222, 152, 34)
 
 
 def _ouro(img: Image.Image, xy, txt: str, fonte, anchor: str = "ls", brilho: bool = True) -> int:
@@ -565,7 +572,7 @@ def _gerar_sobre_placa(ramo: str, preco: str, empresa: str, arte: int) -> bytes:
         claro = tuple(int(c * 0.4 + 255 * 0.6) for c in cor) + (255,)
         tam = 80 if len(r["rotulo"]) > 22 else (96 if len(r["rotulo"]) > 16 else 128)
         _tx(d, (L * S // 2, (300 if tam > 100 else 280) * S), r["rotulo"], font=_g(serif_i, tam * S), fill=claro, anchor="ms")
-        f_v, f_rs, f_c = _g("PlayfairDisplay-ExtraBold.ttf", 122 * S), _g("PlayfairDisplay-ExtraBold.ttf", 60 * S), _g("PlayfairDisplay-ExtraBold.ttf", 58 * S)
+        f_v, f_rs, f_c = _g("Inter-800.ttf", 118 * S), _g("Inter-800.ttf", 56 * S), _g("Inter-800.ttf", 54 * S)
         w = int(d.textlength("R$ ", font=f_rs) + d.textlength(inteiro, font=f_v) + d.textlength("," + cent, font=f_c))
         larg_faixa = max(w, int(d.textlength("só se você gostar do resultado", font=_g("Inter-600.ttf", 36 * S)))) + 130 * S
         x0 = (L * S - larg_faixa) // 2
@@ -622,7 +629,7 @@ def _gerar_sobre_placa(ramo: str, preco: str, empresa: str, arte: int) -> bytes:
         d.ellipse([cx - rr + 13 * S, cy - rr + 13 * S, cx + rr - 13 * S, cy + rr - 13 * S], outline=(110, 74, 16, 255), width=3 * S)
         tinta = (58, 38, 6, 255)
         d.text((cx, cy - 88 * S), "POR APENAS", font=_g("Inter-800.ttf", 24 * S), fill=tinta, anchor="mm")
-        d.text((cx, cy - 10 * S), "R$" + inteiro, font=_g(serif, (80 if len(inteiro) <= 3 else 62) * S), fill=tinta, anchor="mm")
+        d.text((cx, cy - 10 * S), "R$" + inteiro, font=_g("Inter-800.ttf", (76 if len(inteiro) <= 3 else 58) * S), fill=tinta, anchor="mm")
         d.text((cx, cy + 66 * S), "só se gostar", font=_g("Inter-800.ttf", 27 * S), fill=tinta, anchor="mm")
         d.text((cx, cy + 98 * S), "do resultado", font=_g("Inter-800.ttf", 27 * S), fill=tinta, anchor="mm")
         _beneficios(img, r["itens"], cor, 480)
@@ -719,7 +726,7 @@ def _gerar_servico_foto(preco: str, titulo: str, itens: List[str], arte: int) ->
         for i, linha in enumerate(linhas):
             _tx(d, (L * S // 2, (620 + i * 84) * S), linha, font=f_titulo, fill=branco, anchor="ms")
         topo = 620 + (len(linhas) - 1) * 84 + 36
-        f_v, f_rs, f_c = _g("PlayfairDisplay-ExtraBold.ttf", 104 * S), _g("PlayfairDisplay-ExtraBold.ttf", 50 * S), _g("PlayfairDisplay-ExtraBold.ttf", 48 * S)
+        f_v, f_rs, f_c = _g("Inter-800.ttf", 100 * S), _g("Inter-800.ttf", 48 * S), _g("Inter-800.ttf", 46 * S)
         w = int(d.textlength("R$ ", font=f_rs) + d.textlength(inteiro, font=f_v) + d.textlength("," + cent, font=f_c))
         lf = max(w, int(d.textlength("condição especial", font=_g("Inter-600.ttf", 28 * S)))) + 110 * S
         x0, y0, y1 = (L * S - lf) // 2, topo * S, (topo + 188) * S
@@ -739,7 +746,7 @@ def _gerar_servico_foto(preco: str, titulo: str, itens: List[str], arte: int) ->
         f_t2 = _g("PlayfairDisplay-ExtraBold.ttf", 60 * S)
         for i, linha in enumerate(_quebra(d, titulo, f_t2, (L - 150) * S)[:2]):
             _tx(d, (L * S // 2, (610 + i * 66) * S), linha, font=f_t2, fill=branco, anchor="ms")
-        f_v, f_rs = _g("PlayfairDisplay-ExtraBold.ttf", 210 * S), _g("PlayfairDisplay-ExtraBold.ttf", 66 * S)
+        f_v, f_rs = _g("Inter-800.ttf", 200 * S), _g("Inter-800.ttf", 62 * S)
         w = int(d.textlength("R$ ", font=f_rs) + d.textlength(inteiro, font=f_v))
         x = (L * S - w) // 2
         x += _ouro(img, (x, 830 * S), "R$ ", f_rs)
@@ -762,7 +769,7 @@ def _gerar_servico_foto(preco: str, titulo: str, itens: List[str], arte: int) ->
         d.ellipse([cx - rr + 12 * S, cy - rr + 12 * S, cx + rr - 12 * S, cy + rr - 12 * S], outline=(110, 74, 16, 255), width=3 * S)
         tinta = (58, 38, 6, 255)
         d.text((cx, cy - 78 * S), "POR APENAS", font=_g("Inter-800.ttf", 22 * S), fill=tinta, anchor="mm")
-        d.text((cx, cy - 6 * S), "R$" + inteiro, font=_g("PlayfairDisplay-ExtraBold.ttf", (76 if len(inteiro) <= 3 else 58) * S), fill=tinta, anchor="mm")
+        d.text((cx, cy - 6 * S), "R$" + inteiro, font=_g("Inter-800.ttf", (72 if len(inteiro) <= 3 else 56) * S), fill=tinta, anchor="mm")
         d.text((cx, cy + 62 * S), "condição", font=_g("Inter-800.ttf", 25 * S), fill=tinta, anchor="mm")
         d.text((cx, cy + 90 * S), "especial", font=_g("Inter-800.ttf", 25 * S), fill=tinta, anchor="mm")
     _beneficios(img, itens, cor, 986)
@@ -802,7 +809,7 @@ def _gerar_servico(preco: str, titulo: str, itens: List[str], arte: int) -> byte
         ultimo = titulo_em_linhas(100, 172)
         _tx(d, (L * S // 2, (ultimo + 100) * S), "em promoção", font=_g(serif_i, 92 * S), fill=tuple(int(c * 0.4 + 255 * 0.6) for c in cor) + (255,), anchor="ms")
         topo = ultimo + 132
-        f_v, f_rs, f_c = _g("PlayfairDisplay-ExtraBold.ttf", 120 * S), _g("PlayfairDisplay-ExtraBold.ttf", 58 * S), _g("PlayfairDisplay-ExtraBold.ttf", 56 * S)
+        f_v, f_rs, f_c = _g("Inter-800.ttf", 116 * S), _g("Inter-800.ttf", 56 * S), _g("Inter-800.ttf", 54 * S)
         w = int(d.textlength("R$ ", font=f_rs) + d.textlength(inteiro, font=f_v) + d.textlength("," + cent, font=f_c))
         lf = max(w, int(d.textlength("condição especial", font=_g("Inter-600.ttf", 30 * S)))) + 130 * S
         x0 = (W - lf) // 2
@@ -822,7 +829,7 @@ def _gerar_servico(preco: str, titulo: str, itens: List[str], arte: int) -> byte
         d.rounded_rectangle([(L - 560) * S // 2, 70 * S, (L + 560) * S // 2, 128 * S], radius=29 * S, outline=OURO_ESCURO + (255,), width=3 * S, fill=(6, 16, 40, 150))
         _tx(d, (L * S // 2, 100 * S), "CONDIÇÃO ESPECIAL", font=_g("Inter-800.ttf", 26 * S), fill=OURO_CLARO + (255,), anchor="mm")
         ultimo = titulo_em_linhas(72, 232)
-        f_v, f_rs = _g("PlayfairDisplay-ExtraBold.ttf", 230 * S), _g("PlayfairDisplay-ExtraBold.ttf", 74 * S)
+        f_v, f_rs = _g("Inter-800.ttf", 220 * S), _g("Inter-800.ttf", 70 * S)
         w = int(d.textlength("R$ ", font=f_rs) + d.textlength(inteiro, font=f_v))
         x = (W - w) // 2
         base = (ultimo + 220) * S
@@ -846,7 +853,7 @@ def _gerar_servico(preco: str, titulo: str, itens: List[str], arte: int) -> byte
         d.ellipse([cx - rr + 12 * S, cy - rr + 12 * S, cx + rr - 12 * S, cy + rr - 12 * S], outline=(110, 74, 16, 255), width=3 * S)
         tinta = (58, 38, 6, 255)
         d.text((cx, cy - 86 * S), "POR APENAS", font=_g("Inter-800.ttf", 24 * S), fill=tinta, anchor="mm")
-        d.text((cx, cy - 8 * S), "R$" + inteiro, font=_g("PlayfairDisplay-ExtraBold.ttf", (82 if len(inteiro) <= 3 else 62) * S), fill=tinta, anchor="mm")
+        d.text((cx, cy - 8 * S), "R$" + inteiro, font=_g("Inter-800.ttf", (78 if len(inteiro) <= 3 else 58) * S), fill=tinta, anchor="mm")
         d.text((cx, cy + 74 * S), "condição", font=_g("Inter-800.ttf", 26 * S), fill=tinta, anchor="mm")
         d.text((cx, cy + 104 * S), "especial", font=_g("Inter-800.ttf", 26 * S), fill=tinta, anchor="mm")
         _ar_condicionado(img, W // 2, 760 * S, 620 * S)
