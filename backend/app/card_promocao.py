@@ -389,7 +389,7 @@ def _tx(d: ImageDraw.ImageDraw, xy, txt: str, font=None, fill=(255, 255, 255, 25
 
 
 PASTA_PLACAS = os.path.join(os.path.dirname(__file__), "placas")
-ARTES = (1, 2, 3)
+ARTES = (1, 2, 3, 4, 5)
 
 
 def tem_placa(ramo: str) -> bool:
@@ -716,7 +716,18 @@ def gerar(ramo: str, preco: str, empresa: str = "", arte: int = 1, titulo: str =
     """O card: do SERVIÇO da empresa (ramo "servico": título e itens vêm do cadastro), sobre a foto do ramo (3 estilos de arte) quando há placa,
     ou o card desenhado pelo sistema."""
     if ramo == "servico":
-        return _gerar_servico(preco, titulo, [i for i in itens.split("|") if i.strip()], arte if arte in ARTES else 1)
+        lista = [i for i in itens.split("|") if i.strip()] or ["Atendimento rápido", "Orçamento sem compromisso", "Garantia no serviço", "Equipe de confiança"]
+        while 0 < len(lista) < 4:
+            lista = lista + [lista[len(lista) % len(lista)]]
+        if arte in (4, 5) and os.path.exists(os.path.join(PASTA_PLACAS, "servico.jpg")):
+            partes = (titulo or "Seu serviço").split()
+            meio = max(1, len(partes) // 2)
+            return _compor_criativa("servico", arte, [" ".join(partes[:meio]), " ".join(partes[meio:]) or "serviço"], "em promoção", preco, lista[:4],
+                                    (170, 232, 255), (30, 130, 200), "Chame no WhatsApp", "CONDIÇÃO ESPECIAL")
+        return _gerar_servico(preco, titulo, [i for i in itens.split("|") if i.strip()], arte if arte in (1, 2, 3) else 1)
+    if tem_placa(ramo) and arte in (4, 5):
+        r = RAMOS.get(ramo) or RAMOS["padrao"]
+        return _compor_criativa(ramo, arte, ["Seu", "site"], "para " + r["rotulo"], preco, r["itens"], _hex(r["cor"])[:3], _hex(r["cor2"])[:3], "Nos envie uma mensagem", r["pill"])
     if tem_placa(ramo):
         return _gerar_sobre_placa(ramo, preco, empresa, arte if arte in ARTES else 1)
     return _gerar_desenhado(ramo, preco, empresa)
@@ -948,3 +959,129 @@ def midia_da_promocao(cfg: Dict[str, Any], nome_do_lead: str = "", ramo_do_lead_
         titulo = (promo["servico"] or oferta["nome"] or "Seu serviço")[:60]
         return midia_do_card("servico", preco, nome_do_lead, promo["arte"], titulo, ai_oferta.itens_do_card(cfg))
     return midia_do_card(ramo_do_lead(ramo_do_lead_txt, nome_do_lead, place_types), preco, nome_do_lead, promo["arte"])
+
+
+# ---------------------------------------------------------------- composições criativas (artes 4 e 5)
+# Não são o mesmo modelo com cores diferentes: a 4 é um cartaz LATERAL (foto ampliada à direita, coluna de texto à esquerda) e a 5 é um CARTAZ
+# TIPOGRÁFICO (palavras gigantes e etiqueta de preço inclinada). Servem tanto aos ramos (com placa) quanto ao serviço da empresa (foto de ar-condicionado).
+
+def _base_ampliada(caminho: str, foco_x: float, foco_y: float, zoom: float) -> Image.Image:
+    """A foto ampliada, cortada em 1080x1350 com o foco (0-1) no lugar pedido: o objeto principal fica grande e fora do centro."""
+    foto = Image.open(caminho).convert("RGB")
+    esc = max(L / foto.width, A / foto.height) * zoom
+    foto = foto.resize((int(foto.width * esc) + 1, int(foto.height * esc) + 1), Image.LANCZOS)
+    cx, cy = int(foto.width * foco_x), int(foto.height * foco_y)
+    x0 = max(0, min(foto.width - L, cx - int(L * 0.62)))      # o foco cai à direita da arte
+    y0 = max(0, min(foto.height - A, cy - int(A * 0.62)))     # e na metade de baixo
+    return foto.crop((x0, y0, x0 + L, y0 + A)).convert("RGBA")
+
+
+def _foco_do_ramo(ramo: str) -> Tuple[str, float, float, float]:
+    if ramo == "servico":
+        return os.path.join(PASTA_PLACAS, "servico.jpg"), 0.72, 0.18, 1.0
+    return os.path.join(PASTA_PLACAS, f"{ramo}.jpg"), FOCO_X.get(ramo, 0.55), 0.78, 1.55
+
+
+def _compor_criativa(ramo: str, arte: int, linhas: List[str], destaque: str, preco: str, itens: List[str], cor, cor2, botao: str, pill: str) -> bytes:
+    caminho, fx, fy, zoom = _foco_do_ramo(ramo)
+    base = _base_ampliada(caminho, fx, fy, zoom)
+    img = base.resize((L * S, A * S), Image.LANCZOS)
+    inteiro, cent = _preco_partes(preco)
+    branco = (255, 255, 255, 255)
+    claro = tuple(int(c * 0.4 + 255 * 0.6) for c in cor) + (255,)
+    sombra = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ds = ImageDraw.Draw(sombra)
+
+    if arte == 4:
+        # cartaz lateral: sombra forte à esquerda (onde fica o texto) e leve embaixo
+        for x in range(L * S):
+            t = x / (L * S)
+            a = int(235 * max(0, 1 - t / 0.78) ** 1.15)
+            ds.line([(x, 0), (x, A * S)], fill=(5, 9, 20, a))
+        for y in range(A * S):
+            t = y / (A * S)
+            if t > 0.82:
+                ds.line([(0, y), (L * S, y)], fill=(5, 9, 20, int(150 * (t - 0.82) / 0.18)))
+        img.alpha_composite(sombra)
+        d = ImageDraw.Draw(img)
+        f_pill = _g("Inter-700.ttf", 21 * S)
+        lp = int(sum(d.textlength(c, font=f_pill) + 4 * S for c in pill)) + 48 * S
+        d.rounded_rectangle([64 * S, 70 * S, 64 * S + lp, 120 * S], radius=25 * S, outline=OURO_ESCURO + (255,), width=2 * S, fill=(6, 10, 22, 150))
+        _texto(d, (88 * S, 95 * S), pill, f_pill, OURO_CLARO + (255,), espaco=4 * S, ancora="lm")
+        y = 250
+        for i, linha in enumerate(linhas):
+            _tx(d, (64 * S, (y + i * 104) * S), linha, font=_g("PlayfairDisplay-ExtraBold.ttf", 98 * S), fill=branco, anchor="ls")
+        y += (len(linhas) - 1) * 104 + 96
+        _tx(d, (64 * S, y * S), destaque, font=_g("PlayfairDisplay-SemiBoldItalic.ttf", 84 * S if len(destaque) < 14 else 64 * S), fill=claro, anchor="ls")
+        y += 70
+        f_v, f_rs, f_c = _g("Inter-800.ttf", 150 * S), _g("Inter-800.ttf", 56 * S), _g("Inter-800.ttf", 54 * S)
+        x = 64 * S
+        x += _ouro(img, (x, (y + 150) * S), "R$ ", f_rs)
+        x += _ouro(img, (x, (y + 150) * S), inteiro, f_v)
+        _ouro(img, (x, (y + 150) * S), "," + cent, f_c)
+        d = ImageDraw.Draw(img)
+        _tx(d, (64 * S, (y + 200) * S), "só se você gostar do resultado" if ramo != "servico" else "valor combinado antes", font=_g("Inter-600.ttf", 30 * S), fill=branco, anchor="ls")
+        yi = y + 262
+        for k, item in enumerate(itens[:4]):
+            _icone(d, _icone_para(item), 92 * S, (yi + k * 70 + 24) * S, 24 * S, OURO_CLARO + (255,))
+            _tx(d, (140 * S, (yi + k * 70 + 24) * S), item, font=_g("Inter-700.ttf", 27 * S), fill=branco, anchor="lm")
+        _botao_whats(img, cor, cor2, 1214, botao)
+    else:
+        # cartaz tipográfico: palavras gigantes no alto e etiqueta de preço inclinada sobre a foto
+        for y in range(A * S):
+            t = y / (A * S)
+            a = int(225 * max(0, 1 - t / 0.52) ** 1.2) if t < 0.52 else (int(160 * (t - 0.84) / 0.16) if t > 0.84 else 0)
+            ds.line([(0, y), (L * S, y)], fill=(5, 9, 20, a))
+        img.alpha_composite(sombra)
+        d = ImageDraw.Draw(img)
+        def ajustada(txt: str, max_px: int = 176) -> ImageFont.FreeTypeFont:
+            """O maior tamanho (até max_px) em que a palavra cabe na largura da arte."""
+            for px in range(max_px, 60, -4):
+                f = _g("Inter-800.ttf", px * S)
+                if d.textlength(txt, font=f) <= (L - 128) * S:
+                    return f
+            return _g("Inter-800.ttf", 60 * S)
+        l1, l2 = (linhas[0] if linhas else "Seu").upper(), (linhas[1] if len(linhas) > 1 else "SITE").upper()
+        _tx(d, (64 * S, 232 * S), l1, font=ajustada(l1), fill=branco, anchor="ls")
+        _tx(d, (64 * S, 392 * S), l2, font=ajustada(l2), fill=OURO_CLARO + (255,), anchor="ls")
+        d.line([(64 * S, 432 * S), (330 * S, 432 * S)], fill=OURO_ESCURO + (255,), width=5 * S)
+        _tx(d, (64 * S, 490 * S), destaque, font=_g("PlayfairDisplay-SemiBoldItalic.ttf", 64 * S if len(destaque) < 20 else 50 * S), fill=claro, anchor="ls")
+        # etiqueta de preço inclinada
+        et = Image.new("RGBA", (470 * S, 260 * S), (0, 0, 0, 0))
+        de = ImageDraw.Draw(et)
+        de.rounded_rectangle([10 * S, 10 * S, 460 * S, 250 * S], radius=30 * S, fill=OURO_CLARO + (255,))
+        et.paste(_gradiente(450 * S, 240 * S, OURO_CLARO + (255,), OURO_ESCURO + (255,)), (10 * S, 10 * S), _arredonda(Image.new("RGBA", (450 * S, 240 * S), (255, 255, 255, 255)), 30 * S).split()[3])
+        de = ImageDraw.Draw(et)
+        tinta = (50, 32, 4, 255)
+        de.text((235 * S, 52 * S), "POR APENAS" if ramo != "servico" else "CONDIÇÃO ESPECIAL", font=_g("Inter-800.ttf", 24 * S), fill=tinta, anchor="mm")
+        de.text((235 * S, 140 * S), f"R$ {inteiro}", font=_g("Inter-800.ttf", (108 if len(inteiro) <= 3 else 84) * S), fill=tinta, anchor="mm")
+        de.text((235 * S, 212 * S), "só se você gostar" if ramo != "servico" else "valor combinado antes", font=_g("Inter-700.ttf", 27 * S), fill=tinta, anchor="mm")
+        et = et.rotate(7, resample=Image.BICUBIC, expand=True)
+        luz = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        luz.paste((0, 0, 0, 150), (548 * S, 478 * S), et.split()[3])
+        img.alpha_composite(luz.filter(ImageFilter.GaussianBlur(16 * S)))
+        img.alpha_composite(et, (516 * S, 448 * S))
+        # benefícios em "pílulas" com ícone, embaixo
+        d = ImageDraw.Draw(img)
+        f = _g("Inter-700.ttf", 24 * S)
+        y0 = 1052
+        for k, item in enumerate(itens[:4]):
+            col, lin = k % 2, k // 2
+            x0 = (48 + col * 500) * S
+            yy = (y0 + lin * 70) * S
+            tw = int(d.textlength(item, font=f))
+            lg = min(tw + 96 * S, 470 * S)
+            d.rounded_rectangle([x0, yy, x0 + lg, yy + 56 * S], radius=28 * S, fill=(6, 12, 28, 170), outline=OURO_ESCURO + (200,), width=2 * S)
+            _icone(d, _icone_para(item), x0 + 30 * S, yy + 28 * S, 15 * S, OURO_CLARO + (255,))
+            fp = f
+            for px in range(24, 17, -1):
+                fp = _g("Inter-700.ttf", px * S)
+                if d.textlength(item, font=fp) <= 405 * S:
+                    break
+            d.text((x0 + 60 * S, yy + 28 * S), item, font=fp, fill=branco, anchor="lm")
+        _botao_whats(img, cor, cor2, 1214, botao)
+
+    saida = img.convert("RGB").resize((L, A), Image.LANCZOS)
+    buf = io.BytesIO()
+    saida.save(buf, "PNG", optimize=True)
+    return buf.getvalue()

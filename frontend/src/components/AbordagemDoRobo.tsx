@@ -159,7 +159,7 @@ export const AbordagemDoRobo: React.FC<{
               <p className="text-xs text-slate-500 mb-3 leading-relaxed">O sistema monta sozinho um card para cada lead, com o ramo dele, o nome da empresa dele e o valor acima. Não precisa subir arquivo.</p>
               <div className={`grid gap-3 ${artes.length > 1 ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 max-w-[320px] mx-auto'}`}>
                 {artes.map((u, i) => {
-                  const n = (i + 1) as 1 | 2 | 3;
+                  const n = (i + 1) as 1 | 2 | 3 | 4 | 5;
                   const ativa = (p.arte ?? 1) === n;
                   return (
                     <button key={n} type="button" onClick={() => set('arte', n)} aria-pressed={ativa}

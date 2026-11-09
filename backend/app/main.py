@@ -1905,7 +1905,7 @@ async def card_de_exemplo(ramo: str = "padrao", preco: str = "347", empresa: str
                           user: dict = Depends(usuario_do_espaco)):
     """Prévia do card na tela do robô: mostra como a promoção vai chegar ao lead."""
     ramo = ramo if (ramo in card_promocao.RAMOS or ramo == "servico") else "padrao"
-    png = await asyncio.get_running_loop().run_in_executor(None, _card_em_cache, ramo, preco[:12], empresa[:40], arte if arte in (1, 2, 3) else 1, titulo[:60], itens[:260])
+    png = await asyncio.get_running_loop().run_in_executor(None, _card_em_cache, ramo, preco[:12], empresa[:40], arte if arte in (1, 2, 3, 4, 5) else 1, titulo[:60], itens[:260])
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "private, max-age=300"})
 
 
@@ -1913,7 +1913,7 @@ async def card_de_exemplo(ramo: str = "padrao", preco: str = "347", empresa: str
 async def artes_do_card(ramo: str = "padrao", user: dict = Depends(usuario_do_espaco)):
     """Quantos estilos de arte existem para este ramo (3 quando há foto do ramo; 1 no card desenhado pelo sistema)."""
     if ramo == "servico":
-        return {"quantidade": 3, "com_foto": False}
+        return {"quantidade": 5, "com_foto": True}
     ramo = ramo if ramo in card_promocao.RAMOS else "padrao"
     return {"quantidade": card_promocao.artes_disponiveis(ramo), "com_foto": card_promocao.tem_placa(ramo)}
 

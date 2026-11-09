@@ -53,7 +53,7 @@ export const PromocaoDoServico: React.FC<{ promocao?: Partial<PromocaoRobo>; ser
     setMontando(true);
     const espera = setTimeout(async () => {
       try {
-        for (let a = 1; a <= 3; a++) {
+        for (let a = 1; a <= 5; a++) {
           const u = await api.cardDaPromocao('servico', precoCard, 'Sua Empresa', a, { titulo: nome, itens: itens.slice(0, 4).map(i => i.slice(0, 46)).join('|') });
           urls.push(u);
           if (vivo) setArtes([...urls]); else URL.revokeObjectURL(u);
@@ -106,7 +106,7 @@ export const PromocaoDoServico: React.FC<{ promocao?: Partial<PromocaoRobo>; ser
           </label>
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
             {artes.map((u, i) => {
-              const n = (i + 1) as 1 | 2 | 3;
+              const n = (i + 1) as 1 | 2 | 3 | 4 | 5;
               const ativa = (p.arte ?? 1) === n;
               return (
                 <button key={n} type="button" onClick={() => set('arte', n)} aria-pressed={ativa}

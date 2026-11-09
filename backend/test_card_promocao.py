@@ -57,10 +57,10 @@ def test_card_na_abordagem_so_quando_ligado():
 
 def test_placas_dos_ramos_dao_tres_artes_e_ramo_sem_foto_cai_no_desenhado():
     for ramo in ("barbearia", "restaurante", "academia", "terapeuta", "arquitetura"):
-        assert c.tem_placa(ramo) and c.artes_disponiveis(ramo) == 3
-        imgs = [Image.open(io.BytesIO(c.gerar(ramo, "347", "Empresa X", a))) for a in (1, 2, 3)]
+        assert c.tem_placa(ramo) and c.artes_disponiveis(ramo) == 5
+        imgs = [Image.open(io.BytesIO(c.gerar(ramo, "347", "Empresa X", a))) for a in (1, 2, 3, 4, 5)]
         assert all(i.size == (1080, 1350) for i in imgs)
-        assert len({i.tobytes() for i in imgs}) == 3                 # as três artes são diferentes
+        assert len({i.tobytes() for i in imgs}) == 5                 # as cinco artes são diferentes
     assert c.ramo_do_lead("Psicólogos") == "terapeuta" and c.ramo_do_lead("Arquitetura e engenharia") == "arquitetura"
     assert not c.tem_placa("dentista") and c.artes_disponiveis("dentista") == 1
 

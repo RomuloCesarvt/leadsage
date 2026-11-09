@@ -191,7 +191,7 @@ def normalizar_promocao(d: Any) -> Dict[str, Any]:
         # manda o card já na PRIMEIRA mensagem do WhatsApp (a abordagem), não só quando o lead responde
         "card_na_abordagem": bool(d.get("card_na_abordagem")),
         # qual dos 3 estilos de arte do card (1 faixa de valor, 2 valor gigante, 3 selo)
-        "arte": d.get("arte") if d.get("arte") in (1, 2, 3) else 1,
+        "arte": d.get("arte") if d.get("arte") in (1, 2, 3, 4, 5) else 1,
         # modo empresa: o serviço em promoção (ex.: "Limpeza de ar-condicionado"), que dá o título do card e do aviso
         "servico": _texto(d.get("servico"), 60),
     }
