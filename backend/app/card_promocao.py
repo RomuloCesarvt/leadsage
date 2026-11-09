@@ -384,6 +384,7 @@ def artes_disponiveis(ramo: str) -> int:
     return len(ARTES) if tem_placa(ramo) else 1
 
 
+DESCE_FOTO = {"restaurante": 0, "academia": 100}      # quanto a foto desce na arte (padrão 150): o notebook não pode ficar sob o botão
 FOCO_X = {"barbearia": 0.5, "restaurante": 0.6, "academia": 0.52, "terapeuta": 0.62, "arquitetura": 0.55}   # onde ficam o notebook e o celular na foto
 
 
@@ -410,21 +411,16 @@ def _placa(ramo: str) -> Image.Image:
     cx = int(foto.width * FOCO_X.get(ramo, 0.5))
     x0 = max(0, min(foto.width - L, cx - L // 2))
     foto = foto.crop((x0, 0, x0 + L, foto.height)).convert("RGBA")
-    # cor do alto da foto, escurecida, para preencher o topo da arte
-    amostra = foto.crop((0, 0, L, 12)).resize((1, 1), Image.BOX).getpixel((0, 0))
-    base = tuple(int(c * 0.28) for c in amostra[:3])
-    tela = Image.new("RGBA", (L, A), base + (255,))
-    topo_gradiente = ImageDraw.Draw(tela)
-    for y in range(A):
-        t = y / A
-        c = tuple(int(base[k] * (1 - 0.35 * t)) for k in range(3))
-        topo_gradiente.line([(0, y), (L, y)], fill=c + (255,))
-    y_foto = A - foto.height
-    # a foto entra suave por cima: máscara com degradê nos primeiros 220 px
+    y_foto = A - foto.height + DESCE_FOTO.get(ramo, 150)          # desce a foto: o notebook fica abaixo da fileira de benefícios
+    tela = Image.new("RGBA", (L, A), (10, 12, 18, 255))
+    if y_foto > 0:
+        # o alto da arte é a continuação desfocada da própria cena (espelhada e borrada), com a mesma luz: não há faixa chapada
+        faixa = foto.crop((0, 0, L, 40)).resize((L, y_foto + 340), Image.BILINEAR)
+        tela.paste(faixa.filter(ImageFilter.GaussianBlur(40)), (0, 0))
     mascara = Image.new("L", foto.size, 255)
     dm = ImageDraw.Draw(mascara)
-    for y in range(min(260, foto.height)):
-        dm.line([(0, y), (L, y)], fill=int(255 * (y / 260) ** 1.6))
+    for y in range(min(300, foto.height)):
+        dm.line([(0, y), (L, y)], fill=int(255 * (y / 300) ** 1.2))
     tela.paste(foto, (0, y_foto), mascara)
     return tela
 
@@ -444,102 +440,184 @@ def _centro(d: ImageDraw.ImageDraw, y: int, txt: str, fonte, cor, ancora: str = 
     return int(d.textlength(txt, font=fonte))
 
 
-def _botao_whats(d: ImageDraw.ImageDraw, cor, y: int, texto: str = "Nos envie uma mensagem", preenchido: bool = False) -> None:
-    f = _f("Inter-800.ttf", 34)
-    larg = int(d.textlength(texto, font=f)) + 150 * S
-    x0 = (L * S - larg) // 2
-    fundo = cor if preenchido else (9, 14, 28, 235)
-    d.rounded_rectangle([x0, y * S, x0 + larg, (y + 92) * S], radius=46 * S, fill=fundo, outline=cor, width=3 * S)
-    tinta = (14, 14, 14, 255) if preenchido else (255, 255, 255, 255)
-    ic = (14, 14, 14, 255) if preenchido else cor
-    cx, cy = x0 + 62 * S, (y + 46) * S
-    d.ellipse([cx - 24 * S, cy - 24 * S, cx + 24 * S, cy + 24 * S], outline=ic, width=4 * S)
-    d.polygon([(cx - 24 * S, cy + 26 * S), (cx - 20 * S, cy + 10 * S), (cx - 8 * S, cy + 20 * S)], fill=ic)
-    d.arc([cx - 11 * S, cy - 11 * S, cx + 11 * S, cy + 11 * S], 200, 340, fill=ic, width=4 * S)
-    _tx(d, (x0 + 104 * S, cy), texto, font=f, fill=tinta, anchor="lm")
+OURO_CLARO, OURO_ESCURO = (250, 232, 170), (196, 146, 52)
 
 
-def _beneficios(d: ImageDraw.ImageDraw, itens: List[str], cor, y: int) -> None:
-    """Quatro benefícios em colunas, com um ícone de visto e o texto curto embaixo."""
-    f = _f("Inter-700.ttf", 21)
-    larg_col = (L - 2 * 50) // 4
+def _ouro(img: Image.Image, xy, txt: str, fonte, anchor: str = "ls", brilho: bool = True) -> int:
+    """Texto com degradê de ouro (claro em cima, escuro embaixo) e um brilho suave atrás. Devolve a largura."""
+    caixa = ImageDraw.Draw(Image.new("L", (1, 1))).textbbox(xy, txt, font=fonte, anchor=anchor)
+    pad = 40 * S
+    x0, y0, x1, y1 = caixa[0] - pad, caixa[1] - pad, caixa[2] + pad, caixa[3] + pad
+    w, h = x1 - x0, y1 - y0
+    mascara = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(mascara).text((xy[0] - x0, xy[1] - y0), txt, font=fonte, fill=255, anchor=anchor)
+    if brilho:
+        halo = Image.new("RGBA", (w, h), OURO_ESCURO + (0,))
+        halo.putalpha(mascara.filter(ImageFilter.GaussianBlur(10 * S)).point(lambda v: int(v * 0.55)))
+        img.alpha_composite(halo, (x0, y0))
+    grad = Image.new("RGBA", (w, h))
+    gd = ImageDraw.Draw(grad)
+    topo, base = caixa[1] - y0, caixa[3] - y0
+    for yy in range(h):
+        t = min(1, max(0, (yy - topo) / max(1, base - topo)))
+        cor = tuple(int(OURO_CLARO[k] + (OURO_ESCURO[k] - OURO_CLARO[k]) * t) for k in range(3))
+        gd.line([(0, yy), (w, yy)], fill=cor + (255,))
+    img.paste(grad, (x0, y0), mascara)
+    return caixa[2] - caixa[0]
+
+
+def _vidro(img: Image.Image, caixa, raio: int, borda=(236, 196, 104), alfa: int = 70) -> None:
+    """Painel de vidro fosco: desfoca o que está atrás, clareia de leve e põe um fio dourado na borda."""
+    x0, y0, x1, y1 = [int(v) for v in caixa]
+    fundo = img.crop((x0, y0, x1, y1)).filter(ImageFilter.GaussianBlur(16 * S))
+    escuro = Image.new("RGBA", fundo.size, (8, 12, 26, 150))
+    fundo.alpha_composite(escuro)
+    fundo.alpha_composite(Image.new("RGBA", fundo.size, (255, 255, 255, int(alfa * 0.25))))
+    m = Image.new("L", fundo.size, 0)
+    ImageDraw.Draw(m).rounded_rectangle([0, 0, fundo.size[0] - 1, fundo.size[1] - 1], radius=raio, fill=255)
+    img.paste(fundo, (x0, y0), m)
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([x0, y0, x1, y1], radius=raio, outline=borda + (255,), width=2 * S)
+
+
+def _icone(d: ImageDraw.ImageDraw, tipo: int, cx: int, cy: int, r: int, cor) -> None:
+    """Quatro ícones de traço: conversa, estrela, escudo com visto e celular."""
+    w = max(2, int(r * 0.1))
+    if tipo == 0:
+        d.ellipse([cx - r, cy - r, cx + r, cy + r * 0.9], outline=cor, width=w)
+        d.polygon([(cx - r * 0.85, cy + r * 0.55), (cx - r * 1.1, cy + r * 1.15), (cx - r * 0.35, cy + r * 0.8)], fill=cor)
+        d.arc([cx - r * 0.45, cy - r * 0.45, cx + r * 0.45, cy + r * 0.35], 200, 340, fill=cor, width=w)
+    elif tipo == 1:
+        pts = []
+        import math
+        for k in range(10):
+            ang = -math.pi / 2 + k * math.pi / 5
+            rad = r * (1.0 if k % 2 == 0 else 0.42)
+            pts.append((cx + rad * math.cos(ang), cy + rad * math.sin(ang)))
+        d.polygon(pts, outline=cor, width=w)
+    elif tipo == 2:
+        d.polygon([(cx, cy - r), (cx + r * 0.85, cy - r * 0.55), (cx + r * 0.75, cy + r * 0.35), (cx, cy + r), (cx - r * 0.75, cy + r * 0.35), (cx - r * 0.85, cy - r * 0.55)], outline=cor, width=w)
+        d.line([(cx - r * 0.35, cy), (cx - r * 0.05, cy + r * 0.3), (cx + r * 0.4, cy - r * 0.25)], fill=cor, width=w, joint="curve")
+    else:
+        d.rounded_rectangle([cx - r * 0.55, cy - r, cx + r * 0.55, cy + r], radius=int(r * 0.22), outline=cor, width=w)
+        d.line([(cx - r * 0.15, cy + r * 0.72), (cx + r * 0.15, cy + r * 0.72)], fill=cor, width=w)
+
+
+def _beneficios(img: Image.Image, itens: List[str], cor, y: int) -> None:
+    """Os quatro benefícios numa fileira: ícone de traço dourado e uma frase de duas linhas embaixo (conversa, estrela, escudo, celular)."""
+    sombra = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ImageDraw.Draw(sombra).rectangle([0, (y - 20) * S, L * S, (y + 196) * S], fill=(6, 10, 22, 150))
+    img.alpha_composite(sombra.filter(ImageFilter.GaussianBlur(34 * S)))
+    d = ImageDraw.Draw(img)
+    f = _g("Inter-700.ttf", 27 * S)
+    larg_col = (L - 2 * 40) // 4
     for k, item in enumerate(itens[:4]):
-        cx = (50 + larg_col * k + larg_col // 2) * S
-        d.ellipse([cx - 22 * S, y * S, cx + 22 * S, (y + 44) * S], fill=cor)
-        d.line([(cx - 9 * S, (y + 23) * S), (cx - 3 * S, (y + 29) * S), (cx + 10 * S, (y + 15) * S)], fill=(14, 14, 14, 255), width=4 * S, joint="curve")
-        for i, linha in enumerate(_quebra(d, item, f, (larg_col - 14) * S)[:3]):
-            _tx(d, (cx, (y + 62 + i * 25) * S), linha, font=f, fill=(244, 246, 250, 255), anchor="mm")
+        cx = (40 + larg_col * k + larg_col // 2) * S
+        _icone(d, k, cx, (y + 36) * S, 36 * S, OURO_CLARO + (255,))
+        for i, linha in enumerate(_quebra(d, item, f, (larg_col - 6) * S)[:3]):
+            _tx(d, (cx, (y + 100 + i * 33) * S), linha, font=f, fill=(255, 255, 255, 255), anchor="mm")
+
+
+def _botao_whats(img: Image.Image, cor, cor2, y: int, texto: str = "Nos envie uma mensagem") -> None:
+    """O botão de chamada: degradê da cor do ramo, brilho embaixo, ícone de conversa e seta."""
+    d = ImageDraw.Draw(img)
+    f = _g("Inter-800.ttf", 40 * S)
+    larg = int(d.textlength(texto, font=f)) + 230 * S
+    x0 = (L * S - larg) // 2
+    alt = 112 * S
+    luz = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ImageDraw.Draw(luz).rounded_rectangle([x0, y * S + 18 * S, x0 + larg, y * S + alt + 18 * S], radius=alt // 2, fill=cor2 + (150,))
+    img.alpha_composite(luz.filter(ImageFilter.GaussianBlur(20 * S)))
+    grad = _gradiente(larg, alt, tuple(int(c * 0.78) for c in cor2) + (255,), tuple(int(c * 0.55) for c in cor2) + (255,))
+    img.alpha_composite(_arredonda(grad, alt // 2), (x0, y * S))
+    d = ImageDraw.Draw(img)
+    escuro = (255, 255, 255, 255)
+    cy = y * S + alt // 2
+    _icone(d, 0, x0 + 78 * S, cy - 3 * S, 27 * S, escuro)
+    d.text((x0 + 128 * S, cy), texto, font=f, fill=escuro, anchor="lm")
+    xs = x0 + larg - 64 * S
+    d.line([(xs - 18 * S, cy), (xs + 12 * S, cy)], fill=escuro, width=4 * S)
+    d.line([(xs, cy - 12 * S), (xs + 12 * S, cy), (xs, cy + 12 * S)], fill=escuro, width=4 * S, joint="curve")
 
 
 def _gerar_sobre_placa(ramo: str, preco: str, empresa: str, arte: int) -> bytes:
     r = RAMOS.get(ramo) or RAMOS["padrao"]
-    cor = _hex(r["cor"])
+    cor, cor2 = _hex(r["cor"])[:3], _hex(r["cor2"])[:3]
     img = _placa(ramo).resize((L * S, A * S), Image.LANCZOS)
     inteiro, cent = _preco_partes(preco)
-    f_serif = "PlayfairDisplay-ExtraBold.ttf"
-    f_serif_i = "PlayfairDisplay-ExtraBoldItalic.ttf"
-    _vinheta_s(img, 540, 300)          # sombra no alto (texto legível sobre qualquer foto) e no pé (botão)
+    _vinheta_s(img, 470, 260)
     d = ImageDraw.Draw(img)
+    branco = (255, 255, 255, 255)
+    serif, serif_i = "PlayfairDisplay-SemiBold.ttf", "PlayfairDisplay-SemiBoldItalic.ttf"
 
     if arte == 1:
-        # faixa de valor (o estilo da referência): título, faixa com o valor, benefícios e botão
-        _centro(d, 150 * S, "Site para", _f(f_serif, 96), (255, 255, 255, 255))
-        tam = 84 if len(r["rotulo"]) > 18 else 96
-        _centro(d, 252 * S, r["rotulo"], _f(f_serif_i, tam), cor)
-        f_v, f_rs, f_c = _f(f_serif, 92), _f(f_serif, 44), _f(f_serif, 40)
+        # o padrão: título grande, faixa azul-marinho com borda dourada e o valor em ouro, ícones dourados, aparelhos e botão
+        _tx(d, (L * S // 2, 178 * S), "Site para", font=_g("PlayfairDisplay-ExtraBold.ttf", 152 * S), fill=branco, anchor="ms")
+        claro = tuple(int(c * 0.4 + 255 * 0.6) for c in cor) + (255,)
+        tam = 80 if len(r["rotulo"]) > 22 else (96 if len(r["rotulo"]) > 16 else 128)
+        _tx(d, (L * S // 2, (300 if tam > 100 else 280) * S), r["rotulo"], font=_g(serif_i, tam * S), fill=claro, anchor="ms")
+        f_v, f_rs, f_c = _g("PlayfairDisplay-ExtraBold.ttf", 122 * S), _g("PlayfairDisplay-ExtraBold.ttf", 60 * S), _g("PlayfairDisplay-ExtraBold.ttf", 58 * S)
         w = int(d.textlength("R$ ", font=f_rs) + d.textlength(inteiro, font=f_v) + d.textlength("," + cent, font=f_c))
-        faixa_w = max(w, int(d.textlength("só se você gostar do resultado", font=_f("Inter-700.ttf", 30)))) + 90 * S
-        x0 = (L * S - faixa_w) // 2
-        painel = _gradiente(faixa_w, 178 * S, (10, 20, 52, 238), (14, 30, 72, 238))
-        img.alpha_composite(_arredonda(painel, 22 * S), (x0, 296 * S))
+        larg_faixa = max(w, int(d.textlength("só se você gostar do resultado", font=_g("Inter-600.ttf", 36 * S)))) + 130 * S
+        x0 = (L * S - larg_faixa) // 2
+        y0, y1 = 352 * S, 590 * S
+        halo = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        ImageDraw.Draw(halo).rounded_rectangle([x0 - 4 * S, y0 - 4 * S, x0 + larg_faixa + 4 * S, y1 + 4 * S], radius=30 * S, outline=OURO_ESCURO + (255,), width=10 * S)
+        img.alpha_composite(halo.filter(ImageFilter.GaussianBlur(14 * S)))
+        faixa = _gradiente(larg_faixa, y1 - y0, (10, 22, 62, 246), (8, 18, 52, 246))
+        img.alpha_composite(_arredonda(faixa, 28 * S), (x0, y0))
         d = ImageDraw.Draw(img)
-        d.rounded_rectangle([x0, 296 * S, x0 + faixa_w, 474 * S], radius=22 * S, outline=(224, 181, 92, 255), width=3 * S)
+        d.rounded_rectangle([x0, y0, x0 + larg_faixa, y1], radius=28 * S, outline=OURO_ESCURO + (255,), width=4 * S)
+        d.rounded_rectangle([x0 + 9 * S, y0 + 9 * S, x0 + larg_faixa - 9 * S, y1 - 9 * S], radius=22 * S, outline=OURO_CLARO + (150,), width=2 * S)
         x = (L * S - w) // 2
-        _tx(d, (x, 398 * S), "R$ ", font=f_rs, fill=(236, 196, 104, 255), anchor="ls")
-        x += int(d.textlength("R$ ", font=f_rs))
-        _tx(d, (x, 398 * S), inteiro, font=f_v, fill=(236, 196, 104, 255), anchor="ls")
-        x += int(d.textlength(inteiro, font=f_v))
-        _tx(d, (x, 398 * S), "," + cent, font=f_c, fill=(236, 196, 104, 255), anchor="ls")
-        _centro(d, 450 * S, "só se você gostar do resultado", _f("Inter-700.ttf", 30), (255, 255, 255, 255))
-        _botao_whats(d, cor, 1226)
+        x += _ouro(img, (x, 476 * S), "R$ ", f_rs)
+        x += _ouro(img, (x, 476 * S), inteiro, f_v)
+        _ouro(img, (x, 476 * S), "," + cent, f_c)
+        d = ImageDraw.Draw(img)
+        _centro(d, 552 * S, "só se você gostar do resultado", _g("Inter-600.ttf", 36 * S), branco)
+        _beneficios(img, r["itens"], cor, 628)
+        _botao_whats(img, cor, cor2, 1214)
 
     elif arte == 2:
-        # valor em destaque: pouca coisa, o preço gigante
-        f_pill = _f("Inter-700.ttf", 22)
-        larg_pill = int(sum(d.textlength(c, font=f_pill) + 4 * S for c in r["pill"])) + 56 * S
+        # valor em destaque, ouro gigante; benefícios logo abaixo
+        f_pill = _g("Inter-700.ttf", 25 * S)
+        larg_pill = int(sum(d.textlength(c, font=f_pill) + 4.5 * S for c in r["pill"])) + 64 * S
         x0 = (L * S - larg_pill) // 2
-        d.rounded_rectangle([x0, 80 * S, x0 + larg_pill, 134 * S], radius=27 * S, outline=cor, width=2 * S, fill=(8, 10, 18, 150))
-        _texto(d, (x0 + 28 * S, 107 * S), r["pill"], f_pill, cor, espaco=4 * S, ancora="lm")
-        f_v, f_rs = _f("Inter-800.ttf", 230), _f("Inter-800.ttf", 70)
-        w = int(d.textlength("R$", font=f_rs) + 18 * S + d.textlength(inteiro, font=f_v))
+        d.rounded_rectangle([x0, 64 * S, x0 + larg_pill, 126 * S], radius=31 * S, outline=OURO_ESCURO + (255,), width=3 * S, fill=(8, 10, 18, 150))
+        _texto(d, (x0 + 32 * S, 95 * S), r["pill"], f_pill, OURO_CLARO + (255,), espaco=4.5 * S, ancora="lm")
+        f_v, f_rs = _g(serif, 250 * S), _g(serif, 78 * S)
+        w = int(d.textlength("R$ ", font=f_rs) + d.textlength(inteiro, font=f_v))
         x = (L * S - w) // 2
-        _tx(d, (x, 332 * S), "R$", font=f_rs, fill=(255, 255, 255, 235), anchor="ls")
-        _tx(d, (x + int(d.textlength("R$", font=f_rs)) + 18 * S, 402 * S), inteiro, font=f_v, fill=(255, 255, 255, 255), anchor="ls")
-        d.rounded_rectangle([(L * S - 160 * S) // 2, 428 * S, (L * S + 160 * S) // 2, 436 * S], radius=4 * S, fill=cor)
-        _centro(d, 494 * S, "valor fixo, sem pegadinha", _f("Inter-700.ttf", 36), (255, 255, 255, 255))
-        _centro(d, 540 * S, "só paga se gostar do resultado", _f("Inter-600.ttf" if os.path.exists(os.path.join(PASTA, "Inter-600.ttf")) else "Inter-700.ttf", 30), (214, 222, 240, 255))
-        _botao_whats(d, cor, 1226, "Quero ver o meu site", preenchido=True)
+        x += _ouro(img, (x, 336 * S), "R$ ", f_rs)
+        _ouro(img, (x, 392 * S), inteiro, f_v)
+        d = ImageDraw.Draw(img)
+        _centro(d, 462 * S, "valor fixo, sem pegadinha", _g("Inter-800.ttf", 42 * S), branco)
+        _centro(d, 514 * S, "só paga se gostar do resultado", _g("Inter-600.ttf", 34 * S), (226, 231, 244, 255))
+        _beneficios(img, r["itens"], cor, 572)
+        _botao_whats(img, cor, cor2, 1214, "Quero ver o meu site")
 
     else:
-        # selo: título à esquerda e um selo circular com o valor
-        _tx(d, (64 * S, 150 * S), "Seu site", font=_f(f_serif, 104), fill=(255, 255, 255, 255), anchor="ls")
-        _tx(d, (64 * S, 262 * S), "profissional", font=_f(f_serif_i, 104), fill=cor, anchor="ls")
-        _tx(d, (64 * S, 316 * S), r["pill"].replace("SITE PARA ", "para ").lower(), font=_f("Inter-700.ttf", 30), fill=(232, 236, 245, 255), anchor="ls")
-        cx, cy, rr = 850 * S, 470 * S, 150 * S
-        sel = Image.new("RGBA", img.size, (0, 0, 0, 0))
-        ds = ImageDraw.Draw(sel)
-        ds.ellipse([cx - rr + 8 * S, cy - rr + 16 * S, cx + rr + 8 * S, cy + rr + 16 * S], fill=(0, 0, 0, 120))
-        sel = sel.filter(ImageFilter.GaussianBlur(14 * S))
-        img.alpha_composite(sel)
+        # selo dourado ao lado do título, benefícios em fileira
+        _tx(d, (64 * S, 168 * S), "Seu site", font=_g(serif, 100 * S), fill=branco, anchor="ls")
+        _tx(d, (64 * S, 278 * S), "profissional", font=_g(serif_i, 100 * S), fill=tuple(int(c * 0.35 + 255 * 0.65) for c in cor) + (255,), anchor="ls")
+        _tx(d, (64 * S, 330 * S), r["pill"].replace("SITE PARA ", "para ").lower(), font=_g("Inter-700.ttf", 31 * S), fill=(240, 243, 250, 255), anchor="ls")
+        cx, cy, rr = 852 * S, 252 * S, 152 * S
+        luz = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        ImageDraw.Draw(luz).ellipse([cx - rr, cy - rr + 16 * S, cx + rr, cy + rr + 16 * S], fill=(0, 0, 0, 150))
+        img.alpha_composite(luz.filter(ImageFilter.GaussianBlur(18 * S)))
+        selo = _gradiente(rr * 2, rr * 2, OURO_CLARO + (255,), OURO_ESCURO + (255,))
+        m = Image.new("L", selo.size, 0)
+        ImageDraw.Draw(m).ellipse([0, 0, rr * 2 - 1, rr * 2 - 1], fill=255)
+        img.paste(selo, (cx - rr, cy - rr), m)
         d = ImageDraw.Draw(img)
-        d.ellipse([cx - rr, cy - rr, cx + rr, cy + rr], fill=(236, 196, 104, 255))
-        d.ellipse([cx - rr + 10 * S, cy - rr + 10 * S, cx + rr - 10 * S, cy + rr - 10 * S], outline=(120, 82, 18, 255), width=3 * S)
-        _tx(d, (cx, cy - 78 * S), "POR APENAS", font=_f("Inter-800.ttf", 24), fill=(70, 46, 8, 255), anchor="mm")
-        f_n = _f("Inter-800.ttf", 70 if len(inteiro) <= 3 else 54)
-        _tx(d, (cx, cy - 6 * S), "R$" + inteiro, font=f_n, fill=(40, 26, 4, 255), anchor="mm")
-        _tx(d, (cx, cy + 62 * S), "só se gostar", font=_f("Inter-800.ttf", 26), fill=(70, 46, 8, 255), anchor="mm")
-        _tx(d, (cx, cy + 96 * S), "do resultado", font=_f("Inter-800.ttf", 26), fill=(70, 46, 8, 255), anchor="mm")
-        _botao_whats(d, cor, 1226)
+        d.ellipse([cx - rr + 13 * S, cy - rr + 13 * S, cx + rr - 13 * S, cy + rr - 13 * S], outline=(110, 74, 16, 255), width=3 * S)
+        tinta = (58, 38, 6, 255)
+        d.text((cx, cy - 88 * S), "POR APENAS", font=_g("Inter-800.ttf", 24 * S), fill=tinta, anchor="mm")
+        d.text((cx, cy - 10 * S), "R$" + inteiro, font=_g(serif, (80 if len(inteiro) <= 3 else 62) * S), fill=tinta, anchor="mm")
+        d.text((cx, cy + 66 * S), "só se gostar", font=_g("Inter-800.ttf", 27 * S), fill=tinta, anchor="mm")
+        d.text((cx, cy + 98 * S), "do resultado", font=_g("Inter-800.ttf", 27 * S), fill=tinta, anchor="mm")
+        _beneficios(img, r["itens"], cor, 480)
+        _botao_whats(img, cor, cor2, 1214)
 
     saida = img.convert("RGB").resize((L, A), Image.LANCZOS)
     buf = io.BytesIO()
@@ -552,9 +630,9 @@ def _vinheta_s(img: Image.Image, topo: int, base: int) -> None:
     sombra = Image.new("RGBA", img.size, (0, 0, 0, 0))
     d = ImageDraw.Draw(sombra)
     for y in range(topo * S):
-        d.line([(0, y), (img.width, y)], fill=(6, 8, 14, int(240 * (1 - y / (topo * S)) ** 1.15)))
+        d.line([(0, y), (img.width, y)], fill=(6, 8, 14, int(150 * (1 - y / (topo * S)) ** 1.2)))
     for y in range(base * S):
-        d.line([(0, img.height - 1 - y), (img.width, img.height - 1 - y)], fill=(6, 8, 14, int(200 * (1 - y / (base * S)) ** 1.3)))
+        d.line([(0, img.height - 1 - y), (img.width, img.height - 1 - y)], fill=(6, 8, 14, int(170 * (1 - y / (base * S)) ** 1.3)))
     img.alpha_composite(sombra)
 
 
