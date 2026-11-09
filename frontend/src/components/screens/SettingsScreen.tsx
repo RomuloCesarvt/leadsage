@@ -3,6 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { Save, User, Target, Globe, Check, AlertCircle, Image as ImageIcon, Palette } from 'lucide-react';
 import { prepararImagem } from '../../lib/imagem';
 import { useApp } from '../../context/AppContext';
+import { ehEmpresa } from '../../lib/modoDaConta';
+
+// cada modo tem os seus serviços: agência vende marketing; empresa vende o próprio serviço (ar-condicionado e afins)
+const SERVICOS_AGENCIA = ['Sites', 'Tráfego pago', 'Social media', 'Design', 'Consultoria'];
+const SERVICOS_EMPRESA = ['Instalação', 'Limpeza e higienização', 'Manutenção preventiva', 'Conserto', 'Venda de aparelhos', 'Projeto e dimensionamento'];
 import { api } from '../../services/api';
 
 export const SettingsScreen: React.FC = () => {
@@ -55,6 +60,18 @@ export const SettingsScreen: React.FC = () => {
     setCorDestaque(user.brand_accent || '#f59e0b');
     setContatoMarca(user.brand_contact || '');
   }, [user]);
+
+  const empresaModo = ehEmpresa(user);
+  const [servicoNovo, setServicoNovo] = useState('');
+  const listaDeServicos = empresaModo ? SERVICOS_EMPRESA : SERVICOS_AGENCIA;
+  const outraLista = empresaModo ? SERVICOS_AGENCIA : SERVICOS_EMPRESA;
+  // serviços escritos pela própria pessoa (fora das duas listas) aparecem como opção marcada, no modo em que ela os criou ou em ambos
+  const servicosExtras = selectedServices.filter(x => !listaDeServicos.includes(x) && !outraLista.includes(x));
+  const adicionarServico = () => {
+    const v = servicoNovo.trim().slice(0, 40);
+    if (v && !selectedServices.includes(v)) { setSelectedServices(prev => [...prev, v]); setSaveState('idle'); }
+    setServicoNovo('');
+  };
 
   const toggleService = (s: string) => {
     setSelectedServices(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
@@ -204,7 +221,7 @@ export const SettingsScreen: React.FC = () => {
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-3">Serviço que você vende</label>
                   <div className="flex flex-wrap gap-2">
-                    {['Sites', 'Tráfego pago', 'Social media', 'Design', 'Consultoria'].map((item) => (
+                    {[...listaDeServicos, ...servicosExtras].map((item) => (
                       <button 
                         key={item} 
                         onClick={() => toggleService(item)}
@@ -214,10 +231,20 @@ export const SettingsScreen: React.FC = () => {
                       </button>
                     ))}
                   </div>
+                  {empresaModo && (
+                    <input
+                      type="text" value={servicoNovo} maxLength={40}
+                      onChange={(e) => setServicoNovo(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); adicionarServico(); } }}
+                      onBlur={adicionarServico}
+                      placeholder="Outro serviço seu? Escreva e pressione Enter..."
+                      className="mt-3 w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-3">Nichos que você prospecta</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-3">{empresaModo ? 'Quem você atende (tipos de cliente)' : 'Nichos que você prospecta'}</label>
                   <div className="flex flex-wrap gap-2 mb-3">
                     {selectedNiches.map((item) => (
                       <div key={item} className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-sm font-medium flex items-center gap-2">
@@ -227,7 +254,7 @@ export const SettingsScreen: React.FC = () => {
                   </div>
                   <input
                     type="text"
-                    placeholder="Adicionar nicho e pressionar Enter..."
+                    placeholder={empresaModo ? "Adicionar tipo de cliente e pressionar Enter... Ex.: clínicas, restaurantes, condomínios" : "Adicionar nicho e pressionar Enter..."}
                     value={nicheInput}
                     onChange={(e) => setNicheInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addNiche(); } }}
@@ -382,12 +409,12 @@ export const SettingsScreen: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className={rotulo}>Nicho principal</label>
+                    <label className={rotulo}>{empresaModo ? 'Cliente principal' : 'Nicho principal'}</label>
                     <input
                       type="text"
                       value={nicho}
                       onChange={e => { setNicho(e.target.value); setPerfilState('idle'); }}
-                      placeholder="Padarias, clinicas, advocacia..."
+                      placeholder={empresaModo ? "Clínicas, restaurantes, condomínios, residências..." : "Padarias, clinicas, advocacia..."}
                       className={campo}
                     />
                   </div>
@@ -397,7 +424,7 @@ export const SettingsScreen: React.FC = () => {
                       rows={3}
                       value={oferta}
                       onChange={e => { setOferta(e.target.value); setPerfilState('idle'); }}
-                      placeholder="O que voce vende, que problema resolve e o seu diferencial. A IA escreve as abordagens a partir disto."
+                      placeholder={empresaModo ? "Que serviço você presta, que problema resolve e o seu diferencial (ex.: atendimento rápido, garantia). A IA escreve as abordagens a partir disto." : "O que voce vende, que problema resolve e o seu diferencial. A IA escreve as abordagens a partir disto."}
                       className={`${campo} resize-none custom-scrollbar`}
                     />
                   </div>

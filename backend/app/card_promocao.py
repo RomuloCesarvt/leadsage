@@ -686,8 +686,97 @@ def _ar_condicionado(img: Image.Image, cx: int, cy: int, larg: int) -> None:
     img.alpha_composite(ar.filter(ImageFilter.GaussianBlur(2 * S)))
 
 
+def _gerar_servico_foto(preco: str, titulo: str, itens: List[str], arte: int) -> bytes:
+    """O card do serviço sobre a FOTO (placas/servico.jpg): a foto inteira no alto como destaque e as informações na metade de baixo."""
+    titulo = (titulo or "Seu serviço").strip()[:60]
+    itens = (itens or ["Atendimento rápido", "Orçamento sem compromisso", "Garantia no serviço", "Equipe de confiança"])[:4]
+    while 0 < len(itens) < 4:
+        itens = itens + [itens[len(itens) % len(itens)]]
+    inteiro, cent = _preco_partes(preco)
+    cor, cor2 = (170, 232, 255), (30, 130, 200)
+    foto = Image.open(os.path.join(PASTA_PLACAS, "servico.jpg")).convert("RGBA")
+    esc = max(L / foto.width, A / foto.height)
+    foto = foto.resize((int(foto.width * esc) + 1, int(foto.height * esc) + 1), Image.LANCZOS).crop((0, 0, L, A))
+    img = foto.resize((L * S, A * S), Image.LANCZOS)
+    # sombra: leve no alto e forte na metade de baixo (onde ficam as informações)
+    sombra = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ds = ImageDraw.Draw(sombra)
+    for y in range(A * S):
+        t = y / (A * S)
+        a = int(60 * (1 - t / 0.12)) if t < 0.12 else 0
+        if t > 0.40:
+            a = int(235 * min(1, (t - 0.40) / 0.30) ** 1.1)
+        ds.line([(0, y), (L * S, y)], fill=(4, 14, 34, a))
+    img.alpha_composite(sombra)
+    d = ImageDraw.Draw(img)
+    branco = (255, 255, 255, 255)
+    serif, serif_i = "PlayfairDisplay-SemiBold.ttf", "PlayfairDisplay-SemiBoldItalic.ttf"
+    claro = tuple(int(c * 0.4 + 255 * 0.6) for c in cor) + (255,)
+    f_titulo = _g("PlayfairDisplay-ExtraBold.ttf", 78 * S)
+    linhas = _quebra(d, titulo, f_titulo, (L - 150) * S)[:2]
+
+    if arte == 1:
+        for i, linha in enumerate(linhas):
+            _tx(d, (L * S // 2, (620 + i * 84) * S), linha, font=f_titulo, fill=branco, anchor="ms")
+        topo = 620 + (len(linhas) - 1) * 84 + 36
+        f_v, f_rs, f_c = _g("PlayfairDisplay-ExtraBold.ttf", 104 * S), _g("PlayfairDisplay-ExtraBold.ttf", 50 * S), _g("PlayfairDisplay-ExtraBold.ttf", 48 * S)
+        w = int(d.textlength("R$ ", font=f_rs) + d.textlength(inteiro, font=f_v) + d.textlength("," + cent, font=f_c))
+        lf = max(w, int(d.textlength("condição especial", font=_g("Inter-600.ttf", 28 * S)))) + 110 * S
+        x0, y0, y1 = (L * S - lf) // 2, topo * S, (topo + 188) * S
+        img.alpha_composite(_arredonda(_gradiente(lf, y1 - y0, (8, 20, 56, 246), (6, 16, 46, 246)), 26 * S), (x0, y0))
+        d = ImageDraw.Draw(img)
+        d.rounded_rectangle([x0, y0, x0 + lf, y1], radius=26 * S, outline=OURO_ESCURO + (255,), width=4 * S)
+        d.rounded_rectangle([x0 + 8 * S, y0 + 8 * S, x0 + lf - 8 * S, y1 - 8 * S], radius=20 * S, outline=OURO_CLARO + (150,), width=2 * S)
+        x = (L * S - w) // 2
+        x += _ouro(img, (x, y0 + 126 * S), "R$ ", f_rs)
+        x += _ouro(img, (x, y0 + 126 * S), inteiro, f_v)
+        _ouro(img, (x, y0 + 126 * S), "," + cent, f_c)
+        d = ImageDraw.Draw(img)
+        _centro(d, y1 - 20 * S, "condição especial", _g("Inter-600.ttf", 28 * S), branco)
+    elif arte == 2:
+        d.rounded_rectangle([(L - 520) * S // 2, 64 * S, (L + 520) * S // 2, 122 * S], radius=29 * S, outline=OURO_ESCURO + (255,), width=3 * S, fill=(6, 16, 40, 170))
+        _tx(d, (L * S // 2, 94 * S), "CONDIÇÃO ESPECIAL", font=_g("Inter-800.ttf", 26 * S), fill=OURO_CLARO + (255,), anchor="mm")
+        f_t2 = _g("PlayfairDisplay-ExtraBold.ttf", 60 * S)
+        for i, linha in enumerate(_quebra(d, titulo, f_t2, (L - 150) * S)[:2]):
+            _tx(d, (L * S // 2, (610 + i * 66) * S), linha, font=f_t2, fill=branco, anchor="ms")
+        f_v, f_rs = _g("PlayfairDisplay-ExtraBold.ttf", 210 * S), _g("PlayfairDisplay-ExtraBold.ttf", 66 * S)
+        w = int(d.textlength("R$ ", font=f_rs) + d.textlength(inteiro, font=f_v))
+        x = (L * S - w) // 2
+        x += _ouro(img, (x, 830 * S), "R$ ", f_rs)
+        _ouro(img, (x, 864 * S), inteiro, f_v)
+        d = ImageDraw.Draw(img)
+        _centro(d, 926 * S, "valor combinado antes, sem surpresa", _g("Inter-700.ttf", 32 * S), branco)
+    else:
+        for i, linha in enumerate(_quebra(d, titulo, _g("PlayfairDisplay-ExtraBold.ttf", 72 * S), (640) * S)[:2]):
+            _tx(d, (64 * S, (640 + i * 78) * S), linha, font=_g("PlayfairDisplay-ExtraBold.ttf", 72 * S), fill=branco, anchor="ls")
+        _tx(d, (64 * S, 810 * S), "em promoção", font=_g(serif_i, 58 * S), fill=claro, anchor="ls")
+        cx, cy, rr = 862 * S, 742 * S, 136 * S
+        luz = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        ImageDraw.Draw(luz).ellipse([cx - rr, cy - rr + 14 * S, cx + rr, cy + rr + 14 * S], fill=(0, 0, 0, 150))
+        img.alpha_composite(luz.filter(ImageFilter.GaussianBlur(16 * S)))
+        selo = _gradiente(rr * 2, rr * 2, OURO_CLARO + (255,), OURO_ESCURO + (255,))
+        m = Image.new("L", selo.size, 0)
+        ImageDraw.Draw(m).ellipse([0, 0, rr * 2 - 1, rr * 2 - 1], fill=255)
+        img.paste(selo, (cx - rr, cy - rr), m)
+        d = ImageDraw.Draw(img)
+        d.ellipse([cx - rr + 12 * S, cy - rr + 12 * S, cx + rr - 12 * S, cy + rr - 12 * S], outline=(110, 74, 16, 255), width=3 * S)
+        tinta = (58, 38, 6, 255)
+        d.text((cx, cy - 78 * S), "POR APENAS", font=_g("Inter-800.ttf", 22 * S), fill=tinta, anchor="mm")
+        d.text((cx, cy - 6 * S), "R$" + inteiro, font=_g("PlayfairDisplay-ExtraBold.ttf", (76 if len(inteiro) <= 3 else 58) * S), fill=tinta, anchor="mm")
+        d.text((cx, cy + 62 * S), "condição", font=_g("Inter-800.ttf", 25 * S), fill=tinta, anchor="mm")
+        d.text((cx, cy + 90 * S), "especial", font=_g("Inter-800.ttf", 25 * S), fill=tinta, anchor="mm")
+    _beneficios(img, itens, cor, 986)
+    _botao_whats(img, cor, cor2, 1214, "Chame no WhatsApp")
+    saida = img.convert("RGB").resize((L, A), Image.LANCZOS)
+    buf = io.BytesIO()
+    saida.save(buf, "PNG", optimize=True)
+    return buf.getvalue()
+
+
 def _gerar_servico(preco: str, titulo: str, itens: List[str], arte: int) -> bytes:
     """O card do serviço que a EMPRESA vende (ex.: limpeza de ar-condicionado): título, valor, o que está incluso e o botão."""
+    if os.path.exists(os.path.join(PASTA_PLACAS, "servico.jpg")):
+        return _gerar_servico_foto(preco, titulo, itens, arte)
     titulo = (titulo or "Seu serviço").strip()[:60]
     itens = (itens or ["Atendimento rápido", "Orçamento sem compromisso", "Garantia no serviço", "Equipe de confiança"])[:4]
     while len(itens) < 4 and len(itens) > 0:
