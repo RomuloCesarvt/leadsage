@@ -11,7 +11,7 @@ type Estilo = 'consultiva' | 'comercial';
 
 const PROMOCAO_PADRAO: PromocaoRobo = {
   ativa: true,
-  preco: '600',
+  preco: '347',
   inclui: 'Hospedagem por 1 ano inclusa\nSem custo de domínio (o site fica em um endereço .vercel.app)\nManutenção do site inclusa',
   validade: '',
   chamada: '',
