@@ -44,6 +44,7 @@ from app import criativo as criativo_mod
 from app import score_ar
 from app import card_promocao
 from app import valor_momento
+from app import convites
 import httpx
 from app.firebase_config import get_current_user, db as firestore_db
 from app import profile_store
@@ -216,6 +217,10 @@ def _identidade(profile: UserProfile, user: dict) -> UserProfile:
 @app.get("/api/profile", response_model=UserProfile)
 async def get_user_profile(user: dict = Depends(usuario_do_espaco)):
     uid = user.get("uid")
+    try:
+        await convites.aplicar(uid, user.get("email"))         # convite de teste liberado para este e-mail (uma vez)
+    except Exception as exc:
+        print(f"Convite não aplicado: {type(exc).__name__}: {exc}")
     profile = await get_profile(uid)
     balance = await get_user_balance(_espaco(user), user.get("email"))
     profile.credits = balance.get("credits", 0)
@@ -230,6 +235,10 @@ async def update_user_profile(profile: UserProfile, user: dict = Depends(usuario
     compartilhada por todos os usuarios.
     """
     uid = user.get("uid")
+    try:
+        await convites.aplicar(uid, user.get("email"))         # antes de escolher o modo: quem tem convite já nasce com os modos dele
+    except Exception as exc:
+        print(f"Convite não aplicado: {type(exc).__name__}: {exc}")
     # só o que a tela mandou: o seletor de modo envia apenas {"modo"}, e os campos que ficaram de fora não podem virar vazio
     corpo = profile.model_dump(exclude_unset=True)
     corpo.pop("modos", None)                       # nunca vem do usuário
