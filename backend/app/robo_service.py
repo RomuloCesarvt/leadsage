@@ -377,6 +377,8 @@ async def _incluir_abordagem(uid: str, conversa: Dict[str, Any], lead: Optional[
     ]
     if previas:
         conversa["mensagens"] = previas + conversa["mensagens"]
+    if any(i.get("card_enviado") for i in enviadas):
+        conversa.setdefault("sdr", {})["promo_enviada"] = True      # o card com o valor já foi na abordagem: não se repete
 
 
 # Uma conversa por vez: o Conector chama o robo de varios lugares ao mesmo tempo (agrupador, nova tentativa, varredura).

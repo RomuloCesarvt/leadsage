@@ -45,3 +45,11 @@ def test_formato_previa_nao_leva_card():
     cfg = {**CFG, "promocao": {**PROMO, "formato": "previa"}}
     d = _decidir([{"de": "robo", "texto": "Aqui a prévia https://x.vercel.app"}, {"de": "contato", "texto": "gostei!"}], cfg, sdr={"previa_enviada": "x"})
     assert not d.card and "R$ 347" in d.resposta
+
+
+def test_card_na_abordagem_so_quando_ligado():
+    from app import ai_oferta
+    assert not ai_oferta.card_na_abordagem(CFG)
+    cfg = {**CFG, "promocao": {**PROMO, "formato": "ambos", "card_na_abordagem": True}}
+    assert ai_oferta.card_na_abordagem(cfg)
+    assert not ai_oferta.card_na_abordagem({**cfg, "promocao": {**cfg["promocao"], "formato": "previa"}})

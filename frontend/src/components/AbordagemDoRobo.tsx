@@ -45,7 +45,7 @@ export const AbordagemDoRobo: React.FC<{
   onEstilo: (e: Estilo) => void;
   onPromocao: (p: PromocaoRobo) => void;
 }> = ({ estilo = 'consultiva', promocao, onEstilo, onPromocao }) => {
-  const p: PromocaoRobo = { ...PROMOCAO_PADRAO, ...(promocao || {}), ativa: promocao?.ativa ?? false, formato: promocao?.formato ?? 'previa' };
+  const p: PromocaoRobo = { ...PROMOCAO_PADRAO, ...(promocao || {}), ativa: promocao?.ativa ?? false, formato: promocao?.formato ?? 'previa', card_na_abordagem: promocao?.card_na_abordagem ?? false };
   const set = <K extends keyof PromocaoRobo>(k: K, v: PromocaoRobo[K]) => onPromocao({ ...p, [k]: v });
 
   const escolher = (e: Estilo) => {
@@ -147,6 +147,10 @@ export const AbordagemDoRobo: React.FC<{
                   {RAMOS_DO_CARD.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
                 </select>
               </div>
+              <label className="flex items-start gap-2.5 cursor-pointer mb-3">
+                <input type="checkbox" checked={!!p.card_na_abordagem} onChange={e => set('card_na_abordagem', e.target.checked)} className="mt-0.5 w-4 h-4 accent-blue-600" />
+                <span className="text-sm text-slate-700"><b>Enviar o card já na primeira mensagem (abordagem do WhatsApp)</b> <span className="text-slate-500">— o lead já recebe a promoção com o valor; depois o robô não repete.</span></span>
+              </label>
               <p className="text-xs text-slate-500 mb-3 leading-relaxed">O sistema monta sozinho um card para cada lead, com o ramo dele, o nome da empresa dele e o valor acima. Não precisa subir arquivo.</p>
               <div className="flex justify-center">
                 {imagemCard

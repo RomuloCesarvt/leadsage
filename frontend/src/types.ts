@@ -397,6 +397,8 @@ export interface PromocaoRobo {
   chamada: string;
   /** o que acompanha a promoção: só a prévia do site, só o card, ou os dois */
   formato?: 'previa' | 'card' | 'ambos';
+  /** manda o card já na primeira mensagem do WhatsApp (a abordagem) */
+  card_na_abordagem?: boolean;
 }
 
 export interface OfertaRobo {

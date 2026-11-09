@@ -188,6 +188,8 @@ def normalizar_promocao(d: Any) -> Dict[str, Any]:
         "chamada": _texto(d.get("chamada"), 160),   # a pergunta final; vazio = a padrao
         # o que acompanha a promoção: só a prévia do site (padrão antigo), só o card da promoção, ou os dois
         "formato": d.get("formato") if d.get("formato") in ("previa", "card", "ambos") else "previa",
+        # manda o card já na PRIMEIRA mensagem do WhatsApp (a abordagem), não só quando o lead responde
+        "card_na_abordagem": bool(d.get("card_na_abordagem")),
     }
 
 
@@ -204,6 +206,10 @@ def formato_da_promocao(cfg: Dict[str, Any]) -> str:
 
 def usa_card(cfg: Dict[str, Any]) -> bool:
     return formato_da_promocao(cfg) in ("card", "ambos")
+
+
+def card_na_abordagem(cfg: Dict[str, Any]) -> bool:
+    return usa_card(cfg) and normalizar_promocao(cfg.get("promocao"))["card_na_abordagem"]
 
 
 def so_card(cfg: Dict[str, Any]) -> bool:
