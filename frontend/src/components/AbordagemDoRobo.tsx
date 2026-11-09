@@ -22,7 +22,8 @@ const PROMOCAO_PADRAO: PromocaoRobo = {
 const RAMOS_DO_CARD: [string, string, string][] = [
   ['dentista', 'Dentistas', 'Sorriso Claro'], ['estetica', 'Clínicas de estética', 'Aura Estética'], ['advocacia', 'Advogados', 'Silva e Prado'],
   ['oficina', 'Oficinas mecânicas', 'Auto Center Rocha'], ['pet', 'Pet shops', 'Amigo Fiel'], ['barbearia', 'Barbearias', 'Navalha de Ouro'],
-  ['academia', 'Academias', 'Força Total'], ['restaurante', 'Restaurantes', 'Sabor da Casa'], ['padrao', 'Outros ramos', 'Sua Empresa'],
+  ['academia', 'Academias', 'Força Total'], ['restaurante', 'Restaurantes', 'Sabor da Casa'], ['terapeuta', 'Terapeutas e psicólogos', 'Espaço Serena'],
+  ['arquitetura', 'Arquitetos e engenheiros', 'Studio Prado'], ['padrao', 'Outros ramos', 'Sua Empresa'],
 ];
 
 const FORMATOS: { id: 'previa' | 'card' | 'ambos'; titulo: string; texto: string }[] = [
@@ -45,7 +46,7 @@ export const AbordagemDoRobo: React.FC<{
   onEstilo: (e: Estilo) => void;
   onPromocao: (p: PromocaoRobo) => void;
 }> = ({ estilo = 'consultiva', promocao, onEstilo, onPromocao }) => {
-  const p: PromocaoRobo = { ...PROMOCAO_PADRAO, ...(promocao || {}), ativa: promocao?.ativa ?? false, formato: promocao?.formato ?? 'previa', card_na_abordagem: promocao?.card_na_abordagem ?? false };
+  const p: PromocaoRobo = { ...PROMOCAO_PADRAO, ...(promocao || {}), ativa: promocao?.ativa ?? false, formato: promocao?.formato ?? 'previa', card_na_abordagem: promocao?.card_na_abordagem ?? false, arte: promocao?.arte ?? 1 };
   const set = <K extends keyof PromocaoRobo>(k: K, v: PromocaoRobo[K]) => onPromocao({ ...p, [k]: v });
 
   const escolher = (e: Estilo) => {
@@ -58,23 +59,27 @@ export const AbordagemDoRobo: React.FC<{
 
   const formato = p.formato ?? 'previa';
   const comCard = formato === 'card' || formato === 'ambos';
-  const [ramoCard, setRamoCard] = useState('dentista');
-  const [imagemCard, setImagemCard] = useState('');
+  const [ramoCard, setRamoCard] = useState('barbearia');
+  const [artes, setArtes] = useState<string[]>([]);       // as miniaturas dos estilos de arte do ramo escolhido
   const [montandoCard, setMontandoCard] = useState(false);
   const precoCard = String(p.preco || '').replace(/[^\d.,]/g, '');
   useEffect(() => {
-    if (estilo !== 'comercial' || !comCard || !precoCard) { setImagemCard(''); return; }
+    if (estilo !== 'comercial' || !comCard || !precoCard) { setArtes([]); return; }
     let vivo = true;
-    let url = '';
+    const urls: string[] = [];
     setMontandoCard(true);
-    const espera = setTimeout(() => {
-      const empresa = RAMOS_DO_CARD.find(r => r[0] === ramoCard)?.[2] || 'Sua Empresa';
-      api.cardDaPromocao(ramoCard, precoCard, empresa)
-        .then(u => { url = u; if (vivo) setImagemCard(u); else URL.revokeObjectURL(u); })
-        .catch(() => { if (vivo) setImagemCard(''); })
-        .finally(() => { if (vivo) setMontandoCard(false); });
+    const espera = setTimeout(async () => {
+      try {
+        const empresa = RAMOS_DO_CARD.find(r => r[0] === ramoCard)?.[2] || 'Sua Empresa';
+        const { quantidade } = await api.artesDoCard(ramoCard);
+        for (let a = 1; a <= quantidade; a++) {
+          const u = await api.cardDaPromocao(ramoCard, precoCard, empresa, a);
+          urls.push(u);
+          if (vivo) setArtes([...urls]); else URL.revokeObjectURL(u);
+        }
+      } catch { if (vivo) setArtes([]); } finally { if (vivo) setMontandoCard(false); }
     }, 500);
-    return () => { vivo = false; clearTimeout(espera); if (url) URL.revokeObjectURL(url); };
+    return () => { vivo = false; clearTimeout(espera); urls.forEach(u => URL.revokeObjectURL(u)); };
   }, [estilo, comCard, precoCard, ramoCard]);
 
   const Opcao: React.FC<{ id: Estilo; titulo: string; texto: string; Icone: React.FC<{ className?: string }> }> = ({ id, titulo, texto, Icone }) => (
@@ -142,7 +147,7 @@ export const AbordagemDoRobo: React.FC<{
           {comCard && (
             <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
               <div className="flex flex-wrap items-center gap-3 mb-3">
-                <span className="text-sm font-bold text-slate-700 flex items-center gap-1.5"><ImageIcon className="w-4 h-4 text-blue-600" /> O card que o lead recebe</span>
+                <span className="text-sm font-bold text-slate-700 flex items-center gap-1.5"><ImageIcon className="w-4 h-4 text-blue-600" /> As artes do card (escolha uma)</span>
                 <select value={ramoCard} onChange={e => setRamoCard(e.target.value)} className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg" aria-label="Ramo do exemplo">
                   {RAMOS_DO_CARD.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
                 </select>
@@ -152,12 +157,24 @@ export const AbordagemDoRobo: React.FC<{
                 <span className="text-sm text-slate-700"><b>Enviar o card já na primeira mensagem (abordagem do WhatsApp)</b> <span className="text-slate-500">— o lead já recebe a promoção com o valor; depois o robô não repete.</span></span>
               </label>
               <p className="text-xs text-slate-500 mb-3 leading-relaxed">O sistema monta sozinho um card para cada lead, com o ramo dele, o nome da empresa dele e o valor acima. Não precisa subir arquivo.</p>
-              <div className="flex justify-center">
-                {imagemCard
-                  ? <img src={imagemCard} alt="Exemplo do card da promoção" className="w-full max-w-[320px] rounded-xl shadow-md border border-slate-200" />
-                  : <div className="w-full max-w-[320px] aspect-[4/5] rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center text-xs text-slate-500 gap-2">
-                      {montandoCard ? <><Loader2 className="w-4 h-4 animate-spin" /> Montando o card…</> : 'Informe o valor para ver o card'}
-                    </div>}
+              <div className={`grid gap-3 ${artes.length > 1 ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 max-w-[320px] mx-auto'}`}>
+                {artes.map((u, i) => {
+                  const n = (i + 1) as 1 | 2 | 3;
+                  const ativa = (p.arte ?? 1) === n;
+                  return (
+                    <button key={n} type="button" onClick={() => set('arte', n)} aria-pressed={ativa}
+                      className={`relative rounded-xl overflow-hidden border-2 transition-colors ${ativa ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200 hover:border-slate-300'}`}>
+                      <img src={u} alt={`Arte ${n}`} className="w-full block" />
+                      {artes.length > 1 && <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-md text-[11px] font-bold ${ativa ? 'bg-blue-600 text-white' : 'bg-white/90 text-slate-700'}`}>{ativa ? '✓ ' : ''}Arte {n}</span>}
+                    </button>
+                  );
+                })}
+                {!artes.length && (
+                  <div className="w-full aspect-[4/5] rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center text-xs text-slate-500 gap-2 col-span-full">
+                    {montandoCard ? <><Loader2 className="w-4 h-4 animate-spin" /> Montando as artes…</> : 'Informe o valor para ver as artes'}
+                  </div>
+                )}
+                {montandoCard && artes.length > 0 && <div className="flex items-center justify-center text-xs text-slate-500 gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Montando…</div>}
               </div>
             </div>
           )}

@@ -400,6 +400,8 @@ export interface PromocaoRobo {
   formato?: 'previa' | 'card' | 'ambos';
   /** manda o card já na primeira mensagem do WhatsApp (a abordagem) */
   card_na_abordagem?: boolean;
+  /** estilo de arte do card (1 faixa de valor, 2 valor gigante, 3 selo) */
+  arte?: 1 | 2 | 3;
 }
 
 export interface OfertaRobo {

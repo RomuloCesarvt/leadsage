@@ -318,10 +318,10 @@ export const api = {
   },
 
   /** O card da promoção como o lead vai receber (imagem gerada pelo servidor), pronto para usar em <img src>. */
-  async cardDaPromocao(ramo: string, preco: string, empresa: string): Promise<string> {
+  async cardDaPromocao(ramo: string, preco: string, empresa: string, arte = 1): Promise<string> {
     const user = auth.currentUser;
     const token = user ? await user.getIdToken() : '';
-    const q = new URLSearchParams({ ramo, preco, empresa });
+    const q = new URLSearchParams({ ramo, preco, empresa, arte: String(arte) });
     const r = await fetch(`${API_BASE_URL}/robo/promocao/card?${q}`, {
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(modoAtivo ? { 'X-Modo': modoAtivo } : {}) },
     });
@@ -331,6 +331,10 @@ export const api = {
 
   async painelDoValor(): Promise<{ momentos: PainelDoMomento[] }> {
     return await fetchWithToken('/robo/valor/painel');
+  },
+
+  async artesDoCard(ramo: string): Promise<{ quantidade: number; com_foto: boolean }> {
+    return await fetchWithToken(`/robo/promocao/artes?ramo=${encodeURIComponent(ramo)}`);
   },
 
   async criativoVer(): Promise<CriativoInfo> {

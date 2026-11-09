@@ -53,3 +53,19 @@ def test_card_na_abordagem_so_quando_ligado():
     cfg = {**CFG, "promocao": {**PROMO, "formato": "ambos", "card_na_abordagem": True}}
     assert ai_oferta.card_na_abordagem(cfg)
     assert not ai_oferta.card_na_abordagem({**cfg, "promocao": {**cfg["promocao"], "formato": "previa"}})
+
+
+def test_placas_dos_ramos_dao_tres_artes_e_ramo_sem_foto_cai_no_desenhado():
+    for ramo in ("barbearia", "restaurante", "academia", "terapeuta", "arquitetura"):
+        assert c.tem_placa(ramo) and c.artes_disponiveis(ramo) == 3
+        imgs = [Image.open(io.BytesIO(c.gerar(ramo, "347", "Empresa X", a))) for a in (1, 2, 3)]
+        assert all(i.size == (1080, 1350) for i in imgs)
+        assert len({i.tobytes() for i in imgs}) == 3                 # as três artes são diferentes
+    assert c.ramo_do_lead("Psicólogos") == "terapeuta" and c.ramo_do_lead("Arquitetura e engenharia") == "arquitetura"
+    assert not c.tem_placa("dentista") and c.artes_disponiveis("dentista") == 1
+
+
+def test_assinatura_inclui_a_arte():
+    url = c.url_do_card("barbearia", "347", "X", 2)
+    sig = url.split("sig=")[1]
+    assert c.assinatura_valida("barbearia", "347", "X", sig, 2) and not c.assinatura_valida("barbearia", "347", "X", sig, 3)
