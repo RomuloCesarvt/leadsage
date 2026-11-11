@@ -68,6 +68,7 @@ if (
 
 /** O modo que o app está usando agora (agência ou empresa): vai em cada pedido para o servidor separar os dados de trabalho. */
 let modoAtivo = '';
+export const modoAtivoAtual = (): string => modoAtivo;
 export const definirModoAtivo = (modo: string): void => { modoAtivo = modo === 'empresa' ? 'empresa' : modo === 'agencia' ? 'agencia' : ''; };
 
 async function fetchWithToken(endpoint: string, options: RequestInit = {}) {

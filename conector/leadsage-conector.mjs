@@ -16,13 +16,13 @@
  */
 import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync, rmSync } from 'node:fs';
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '3.0.2';
+export const VERSAO = '3.0.3';
 const PORTA = 2790;           // a primeira porta; se estiver ocupada (outro Conector aberto), tenta as seguintes
 const PORTAS_EXTRAS = 9;
 
@@ -541,6 +541,18 @@ export function acharNavegador(existe = existsSync, plataforma = process.platfor
   return lista.find((p) => p && existe(p)) || '';
 }
 
+/** Fecha navegadores (Edge/Chrome) que estão usando a pasta da sessão e apaga os travas que eles deixaram. Só mexe nesta pasta. */
+export async function liberarPastaDaSessao(pasta, plataforma = process.platform) {
+  const cmd = plataforma === 'win32'
+    ? ['powershell', ['-NoProfile', '-Command', `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.Contains('${pasta.replace(/'/g, "''")}') -and $_.Name -match 'msedge|chrome' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`]]
+    : ['pkill', ['-f', pasta]];
+  await new Promise((resolver) => { execFile(cmd[0], cmd[1], () => resolver()); });
+  await new Promise((r) => setTimeout(r, 1500));
+  for (const trava of ['SingletonLock', 'SingletonCookie', 'SingletonSocket']) {
+    try { rmSync(join(pasta, 'session', trava), { force: true }); } catch { /* ok */ }
+  }
+}
+
 /** Liga o WhatsApp Web. Devolve um adaptador { enviar, parar } e chama os ouvintes. */
 async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = () => {}, aoCodigo = () => {}, parear = '' }) {
   const envios = criarGuardaDeEnvios();
@@ -617,7 +629,15 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
     }
   });
 
-  await client.initialize();
+  try {
+    await client.initialize();
+  } catch (e) {
+    if (!/already running|userDataDir/i.test(String(e?.message))) throw e;
+    // sobrou um navegador de uma execução anterior segurando a pasta da sessão: fecha só o que usa ESTA pasta e tenta de novo
+    log('O navegador desta pasta ficou aberto de antes; fechando e tentando de novo.');
+    await liberarPastaDaSessao(join(AQUI, 'sessao'));
+    await client.initialize();
+  }
 
   return {
     async enviar(telefone, texto, digitandoMs, chatId = '', midia = null) {

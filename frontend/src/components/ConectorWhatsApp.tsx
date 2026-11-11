@@ -10,20 +10,22 @@
  */
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Download, Loader2, ShieldCheck, Smartphone, Unplug, Wifi, WifiOff } from 'lucide-react';
-import { api } from '../services/api';
+import { api, modoAtivoAtual } from '../services/api';
 import { WhatsAppIcon } from './BrandIcons';
 import { sondar } from '../lib/sondagem';
 import type { RoboConfig, SaudeDoNumero } from '../types';
 
 /** O arquivo que o usuário baixa: leva a chave, instala o que falta e abre o Conector. */
-export function arquivoDoConector(chave: string, site: string): string {
+export function arquivoDoConector(chave: string, site: string, modo: string = ''): string {
+  // cada modo tem a SUA pasta (chave, sessão do WhatsApp e navegador): dois Conectores na mesma pasta brigam pelo mesmo navegador
+  const pasta = modo === 'empresa' ? 'LeadSageConector-Empresa' : 'LeadSageConector';
   const linhas = [
     '@echo off',
     'chcp 65001 >nul',
     'title LeadSage - WhatsApp pelo computador',
     'setlocal',
     `set "SITE=${site}"`,
-    'set "PASTA=%LOCALAPPDATA%\\LeadSageConector"',
+    `set "PASTA=%LOCALAPPDATA%\\${pasta}"`,
     'if not exist "%PASTA%" mkdir "%PASTA%"',
     'cd /d "%PASTA%"',
     `> config.json echo {"chave":"${chave}","site":"${site}"}`,
@@ -431,7 +433,7 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
           {nuvem ? null : celular ? (
             <p className="text-xs text-slate-500">O arquivo do Conector é para Windows: baixe-o no computador. Depois, daqui do celular você vê as conversas, responde, dispara e o robô atende.</p>
           ) : chave ? (
-            <button onClick={() => baixar('Conectar-WhatsApp.bat', arquivoDoConector(chave, window.location.origin))}
+            <button onClick={() => baixar('Conectar-WhatsApp.bat', arquivoDoConector(chave, window.location.origin, modoAtivoAtual()))}
               className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-2">
               <Download className="w-4 h-4" /> Baixar Conectar-WhatsApp.bat
             </button>

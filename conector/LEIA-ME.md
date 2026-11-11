@@ -46,10 +46,8 @@ no roteador: só faz chamadas para fora (e uma página local, `127.0.0.1`, que s
 
 ## Dois números no mesmo computador (agência e empresa)
 
-Cada modo do LeadSage tem a sua chave e o seu WhatsApp. Para ter os dois conectados ao mesmo tempo, rode **um Conector por modo, cada um na sua pasta**:
+Cada modo do LeadSage tem a sua chave e o seu WhatsApp. Baixe o `Conectar-WhatsApp.bat` **dentro de cada modo** (a tela do modo Empresa gera o arquivo da empresa, a da Agência gera o da agência).
 
-1. Crie uma pasta nova (por exemplo `Conector-Empresa`) e baixe nela o `Conectar-WhatsApp.bat` gerado **no modo Empresa**.
-2. Abra esse `.bat` de dentro da pasta nova. O Conector da agência continua rodando na pasta dele.
-3. O segundo Conector usa a próxima porta livre (2791, 2792...) e mostra o endereço no próprio painel.
-
-**Não coloque os dois `.bat` na mesma pasta:** o `config.json` guarda uma chave só, e o último que abrir apaga a chave do outro.
+- O da agência instala em `%LOCALAPPDATA%\LeadSageConector`; o da empresa, em `%LOCALAPPDATA%\LeadSageConector-Empresa`. Cada um tem a sua chave, a sua sessão do WhatsApp e o seu navegador, então não se atrapalham.
+- O segundo Conector usa a próxima porta livre (2791, 2792...); o endereço aparece na janela do programa.
+- Se aparecer "The browser is already running", é um navegador de uma execução anterior ainda aberto: o Conector (3.0.3 em diante) fecha só o dessa pasta e tenta de novo sozinho.
