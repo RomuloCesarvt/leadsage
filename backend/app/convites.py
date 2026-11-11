@@ -12,7 +12,9 @@ from typing import Any, Dict, Optional
 from app import espaco, robo_store
 
 CONVITES: Dict[str, Dict[str, Any]] = {
-    "vizarbtu@gmail.com": {"modo": "empresa", "creditos": 20, "plano": "m_escala", "dias": 30},
+    "vizarbtu@gmail.com": {"modo": "empresa", "creditos": 20, "plano": "m_escala", "dias": 30,
+                           # créditos extras, cada um aplicado uma única vez (pelo "id") na carteira do modo, mesmo que o convite já tenha sido usado
+                           "bonus": [{"id": "2026-11-11-mais-20", "creditos": 20}]},
 }
 
 
@@ -38,6 +40,7 @@ async def aplicar(uid: str, email: Optional[str]) -> bool:
     uid = espaco.conta(uid)
     chave = f"convite:{uid}"
     if await robo_store._sql_get(chave):
+        await _aplicar_bonus(uid, email, c)
         return False
     # marca ANTES de aplicar: se algo falhar no meio, o convite não credita duas vezes (o erro aparece no log)
     await robo_store._sql_put(chave, uid, "sistema", {"email": (email or "").lower(), "em": datetime.now(timezone.utc).isoformat(timespec="seconds")})
@@ -55,5 +58,23 @@ async def aplicar(uid: str, email: Optional[str]) -> bool:
     await profile_store.conceder_plano(uid, f"{plano['nome']} (convite de teste)", int(plano.get("sites") or 0), plano["id"], {
         "licenca_ate": ate, "assinatura_status": "convite", "assinatura_plano": plano["id"],
     })
+    await _aplicar_bonus(uid, email, c)
     print(f"Convite aplicado: {email} -> {modo}, {c.get('creditos')} créditos, plano {plano['id']} até {ate}")
     return True
+
+
+async def _aplicar_bonus(uid: str, email: Optional[str], c: Dict[str, Any]) -> None:
+    """Créditos extras do convite: cada bônus (pelo id) entra uma vez só, marcado antes de creditar para nunca somar duas vezes."""
+    from app import credit_system, profile_store
+
+    modo = c.get("modo") if c.get("modo") in profile_store.MODOS else "empresa"
+    for b in c.get("bonus") or []:
+        bid, qtd = str((b or {}).get("id") or "").strip(), int((b or {}).get("creditos") or 0)
+        if not bid or qtd <= 0:
+            continue
+        chave = f"convite-bonus:{uid}:{bid}"
+        if await robo_store._sql_get(chave):
+            continue
+        await robo_store._sql_put(chave, uid, "sistema", {"email": (email or "").lower(), "creditos": qtd, "em": datetime.now(timezone.utc).isoformat(timespec="seconds")})
+        await credit_system.add_credits(espaco.do_modo(uid, modo), qtd, f"Créditos extras do convite ({modo})")
+        print(f"Bônus do convite aplicado: {email} -> {modo}, +{qtd} créditos ({bid})")
