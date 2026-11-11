@@ -310,9 +310,26 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
 
   await abrir();
 
+  /** Baixa a imagem da arte (o endereço é assinado pelo LeadSage). Falhou ou grande demais: devolve null e a mensagem sai só com o texto. */
+  async function baixarMidia(midia) {
+    try {
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 20000);
+      const r = await fetch(midia.url, { signal: ctl.signal });
+      clearTimeout(t);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const dados = Buffer.from(await r.arrayBuffer());
+      if (!dados.length || dados.length > 8 * 1024 * 1024) throw new Error('arquivo vazio ou grande demais');
+      return { dados, mime: midia.mime || r.headers.get('content-type') || 'image/png' };
+    } catch (e) {
+      aviso('Não consegui baixar a arte da promoção; a mensagem segue só com o texto:', e.message);
+      return null;
+    }
+  }
+
   return {
     get pronto() { return pronto; },
-    async enviar(telefone, texto, digitandoMs, chatId = '') {
+    async enviar(telefone, texto, digitandoMs, chatId = '', midia = null) {
       try {
         if (!sock || !pronto) return { ok: false, erro: 'O WhatsApp não está conectado agora.' };
         let jid;
@@ -330,7 +347,14 @@ export async function iniciarBaileys({ dir, parear = '', aoQr, aoCodigo, aoPront
         await dormir(espera);
         await sock.sendPresenceUpdate('paused', jid).catch(() => {});
         envios.registrar(texto);
-        const enviada = await sock.sendMessage(jid, { text: texto });
+        // a arte da promoção vai como imagem, com o texto na legenda; se não der para baixá-la, a mensagem segue só com o texto
+        const arquivo = midia && midia.url ? await baixarMidia(midia) : null;
+        const conteudo = arquivo
+          ? (arquivo.mime === 'application/pdf'
+            ? { document: arquivo.dados, mimetype: arquivo.mime, fileName: midia.nome || 'promocao.pdf', caption: texto }
+            : { image: arquivo.dados, mimetype: arquivo.mime, caption: texto })
+          : { text: texto };
+        const enviada = await sock.sendMessage(jid, conteudo);
         if (!enviada?.key?.id) return { ok: false, erro: 'o WhatsApp não devolveu o envio' };
         // só conta como enviada quando o servidor do WhatsApp confirma; sem isso a tela dizia "enviado" e o celular não tinha nada
         const confirmacao = await entregas.aguardar(enviada.key.id, 25000);
