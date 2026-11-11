@@ -79,6 +79,12 @@ def _dossie(lead: LeadItem, local: bool = False) -> str:
     diferença entre uma mensagem que prova ter olhado aquele comércio e
     um texto que serviria para qualquer um da mesma rua.
     """
+    if local:
+        # venda de serviço (ar-condicionado): só quem é, o ramo e onde fica; nota, avaliações e Google são assunto de marketing
+        base = [f"- Negócio: {lead.name}", f"- Ramo: {lead.role}", f"- Onde fica: {lead.neighborhood + ', ' if lead.neighborhood else ''}{lead.city}"]
+        if lead.opening_hours:
+            base.append(f"- Horário: {lead.opening_hours}")
+        return "\n".join(base)
     linhas = [
         f"- Negócio: {lead.name}",
         f"- Ramo: {lead.role}",
@@ -101,9 +107,6 @@ def _dossie(lead: LeadItem, local: bool = False) -> str:
         if texto and texto != lead.review_highlight:
             linhas.append(f'- Outra avaliação ({nota}★): "{texto[:160]}"')
 
-    if local:
-        # serviço local (ar-condicionado): site, lacunas digitais e diagnóstico de site não são assunto
-        return "\n".join(linhas[:4] + [l for l in linhas[5:] if not l.startswith(("- Situação", "- Diagnóstico", "  · o site", "- O site roda"))])
     situacao = {
         "none": "não tem site nenhum no perfil do Google",
         "social": "o link do perfil leva a uma rede social, não a um site",
@@ -162,13 +165,13 @@ O NEGÓCIO (verificado, pode citar)
 Ganchos prontos (escolha UM): {_ganchos(lead) if req.previa != "nenhuma" else "(use o ramo e os dados acima)"}
 
 O RAMO DESTE NEGÓCIO
-{abordagem_mestra.bloco_do_ramo(lead.niche or lead.role)}
+{abordagem_mestra.bloco_do_ramo(lead.niche or lead.role, local=(req.previa == "nenhuma"))}
 
 {abordagem_mestra.TEMPERATURA}
 
 {abordagem_mestra.estrutura(assina, sem_site=sem_site, previa=(req.previa or ''), canal=canal, lead_id=str(lead.id), variacao=req.variacao, evitar=req.evitar, apresentacao=(req.apresentacao or ''), nicho=(lead.niche or lead.role or ''))}
 
-{abordagem_mestra.GATILHOS}
+{abordagem_mestra.GATILHOS_LOCAL if req.previa == "nenhuma" else abordagem_mestra.GATILHOS}
 
 CANAL: {canal}. Tom: {regras_canal['tom']}. Tamanho: {regras_canal['limite']}. Estrutura: {regras_canal['estrutura']}.
 TOM PEDIDO: {req.tone}. Voz: {tom['voz']}. Postura: {tom['postura']}. Abertura: {tom['abertura']}. Evite: {tom['evite']}.
@@ -194,10 +197,12 @@ def _pedido_dos_seguimentos(req: PitchGenerationRequest) -> str:
     """
     if not getattr(req, "com_seguimentos", False):
         return ""
+    novidade = ("o ambiente, o bairro, o horário, a limpeza ou a manutenção dos aparelhos; NADA de nota, avaliação ou Google"
+                if req.previa == "nenhuma" else "outro gancho, outra avaliação, o horário")
     return (
         '\nInclua também "follow_ups": lista de 2 objetos {"quando" (ex.: "2 dias depois"), "objetivo" (uma frase), "texto" (até 40 palavras, '
-        'mesmo canal)} para quem NÃO respondeu: sem repetir o argumento da abertura, com algo novo dos dados acima (outro gancho, outra avaliação, '
-        "o horário). O 2º é o CONTATO FINAL: cordial, sem pressão, deixa a porta aberta e diz que não vai insistir. "
+        'mesmo canal)} para quem NÃO respondeu: sem repetir o argumento da abertura, com algo novo dos dados acima (' + novidade + '). '
+        "O 2º é o CONTATO FINAL: cordial, sem pressão, deixa a porta aberta e diz que não vai insistir. "
         "NUNCA estatística de mercado, número de concorrente, percentual, preço ou prazo inventado."
     )
 

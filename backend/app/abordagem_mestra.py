@@ -122,6 +122,10 @@ GATILHOS = """GATILHOS (no máximo dois, só se forem verdadeiros): especificida
 (nota, avaliações, o que os clientes escrevem); reciprocidade (oferecer um esboço primeiro); um sim pequeno antes de qualquer reunião.
 NUNCA: urgência ou escassez inventada, medo ("você está perdendo dinheiro"), número de mercado, comparação com concorrente nominal, promessa de resultado."""
 
+GATILHOS_LOCAL = """GATILHOS (no máximo dois, só se forem verdadeiros): especificidade (um detalhe do ambiente, como o tipo de local ou o bairro); um sim pequeno
+antes de qualquer visita (orçamento sem compromisso). NUNCA: urgência ou escassez inventada, medo, número de mercado, comparação com concorrente,
+promessa de resultado, e nada de nota, avaliações ou Google: é venda de serviço, não de marketing."""
+
 TEMPERATURA = """TEMPERATURA: contato FRIO, não te conhece nem pediu nada: trate como um desconhecido educado; aquecer vem antes de vender. Sem preço e sem
 link no primeiro toque; reunião nunca é exigência; o objetivo do toque 1 é ser respondido. Se o ramo tem hora de pico (guia do ramo), reconheça que
 ele deve estar ocupado e seja breve."""
@@ -209,12 +213,11 @@ ESTILO DESTA MENSAGEM (para ela ser diferente das outras do lote): {estilo}
 
 ESTRUTURA_LOCAL = """COMO ESCREVER A PRIMEIRA MENSAGEM (prosa corrida, em linhas curtas, sem listas)
 1. {saudacao}, <nome da pessoa se estiver no dossiê>! + quem você é em UMA frase curta, neste jeito: "{apresentacao}" (pode ajustar a ordem das palavras).
-2. POR QUE ESCREVEU PARA ELES: diga com naturalidade que encontrou o negócio pesquisando no Google e que, em um ambiente como o deles ({ramo}),
-   o ar-condicionado funcionando bem faz diferença (conforto de quem chega e de quem trabalha, conta de luz, aparelho que não para). Um fato REAL do dossiê
-   (nota, avaliações, o tipo de ambiente) se houver; sem inventar nada sobre os aparelhos deles.
+2. POR QUE ESCREVEU PARA ELES: em um ambiente como o deles ({ramo}), o ar-condicionado funcionando bem faz diferença (conforto de quem chega e de quem
+   trabalha, conta de luz, aparelho que não para). Fale só do ambiente e do serviço; sem inventar nada sobre os aparelhos deles.
 3. O QUE VOCÊ OFERECE em UMA frase, só com o que está nos fatos do serviço (instalação, limpeza, manutenção). Sem preço, sem prazo, sem promessa que não esteja cadastrada.
 4. {pergunta}
-NÃO fale de site, prévia, marketing digital, Google Meu Negócio, redes sociais nem mande link: o serviço é de ar-condicionado.
+NÃO fale de site, prévia, marketing, Google, nota, avaliações, estrelas, reputação, redes sociais nem mande link: você VENDE UM SERVIÇO (ar-condicionado), não presta consultoria de marketing.
 ESTILO DESTA MENSAGEM (para ela ser diferente das outras do lote): {estilo}
 {voz}
 {evitar}"""
@@ -233,7 +236,7 @@ def _estrutura_local(sender_name: str, agora: Optional[datetime], apresentacao: 
     base = sum(ord(c) for c in str(lead_id or "")) + int(variacao or 0)
     return ESTRUTURA_LOCAL.format(
         saudacao=saudacao_do_horario(agora), apresentacao=quem_sou(sender_name, apresentacao, lead_id, variacao), ramo=(nicho or "o seu negócio").lower(),
-        pergunta=PERGUNTAS_LOCAL[base % len(PERGUNTAS_LOCAL)], estilo=estilo_da_mensagem(lead_id, variacao),
+        pergunta=PERGUNTAS_LOCAL[base % len(PERGUNTAS_LOCAL)], estilo=estilo_da_mensagem(lead_id, variacao, local=True),
         voz=VOZ_HUMANA.format(tamanho=sorteio["tamanho"]),
         evitar=("NÃO comece como estas mensagens já usadas neste lote: " + " | ".join(f'"{p}"' for p in passadas)) if passadas else "",
     )
@@ -252,10 +255,21 @@ ESTILOS_DE_ABERTURA = (
 )
 
 
-def estilo_da_mensagem(lead_id: str = "", variacao: int = 0) -> str:
+ESTILOS_LOCAL = (
+    "abra com o cumprimento e o nome, apresente-se em uma frase e diga que trabalha com ar-condicionado na região.",
+    "abra se apresentando e já puxe o assunto do conforto: como está o ar-condicionado por aí no calor?",
+    "abra com o cumprimento, apresente-se e diga que está fazendo limpeza e manutenção de ar-condicionado por perto.",
+    "abra pelo serviço: comece dizendo o que você faz (instalação, limpeza, manutenção) e só depois se apresente.",
+    "tom bem informal, como mensagem de WhatsApp entre conhecidos do bairro, com frases bem curtas.",
+    "abra com uma pergunta simples sobre os aparelhos do local e depois se apresente.",
+)
+
+
+def estilo_da_mensagem(lead_id: str = "", variacao: int = 0, local: bool = False) -> str:
     """Um jeito de abrir que muda de um lead para outro (estavel por lead; a tentativa seguinte troca)."""
     base = sum(ord(c) for c in str(lead_id or "")) + int(variacao or 0)
-    return ESTILOS_DE_ABERTURA[base % len(ESTILOS_DE_ABERTURA)]
+    pool = ESTILOS_LOCAL if local else ESTILOS_DE_ABERTURA
+    return pool[base % len(pool)]
 
 
 def sorteio_da_mensagem(lead_id: str, previa: str, n: int) -> Dict[str, str]:
@@ -316,8 +330,17 @@ def _estrutura_longa(sender_name: str, agora: Optional[datetime] = None, sem_sit
     return texto
 
 
-def bloco_do_ramo(nicho: Optional[str]) -> str:
+def bloco_do_ramo(nicho: Optional[str], local: bool = False) -> str:
+    if local:
+        return bloco_do_ambiente(nicho)
     return nicho_guia.bloco(nicho)
+
+
+def bloco_do_ambiente(nicho: Optional[str]) -> str:
+    """Modo empresa (venda de serviço, ex.: ar-condicionado): o ramo importa só como ambiente de uso. Nada de Google, avaliação ou marketing."""
+    ramo = (nicho or "").strip() or "negócio local"
+    return (f"Ambiente: {ramo}. Pense só no uso do ar-condicionado ali: conforto de quem chega e de quem trabalha, conta de luz, aparelho que para no calor, "
+            "limpeza e manutenção em dia. Você vende um serviço: não fale de marketing, Google, nota, avaliações, redes sociais nem site.")
 
 
 _CUMPRIMENTO = re.compile(r"\b(oi|ol[aá]|bom dia|boa tarde|boa noite|e a[ií])\b", re.I)
@@ -367,8 +390,8 @@ def revisar_roteiro(texto: str, sem_site: bool, previa: str = "") -> list:
     problemas = []
     if previa == "nenhuma":
         # serviço local: a mensagem não pode falar de site, prévia, link nem marketing digital, e termina numa pergunta fácil
-        if re.search(r"\b(site|pr[eé]via|esbo[çc]o|link|marketing|google meu neg[óo]cio|redes sociais)\b", t):
-            problemas.append("fala de site, prévia, link ou marketing digital: o serviço é de ar-condicionado")
+        if re.search(r"\b(site|pr[eé]via|esbo[çc]o|link|marketing|google|avalia[çc][aãõo]\w*|nota|estrelas?|reputa[çc][aã]o|perfil|redes sociais)\b", t):
+            problemas.append("fala de site, prévia, link, Google, nota, avaliações ou marketing: o serviço é de ar-condicionado")
         if "?" not in t:
             problemas.append("não termina com uma pergunta fácil de responder")
         return problemas

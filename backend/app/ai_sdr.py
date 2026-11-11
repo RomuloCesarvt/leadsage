@@ -27,7 +27,7 @@ import re as _re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from app import agentes, ai_oferta, fechamento, identidade, nicho_guia, playbook_vendas, previa_honesta, quem_fala, valor_momento
+from app import abordagem_mestra, agentes, ai_oferta, fechamento, identidade, nicho_guia, playbook_vendas, previa_honesta, quem_fala, valor_momento
 from app.playbook_sites import FALA_DO_ROBO_SOBRE_SITES
 
 ETAPAS = ("abertura", "descoberta", "diagnostico", "proposta", "objecao", "agendamento", "fechamento", "perdido")
@@ -158,6 +158,23 @@ Faça em 2 mensagens curtas, nesta ordem:
 PROIBIDO: dizer "vou ver o valor", "vou consultar", "te retorno com o valor" (esfria), citar valor em reais, discutir o preço ou pedir desculpas.
 Marque "passar_para_humano": true e "motivo": "objeção de preço — gancho dado, passe a condição e o valor".
 """
+
+
+def _dossie_local(lead: Optional[Dict[str, Any]]) -> str:
+    """Modo empresa (venda de serviço): só quem é, o ramo e onde fica. Nota, avaliações, Google, redes e site são assunto de marketing."""
+    lead = lead or {}
+    linhas: List[str] = []
+    nome = lead.get("company") or lead.get("name")
+    if nome:
+        linhas.append(f"Negócio: {nome}")
+    for chave, rotulo in (("niche", "Ramo"), ("city", "Cidade")):
+        if lead.get(chave):
+            linhas.append(f"{rotulo}: {lead[chave]}")
+    jeito = agentes.instrucao(lead.get("agente"))
+    if jeito:
+        linhas.append(f"Jeito de atender ESCOLHIDO PELO DONO para este lead: {jeito}")
+    return "\n".join(linhas) or ("Não há dados sobre este negócio. Descubra na conversa: o que ele faz, quantos aparelhos de ar-condicionado tem e "
+                                "quando foi a última limpeza ou manutenção.")
 
 
 def _formatar_dossie(lead: Optional[Dict[str, Any]], raio: Optional[Dict[str, Any]]) -> str:
@@ -362,6 +379,8 @@ def montar_prompt(
         oferta = ""                                    # o serviço vem da oferta cadastrada; a descrição de agência não vale aqui
     servico = ai_oferta.bloco_do_servico(cfg, lead)
     ramo = nicho_guia.bloco((lead or {}).get("niche"))
+    if ai_oferta.sem_previa(cfg):
+        ramo = abordagem_mestra.bloco_do_ambiente((lead or {}).get("niche"))
     vender = cfg.get("objetivo") == "vender"
     meta = {
         "agendar": "marcar uma conversa de 15 minutos com o responsável (ligação ou vídeo)",
@@ -453,7 +472,7 @@ Instruções do dono: {cfg.get('instrucoes') or '(nenhuma)'}
 
 {ritmo}
 == DOSSIÊ DESTE NEGÓCIO (use; é o que torna a conversa única) ==
-{_formatar_dossie(lead, raio)}
+{_dossie_local(lead) if local else _formatar_dossie(lead, raio)}
 
 == ENTENDENDO O RAMO ==
 {ramo}
@@ -575,6 +594,7 @@ CONDUCAO_LOCAL = """== COMO CONDUZIR ATÉ O ORÇAMENTO OU A VISITA ==
    endereço, e passe para o humano (passar_para_humano true; motivo "visita agendada"). Preencha "reuniao" só quando o CLIENTE confirmou dia e hora exatos.
 7. Urgência real do cliente (aparelho parado, vazando, clínica sem ar) é prioridade: passe para o humano na hora.
 8. Nunca invente preço, prazo, garantia, desconto, marca, certificação ou região. Fora da tabela: "o técnico confirma na visita".
+   Você vende um SERVIÇO: nada de marketing, Google, nota, avaliações, estrelas, reputação, redes sociais ou site, nem para elogiar o negócio.
 9. Espelhe o jeito dele: formal com quem é formal, direto com quem é direto, curto com quem escreve curto."""
 
 REGRA_DE_PRECO_LOCAL = """- VALORES: só fale de dinheiro quando o cliente perguntar. Aí responda em 2 ou 3 frases curtas: o que está incluso no serviço, o valor da tabela cadastrada
@@ -591,6 +611,9 @@ _TROCAS_LOCAL = (
     ("com UM fato real (dossiê, ramo, a prévia pronta)", "com UM fato real (dossiê, ramo, o serviço cadastrado)"),
     ("reciprocidade (o site/diagnóstico já feito para ele)", "reciprocidade (o orçamento e a visita sem compromisso)"),
     ("proponha dois horários concretos (ou o link)", "proponha dois horários concretos (ou o link da agenda, se cadastrado)"),
+    ("prova social com dados REAIS do dossiê (a nota dele, as avaliações dele); aversão à perda (o cliente que\nprocura e cai no concorrente)",
+     "aversão à perda (aparelho sujo gasta mais energia e quebra antes do tempo); NUNCA cite nota, avaliações ou perfil do Google do cliente"),
+    ('"vi seu perfil no Google"', '"trabalho com ar-condicionado"'),
 )
 
 
@@ -599,6 +622,9 @@ def _sem_site(prompt: str) -> str:
     for velho, novo in _TROCAS_LOCAL:
         prompt = prompt.replace(velho, novo)
     return prompt
+
+
+_MARKETING_NO_SERVICO = _re.compile(r"\b(google|avalia[çc][aãõo]\w*|nota\s+\d|estrelas?|reputa[çc][aã]o|marketing|presen[çc]a digital|redes sociais|instagram)\b", _re.I)
 
 
 def _modo_local(cfg: Dict[str, Any]) -> bool:
@@ -837,6 +863,12 @@ def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: Lis
                           criando_previa: bool = False, momento: str = "") -> List[str]:
     """`criando_previa`: o sistema vai criar o site agora e trocar [LINK_DA_PREVIA] pelo link; o marcador e a promessa do link valem."""
     erros: List[str] = []
+    # -2) modo empresa vende serviço: a resposta nunca fala de Google, nota, avaliações ou marketing
+    if ai_oferta.sem_previa(cfg):
+        m = _MARKETING_NO_SERVICO.search(" ".join(textos))
+        if m:
+            erros.append(f"Você vende um SERVIÇO (ar-condicionado): tire \"{m.group(0)}\" e qualquer fala de Google, nota, avaliações ou marketing; "
+                         "fale só do serviço, do ambiente e do orçamento.")
     # -1) o robô nunca se apresenta como assistente virtual/robô/IA: o número pode ser banido
     se_diz_robo = _SE_DIZ_ROBO.search(" ".join(textos))
     if se_diz_robo:
