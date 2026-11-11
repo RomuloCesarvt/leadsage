@@ -22,8 +22,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '3.0.1';
-const PORTA = 2790;
+export const VERSAO = '3.0.2';
+const PORTA = 2790;           // a primeira porta; se estiver ocupada (outro Conector aberto), tenta as seguintes
+const PORTAS_EXTRAS = 9;
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (...a) => console.log(new Date().toLocaleTimeString('pt-BR'), ...a);
@@ -874,9 +875,22 @@ export async function executar() {
     estado.mensagem = 'Chave salva. Ligando o WhatsApp…';
     iniciarTudo();
   }, origensPermitidas(cfg.site), () => waAtual);
-  srv.on('error', (e) => { console.error(e.code === 'EADDRINUSE' ? 'O Conector já está aberto em outra janela.' : e.message); process.exit(1); });
-  await new Promise((r) => srv.listen(PORTA, '127.0.0.1', r));
-  const url = `http://127.0.0.1:${PORTA}`;
+  // Dois Conectors no mesmo computador (por exemplo, o da agência e o da empresa, cada um com o seu número): o segundo não pode fechar por a
+  // porta estar ocupada. Ele procura a próxima livre (2790, 2791, ...) e segue.
+  let portaEscolhida = PORTA;
+  await new Promise((resolve) => {
+    const tentar = (porta) => {
+      const falhou = (e) => {
+        if (e.code === 'EADDRINUSE' && porta < PORTA + PORTAS_EXTRAS) { log(`A porta ${porta} está ocupada por outro Conector; tentando a ${porta + 1}.`); tentar(porta + 1); return; }
+        console.error(e.code === 'EADDRINUSE' ? 'Não achei porta livre (2790 a 2799). Feche algum Conector e abra de novo.' : e.message);
+        process.exit(1);
+      };
+      srv.once('error', falhou);
+      srv.listen(porta, '127.0.0.1', () => { srv.off('error', falhou); portaEscolhida = porta; resolve(); });
+    };
+    tentar(PORTA);
+  });
+  const url = `http://127.0.0.1:${portaEscolhida}`;
   // Abre o próprio LeadSage (a aba onde o usuário já está logado): o QR code aparece lá dentro.
   // A página local continua disponível como reserva.
   abrirNoNavegador(`${cfg.site}/?tela=robo&aba=configurar`);

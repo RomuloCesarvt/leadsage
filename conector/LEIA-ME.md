@@ -42,3 +42,14 @@ Precisa de Node 18+ e do Chrome ou Edge instalado.
 ## Segurança
 A chave fica só no seu computador. Gerar outra no LeadSage derruba a antiga na hora. O Conector não abre portas
 no roteador: só faz chamadas para fora (e uma página local, `127.0.0.1`, que só o seu computador enxerga).
+
+
+## Dois números no mesmo computador (agência e empresa)
+
+Cada modo do LeadSage tem a sua chave e o seu WhatsApp. Para ter os dois conectados ao mesmo tempo, rode **um Conector por modo, cada um na sua pasta**:
+
+1. Crie uma pasta nova (por exemplo `Conector-Empresa`) e baixe nela o `Conectar-WhatsApp.bat` gerado **no modo Empresa**.
+2. Abra esse `.bat` de dentro da pasta nova. O Conector da agência continua rodando na pasta dele.
+3. O segundo Conector usa a próxima porta livre (2791, 2792...) e mostra o endereço no próprio painel.
+
+**Não coloque os dois `.bat` na mesma pasta:** o `config.json` guarda uma chave só, e o último que abrir apaga a chave do outro.
