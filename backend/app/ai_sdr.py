@@ -444,6 +444,9 @@ def montar_prompt(
     secretaria = SECRETARIA_LOCAL if local else secretaria_padrao
     if local:
         meta = "levar a pessoa a pedir um orçamento ou agendar uma visita técnica sem compromisso, e combinar o melhor dia e horário"
+    bloco_local = ""
+    if local:
+        bloco_local = ((RECEPTIVO_LOCAL.format(quem=quem) + "\n\n") if _contato_chamou_primeiro(mensagens) else "") + "== ROTEIRO DO SERVIÇO PEDIDO ==\n" + _roteiro_do_servico(mensagens) + "\n\n"
     abertura = quem_fala or (f"{assistente}, da equipe de {quem}" if assistente else f"da equipe de {quem}")
     objeto_ritmo = "o serviço e o orçamento" if local else "a prévia do site"
     ritmo = f"""== RITMO: NÃO ACELERE (o que mais espanta o lead) ==
@@ -494,7 +497,7 @@ Avance uma etapa por vez: abertura → descoberta → diagnóstico → proposta 
 
 {conducao}
 
-== MÉTODO DE VENDAS (como um bom SDR conduz) ==
+{bloco_local}== MÉTODO DE VENDAS (como um bom SDR conduz) ==
 {playbook_vendas.METODO}
 == OBJEÇÕES: O QUE REALMENTE TRAVA E COMO RESPONDER ==
 {objecoes}
@@ -625,6 +628,59 @@ def _sem_site(prompt: str) -> str:
 
 
 _MARKETING_NO_SERVICO = _re.compile(r"\b(google|avalia[çc][aãõo]\w*|nota\s+\d|estrelas?|reputa[çc][aã]o|marketing|presen[çc]a digital|redes sociais|instagram)\b", _re.I)
+
+
+# Modo empresa: quando o CLIENTE chama primeiro (ninguém da equipe abordou), e o roteiro de cada serviço. Entra no prompt só no modo empresa.
+RECEPTIVO_LOCAL = """== QUEM CHAMOU PRIMEIRO (a pessoa veio até você: é a venda mais quente que existe) ==
+Ninguém da equipe abordou esta pessoa: ELA escreveu porque precisa ou está comparando. Seu trabalho é não deixá-la esfriar nem ir para o concorrente.
+1. Cumprimente pelo nome (se souber), diga em meia frase que é da equipe de {quem} e RESPONDA o que ela perguntou na mesma mensagem. Nada de "como posso ajudar?" sozinho.
+2. Descubra o essencial com UMA pergunta por mensagem, nesta ordem: o que precisa (instalar, limpar, consertar, manutenção) -> quantos aparelhos e de que tipo -> onde fica (bairro) ->
+   se tem urgência. Pule o que ela já contou na primeira fala.
+3. Primeiras falas comuns e o que fazer:
+   - "oi" / "boa tarde" / "tem alguém aí?": cumprimente, diga que é da equipe de {quem}, e pergunte o que ela precisa (instalação, limpeza, conserto ou manutenção?).
+   - "quanto custa X?": diga o valor da tabela cadastrada SE o serviço estiver nela (ligado ao que está incluso) e já pergunte quantos aparelhos; fora da tabela, diga que depende do aparelho e que o técnico passa o valor certo na visita, e pergunte quantos e de que tipo.
+   - "vocês fazem X?": se X está no serviço cadastrado, diga que sim e pergunte o aparelho; se NÃO está, diga com honestidade que não faz e, se houver algo próximo no cadastro, ofereça.
+   - "preciso de orçamento" / "preciso de um técnico": vá direto ao levantamento (serviço, aparelhos, bairro) e proponha o dia da visita.
+   - Chegou por anúncio, promoção ou indicação: agradeça, confirme a condição SÓ se ela estiver cadastrada e conduza ao agendamento.
+   - Mandou foto, áudio transcrito ou localização: confirme que recebeu o que deu para entender e peça só o que falta; foto da etiqueta do aparelho ajuda o técnico (peça, sem obrigar).
+4. Quem chama primeiro decide rápido: com 2 informações já proponha o dia e o horário (dois horários concretos da agenda cadastrada, de preferência hoje ou amanhã). Não faça questionário.
+5. URGÊNCIA (parado, vazando, não gela, cheiro de queimado, faísca, clínica ou loja sem ar): trate como prioridade, peça só endereço e telefone e passe para o humano na hora (passar_para_humano true; motivo "urgência: ...").
+   Cheiro de queimado ou faísca: oriente a desligar o aparelho da tomada/disjuntor até o técnico chegar.
+6. Nunca peça CPF nem pagamento. Preço só o da tabela; garantia, prazo, marca e região só o cadastrado."""
+
+ROTEIROS_LOCAL = (
+    ("instalacao", r"instal|colocar (?:um )?(?:ar|split)|comprei (?:um )?(?:ar|split)|mudar de lugar|transfer|mudan[çc]a",
+     "SERVIÇO: INSTALAÇÃO. Pergunte: o aparelho já foi comprado (marca, BTUs, split/janela/cassete)? é parede de alvenaria ou drywall? qual a distância entre a unidade interna e a externa? "
+     "tem ponto elétrico e dreno? Explique que a visita confere o local e fecha o valor; peça foto do local de instalação se a pessoa puder. Convide para visita ou orçamento e proponha dia e horário."),
+    ("limpeza", r"limp|higieniz|sujo|cheiro|mofo|fedor|cheira|pingando sujeira|lavar",
+     "SERVIÇO: LIMPEZA / HIGIENIZAÇÃO. Pergunte: quantos aparelhos e tipo (split, cassete, piso-teto)? quando foi a última limpeza? tem cheiro, pinga ou gela pouco? "
+     "Explique o que muda (ar mais limpo, menos conta de luz, aparelho dura mais) e, se a tabela cadastrada tiver o valor, diga. Se há vários aparelhos, pergunte se quer tudo no mesmo dia. Proponha dia e horário."),
+    ("conserto", r"conserto|consertar|quebr|n[aã]o (?:liga|gela|funciona|resfria)|parou|pingando|vazando|vazamento|gela pouco|barulho|g[aá]s|erro|defeito|c[oó]digo",
+     "SERVIÇO: CONSERTO / DEFEITO. Pergunte: o que o aparelho está fazendo (não liga, não gela, pinga, barulho, código de erro)? marca e modelo, se souber? desde quando? "
+     "NUNCA diagnostique nem prometa causa ou preço: diga que o técnico avalia na visita. Se parou, vaza ou cheira a queimado, é urgência: passe para o humano. Proponha a visita o mais cedo possível."),
+    ("manutencao", r"manuten[çc][aã]o|preventiva|contrato|plano|pmoc|peri[oó]dic|todo m[eê]s|mensal|empresa|condom[ií]nio|cl[ií]nica|escrit[oó]rio|loja",
+     "SERVIÇO: MANUTENÇÃO PREVENTIVA / EMPRESAS. Pergunte: quantos aparelhos no total, em quantos locais? tem plano ou técnico hoje? quem cuida e quem decide? "
+     "Fale do custo menor que o conserto e, SÓ se o dono cadastrou, de PMOC. Proponha uma visita de levantamento para montar a proposta e peça o contato de quem decide."),
+)
+
+
+def _roteiro_do_servico(mensagens: List[Dict[str, Any]]) -> str:
+    """O roteiro do serviço que o cliente pediu (pelo que ELE escreveu); vários se pediu mais de um, nenhum se ainda não deu para saber."""
+    falas = " ".join(str(m.get("texto") or "") for m in mensagens if m.get("de") == "contato").lower()
+    achados = [txt for _id, rx, txt in ROTEIROS_LOCAL if _re.search(rx, falas)]
+    if not achados:
+        return "SERVIÇO AINDA NÃO DEFINIDO: a primeira pergunta é o que a pessoa precisa (instalação, limpeza, conserto ou manutenção?)."
+    return "\n".join(achados[:2])
+
+
+def _contato_chamou_primeiro(mensagens: List[Dict[str, Any]]) -> bool:
+    """Ninguém da equipe (robô ou humano) escreveu antes: a conversa começou pelo cliente."""
+    for m in mensagens:
+        if m.get("de") in ("robo", "humano", "dono", "eu", "voce"):
+            return False
+        if m.get("de") == "contato":
+            return True
+    return False
 
 
 def _modo_local(cfg: Dict[str, Any]) -> bool:
