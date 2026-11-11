@@ -419,6 +419,12 @@ def bloco_do_servico(cfg: Dict[str, Any], lead: Optional[Dict[str, Any]]) -> str
                       "nao": "Não há visita técnica: o orçamento sai por mensagem, com o que a pessoa descrever."}[o["visita"]])
         if o["agenda"]:
             fatos.append(f"Agenda e horários de atendimento: {o['agenda']}")
+        if promocao_do_servico(cfg):
+            pr = normalizar_promocao(cfg.get("promocao"))
+            itens_pr = _itens(pr["inclui"])
+            fatos.append(f"PROMOÇÃO ATIVA: {(pr['servico'] or nome)} por {_brl(pr['preco'])}"
+                         + (f", com {', '.join(itens_pr)}" if itens_pr else "") + (f", válida {pr['validade'].rstrip('.')}" if pr["validade"] else "")
+                         + ". Pode apresentá-la na abordagem; o valor e a validade são só estes.")
         regra_esboco = ("SEM SITE E SEM PRÉVIA: este serviço não envolve site, prévia, esboço nem link. Nunca ofereça nem cite. "
                         "O próximo passo é sempre o orçamento ou a visita técnica.")
     elif o["esboco"] == "gratis":

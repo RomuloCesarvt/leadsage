@@ -188,8 +188,16 @@ conhece estranha e a mensagem perde o sentido. A única pergunta da mensagem é 
 que acabou de receber a mensagem: nada de supor o que ele está vivendo."""
 
 
-def quem_sou(sender_name: str, apresentacao: str = "", lead_id: str = "", n: int = 0) -> str:
-    valor = escolher(VALORES, lead_id, n, "valor", 5)
+VALORES_LOCAL = (
+    "trabalho com instalação, limpeza e manutenção de ar-condicionado",
+    "cuido de ar-condicionado: instalação, limpeza e manutenção",
+    "faço limpeza, manutenção e instalação de ar-condicionado aqui na região",
+)
+
+
+def quem_sou(sender_name: str, apresentacao: str = "", lead_id: str = "", n: int = 0, local: bool = False) -> str:
+    # modo empresa: o que a pessoa faz é o serviço dela, nunca "presença digital, site e Google"
+    valor = escolher(VALORES_LOCAL if local else VALORES, lead_id, n, "valor", 5)
     if (apresentacao or "").strip():
         x = apresentacao.strip()
         pool = INTROS_COM_NOME if not x.lower().startswith("a equipe") else INTROS_COM_NOME[:2]
@@ -213,10 +221,14 @@ ESTILO DESTA MENSAGEM (para ela ser diferente das outras do lote): {estilo}
 
 ESTRUTURA_LOCAL = """COMO ESCREVER A PRIMEIRA MENSAGEM (prosa corrida, em linhas curtas, sem listas)
 1. {saudacao}, <nome da pessoa se estiver no dossiê>! + quem você é em UMA frase curta, neste jeito: "{apresentacao}" (pode ajustar a ordem das palavras).
-2. POR QUE ESCREVEU PARA ELES: em um ambiente como o deles ({ramo}), o ar-condicionado funcionando bem faz diferença (conforto de quem chega e de quem
-   trabalha, conta de luz, aparelho que não para). Fale só do ambiente e do serviço; sem inventar nada sobre os aparelhos deles.
-3. O QUE VOCÊ OFERECE em UMA frase, só com o que está nos fatos do serviço (instalação, limpeza, manutenção). Sem preço, sem prazo, sem promessa que não esteja cadastrada.
-4. {pergunta}
+2. "ENCONTREI SUA EMPRESA": diga com naturalidade que encontrou a empresa dele(a) pelo nome (use o nome do negócio) e que trabalha com o serviço dos fatos acima.
+   Só isso: NÃO diga onde nem como achou (nada de Google, perfil, nota, avaliações ou estrelas).
+3. POR QUE IMPORTA: em UMA frase, a importância do serviço para um ambiente como o dele ({ramo}): conforto de quem chega e de quem trabalha, conta de luz,
+   aparelho que não para, menos conserto. Sem inventar nada sobre os aparelhos dele nem número de mercado.
+4. A OFERTA, em UMA frase, só com o que está nos fatos do serviço: se houver condição especial ou promoção cadastrada, apresente-a (se houver arte anexa, diga
+   que mandou a arte com os detalhes); se não, ofereça o orçamento ou a visita técnica sem compromisso (e diga que é grátis só se estiver nos fatos). Sem prazo nem promessa
+   que não esteja cadastrada.
+5. {pergunta}
 NÃO fale de site, prévia, marketing, Google, nota, avaliações, estrelas, reputação, redes sociais nem mande link: você VENDE UM SERVIÇO (ar-condicionado), não presta consultoria de marketing.
 ESTILO DESTA MENSAGEM (para ela ser diferente das outras do lote): {estilo}
 {voz}
@@ -235,7 +247,7 @@ def _estrutura_local(sender_name: str, agora: Optional[datetime], apresentacao: 
     passadas = [str(x).strip()[:80] for x in (evitar or []) if str(x).strip()][:6]
     base = sum(ord(c) for c in str(lead_id or "")) + int(variacao or 0)
     return ESTRUTURA_LOCAL.format(
-        saudacao=saudacao_do_horario(agora), apresentacao=quem_sou(sender_name, apresentacao, lead_id, variacao), ramo=(nicho or "o seu negócio").lower(),
+        saudacao=saudacao_do_horario(agora), apresentacao=quem_sou(sender_name, apresentacao, lead_id, variacao, local=True), ramo=(nicho or "o seu negócio").lower(),
         pergunta=PERGUNTAS_LOCAL[base % len(PERGUNTAS_LOCAL)], estilo=estilo_da_mensagem(lead_id, variacao, local=True),
         voz=VOZ_HUMANA.format(tamanho=sorteio["tamanho"]),
         evitar=("NÃO comece como estas mensagens já usadas neste lote: " + " | ".join(f'"{p}"' for p in passadas)) if passadas else "",

@@ -48,3 +48,17 @@ def test_prompt_do_robo_empresa_sem_dossie_de_marketing():
     assert "Clínica Sorriso" in prompt
     assert "nota 4.8" not in prompt and "O que falta no digital" not in prompt and "Diagnóstico da busca" not in prompt
     assert "resumo do Google" not in prompt
+
+
+def test_apresentacao_e_roteiro_da_abordagem_local_trazem_o_servico_e_a_oferta():
+    est = abordagem_mestra.estrutura("Ana", previa="nenhuma", lead_id="1", nicho="Dentista")
+    assert "ar-condicionado" in est.split("2.")[0] and "presença digital" not in est and "Google e WhatsApp" not in est
+    assert "ENCONTREI SUA EMPRESA" in est and "A OFERTA" in est
+
+
+def test_promocao_ativa_entra_nos_fatos_do_servico():
+    from app import ai_oferta
+    cfg = {"oferta": {"servico": "ar", "nome": "Limpeza"}, "promocao": {"ativa": True, "preco": "347", "inclui": "Limpeza completa", "servico": "Limpeza de split"}}
+    assert "PROMOÇÃO ATIVA: Limpeza de split por R$ 347" in ai_oferta.bloco_do_servico(cfg, None)
+    cfg["promocao"]["ativa"] = False
+    assert "PROMOÇÃO ATIVA" not in ai_oferta.bloco_do_servico(cfg, None)
