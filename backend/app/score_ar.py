@@ -55,10 +55,10 @@ def pontuar(lead: Dict[str, Any]) -> Tuple[int, List[str]]:
                 citam_defeito += 1
     if citam_defeito:
         pontos += 28
-        motivos.append(f"{citam_defeito} avaliação(ões) falam de ar/calor com defeito")
+        motivos.append("clientes comentam ar/calor com defeito")
     elif citam_calor:
         pontos += 18
-        motivos.append(f"{citam_calor} avaliação(ões) citam calor ou ar-condicionado")
+        motivos.append("clientes comentam calor ou ar-condicionado")
 
     # 2) tipo de negócio
     base = _n(" ".join([str(lead.get("niche") or ""), str(lead.get("role") or ""), str(lead.get("company") or ""), " ".join(lead.get("place_types") or [])]))
@@ -85,10 +85,10 @@ def pontuar(lead: Dict[str, Any]) -> Tuple[int, List[str]]:
     n = int(lead.get("rating_count") or 0)
     if n >= 200:
         pontos += 10
-        motivos.append(f"local movimentado ({n} avaliações)")
+        motivos.append("local movimentado")
     elif n >= 50:
         pontos += 6
-        motivos.append(f"bom movimento ({n} avaliações)")
+        motivos.append("bom movimento")
     elif n >= 10:
         pontos += 3
 

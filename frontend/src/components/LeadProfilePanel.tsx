@@ -4,6 +4,7 @@ import {
   InstagramIcon, WhatsAppIcon, FacebookIcon, LinkedInIcon, TikTokIcon, XIcon, GoogleMapsIcon,
 } from './BrandIcons';
 import { RaioXLead, Secao } from './RaioXLead';
+import { modoAtivoAtual } from '../services/api';
 import {
   X, MapPin, CheckCircle2, Sparkles, Target, Send, Globe, Phone, Mail, Star, Clock, Gauge, Building2,
 } from 'lucide-react';
@@ -64,6 +65,8 @@ export const LeadProfilePanel: React.FC = () => {
   if (!selectedProfileLead) return null;
 
   const lead = selectedProfileLead;
+  // modo empresa vende serviço: nota do Google, avaliações, presença digital e raio-x de marketing não fazem sentido aqui
+  const empresa = modoAtivoAtual() === 'empresa';
   const socials = lead.socials || {};
   const temFoto = typeof lead.avatar === 'string' && lead.avatar.startsWith('/api/place-photo');
   const nota = typeof lead.rating === 'number' ? lead.rating : 0;
@@ -119,7 +122,7 @@ export const LeadProfilePanel: React.FC = () => {
           <div className="p-5 space-y-7">
 
             {/* Indicadores */}
-            <div className="grid grid-cols-3 gap-2">
+            {!empresa && <div className="grid grid-cols-3 gap-2">
               <Indicador icone={<Star className="w-3 h-3" />} rotulo="Google"
                 valor={nota ? `${nota.toFixed(1).replace('.', ',')} · ${lead.rating_count || 0}` : 'sem nota'}
                 tom={nota >= 4.5 ? 'ok' : nota >= 4 ? 'atencao' : nota ? 'ruim' : 'neutro'} />
@@ -129,7 +132,7 @@ export const LeadProfilePanel: React.FC = () => {
               <Indicador icone={<Gauge className="w-3 h-3" />} rotulo="Contato"
                 valor={typeof lead.contactability === 'number' ? `${lead.contactability}%` : '—'}
                 tom={typeof lead.contactability === 'number' ? (lead.contactability >= 60 ? 'ok' : 'atencao') : 'neutro'} />
-            </div>
+            </div>}
 
             {/* Contatos e redes */}
             <div className="space-y-3">
@@ -186,10 +189,10 @@ export const LeadProfilePanel: React.FC = () => {
             </Secao>
 
             {/* Dossiê: empresa, pessoas, dores, abordagem, Google Meu Negócio */}
-            <RaioXLead lead={lead} />
+            {!empresa && <RaioXLead lead={lead} />}
 
             {/* Ganchos verificados */}
-            {!!(lead.hooks || []).length && (
+            {!empresa && !!(lead.hooks || []).length && (
               <Secao icone={<Target className="w-3.5 h-3.5 text-emerald-600" />} titulo="Por onde abrir a conversa">
                 <ul className="space-y-2">
                   {(lead.hooks || []).map((g: string, i: number) => (
@@ -208,7 +211,7 @@ export const LeadProfilePanel: React.FC = () => {
             )}
 
             {/* Presença digital */}
-            {(lead.site_status || lead.site_quality !== undefined) && (
+            {!empresa && (lead.site_status || lead.site_quality !== undefined) && (
               <Secao icone={<Globe className="w-3.5 h-3.5 text-blue-600" />} titulo="Presença digital hoje">
                 <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
                   <p className="text-[13px] text-slate-800">{SITUACAO[lead.site_status] || 'Situação desconhecida'}</p>
@@ -231,7 +234,7 @@ export const LeadProfilePanel: React.FC = () => {
             )}
 
             {/* O que o Google mostra */}
-            {(lead.google_description || lead.price_level || lead.opening_hours_week?.length
+            {!empresa && (lead.google_description || lead.price_level || lead.opening_hours_week?.length
               || lead.open_now !== undefined || lead.place_types?.length) && (
               <Secao icone={<Building2 className="w-3.5 h-3.5 text-amber-600" />} titulo="O que o Google mostra">
                 {lead.google_description && <p className="text-[13px] text-slate-800 leading-relaxed">{lead.google_description}</p>}
@@ -254,7 +257,7 @@ export const LeadProfilePanel: React.FC = () => {
             )}
 
             {/* Avaliações com texto */}
-            {!!(lead.reviews_sample || []).length && (
+            {!empresa && !!(lead.reviews_sample || []).length && (
               <Secao icone={<Sparkles className="w-3.5 h-3.5 text-yellow-600" />} titulo="O que os clientes escreveram">
                 {(lead.reviews_sample || []).map((r: any, i: number) => (
                   <blockquote key={i} className="bg-white border border-slate-200 rounded-xl p-3">
