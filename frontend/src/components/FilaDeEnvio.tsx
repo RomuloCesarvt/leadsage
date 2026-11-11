@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useApp } from '../context/AppContext';
+import { ehEmpresa } from '../lib/modoDaConta';
+import type { PromocaoRobo } from '../types';
 import { WhatsAppIcon, InstagramIcon, LinkedInIcon } from './BrandIcons';
 import { ehSalvo } from '../lib/leadsSalvos';
 import { jaDisparado, ordenarCandidatos } from '../lib/ordemDaFila';
@@ -101,7 +103,12 @@ export const FilaDeEnvio: React.FC = () => {
   const [edicao, setEdicao] = useState<Record<string, { texto: string; assunto: string }>>({});
   const [enviados, setEnviados] = useState(false);
   // criar a prévia do site de cada lead antes de gerar as mensagens (assim a mensagem pode dizer "montei" com verdade)
-  const [criarPrevia, setCriarPrevia] = useState(true);
+  const empresa = ehEmpresa(user);          // empresa não vende site: aqui não se cria site, e sim se usa a promoção ativa (a que tem a arte)
+  const [criarPrevia, setCriarPrevia] = useState(!ehEmpresa(user));
+  const [promo, setPromo] = useState<Partial<PromocaoRobo> | null>(null);
+  const [nomeDoServico, setNomeDoServico] = useState('');
+  const [arteDaPromo, setArteDaPromo] = useState('');
+  const [salvandoPromo, setSalvandoPromo] = useState(false);
   const [cota, setCota] = useState<{ usados: number; cota: number | null; ilimitado: boolean } | null>(null);
   const [previas, setPrevias] = useState({ feitas: 0, total: 0 });
   const [avisoPrevias, setAvisoPrevias] = useState('');
@@ -135,6 +142,29 @@ export const FilaDeEnvio: React.FC = () => {
 
   useEffect(() => { void carregar(); void carregarWhats(); }, [carregar, carregarWhats]);
   useEffect(() => { api.cotaDeSites().then(c => { setCota(c); if (!c.ilimitado && (c.cota || 0) - c.usados <= 0) setCriarPrevia(false); }).catch(() => {}); }, []);
+  // empresa: nunca cria site; carrega a promoção do serviço para mostrar e ligar o envio da arte
+  useEffect(() => {
+    if (!empresa) return;
+    setCriarPrevia(false);
+    api.roboConfig().then(c => { setPromo((c as any).promocao || {}); setNomeDoServico((c as any).oferta?.nome || ''); }).catch(() => setPromo({}));
+  }, [empresa]);
+  const promoPronta = !!promo?.ativa && Number(String(promo?.preco ?? '').replace(/\./g, '').replace(',', '.')) > 0;
+  useEffect(() => {
+    if (!empresa || !promoPronta || !promo) { setArteDaPromo(''); return; }
+    let url = '';
+    let vivo = true;
+    const itens = String(promo.inclui || '').split('\n').map(i => i.trim()).filter(Boolean).slice(0, 4).map(i => i.slice(0, 46)).join('|');
+    api.cardDaPromocao('servico', String(promo.preco), 'Sua Empresa', Number(promo.arte) || 1, { titulo: promo.servico || nomeDoServico || 'Seu serviço', itens })
+      .then(u => { url = u; if (vivo) setArteDaPromo(u); else URL.revokeObjectURL(u); }).catch(() => setArteDaPromo(''));
+    return () => { vivo = false; if (url) URL.revokeObjectURL(url); };
+  }, [empresa, promoPronta, promo?.preco, promo?.arte, promo?.servico, promo?.inclui, nomeDoServico]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const alternarPromo = async (ligar: boolean) => {
+    if (!promo) return;
+    setSalvandoPromo(true);
+    const novo = { ...promo, card_na_abordagem: ligar } as PromocaoRobo;
+    setPromo(novo);
+    try { await api.roboSalvarConfig({ promocao: novo }); } catch { setPromo(promo); setErro('Não foi possível salvar a promoção agora.'); } finally { setSalvandoPromo(false); }
+  };
   // a fila anda sozinha (o Conector envia): a tela acompanha, com a aba à vista
   useEffect(() => sondar(() => { void carregar(); void carregarWhats(); }, 15000), [carregar, carregarWhats]);
   useEffect(() => () => setLeadsParaContato([]), [setLeadsParaContato]);
@@ -607,6 +637,23 @@ export const FilaDeEnvio: React.FC = () => {
                     );
                   })}
                 </ul>
+                {empresa ? (
+                  <div className="mt-4 p-3 rounded-xl border border-orange-100 bg-orange-50/50" data-testid="promocao-ativa-na-fila">
+                    <label className={`flex items-start gap-3 ${promoPronta ? 'cursor-pointer' : 'opacity-70'}`}>
+                      <input type="checkbox" disabled={!promoPronta || salvandoPromo} checked={promoPronta && !!promo?.card_na_abordagem}
+                        onChange={e => void alternarPromo(e.target.checked)} className="w-5 h-5 mt-0.5 accent-orange-600 shrink-0" />
+                      <span className="text-sm">
+                        <b className="text-slate-800">Enviar a promoção ativa (com a arte) junto com a primeira mensagem</b>
+                        <span className="block text-xs text-slate-600 mt-0.5 leading-relaxed">
+                          {promoPronta
+                            ? `${promo?.servico || nomeDoServico || 'O serviço'} por R$ ${String(promo?.preco)}: o cliente recebe a mensagem escrita pela IA com a arte da promoção, e depois o robô não repete a oferta.`
+                            : 'Você ainda não tem uma promoção ativa. Ligue e preencha em Robô → Promoção do serviço; a arte é montada ali.'}
+                        </span>
+                      </span>
+                    </label>
+                    {promoPronta && arteDaPromo && <img src={arteDaPromo} alt="Arte da promoção ativa" className="mt-3 w-40 rounded-lg border border-slate-200 shadow-sm" />}
+                  </div>
+                ) : (
                 <label className="mt-4 flex items-start gap-3 p-3 rounded-xl border border-blue-100 bg-blue-50/50 cursor-pointer">
                   <input type="checkbox" checked={criarPrevia} onChange={e => setCriarPrevia(e.target.checked)} className="w-5 h-5 mt-0.5 accent-blue-600 shrink-0" />
                   <span className="text-sm">
@@ -619,6 +666,7 @@ export const FilaDeEnvio: React.FC = () => {
                     </span>
                   </span>
                 </label>
+                )}
                 <button onClick={gerar} disabled={preparando || marcados.size === 0}
                   className="mt-4 w-full sm:w-auto px-5 py-3 md:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-sm flex items-center justify-center gap-2">
                   {preparando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
