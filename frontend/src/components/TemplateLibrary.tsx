@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Plus, Trash2, Pencil, Clock, LayoutTemplate, Wand2, Sparkles, Info } from 'lucide-react';
 import { api } from '../services/api';
 import { TemplateEditor } from './TemplateEditor';
+import { CartaoDaMarca } from './CartaoDaMarca';
 import { DocumentBriefingModal } from './DocumentBriefingModal';
 import type { Template } from '../templates';
 import type { DocumentItem, DocumentAIResponse } from '../types';
@@ -80,15 +81,17 @@ export const TemplateLibrary: React.FC<Props> = ({ kind, titulo, subtitulo, temp
   return (
     <div className="flex-1 flex flex-col h-full">
 
-      <div className="mb-6">
+      <div className="mb-4 md:mb-6">
         <h1 className="text-2xl font-bold tracking-tight text-slate-800">{titulo}</h1>
         <p className="text-slate-500 text-sm mt-1">{subtitulo}</p>
       </div>
 
-      <div className="flex gap-1 mb-6 border-b border-slate-200">
+      <CartaoDaMarca />
+
+      <div className="flex gap-1 mb-4 md:mb-6 border-b border-slate-200">
         <button
           onClick={() => setAba('modelos')}
-          className={`px-4 py-2.5 text-sm font-bold transition-colors border-b-2 flex items-center gap-2 ${
+          className={`flex-1 md:flex-none justify-center min-h-12 px-4 text-sm font-bold transition-colors border-b-2 flex items-center gap-2 ${
             aba === 'modelos'
               ? 'text-blue-600 border-blue-600'
               : 'text-slate-500 border-transparent hover:text-slate-700'
@@ -98,13 +101,13 @@ export const TemplateLibrary: React.FC<Props> = ({ kind, titulo, subtitulo, temp
         </button>
         <button
           onClick={() => setAba('meus')}
-          className={`px-4 py-2.5 text-sm font-bold transition-colors border-b-2 flex items-center gap-2 ${
+          className={`flex-1 md:flex-none justify-center min-h-12 px-4 text-sm font-bold transition-colors border-b-2 flex items-center gap-2 ${
             aba === 'meus'
               ? 'text-blue-600 border-blue-600'
               : 'text-slate-500 border-transparent hover:text-slate-700'
           }`}
         >
-          <FileText className="w-4 h-4" /> Meus documentos ({carregando ? '—' : documentos.length})
+          <FileText className="w-4 h-4" /> Meus<span className="hidden sm:inline">&nbsp;documentos</span> ({carregando ? '—' : documentos.length})
         </button>
       </div>
 
@@ -116,7 +119,7 @@ export const TemplateLibrary: React.FC<Props> = ({ kind, titulo, subtitulo, temp
             abaixo continuam para quem prefere preencher colchetes. */}
         <button
           onClick={() => setBriefing(true)}
-          className="w-full text-left bg-gradient-to-r from-indigo-600 to-blue-600 rounded-2xl p-5 shadow-sm hover:shadow-lg transition-all flex items-center gap-4"
+          className="w-full text-left bg-gradient-to-r from-indigo-600 to-blue-600 rounded-2xl p-4 md:p-5 shadow-sm hover:shadow-lg transition-all flex items-center gap-4"
         >
           <div className="w-12 h-12 rounded-xl bg-white/15 border border-white/25 flex items-center justify-center shrink-0">
             <Wand2 className="w-6 h-6 text-white" />
@@ -138,7 +141,7 @@ export const TemplateLibrary: React.FC<Props> = ({ kind, titulo, subtitulo, temp
           {templates.map(t => (
             <div
               key={t.id}
-              className="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:border-blue-300 hover:shadow-md transition-all flex flex-col"
+              className="group bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-sm hover:border-blue-300 hover:shadow-md transition-all flex flex-col"
             >
               <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center mb-4">
                 <LayoutTemplate className="w-5 h-5 text-blue-600" />
@@ -147,7 +150,7 @@ export const TemplateLibrary: React.FC<Props> = ({ kind, titulo, subtitulo, temp
               <p className="text-sm text-slate-500 flex-1 mb-4">{t.desc}</p>
               <button
                 onClick={() => setEditandoTemplate(t)}
-                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
+                className="w-full min-h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
               >
                 <Plus className="w-4 h-4" /> Usar este modelo
               </button>
@@ -166,7 +169,7 @@ export const TemplateLibrary: React.FC<Props> = ({ kind, titulo, subtitulo, temp
           ))}
         </div>
       ) : documentos.length === 0 ? (
-        <div className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-12 text-center shadow-sm">
+        <div className="flex-1 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-6 md:p-12 text-center shadow-sm">
           <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-6">
             <FileText className="w-8 h-8 text-slate-400" />
           </div>
@@ -186,7 +189,7 @@ export const TemplateLibrary: React.FC<Props> = ({ kind, titulo, subtitulo, temp
           {documentos.map(doc => (
             <div
               key={doc.id}
-              className="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:border-blue-300 transition-colors flex flex-col"
+              className="group bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-sm hover:border-blue-300 transition-colors flex flex-col"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
@@ -196,7 +199,7 @@ export const TemplateLibrary: React.FC<Props> = ({ kind, titulo, subtitulo, temp
                   onClick={() => excluir(doc.id)}
                   disabled={excluindo === doc.id}
                   title="Excluir documento"
-                  className="p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+                  className="w-11 h-11 -mt-2 -mr-2 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -209,7 +212,7 @@ export const TemplateLibrary: React.FC<Props> = ({ kind, titulo, subtitulo, temp
 
               <button
                 onClick={() => abrirDocumento(doc.id)}
-                className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold flex items-center justify-center gap-2 transition-colors"
+                className="w-full min-h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold flex items-center justify-center gap-2 transition-colors"
               >
                 <Pencil className="w-4 h-4" /> Abrir e editar
               </button>

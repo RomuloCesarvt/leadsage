@@ -19,6 +19,7 @@ import { direcaoDeArte } from '../templates/sites/direcao-de-arte';
 import { dadosDoLead, escolherTemplate, montarPrevia } from '../templates/sites/previa';
 import { aplicarCopia } from '../templates/sites/variedade';
 import { ConteudoDoSite } from './ConteudoDoSite';
+import { useCelular } from '../lib/useCelular';
 import type { DestinoFoto, FotoBanco } from './BancoImagens';
 
 /**
@@ -100,6 +101,9 @@ export const SiteBuilder: React.FC = () => {
   const [template, setTemplate] = useState<SiteTemplate | null>(null);
   const [dados, setDados] = useState<SiteData>(dadosIniciais(null));
   const [dispositivo, setDispositivo] = useState<'desktop' | 'mobile'>('desktop');
+  const celular = useCelular();
+  // no celular, editar e ver a prévia são duas telas (lado a lado não cabe)
+  const [painel, setPainel] = useState<'editar' | 'previa'>('editar');
   const [verCodigo, setVerCodigo] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
@@ -399,7 +403,7 @@ export const SiteBuilder: React.FC = () => {
         </div>
 
         {(leads || []).length > 0 && (
-          <div className="mb-6 bg-white border border-slate-200 rounded-2xl p-5">
+          <div className="mb-4 md:mb-6 bg-white border border-slate-200 rounded-2xl p-4 md:p-5">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
               Começar a partir de um lead <span className="normal-case font-medium text-slate-400">(opcional)</span>
             </label>
@@ -412,7 +416,7 @@ export const SiteBuilder: React.FC = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-5">
           {/* os layouts antigos seguem abrindo sites já salvos, mas não são mais oferecidos para criar */}
           {SITE_TEMPLATES.filter(t => !LAYOUTS_ANTIGOS.has(t.id)).map(t => (
             <button
@@ -431,10 +435,10 @@ export const SiteBuilder: React.FC = () => {
                   }}
                 />
               )}
-              <div className="p-4">
-                <h3 className="font-bold text-slate-800 mb-1">{t.nome}</h3>
-                <p className="text-xs text-slate-500 leading-relaxed mb-3">{t.descricao}</p>
-                <div className="flex flex-wrap gap-1">
+              <div className="p-3 md:p-4">
+                <h3 className="font-bold text-slate-800 mb-1 text-sm md:text-base">{t.nome}</h3>
+                <p className="text-xs text-slate-500 leading-relaxed mb-3 line-clamp-2 md:line-clamp-none">{t.descricao}</p>
+                <div className="hidden md:flex flex-wrap gap-1">
                   {t.nichos.slice(0, 3).map(n => (
                     <span key={n} className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[10px] font-semibold">
                       {n}
@@ -480,18 +484,18 @@ export const SiteBuilder: React.FC = () => {
   );
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100dvh-140px)]">
+    <div className="flex-1 flex flex-col h-[calc(100dvh-12.5rem)] md:h-[calc(100dvh-140px)]">
 
-      <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+      <div className="flex items-center justify-between gap-2 md:gap-4 mb-3 md:mb-4 flex-wrap">
         <button
           onClick={() => setTemplate(null)}
-          className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-slate-800"
+          className="min-h-11 flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-slate-800"
         >
           <ArrowLeft className="w-4 h-4" /> Trocar layout ({template.nome})
         </button>
 
-        <div className="flex items-center gap-2">
-          <div className="flex bg-slate-100 rounded-xl p-1">
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="hidden md:flex bg-slate-100 rounded-xl p-1">
             <button
               onClick={() => setDispositivo('desktop')}
               title="Computador"
@@ -507,16 +511,16 @@ export const SiteBuilder: React.FC = () => {
               <Smartphone className="w-4 h-4" />
             </button>
           </div>
-          <button onClick={() => setVerCodigo(true)} className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold flex items-center gap-1.5">
+          <button onClick={() => setVerCodigo(true)} className="hidden md:flex px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold flex items-center gap-1.5">
             <Code className="w-4 h-4" /> Código
           </button>
-          <button onClick={baixar} className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold flex items-center gap-1.5">
+          <button onClick={baixar} aria-label="Baixar" className="min-h-12 md:min-h-0 px-4 md:px-3 md:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold flex items-center justify-center gap-1.5">
             <Download className="w-4 h-4" /> Baixar
           </button>
           <button
             onClick={publicar}
             disabled={salvando}
-            className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-bold flex items-center gap-2"
+            className="flex-1 md:flex-none justify-center min-h-12 md:min-h-0 px-5 md:py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-bold flex items-center gap-2"
           >
             {salvando ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
             {siteId ? 'Salvar alterações' : 'Publicar'}
@@ -530,9 +534,18 @@ export const SiteBuilder: React.FC = () => {
         </div>
       )}
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 overflow-hidden">
+      {celular && (
+        <div role="tablist" className="grid grid-cols-2 gap-1 p-1 mb-3 bg-slate-100 rounded-2xl">
+          {(['editar', 'previa'] as const).map(p => (
+            <button key={p} role="tab" aria-selected={painel === p} onClick={() => setPainel(p)}
+              className={`min-h-11 rounded-xl text-sm font-bold ${painel === p ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>{p === 'editar' ? 'Editar' : 'Ver o site'}</button>
+          ))}
+        </div>
+      )}
 
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-y-auto p-5 space-y-5">
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 grid-rows-[minmax(0,1fr)] gap-4 overflow-hidden">
+
+        <div className={`bg-white border border-slate-200 rounded-2xl overflow-y-auto p-4 md:p-5 space-y-5 ${celular && painel === 'previa' ? 'hidden' : ''}`}>
           <button
             onClick={gerarTextos}
             disabled={gerandoTextos}
@@ -856,7 +869,7 @@ export const SiteBuilder: React.FC = () => {
           </div>
         </div>
 
-        <div className="lg:col-span-2 bg-slate-100 border border-slate-200 rounded-2xl overflow-hidden flex items-center justify-center p-4">
+        <div className={`lg:col-span-2 bg-slate-100 border border-slate-200 rounded-2xl overflow-hidden flex items-center justify-center p-0 md:p-4 ${celular && painel === 'editar' ? 'hidden' : ''}`}>
           <iframe
             title="Prévia do site"
             ref={previa}
@@ -865,7 +878,7 @@ export const SiteBuilder: React.FC = () => {
             // isolado e só conversa por mensagem. Juntar os dois anularia o sandbox.
             sandbox="allow-scripts"
             className={`bg-white shadow-lg transition-all ${
-              dispositivo === 'mobile'
+              dispositivo === 'mobile' && !celular
                 ? 'w-[390px] h-full rounded-[28px] border-[10px] border-slate-800'
                 : 'w-full h-full rounded-lg border border-slate-300'
             }`}

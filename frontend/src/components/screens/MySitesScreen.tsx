@@ -99,21 +99,21 @@ export const MySitesScreen: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col h-full relative">
 
-      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="mb-4 md:mb-6 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-800">Meus Sites</h1>
           <p className="text-slate-500 text-sm mt-1">Gerencie, edite e publique seus sites.</p>
         </div>
         <button
           onClick={() => setViewState('create-site')}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm transition-colors w-fit"
+          className="bg-blue-600 hover:bg-blue-700 text-white min-h-12 px-5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors w-full md:w-fit"
         >
           <Plus className="w-4 h-4" />
           Criar novo site
         </button>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-4 md:mb-6">
         <span className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 font-medium">
           <Globe className="w-4 h-4 text-slate-400" />
           Sites criados{' '}
@@ -138,7 +138,7 @@ export const MySitesScreen: React.FC = () => {
           ))}
         </div>
       ) : sites.length === 0 ? (
-        <div className="flex-1 bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col items-center justify-center p-12 text-center shadow-sm">
+        <div className="flex-1 bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col items-center justify-center p-6 md:p-12 text-center shadow-sm">
           <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-6">
             <Globe className="w-8 h-8 text-slate-400" />
           </div>
@@ -148,7 +148,7 @@ export const MySitesScreen: React.FC = () => {
           </p>
           <button
             onClick={() => setViewState('create-site')}
-            className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm transition-colors flex items-center gap-2"
+            className="min-h-12 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm transition-colors flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
             Criar meu primeiro site
@@ -159,7 +159,7 @@ export const MySitesScreen: React.FC = () => {
           {sites.map(site => (
             <div
               key={site.id}
-              className="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:border-blue-300 transition-colors flex flex-col gap-4"
+              className="group bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-sm hover:border-blue-300 transition-colors flex flex-col gap-3 md:gap-4"
             >
               <div className="flex items-start justify-between">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
@@ -169,7 +169,7 @@ export const MySitesScreen: React.FC = () => {
                   onClick={() => handleDelete(site.id)}
                   disabled={deletingId === site.id}
                   title="Excluir site"
-                  className="p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+                  className="w-11 h-11 -mt-2 -mr-2 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -197,14 +197,14 @@ export const MySitesScreen: React.FC = () => {
                 <button
                   onClick={() => handleEdit(site.id)}
                   disabled={editandoId === site.id}
-                  className="flex-1 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-bold flex items-center justify-center gap-1.5 transition-colors"
+                  className="flex-1 min-h-11 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-bold flex items-center justify-center gap-1.5 transition-colors"
                 >
                   <Pencil className="w-4 h-4" /> {editandoId === site.id ? 'Abrindo...' : 'Editar'}
                 </button>
                 <button
                   onClick={() => handleOpen(site.id)}
                   title="Ver o site"
-                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                  className="w-11 min-h-11 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
                 >
                   <Eye className="w-4 h-4" />
                 </button>
@@ -212,7 +212,7 @@ export const MySitesScreen: React.FC = () => {
                   onClick={() => copiarLink(site)}
                   disabled={!site.slug}
                   title={site.slug ? 'Copiar o link para mandar ao cliente' : 'Sem link ainda'}
-                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors disabled:opacity-40"
+                  className="w-11 min-h-11 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors disabled:opacity-40"
                 >
                   {copiadoId === site.id
                     ? <Check className="w-4 h-4 text-emerald-600" />
@@ -221,7 +221,7 @@ export const MySitesScreen: React.FC = () => {
                 <button
                   onClick={() => handleDownload(site)}
                   title="Baixar .html"
-                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                  className="w-11 min-h-11 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
                 >
                   <Download className="w-4 h-4" />
                 </button>
@@ -232,13 +232,13 @@ export const MySitesScreen: React.FC = () => {
       )}
 
       {preview && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-6">
-          <div className="bg-white rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center md:p-6">
+          <div className="bg-white md:rounded-2xl w-full max-w-5xl h-full md:h-[85vh] flex flex-col overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between gap-3 px-4 md:px-6 py-2 md:py-4 border-b border-slate-100" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}>
               <h3 className="font-bold text-slate-800">{preview.company}</h3>
               <button
                 onClick={() => setPreview(null)}
-                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"
+                aria-label="Fechar" className="w-11 h-11 -mr-2 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400"
               >
                 <X className="w-5 h-5" />
               </button>

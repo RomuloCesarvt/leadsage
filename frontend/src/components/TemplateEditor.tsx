@@ -9,6 +9,8 @@ import type { MarcaDocumento } from '../templates/docs/base';
 import { BancoImagens, buscarFotos } from './BancoImagens';
 import type { FotoBanco } from './BancoImagens';
 import type { DocumentItem } from '../types';
+import { useCelular } from '../lib/useCelular';
+import { prepararImagem } from '../lib/imagem';
 
 const LIMITE_LOGO = 200 * 1024;
 
@@ -50,7 +52,8 @@ export const TemplateEditor: React.FC<Props> = ({
   const [titulo, setTitulo] = useState(documento?.title || template?.title || '');
   const [conteudo, setConteudo] = useState(conteudoBase);
   const [valores, setValores] = useState<Record<string, string>>(documento?.fields || {});
-  const [aba, setAba] = useState<'campos' | 'texto' | 'marca'>('campos');
+  const celular = useCelular();
+  const [aba, setAba] = useState<'campos' | 'texto' | 'marca' | 'previa'>('campos');
   // Novos documentos abrem no tema premium do tipo; os salvos mantêm o seu.
   const [temaId, setTemaId] = useState(
     documento?.fields?.__tema || (kind === 'contrato' ? 'juridico' : 'executivo')
@@ -188,23 +191,21 @@ export const TemplateEditor: React.FC<Props> = ({
     }
   };
 
-  const enviarLogo = (arquivo: File) => {
-    if (arquivo.size > LIMITE_LOGO) {
-      setErro('A logo precisa ter no máximo 200 KB.');
-      return;
+  const enviarLogo = async (arquivo: File) => {
+    try {
+      salvarMarca({ logo: await prepararImagem(arquivo, { larguraMaxima: 600, tetoBytes: LIMITE_LOGO }) });
+    } catch (e: any) {
+      setErro(e?.message || 'Não foi possível usar esta imagem.');
     }
-    const leitor = new FileReader();
-    leitor.onload = () => salvarMarca({ logo: String(leitor.result) });
-    leitor.readAsDataURL(arquivo);
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center md:p-4">
+      <div className="bg-white md:rounded-2xl w-full max-w-6xl h-full md:h-[90vh] flex flex-col overflow-hidden shadow-2xl">
 
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-4">
+        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-200 flex items-center justify-between gap-3" style={{ paddingTop: celular ? 'max(0.75rem, env(safe-area-inset-top))' : undefined }}>
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+            <div className="hidden sm:flex w-10 h-10 rounded-xl bg-blue-50 items-center justify-center shrink-0">
               <FileText className="w-5 h-5 text-blue-600" />
             </div>
             <input
@@ -214,21 +215,21 @@ export const TemplateEditor: React.FC<Props> = ({
               className="flex-1 min-w-0 text-lg font-bold text-slate-800 bg-transparent border-0 border-b border-transparent hover:border-slate-200 focus:border-blue-500 focus:outline-none py-1"
             />
           </div>
-          <button onClick={onFechar} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 shrink-0">
+          <button onClick={onFechar} aria-label="Fechar" className="w-11 h-11 -mr-2 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 shrink-0">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-5 overflow-hidden">
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-5 grid-rows-[minmax(0,1fr)] overflow-hidden">
 
           {/* Formulário */}
-          <div className="lg:col-span-2 border-r border-slate-200 flex flex-col overflow-hidden">
+          <div className={`lg:col-span-2 border-r border-slate-200 flex-col min-h-0 overflow-hidden ${celular && aba === 'previa' ? 'hidden' : 'flex'}`}>
             <div className="flex border-b border-slate-200">
-              {(['campos', 'texto', 'marca'] as const).map(t => (
+              {((celular ? ['campos', 'texto', 'marca', 'previa'] : ['campos', 'texto', 'marca']) as ('campos' | 'texto' | 'marca' | 'previa')[]).map(t => (
                 <button
                   key={t}
                   onClick={() => setAba(t)}
-                  className={`flex-1 px-3 py-3 text-sm font-bold transition-colors ${
+                  className={`flex-1 min-h-12 px-2 text-sm font-bold transition-colors ${
                     aba === t
                       ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/40'
                       : 'text-slate-500 hover:bg-slate-50'
@@ -236,7 +237,7 @@ export const TemplateEditor: React.FC<Props> = ({
                 >
                   {t === 'campos'
                     ? `Campos${faltando ? ` (${faltando})` : ''}`
-                    : t === 'texto' ? 'Texto' : 'Layout'}
+                    : t === 'texto' ? 'Texto' : t === 'marca' ? 'Layout' : 'Prévia'}
                 </button>
               ))}
             </div>
@@ -266,7 +267,7 @@ export const TemplateEditor: React.FC<Props> = ({
                         value={valores[campo] || ''}
                         onChange={e => setValores(v => ({ ...v, [campo]: e.target.value }))}
                         placeholder={campo}
-                        className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        className={`w-full min-h-12 px-3 py-2 border rounded-xl text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                           valores[campo]?.trim()
                             ? 'bg-white border-slate-200'
                             : 'bg-amber-50/50 border-amber-200'
@@ -428,30 +429,30 @@ export const TemplateEditor: React.FC<Props> = ({
           </div>
 
           {/* Pré-visualização */}
-          <div className="lg:col-span-3 flex flex-col overflow-hidden bg-slate-50">
-            <div className="px-5 py-3 border-b border-slate-200 bg-white flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+          <div className={`lg:col-span-3 flex-col min-h-0 overflow-hidden bg-slate-50 ${celular && aba !== 'previa' ? 'hidden' : 'flex'}`}>
+            <div className="px-3 md:px-5 py-2 md:py-3 border-b border-slate-200 bg-white flex items-center justify-between gap-2">
+              <span className="hidden sm:block text-xs font-bold text-slate-500 uppercase tracking-widest">
                 Pré-visualização
               </span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleCopiar}
                   title="Copiar o texto"
-                  className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5"
+                  className="min-h-11 md:min-h-0 px-3 md:py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5"
                 >
                   {copiado ? <><Check className="w-3.5 h-3.5" /> Copiado</> : <><Copy className="w-3.5 h-3.5" /> Copiar</>}
                 </button>
                 <button
                   onClick={handleBaixar}
                   title="Baixar o documento formatado"
-                  className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5"
+                  className="min-h-11 md:min-h-0 px-3 md:py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5"
                 >
                   <Download className="w-3.5 h-3.5" /> Baixar
                 </button>
                 <button
                   onClick={handleImprimir}
                   title="Imprimir ou salvar em PDF"
-                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5"
+                  className="min-h-11 md:min-h-0 px-3 md:py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5"
                 >
                   <Printer className="w-3.5 h-3.5" /> PDF
                 </button>
@@ -469,25 +470,25 @@ export const TemplateEditor: React.FC<Props> = ({
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between gap-4">
+        <div className="px-4 md:px-6 py-3 md:py-4 border-t border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4" style={{ paddingBottom: celular ? 'max(0.75rem, env(safe-area-inset-bottom))' : undefined }}>
           <div className="text-xs text-slate-500">
             {faltando > 0
               ? `${faltando} campo${faltando > 1 ? 's' : ''} ainda em branco — aparecem entre colchetes no texto.`
               : campos.length > 0 ? 'Todos os campos preenchidos.' : ''}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {erro && (
               <span className="text-sm font-semibold text-red-600 flex items-center gap-1.5">
                 <AlertCircle className="w-4 h-4" /> {erro}
               </span>
             )}
-            <button onClick={onFechar} className="px-4 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-700">
+            <button onClick={onFechar} className="hidden md:block px-4 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-700">
               Cancelar
             </button>
             <button
               onClick={handleSalvar}
               disabled={salvando}
-              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl text-sm flex items-center gap-2 transition-colors"
+              className="flex-1 md:flex-none justify-center min-h-12 px-6 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl text-sm flex items-center gap-2 transition-colors"
             >
               {salvando ? (
                 <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Salvando...</>
