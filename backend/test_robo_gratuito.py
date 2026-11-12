@@ -63,3 +63,25 @@ def test_pausa_por_voce_ter_escrito_vale_so_por_um_tempo():
 def test_sem_pausa_ou_sem_data_nao_trava_o_robo():
     assert robo_service._pausa_humana_vigente({"mensagens": []}) is False
     assert robo_service._pausa_humana_vigente({"pausa_humana": True, "mensagens": [{"de": "voce", "em": "lixo"}]}) is False
+
+
+class _P:
+    company_name = "Vizar Peças"
+
+
+def _conv(texto, robo=0):
+    return {"mensagens": [{"de": "robo", "texto": "x"}] * robo + [{"de": "contato", "texto": texto}]}
+
+
+def test_cumprimento_simples_tem_resposta_mesmo_com_a_ia_fora():
+    for t in ("Boa tarde! Tudo bem?", "Bom dia", "Oi", "oii tudo bem?", "Olá!", "Tudo bem?"):
+        d = robo_service._decisao_de_reserva(_conv(t), _P())
+        assert d and d.usou_ia is False and d.mensagens and "Como posso te ajudar" in d.mensagens[0], t
+    assert robo_service._decisao_de_reserva(_conv("Boa tarde! Tudo bem?"), _P()).mensagens[0].startswith("Boa tarde!")
+    assert "Vizar Peças" in robo_service._decisao_de_reserva(_conv("oi"), _P()).mensagens[0]
+
+
+def test_pergunta_de_verdade_espera_a_ia_e_conversa_em_andamento_tambem():
+    assert robo_service._decisao_de_reserva(_conv("Vocês instalam split de 12 mil BTU? Quanto custa?"), _P()) is None
+    assert robo_service._decisao_de_reserva(_conv("oi", robo=2), _P()) is None
+    assert robo_service._decisao_de_reserva({"mensagens": []}, _P()) is None

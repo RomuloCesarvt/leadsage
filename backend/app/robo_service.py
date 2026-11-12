@@ -16,6 +16,7 @@ que robo nenhum.
 import asyncio
 import os
 import re
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Dict, Optional
 
@@ -439,6 +440,25 @@ async def _incluir_abordagem(uid: str, conversa: Dict[str, Any], lead: Optional[
 _TRAVAS: Dict[str, asyncio.Lock] = {}
 
 
+_CUMPRIMENTO = re.compile(r"^(oi+e?|ola+|opa|eae|e ai|hey|hello|hi|bom dia|boa tarde|boa noite)( (tudo bem|td bem|tudo bom|como vai|tudo certo))?$|^(tudo bem|td bem|tudo bom|como vai|tudo certo)$")
+
+
+def _decisao_de_reserva(conversa: Dict[str, Any], perfil) -> Optional[Decisao]:
+    """Resposta SEM IA para quem só cumprimenta, usada quando a IA está indisponível. Qualquer outra coisa espera a IA voltar (o Conector tenta de novo)."""
+    ultima = next((m for m in reversed(conversa.get("mensagens") or []) if m.get("de") == "contato"), None)
+    if not ultima:
+        return None
+    texto = re.sub(r"\s+", " ", re.sub(r"[^a-z ]+", " ", unicodedata.normalize("NFKD", str(ultima.get("texto") or "").lower()).encode("ascii", "ignore").decode())).strip()
+    if not texto or len(texto) > 40 or not _CUMPRIMENTO.match(texto):
+        return None
+    if sum(1 for m in conversa.get("mensagens") or [] if m.get("de") == "robo") >= 2:
+        return None                                       # já houve conversa: cumprimento no meio dela precisa de IA de verdade
+    saudacao = {"bom dia": "Bom dia", "boa tarde": "Boa tarde", "boa noite": "Boa noite"}.get(next((k for k in ("bom dia", "boa tarde", "boa noite") if texto.startswith(k)), ""), "Olá")
+    empresa = str(getattr(perfil, "company_name", "") or "").strip()
+    texto_resp = f"{saudacao}! Tudo bem sim, obrigado por chamar" + (f" a {empresa}" if empresa else "") + ". Como posso te ajudar?"
+    return Decisao(resposta=texto_resp, mensagens=[texto_resp], usou_ia=False)
+
+
 async def processar(
     cfg: Dict[str, Any],
     msg: meta_canais.Recebida,
@@ -601,8 +621,10 @@ async def _processar(
     await _carregar_especialista(lead)
     from app import ia_gate
     ia_gate.PRIORIDADE.set("alta")      # responder quem escreveu vem antes de gerar lote: a conversa não espera na fila da IA
+    decisao: Optional[Decisao] = None
+    motivo_falha = ""
     try:
-        decisao: Decisao = await asyncio.wait_for(
+        decisao = await asyncio.wait_for(
             asyncio.to_thread(
                 decidir, conversa["mensagens"], msg.canal,
                 perfil.model_dump(), cfg, lead, gerador, raio, conversa.get("sdr"),
@@ -610,12 +632,18 @@ async def _processar(
             timeout=PRAZO_IA,
         )
     except asyncio.TimeoutError:
-        _falha_da_ia(conversa, "a IA demorou demais para responder")
-        return await salvar()
+        motivo_falha = "a IA demorou demais para responder"
     except Exception as exc:
-        _falha_da_ia(conversa, f"a IA não respondeu ({type(exc).__name__})")
-        return await salvar()
-    conversa["falhas_ia"] = 0
+        motivo_falha = f"a IA não respondeu ({type(exc).__name__})"
+    if decisao is None:
+        # todos os motores de IA fora (limite diário, sem saldo): um cumprimento simples ("bom dia", "tudo bem?") não pode ficar sem resposta
+        decisao = _decisao_de_reserva(conversa, perfil)
+        if decisao is None:
+            _falha_da_ia(conversa, motivo_falha)
+            return await salvar()
+        print(f"Robô: IA indisponível ({motivo_falha}); respondeu o cumprimento com a mensagem de reserva.")
+    else:
+        conversa["falhas_ia"] = 0
 
     # Do outro lado tem um robo (atendimento automatico): nao responde. A terceira seguida tira o
     # contato da lista do robo, para nao ficar gastando IA e parecendo spam para outro robo.
