@@ -33,11 +33,18 @@ export const PipelineCelular: React.FC<Props> = ({ leads, etapas, etapaDe, filtr
   const [quantos, setQuantos] = React.useState(POR_PAGINA);
   const [atualizando, setAtualizando] = React.useState(false);
   React.useEffect(() => { setQuantos(POR_PAGINA); }, [etapa, filtroTag]);
+  const barra = React.useRef<HTMLDivElement>(null);
+  // centra a aba escolhida dentro da própria barra (scrollIntoView rolaria a página inteira para o lado)
+  React.useEffect(() => {
+    const b = barra.current;
+    const a = b?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (b && a) b.scrollTo({ left: Math.max(0, a.offsetLeft - (b.clientWidth - a.offsetWidth) / 2), behavior: 'smooth' });
+  }, [etapa]);
   const lista = daEtapa(etapa);
   const cor = etapas.find(e => e.key === etapa)?.color || 'bg-blue-600';
 
   return (
-    <div className="pb-2" data-testid="pipeline-celular">
+    <div className="pb-2 overflow-x-clip" data-testid="pipeline-celular">
       <div className="flex items-center justify-between gap-3 mb-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Pipeline</h1>
@@ -53,13 +60,12 @@ export const PipelineCelular: React.FC<Props> = ({ leads, etapas, etapaDe, filtr
       <FaixaDeTags leads={leads} filtro={filtroTag} aoFiltrar={aoFiltrar} />
 
       <div className="sticky top-[3.75rem] z-10 -mx-4 py-2 bg-slate-50/95 backdrop-blur border-b border-slate-200">
-        <div className="flex gap-2 overflow-x-auto snap-x scroll-px-4 -mx-4 px-4 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Etapas do pipeline">
+        <div ref={barra} className="relative flex gap-2 overflow-x-auto snap-x scroll-px-4 -mx-4 px-4 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Etapas do pipeline">
           {etapas.map(e => {
             const n = daEtapa(e.key).length;
             const ativo = e.key === etapa;
             return (
               <button key={e.key} type="button" role="tab" aria-selected={ativo} onClick={() => setEtapa(e.key)}
-                ref={el => { if (ativo && el) el.scrollIntoView({ inline: 'center', block: 'nearest' }); }}
                 className={`snap-start shrink-0 min-h-11 px-4 rounded-full text-sm font-bold flex items-center gap-2 border transition-colors ${ativo ? `${e.color} text-white border-transparent` : 'bg-white text-slate-700 border-slate-200 active:bg-slate-100'}`}>
                 {e.key}
                 <span className={`min-w-6 h-6 px-1.5 rounded-full text-xs flex items-center justify-center ${ativo ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600'}`}>{n}</span>
