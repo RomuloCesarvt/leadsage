@@ -434,12 +434,20 @@ def montar_prompt(
   se passarem). Isto vale também para "indicou outro responsável": se ele ou ela aceita receber algo, mande o material junto.
 """
     local = _modo_local(cfg)
+    # Cada resposta do robô gasta o limite diário GRATUITO das IAs: o pedido completo tem ~6 mil tokens. Cumprimento, pergunta simples e primeira troca
+    # não precisam do manual inteiro (método, objeções, persuasão, reunião): ele entra quando a conversa pede (2+ falas do cliente, fala longa, preço ou objeção).
+    _ult = ultima_do_cliente(mensagens) or ""
+    _n_cliente = sum(1 for m in mensagens if m.get("de") == "contato")
+    precisa_fundo = bool(_n_cliente >= 2 or len(_ult) > 90 or _LEAD_FALOU_DE_VALOR.search(_ult) or _SINAL_DE_OBJECAO.search(_ult)
+                         or (sdr or {}).get("objecoes"))
     regra_orcamento = ('"orcamento": quando o cliente disse o que precisa e TODOS os serviços estão na tabela de preços, liste [{"item": "nome EXATO da linha da tabela", "qtd": 1}]. '
                        'O SISTEMA soma e envia o orçamento com o total: não calcule nem escreva o total na sua mensagem. Se algo não está na tabela ou faltam dados, deixe [] e pergunte.\n') if local else ""
     bloco_previa = "" if local else f"== A PRÉVIA DO SITE DESTE NEGÓCIO ==\n{_bloco_da_previa(lead)}\n\n{REGRA_DA_PREVIA}\n\n"
     bloco_sites = "" if local else f"== SITES: O QUE UM ESPECIALISTA SABE ==\n{FALA_DO_ROBO_SOBRE_SITES}\n\n"
     objecoes = OBJECOES_LOCAL if local else OBJECOES
-    conducao = CONDUCAO_LOCAL if local else reuniao_padrao
+    if not precisa_fundo:
+        objecoes = OBJECOES_RESUMO
+    conducao = CONDUCAO_LOCAL if local else (reuniao_padrao if precisa_fundo else REUNIAO_RESUMO)
     regra_preco = REGRA_DE_PRECO_LOCAL + "\n" if local else preco_padrao
     secretaria = SECRETARIA_LOCAL if local else secretaria_padrao
     if local:
@@ -457,6 +465,7 @@ PROIBIDO antes do passo 5: citar valor, promoção, Pix, sinal, forma de pagamen
 (benefício antes do número). "Pode", "ok", "gostei", "quero ver" significam interesse em VER, não em comprar: mostre e pergunte o que achou.
 O objetivo marcado pelo dono é o ponto de CHEGADA da conversa, nunca o ponto de partida.
 """
+    persuasao = PERSUASAO_COMPLETA if precisa_fundo else PERSUASAO_RESUMO
     lingua_bloco = idioma.instrucao(idioma.do_lead(lead or {}), robo=True)
     prompt = f"""Você é {abertura}, conversando pelo {canal} com o dono de um negócio local.
 Agora é {_agora_brasil(agora)}.
@@ -498,18 +507,10 @@ Avance uma etapa por vez: abertura → descoberta → diagnóstico → proposta 
 
 {conducao}
 
-{bloco_local}== MÉTODO DE VENDAS (como um bom SDR conduz) ==
-{playbook_vendas.METODO}
-== OBJEÇÕES: O QUE REALMENTE TRAVA E COMO RESPONDER ==
+{bloco_local}{('== MÉTODO DE VENDAS (como um bom SDR conduz) ==' + chr(10) + playbook_vendas.METODO + chr(10)) if precisa_fundo else ''}== OBJEÇÕES: O QUE REALMENTE TRAVA E COMO RESPONDER ==
 {objecoes}
 {_bloco_do_gancho(mensagens, cfg, lead, ident)}{playbook_vendas.bloco_do_momento(ultima_do_cliente(mensagens), sdr, vender and fechamento.quer_fechar_forte(ultima_do_cliente(mensagens)), _quem_assume(ident)) if not objecao_de_preco(ultima_do_cliente(mensagens)) else ""}
-== PERSUASÃO: SÓ A LEGÍTIMA ==
-Use: prova social com dados REAIS do dossiê (a nota dele, as avaliações dele); aversão à perda (o cliente que
-procura e cai no concorrente); reciprocidade (o site/diagnóstico já feito para ele); pequenos sins antes do pedido
-maior; espelhar as palavras dele; a CONDIÇÃO ESPECIAL cadastrada pelo dono (só quando ela aparece acima, exatamente como está escrita).
-PROIBIDO: urgência ou escassez inventada ("só hoje", "últimas vagas"), promoção ou desconto que o dono não cadastrou, casos ou depoimentos que não estejam acima,
-resultado garantido, falar mal de concorrente, insistir depois de um "não" claro, pedir CPF, senha ou dado sensível,
-e inventar justificativa (custo, margem, agenda cheia) — para negar um desconto basta dizer que não é possível.
+{persuasao}
 
 == FORMA ==
 - Português do Brasil, tom de conversa. Responda em 1 ou 2 mensagens curtas (no máximo {limite_palavras} palavras cada),
@@ -566,6 +567,29 @@ que você não sabe; reclamação; pedido explícito para falar com uma pessoa.
 """
     return _sem_site(prompt) if local else prompt
 
+
+# Versões curtas (cumprimento, primeira troca, pergunta simples): as regras que NÃO podem faltar, sem o manual inteiro.
+OBJECOES_RESUMO = """
+Se vier objeção ("caro", "já tenho", "não preciso", "vou pensar", "agora não"): acolha em meia frase, vire com UM fato real e peça um passo mínimo de sim ou não.
+UMA tentativa por objeção; se ele repetir o não, encerre com educação. Nunca invente desconto, prazo ou garantia.
+"""
+REUNIAO_RESUMO = """== COMO TRAZER A REUNIÃO (resumo) ==
+Responda PRIMEIRO o que a pessoa perguntou, em uma frase; termine com UM próximo passo fácil (pergunta de sim/não ou escolha entre duas opções).
+Até a 3ª resposta do cliente já deve existir um convite concreto (conversa de 15 minutos ou ver o material), no PRÓXIMO DIA ÚTIL, com dois horários. Não invente nada."""
+PERSUASAO_RESUMO = """== PERSUASÃO: SÓ A LEGÍTIMA ==
+Use só fatos reais do dossiê e a condição cadastrada pelo dono. PROIBIDO: urgência ou escassez inventada, promoção ou desconto não cadastrados, depoimentos ou casos que não estejam acima,
+resultado garantido, falar mal de concorrente, insistir depois de um "não" claro, pedir CPF, senha ou dado sensível, inventar justificativa para negar desconto."""
+_SINAL_DE_OBJECAO = _re.compile(
+    r"\b(caro|car[ií]ssimo|sem condi[çc][oõ]es|n[aã]o (preciso|tenho interesse|quero|vou)|j[aá] tenho|vou pensar|depois|agora n[aã]o|sem tempo|golpe|quem [eé] voc[eê]|"
+    r"como (conseguiu|achou)|s[oó]cio|respons[aá]vel|n[aã]o sei|desconto|concorrente|garantia|rob[oô]|intelig[eê]ncia artificial)\b", _re.I)
+
+PERSUASAO_COMPLETA = """== PERSUASÃO: SÓ A LEGÍTIMA ==
+Use: prova social com dados REAIS do dossiê (a nota dele, as avaliações dele); aversão à perda (o cliente que
+procura e cai no concorrente); reciprocidade (o site/diagnóstico já feito para ele); pequenos sins antes do pedido
+maior; espelhar as palavras dele; a CONDIÇÃO ESPECIAL cadastrada pelo dono (só quando ela aparece acima, exatamente como está escrita).
+PROIBIDO: urgência ou escassez inventada ("só hoje", "últimas vagas"), promoção ou desconto que o dono não cadastrou, casos ou depoimentos que não estejam acima,
+resultado garantido, falar mal de concorrente, insistir depois de um "não" claro, pedir CPF, senha ou dado sensível,
+e inventar justificativa (custo, margem, agenda cheia) — para negar um desconto basta dizer que não é possível."""
 
 # Serviço local sem site (ar-condicionado): as mesmas regras de conduta, sem uma palavra de site, prévia ou link.
 OBJECOES_LOCAL = """

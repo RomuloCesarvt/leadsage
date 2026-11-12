@@ -58,7 +58,7 @@ def test_quando_o_lead_pergunta_o_preco_o_robo_pode_falar_de_valor():
 
 
 def test_prompt_do_modo_vender_manda_descobrir_mostrar_e_so_depois_fechar():
-    p = ai_sdr.montar_prompt(M(("contato", "Bom dia")), "whatsapp", {"company_name": "Frio Total"}, CFG, LEAD)
+    p = ai_sdr.montar_prompt(M(("contato", "Bom dia"), ("robo", "Bom dia!"), ("contato", "como funciona?")), "whatsapp", {"company_name": "Frio Total"}, CFG, LEAD)
     assert "RITMO: NÃO ACELERE" in p and "ponto de CHEGADA" in p
     assert "fechar a venda pela conversa" not in p                      # o texto antigo, que empurrava o fechamento desde o início
     assert "Regra dos 3 turnos" in p and "um convite concreto (fechar" not in p

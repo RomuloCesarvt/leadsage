@@ -39,7 +39,7 @@ def test_negacao_nao_e_sinal_de_compra(texto):
 
 
 def test_o_metodo_vai_no_prompt_e_pede_para_descobrir_o_motivo_real_sem_insistir():
-    p = montar_prompt(conversa("oi"), "whatsapp", {}, CFG, LEAD)
+    p = montar_prompt(conversa("oi", "como funciona?"), "whatsapp", {}, CFG, LEAD)
     assert "MÉTODO DE VENDAS" in p and "cortina de fumaça" in p and "o que\" ou \"como\"" in p
     assert "UMA tentativa por objeção" in p and "Dois \"nãos\" claros" in p
 

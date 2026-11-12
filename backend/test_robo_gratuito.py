@@ -85,3 +85,14 @@ def test_pergunta_de_verdade_espera_a_ia_e_conversa_em_andamento_tambem():
     assert robo_service._decisao_de_reserva(_conv("Vocês instalam split de 12 mil BTU? Quanto custa?"), _P()) is None
     assert robo_service._decisao_de_reserva(_conv("oi", robo=2), _P()) is None
     assert robo_service._decisao_de_reserva({"mensagens": []}, _P()) is None
+
+
+def test_cumprimento_usa_o_prompt_curto_e_a_conversa_de_verdade_o_completo():
+    from app.ai_sdr import montar_prompt
+    cfg = {"objetivo": "agendar", "oferta": {"servico": "site", "nome": "Site", "preco": "1500"}}
+    curto = montar_prompt([{"de": "robo", "texto": "Oi"}, {"de": "contato", "texto": "Boa tarde! Tudo bem?"}], "whatsapp", {"company_name": "X"}, cfg, {"id": "1", "name": "Maria"})
+    cheio = montar_prompt([{"de": "robo", "texto": "Oi"}, {"de": "contato", "texto": "quanto custa?"}], "whatsapp", {"company_name": "X"}, cfg, {"id": "1", "name": "Maria"})
+    assert len(curto) < len(cheio) * 0.75
+    assert "MÉTODO DE VENDAS" not in curto and "MÉTODO DE VENDAS" in cheio
+    for regra in ("PROIBIDO: urgência ou escassez inventada", "NUNCA invente preço", "NUNCA se apresente nem se descreva"):
+        assert regra in curto and regra in cheio           # as travas de segurança não saem nunca

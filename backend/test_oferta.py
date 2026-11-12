@@ -142,7 +142,7 @@ def test_esboco_pago_e_sem_esboco():
 
 
 def test_prompt_tem_o_metodo_da_reuniao():
-    p = prompt()
+    p = montar_prompt([{"de": "contato", "texto": "oi"}, {"de": "robo", "texto": "olá"}, {"de": "contato", "texto": "como funciona?"}], "whatsapp", {"company_name": "LeadSage"}, CFG, LEAD)
     assert "COMO TRAZER A REUNIÃO" in p and "Regra dos 3 turnos" in p and "dois horários concretos" in p
 
 
