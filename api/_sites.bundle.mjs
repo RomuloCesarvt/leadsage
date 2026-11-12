@@ -7018,7 +7018,7 @@ var dadosDoLead = (lead) => {
   };
   return lead ? semearConteudo(base, { cores: true }) : base;
 };
-var MOTOR_VERSAO = "2026-11-04-celular-primeiro";
+var MOTOR_VERSAO = "2026-11-12-celular-ritmo";
 var indiceEstavel2 = (texto, n) => {
   let h = 0;
   for (let i = 0; i < texto.length; i++) h = h * 31 + texto.charCodeAt(i) >>> 0;
