@@ -56,6 +56,15 @@ export const MarcaDoDocumento: React.FC<{ aoSalvar?: () => void }> = ({ aoSalvar
   const [erro, setErro] = useState('');
   const moldura = useRef<HTMLDivElement>(null);
   const [escala, setEscala] = useState(0.4);
+  // abaixo de 1024 px a prévia vem ANTES do formulário e mostra só o topo da capa (onde fica a logo), para a pessoa ver a marca sem rolar
+  const [compacto, setCompacto] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && !window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const m = window.matchMedia('(min-width: 1024px)');
+    const f = () => setCompacto(!m.matches);
+    f(); m.addEventListener?.('change', f);
+    return () => m.removeEventListener?.('change', f);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -177,7 +186,7 @@ export const MarcaDoDocumento: React.FC<{ aoSalvar?: () => void }> = ({ aoSalvar
         </div>
       </div>
 
-      <div className="min-w-0">
+      <div className="min-w-0 order-first lg:order-none">
         <div className="flex items-center justify-between mb-2">
           <span className={rotulo + ' !mb-0'}>Como vai sair</span>
           <div className="inline-flex rounded-lg bg-slate-100 p-0.5">
@@ -187,7 +196,7 @@ export const MarcaDoDocumento: React.FC<{ aoSalvar?: () => void }> = ({ aoSalvar
             ))}
           </div>
         </div>
-        <div ref={moldura} className="rounded-xl border border-slate-200 bg-slate-100 overflow-hidden relative" style={{ height: 1123 * escala }}>
+        <div ref={moldura} className="rounded-xl border border-slate-200 bg-slate-100 overflow-hidden relative" style={{ height: compacto ? Math.min(1123 * escala, 230) : 1123 * escala }}>
           <iframe title="Prévia do documento com a sua marca" srcDoc={html} sandbox="" tabIndex={-1}
             style={{ width: 794, height: 1123, border: 0, background: '#fff', transform: `scale(${escala})`, transformOrigin: '0 0', pointerEvents: 'none' }} />
         </div>
