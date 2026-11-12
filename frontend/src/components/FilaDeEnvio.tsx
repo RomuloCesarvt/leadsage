@@ -461,13 +461,13 @@ export const FilaDeEnvio: React.FC = () => {
         <div className="flex items-center gap-2.5 mb-2.5">
           {rascunho && (
             <input type="checkbox" checked={sel.has(item.id)} onChange={() => alternarSel(item.id)} aria-label={`Enviar para ${item.nome}`}
-              className="w-5 h-5 accent-blue-600 shrink-0" />
+              className="w-6 h-6 md:w-5 md:h-5 accent-blue-600 shrink-0" />
           )}
           <IconeCanal canal={item.canal} />
-          <b className="text-sm text-slate-900 truncate flex-1">{item.nome}</b>
-          <span className={`text-[11px] font-bold rounded-full px-2.5 py-1 shrink-0 ${est.cor}`}>{est.rotulo}</span>
+          <b className="text-[15px] md:text-sm text-slate-900 leading-snug flex-1 min-w-0 break-words">{item.nome}</b>
+          <span className={`text-xs md:text-[11px] font-bold rounded-full px-2.5 py-1 shrink-0 ${est.cor}`}>{est.rotulo}</span>
         </div>
-        <p className="text-[11px] font-semibold text-slate-500 mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <p className="text-xs md:text-[11px] font-semibold text-slate-500 mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
           <span>{NOME_CANAL[item.canal]}{item.editado ? ' · editada por você' : ''}</span>
           {item.previa === 'criada' && (
             <span className="text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5">
@@ -493,10 +493,10 @@ export const FilaDeEnvio: React.FC = () => {
               className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-base md:text-sm leading-relaxed focus:outline-none focus:border-blue-500 resize-y" />
             <div className="flex flex-wrap gap-2 items-center">
               <button onClick={() => salvarEdicao(item)} disabled={trabalhando === item.id || !ed.texto.trim()}
-                className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5">
+                className="min-h-11 md:min-h-0 px-4 md:px-3.5 py-2.5 md:py-2 rounded-xl md:rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm md:text-xs font-bold flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5" /> Salvar
               </button>
-              <button onClick={() => cancelarEdicao(item.id)} className="px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 flex items-center gap-1.5">
+              <button onClick={() => cancelarEdicao(item.id)} className="min-h-11 md:min-h-0 px-4 md:px-3 py-2 rounded-xl md:rounded-lg text-sm md:text-xs font-semibold text-slate-600 hover:bg-slate-100 flex items-center gap-1.5">
                 <X className="w-3.5 h-3.5" /> Cancelar
               </button>
               <span className="text-[11px] text-slate-400 ml-auto">{ed.texto.length} caracteres</span>
@@ -505,9 +505,9 @@ export const FilaDeEnvio: React.FC = () => {
         ) : (
           <>
             {item.assunto && <p className="text-xs font-semibold text-slate-700 mb-1">Assunto: {item.assunto}</p>}
-            <p className="text-[13px] md:text-[13px] text-slate-800 leading-relaxed whitespace-pre-line bg-slate-50 border border-slate-100 rounded-xl p-3 max-h-48 overflow-y-auto">{item.texto}</p>
+            <p className="text-[15px] md:text-[13px] text-slate-800 leading-relaxed whitespace-pre-line bg-slate-50 border border-slate-100 rounded-xl p-3 max-h-60 md:max-h-48 overflow-y-auto">{item.texto}</p>
             {editavel && (
-              <button onClick={() => comecarEdicao(item)} className="mt-2 text-xs font-bold text-blue-700 hover:underline flex items-center gap-1.5">
+              <button onClick={() => comecarEdicao(item)} className="mt-3 md:mt-2 min-h-11 md:min-h-0 px-4 md:px-0 rounded-xl md:rounded-none border border-blue-200 md:border-0 bg-blue-50 md:bg-transparent text-sm md:text-xs font-bold text-blue-700 md:hover:underline flex items-center justify-center md:justify-start gap-2 md:gap-1.5 w-full md:w-auto">
                 <Pencil className="w-3.5 h-3.5" /> Editar mensagem
               </button>
             )}
@@ -515,10 +515,10 @@ export const FilaDeEnvio: React.FC = () => {
         )}
 
         {item.status === 'enviando' && (
-          <p className="text-xs mt-2 flex gap-1.5 text-sky-800"><Clock className="w-3.5 h-3.5 shrink-0 mt-0.5" /> O WhatsApp conectado está enviando esta mensagem.</p>
+          <p className="text-[13px] md:text-xs mt-2 flex gap-1.5 text-sky-800"><Clock className="w-3.5 h-3.5 shrink-0 mt-0.5" /> O WhatsApp conectado está enviando esta mensagem.</p>
         )}
         {item.status !== 'rascunho' && item.status !== 'pendente' && item.status !== 'enviando' && item.motivo && (
-          <p className={`text-xs mt-2 flex gap-1.5 ${item.status === 'falhou' ? 'text-red-700' : 'text-amber-800'}`}>
+          <p className={`text-[13px] md:text-xs mt-2 flex gap-1.5 ${item.status === 'falhou' ? 'text-red-700' : 'text-amber-800'}`}>
             {item.status === 'falhou' ? <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> : <Clock className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
             {item.motivo}
           </p>
@@ -533,31 +533,31 @@ export const FilaDeEnvio: React.FC = () => {
 
         {/* o que fazer com o que já está na fila ou deu problema */}
         {!rascunho && !ed && (
-          <div className="flex flex-wrap gap-2 mt-3">
+          <div className="flex flex-col md:flex-row md:flex-wrap gap-2 mt-3">
             {item.canal === 'whatsapp' && whats?.online && ['pendente', 'falhou'].includes(item.status) && (
               <button onClick={() => enviarAgora(item.id)} disabled={trabalhando === item.id}
-                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 disabled:opacity-60">
+                className="min-h-11 md:min-h-0 px-4 md:px-3 py-2 md:py-1.5 rounded-xl md:rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm md:text-xs font-bold flex items-center gap-1.5 disabled:opacity-60">
                 <Send className="w-3.5 h-3.5" /> {item.status === 'falhou' ? 'Tentar de novo' : 'Enviar agora'}
               </button>
             )}
             {item.canal !== 'email' && item.link && (
-              <button onClick={() => abrir(item)} className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5">
+              <button onClick={() => abrir(item)} className="min-h-11 md:min-h-0 px-4 md:px-3 py-2 md:py-1.5 rounded-xl md:rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm md:text-xs font-bold flex items-center gap-1.5">
                 <ExternalLink className="w-3.5 h-3.5" /> Abrir {NOME_CANAL[item.canal]}
               </button>
             )}
             {item.canal !== 'email' && (
-              <button onClick={() => copiar(item.id, item.texto)} className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-slate-400 text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+              <button onClick={() => copiar(item.id, item.texto)} className="min-h-11 md:min-h-0 px-4 md:px-3 py-2 md:py-1.5 rounded-xl md:rounded-lg bg-white border border-slate-300 md:border-slate-200 hover:border-slate-400 text-sm md:text-xs font-semibold text-slate-700 flex items-center gap-1.5">
                 {copiado === item.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />} {copiado === item.id ? 'Copiado' : 'Copiar'}
               </button>
             )}
             {item.canal !== 'email' && item.status === 'pendente' && !(item.canal === 'whatsapp' && whats?.online) && (
               <button onClick={() => marcarEnviado(item.id)} disabled={trabalhando === item.id}
-                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 disabled:opacity-60">
+                className="min-h-11 md:min-h-0 px-4 md:px-3 py-2 md:py-1.5 rounded-xl md:rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm md:text-xs font-bold flex items-center gap-1.5 disabled:opacity-60">
                 <Check className="w-3.5 h-3.5" /> Enviei
               </button>
             )}
             <button onClick={() => pular(item.id)} disabled={trabalhando === item.id}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 flex items-center gap-1.5">
+              className="min-h-11 md:min-h-0 px-4 md:px-2.5 py-2 md:py-1.5 rounded-xl md:rounded-lg border border-slate-200 md:border-0 text-sm md:text-xs font-semibold text-slate-600 hover:bg-slate-100 flex items-center gap-1.5">
               <SkipForward className="w-3.5 h-3.5" /> Remover da fila
             </button>
           </div>
@@ -694,22 +694,23 @@ export const FilaDeEnvio: React.FC = () => {
       {/* 2. revisar e enviar */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <h2 className="font-bold text-slate-800 flex-1">2. Revisar e enviar</h2>
-          {descartaveis > 0 && (
-            <button onClick={descartarTodos} disabled={!!trabalhando}
-              className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-red-300 hover:text-red-700 disabled:opacity-40 text-slate-600 text-xs font-bold flex items-center gap-1.5">
-              <Trash2 className="w-3.5 h-3.5" /> Descartar todas ({descartaveis})
-            </button>
-          )}
-          <button onClick={() => { void carregar(); void carregarWhats(); }} title="Atualizar" className="p-2 rounded-lg hover:bg-slate-100 text-slate-500">
-            <RefreshCw className={`w-4 h-4 ${carregando ? 'animate-spin' : ''}`} />
+          <h2 className="font-bold text-lg md:text-base text-slate-900 flex-1 leading-tight">2. Revisar e enviar</h2>
+          <button onClick={() => { void carregar(); void carregarWhats(); }} title="Atualizar" aria-label="Atualizar a fila"
+            className="w-11 h-11 md:w-9 md:h-9 rounded-xl border border-slate-200 bg-white md:border-0 md:bg-transparent md:hover:bg-slate-100 text-slate-600 flex items-center justify-center">
+            <RefreshCw className={`w-5 h-5 md:w-4 md:h-4 ${carregando ? 'animate-spin' : ''}`} />
           </button>
         </div>
+        {descartaveis > 0 && (
+          <button onClick={descartarTodos} disabled={!!trabalhando}
+            className="w-full md:w-auto min-h-11 md:min-h-0 px-4 md:px-3 md:py-1.5 rounded-xl md:rounded-lg bg-white border border-slate-300 md:border-slate-200 hover:border-red-300 hover:text-red-700 disabled:opacity-40 text-slate-700 md:text-slate-600 text-sm md:text-xs font-bold flex items-center justify-center gap-2 md:gap-1.5 md:ml-auto">
+            <Trash2 className="w-4 h-4 md:w-3.5 md:h-3.5" /> Descartar todas ({descartaveis})
+          </button>
+        )}
 
-        <div className="flex gap-2 overflow-x-auto pb-1" role="tablist">
+        <div className="flex gap-2 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-1 snap-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist">
           {ABAS.map(a => (
             <button key={a.id} role="tab" aria-selected={aba === a.id} onClick={() => setAba(a.id)}
-              className={`px-4 py-2 rounded-full text-sm font-bold border whitespace-nowrap ${aba === a.id ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-600'}`}>
+              className={`snap-start shrink-0 min-h-11 md:min-h-0 px-4 py-2 rounded-full text-sm font-bold border whitespace-nowrap ${aba === a.id ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-600'}`}>
               {a.rotulo}{a.n ? ` (${a.n})` : ''}
             </button>
           ))}
@@ -764,23 +765,25 @@ export const FilaDeEnvio: React.FC = () => {
         </section>
       )}
 
-      {/* barra de ação: sempre à vista enquanto há mensagens marcadas */}
+      {/* barra de ação: sempre à vista enquanto há mensagens marcadas. No celular fica ACIMA do menu de baixo e em duas linhas: o texto e depois os botões grandes. */}
       {aba === 'revisar' && rascunhos.length > 0 && (
-        <div className="fixed md:sticky bottom-0 inset-x-0 md:inset-x-auto z-30 bg-white/95 backdrop-blur border-t md:border border-slate-200 md:rounded-2xl shadow-[0_-6px_20px_-12px_rgba(15,23,42,.35)] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div className="max-w-4xl mx-auto flex flex-wrap items-center gap-2">
-            <p className="text-xs text-slate-600 flex-1 min-w-[180px] leading-snug">
+        <div className="fixed md:sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 inset-x-0 md:inset-x-auto z-30 bg-white border-t md:border border-slate-200 md:rounded-2xl shadow-[0_-6px_20px_-12px_rgba(15,23,42,.35)] px-4 py-3 md:p-3">
+          <div className="max-w-4xl mx-auto flex flex-col md:flex-row md:flex-wrap md:items-center gap-2.5 md:gap-2">
+            <p className="text-[13px] md:text-xs text-slate-600 md:flex-1 md:min-w-[180px] leading-snug">
               <b className="text-slate-900">{selecionados.length}</b> marcada(s)
-              {selWhats > 0 && restanteHoje !== null && <> · WhatsApp pode enviar mais {restanteHoje} hoje{selWhats > restanteHoje ? '; o resto sai nos próximos dias' : ''}</>}
+              {selWhats > 0 && restanteHoje !== null && <> · o WhatsApp ainda pode enviar {restanteHoje} hoje{selWhats > restanteHoje ? '; o resto sai nos próximos dias' : ''}</>}
               {selEmail > 0 && <> · {selEmail} e-mail(s) = {selEmail * 2} créditos</>}
             </p>
-            <button onClick={descartarSelecionados} disabled={!selecionados.length || !!trabalhando}
-              className="px-3.5 py-3 md:py-2.5 rounded-xl bg-white border border-slate-200 hover:border-red-300 hover:text-red-700 disabled:opacity-40 text-slate-600 text-sm font-bold flex items-center gap-1.5">
-              <Trash2 className="w-4 h-4" /> Descartar
-            </button>
-            <button onClick={enviarSelecionados} disabled={!selecionados.length || !!trabalhando}
-              className="px-5 py-3 md:py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold flex items-center gap-2">
-              {trabalhando === 'aprovar' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Enviar {selecionados.length || ''} marcada(s)
-            </button>
+            <div className="grid grid-cols-[auto_1fr] md:flex gap-2">
+              <button onClick={descartarSelecionados} disabled={!selecionados.length || !!trabalhando} aria-label="Descartar as marcadas"
+                className="min-h-12 md:min-h-0 px-4 md:px-3.5 md:py-2.5 rounded-xl bg-white border border-slate-300 hover:border-red-300 hover:text-red-700 disabled:opacity-40 text-slate-700 text-[15px] md:text-sm font-bold flex items-center justify-center gap-1.5">
+                <Trash2 className="w-5 h-5 md:w-4 md:h-4" /> <span className="hidden sm:inline">Descartar</span>
+              </button>
+              <button onClick={enviarSelecionados} disabled={!selecionados.length || !!trabalhando}
+                className="min-h-12 md:min-h-0 px-5 md:py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-700 disabled:opacity-40 text-white text-[15px] md:text-sm font-bold flex items-center justify-center gap-2">
+                {trabalhando === 'aprovar' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 md:w-4 md:h-4" />} Enviar {selecionados.length || ''} marcada(s)
+              </button>
+            </div>
           </div>
         </div>
       )}

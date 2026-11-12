@@ -8,6 +8,8 @@ import { lerFiltroDoPipeline } from '../../lib/atalhosDoPainel';
 import { AnaliseDoPipeline, FaixaDeTags, COR_DA_TAG } from '../AnaliseDoPipeline';
 import { modoAtivoAtual } from '../../services/api';
 import { acoesDoCard, agenteDe, AGENTES_PADRAO, etiquetasDoCard, haQuanto, type Tom } from '../../lib/cardPipeline';
+import { PipelineCelular } from '../PipelineCelular';
+import { useCelular } from '../../lib/useCelular';
 import { rolarNasBordas, useArrastarParaRolar } from '../../lib/arrastarParaRolar';
 
 const COLUMNS = [
@@ -79,6 +81,7 @@ export const PipelineScreen: React.FC = () => {
   };
 
   // o quadro é largo: dá para segurar o fundo e puxar para os lados, e a barra de baixo é grossa; arrastando um cartão, as bordas rolam sozinhas
+  const celular = useCelular();
   const quadro = React.useRef<HTMLDivElement>(null);
   useArrastarParaRolar(quadro);
 
@@ -89,6 +92,15 @@ export const PipelineScreen: React.FC = () => {
       updateLeadStage(leadId, stage);
     }
   };
+
+  if (celular) {
+    return (
+      <PipelineCelular
+        leads={leads.filter((l: LeadItem) => ehSalvo(l))} etapas={COLUMNS} etapaDe={etapaDe} filtroTag={filtroTag} aoFiltrar={setFiltroTag}
+        mover={updateLeadStage} abrir={setSelectedProfileLead} excluir={excluirLead} atualizar={atualizarPipeline} empresa={empresa}
+      />
+    );
+  }
 
   return (
     <div ref={quadro} onDragOver={(e) => rolarNasBordas(quadro.current, e.clientX)}

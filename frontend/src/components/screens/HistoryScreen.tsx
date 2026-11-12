@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { History, Eye, Trash2, Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
+import { useCelular } from '../../lib/useCelular';
 
 export const HistoryScreen: React.FC = () => {
+  const celular = useCelular();
   const { history, setHistory, setViewState, performLeadSearch, limparResultados } = useApp() as any;
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [limpando, setLimpando] = useState(false);
@@ -79,33 +81,33 @@ export const HistoryScreen: React.FC = () => {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center">
+      <div className="grid grid-cols-3 gap-2 md:gap-4 mb-4 md:mb-6">
+        <div className="bg-white border border-slate-200 rounded-xl p-3 md:p-5 shadow-sm flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
+          <div className="hidden md:flex w-12 h-12 rounded-full bg-slate-50 border border-slate-100 items-center justify-center">
             <Search className="w-5 h-5 text-slate-500" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-500">Total de Buscas</p>
+            <p className="text-xs md:text-sm font-semibold text-slate-500 leading-tight">Buscas</p>
             <p className="text-2xl font-black text-slate-800">{history.length}</p>
           </div>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center">
+        <div className="bg-white border border-slate-200 rounded-xl p-3 md:p-5 shadow-sm flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
+          <div className="hidden md:flex w-12 h-12 rounded-full bg-slate-50 border border-slate-100 items-center justify-center">
             <History className="w-5 h-5 text-slate-500" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-500">Total de Leads</p>
+            <p className="text-xs md:text-sm font-semibold text-slate-500 leading-tight">Leads</p>
             <p className="text-2xl font-black text-slate-800">
               {history.reduce((acc: number, curr: any) => acc + total(curr), 0)}
             </p>
           </div>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center">
+        <div className="bg-white border border-slate-200 rounded-xl p-3 md:p-5 shadow-sm flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
+          <div className="hidden md:flex w-12 h-12 rounded-full bg-slate-50 border border-slate-100 items-center justify-center">
             <History className="w-5 h-5 text-slate-500" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-500">Média por Busca</p>
+            <p className="text-xs md:text-sm font-semibold text-slate-500 leading-tight">Média</p>
             <p className="text-2xl font-black text-slate-800">
               {history.length > 0 ? Math.round(history.reduce((acc: number, curr: any) => acc + total(curr), 0) / history.length) : 0}
             </p>
@@ -125,6 +127,31 @@ export const HistoryScreen: React.FC = () => {
             <h3 className="font-bold text-slate-800 text-lg mb-1">Nenhuma busca realizada</h3>
             <p className="text-slate-500 text-sm">Suas buscas salvas aparecerão aqui.</p>
           </div>
+        ) : celular ? (
+          <ul className="divide-y divide-slate-100" data-testid="historico-celular">
+            {history.map((item: any) => (
+              <li key={item.id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-base font-bold text-slate-900 leading-snug break-words">{item.niche}</p>
+                    <p className="text-sm text-slate-500 mt-0.5 break-words">{String(item.location || '').replace(/, Brazil$/i, '')}</p>
+                  </div>
+                  <span className="shrink-0 text-sm font-bold text-slate-700 bg-slate-100 rounded-lg px-2.5 py-1">{total(item)}</span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">{new Date(item.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })} · {total(item)} encontrados</p>
+                <div className="mt-3 flex gap-2">
+                  <button type="button" onClick={() => performLeadSearch(item.niche, item.location, 20)}
+                    className="flex-1 min-h-12 rounded-xl bg-blue-600 text-white text-[15px] font-bold flex items-center justify-center gap-2 active:bg-blue-700">
+                    <Eye className="w-5 h-5" /> Ver leads
+                  </button>
+                  <button type="button" aria-label="Excluir busca" onClick={() => handleDelete(item.id)} disabled={deletingId === item.id}
+                    className="w-12 min-h-12 rounded-xl border border-slate-200 text-slate-400 flex items-center justify-center active:bg-rose-50 active:text-rose-600 disabled:opacity-40">
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
         ) : (
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
