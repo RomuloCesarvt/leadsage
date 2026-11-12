@@ -38,16 +38,21 @@ export const AvisoDeNovaVersao = () => {
   }, []);
 
   if (!nova) return null;
+  // celular: faixa na largura da tela, ACIMA do menu de baixo (texto à esquerda, botão grande à direita); computador: cartão centralizado
   return (
-    <div role="status" className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] max-w-[92vw] flex items-center gap-3 bg-slate-900 text-white rounded-2xl shadow-xl px-4 py-3 text-sm">
-      <span>Saiu uma versão nova do LeadSage. Recarregue para usar as melhorias.</span>
-      {ocupado
-        ? <span className="shrink-0 text-amber-300 font-semibold">Termine a geração em andamento antes de recarregar.</span>
-        : (
-          <button onClick={() => window.location.reload()} className="shrink-0 flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 rounded-lg px-3 py-1.5 font-bold">
-            <RefreshCw className="w-4 h-4" /> Recarregar
-          </button>
-        )}
+    <div role="status" className="fixed z-[100] inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:bottom-4 md:w-auto md:max-w-xl flex items-center gap-3 bg-slate-900 text-white rounded-2xl shadow-xl p-3.5 md:px-4 md:py-3">
+      <RefreshCw className="w-5 h-5 text-blue-300 shrink-0 hidden min-[380px]:block" aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[15px] md:text-sm font-bold leading-tight">Versão nova disponível</p>
+        <p className="text-[13px] md:text-xs text-slate-300 leading-snug mt-0.5">
+          {ocupado ? <span className="text-amber-300 font-semibold">Termine a geração em andamento para recarregar.</span> : 'Recarregue para usar as melhorias.'}
+        </p>
+      </div>
+      {!ocupado && (
+        <button onClick={() => window.location.reload()} className="shrink-0 min-h-12 md:min-h-0 px-5 md:px-3 md:py-1.5 rounded-xl md:rounded-lg bg-blue-500 hover:bg-blue-600 active:bg-blue-600 text-[15px] md:text-sm font-bold whitespace-nowrap">
+          Recarregar
+        </button>
+      )}
     </div>
   );
 };
