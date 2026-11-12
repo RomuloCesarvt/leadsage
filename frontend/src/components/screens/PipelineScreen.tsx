@@ -4,6 +4,8 @@ import { useApp } from '../../context/AppContext';
 import type { LeadItem } from '../../types';
 import { GripVertical, Phone, MessageCircle, Bot, RefreshCw, UserRound, Check, ChevronDown, Trash2 } from 'lucide-react';
 import { AvisoReguaConcluida } from '../AvisoReguaConcluida';
+import { AnaliseDoPipeline, FaixaDeTags, COR_DA_TAG } from '../AnaliseDoPipeline';
+import { modoAtivoAtual } from '../../services/api';
 import { acoesDoCard, agenteDe, AGENTES_PADRAO, etiquetasDoCard, haQuanto, type Tom } from '../../lib/cardPipeline';
 import { rolarNasBordas, useArrastarParaRolar } from '../../lib/arrastarParaRolar';
 
@@ -50,6 +52,9 @@ export const PipelineScreen: React.FC = () => {
     await removerLeads([lead.id]);
   };
   const [atualizando, setAtualizando] = React.useState(false);
+  // filtro por tag de qualificação (vazio = todos)
+  const [filtroTag, setFiltroTag] = React.useState('');
+  const empresa = modoAtivoAtual() === 'empresa';
   // cartão com o seletor de agente aberto
   const [agenteAberto, setAgenteAberto] = React.useState<string | null>(null);
   // onde o menu do agente aparece: fixo na janela, para a coluna (que rola) nunca cortá-lo nos primeiros cards
@@ -105,9 +110,12 @@ export const PipelineScreen: React.FC = () => {
 
       <AvisoReguaConcluida />
 
+      <AnaliseDoPipeline />
+      <div className="sticky left-0 w-[calc(100vw-2rem)] md:w-auto"><FaixaDeTags leads={leads.filter((l: LeadItem) => ehSalvo(l))} filtro={filtroTag} aoFiltrar={setFiltroTag} /></div>
+
       <div className="flex gap-4 items-start min-w-max pb-8 h-[calc(100dvh-17rem)] md:h-[calc(100vh-200px)]">
         {COLUMNS.map(column => {
-          const columnLeads = leads.filter((l: LeadItem) => ehSalvo(l) && etapaDe(l) === column.key);
+          const columnLeads = leads.filter((l: LeadItem) => ehSalvo(l) && etapaDe(l) === column.key && (!filtroTag || l.qualificacao?.id === filtroTag));
           return (
             <div 
               key={column.key}
@@ -135,7 +143,8 @@ export const PipelineScreen: React.FC = () => {
                 )}
                 {columnLeads.map((lead: LeadItem) => {
                   const scoreInfo = getScoreLabel(lead.opportunityScore);
-                  const etiquetas = etiquetasDoCard(lead);
+                  // modo empresa vende serviço: nada de "Sem site", nota do Google ou prévia nas etiquetas
+                  const etiquetas = etiquetasDoCard(lead).filter(t => !empresa || !/^(Sem site|Nota |Prévia)/.test(t.texto));
                   const acoes = acoesDoCard(lead);
                   const agente = agenteDe(lead);
                   const eu = agente.id === 'humano';
@@ -156,6 +165,14 @@ export const PipelineScreen: React.FC = () => {
                           <p className="text-[11px] text-slate-400 truncate">{lead.niche} · {lead.location?.split(',')[0] || 'Brasil'}</p>
                         </div>
                       </div>
+
+                      {lead.qualificacao && (
+                        <div className="mb-2" data-testid="qualificacao">
+                          <span title={lead.qualificacao.dica} className={`inline-block text-[11px] font-extrabold px-2.5 py-1 rounded-lg border ${COR_DA_TAG[lead.qualificacao.tom] || COR_DA_TAG.neutro}`}>
+                            {lead.qualificacao.rotulo}
+                          </span>
+                        </div>
+                      )}
 
                       {etiquetas.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mb-3" data-testid="etiquetas">

@@ -45,6 +45,7 @@ export interface LeadItem {
   salvo_em?: string;
   favorito?: boolean;
   pipeline_origem?: string;
+  qualificacao?: Qualificacao;
   // quem moveu o card por ultimo ("robô" ou "voce") e por que
   pipeline_por?: string;
   pipeline_motivo?: string;
@@ -594,8 +595,22 @@ export interface PipelineMovimento {
   em: string;
 }
 
+/** A tag de qualificação do lead no pipeline: como ele está andando (Quente, Perguntou valor, Esfriando...), calculada pelo servidor. */
+export interface Qualificacao { id: string; rotulo: string; tom: string; dica: string }
+
+export interface AnaliseDoPipeline {
+  abordados: number; responderam: number; taxa_resposta: number;
+  horario: { nome: string; enviadas: number; responderam: number; taxa: number }[];
+  dia: { nome: string; enviadas: number; responderam: number; taxa: number }[];
+  valor: { nome: string; enviadas: number; responderam: number; taxa: number }[];
+  arte: { nome: string; enviadas: number; responderam: number; taxa: number }[];
+  dicas: { tipo: 'dica' | 'alerta' | 'info'; titulo: string; texto: string }[];
+  minimo_para_concluir: number;
+}
+
 export interface PipelineItem {
   id: string;
+  qualificacao?: Qualificacao;
   etapa: string;
   origem?: string;
   lead?: Partial<LeadItem>;

@@ -55,7 +55,7 @@ from app.sites_store import (
 )
 from app.credit_system import is_admin, acesso_total, BancoDeCreditosIndisponivel
 from app.integrations_store import get_integrations, save_integrations, public_view
-from app import fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, servico_local, abordagem_mestra, conector_whatsapp, caixa_de_entrada, ai_providers, espelho_whatsapp, previa_abertura, agentes, avisos
+from app import qualificacao, fila_envio, telegram_canal, robo_store, robo_service, meta_canais, meta_oauth, robo_conexao, raio_x, banco_imagens, pipeline_store, robo_disparo, ai_oferta, servico_local, abordagem_mestra, conector_whatsapp, caixa_de_entrada, ai_providers, espelho_whatsapp, previa_abertura, agentes, avisos
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote as _quote
 from app.ai_robo import decidir as robo_decidir
@@ -1275,12 +1275,32 @@ async def pipeline_listar(user: dict = Depends(usuario_do_espaco)):
         abertas = {a.get("lead_id"): a for a in await previa_abertura.listar(_espaco(user))}
     except Exception:
         abertas = {}   # sem a contagem o quadro continua igual
+    # a qualificação de cada lead (tag colorida): do estado da conversa, sem as mensagens
+    try:
+        resumos = {c.get("lead_id"): c for c in await robo_store.listar_conversas(_espaco(user)) if c.get("lead_id")}
+    except Exception:
+        resumos = {}
     for i in itens:
         i["historico"] = (i.get("historico") or [])[-5:]
+        try:
+            i["qualificacao"] = qualificacao.etiqueta(i, resumos.get(i.get("id")))
+        except Exception:
+            pass
         a = abertas.get(i.get("id"))
         if a:
             i["previa_abertura"] = {"visitas": a.get("visitas", 0), "ultima": a.get("ultima", "")}
-    return {"etapas": list(pipeline_store.TODAS), "itens": itens, "agentes": [{"id": k, **{c: v[c] for c in ("rotulo", "descricao")}} for k, v in agentes.AGENTES.items()]}
+    return {"etapas": list(pipeline_store.TODAS), "itens": itens, "tags": qualificacao.resumo_das_tags(itens), "agentes": [{"id": k, **{c: v[c] for c in ("rotulo", "descricao")}} for k, v in agentes.AGENTES.items()]}
+
+
+@app.get("/api/pipeline/analise")
+async def pipeline_analise(user: dict = Depends(usuario_do_espaco)):
+    """O que está funcionando: taxa de resposta por horário, dia, forma de falar de valor e arte, com dicas de ajuste (só leitura do que já existe)."""
+    await exigir_recurso(user, "pipeline", "O pipeline")
+    try:
+        return await qualificacao.do_usuario(_espaco(user))
+    except Exception as exc:
+        print(f"Pipeline: falha na análise: {exc}")
+        return {"abordados": 0, "responderam": 0, "taxa_resposta": 0, "horario": [], "dia": [], "valor": [], "arte": [], "dicas": [], "minimo_para_concluir": qualificacao.MINIMO_PARA_CONCLUIR}
 
 
 @app.post("/api/pipeline/sync")

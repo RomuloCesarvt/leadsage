@@ -24,6 +24,7 @@ import type {
   DocumentAIResponse,
   RoboConfig,
   PipelineItem,
+  AnaliseDoPipeline,
   ModeloWhatsApp,
   DisparoResultado,
   RoboConfigEntrada,
@@ -431,6 +432,10 @@ export const api = {
 
   async pipelineListar(): Promise<{ etapas: string[]; itens: PipelineItem[]; agentes?: { id: string; rotulo: string; descricao: string }[] }> {
     return await fetchWithToken('/pipeline');
+  },
+
+  async pipelineAnalise(): Promise<AnaliseDoPipeline> {
+    return await fetchWithToken('/pipeline/analise');
   },
 
   async pipelineSincronizar(leads: Record<string, unknown>[]): Promise<{ novos: number }> {
