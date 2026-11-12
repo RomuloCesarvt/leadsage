@@ -98,7 +98,7 @@ export const RaioXLead: React.FC<{ lead: any; onUsarAbertura?: (texto: string) =
         best_channel: lead.best_channel, whatsapp: lead.whatsapp, phone: lead.phone, email: lead.email,
       }));
     } catch (e: any) {
-      setErro(e?.message || 'Não foi possível gerar o dossiê.');
+      setErro(e?.message || 'Não foi possível fazer o Raio-X.');
     } finally {
       setCarregando(false);
     }
@@ -117,7 +117,7 @@ export const RaioXLead: React.FC<{ lead: any; onUsarAbertura?: (texto: string) =
           className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
         >
           {carregando ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanSearch className="w-4 h-4" />}
-          {carregando ? 'Montando o dossiê…' : 'Gerar dossiê completo'}
+          {carregando ? 'Montando o Raio-X…' : 'Fazer o Raio-X completo'}
         </button>
         <ul className="text-[12px] text-slate-700 mt-3 grid gap-1">
           <li>• Quem é o dono ou responsável e dados da empresa na Receita</li>

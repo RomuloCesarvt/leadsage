@@ -188,7 +188,7 @@ export const LeadProfilePanel: React.FC = () => {
               </p>
             </Secao>
 
-            {/* Dossiê: empresa, pessoas, dores, abordagem, Google Meu Negócio */}
+            {/* Raio-X: empresa, pessoas, dores, abordagem, Google Meu Negócio */}
             {!empresa && <RaioXLead lead={lead} />}
 
             {/* Ganchos verificados */}
