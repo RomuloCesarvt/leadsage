@@ -1,5 +1,5 @@
 /** Rodar: cd frontend && npx tsx src/data/planos.test.ts */
-import { PLANOS_MENSAIS, entregasDoPlano, entregasDoRobo, idNoServidor, precoComRobo } from './planos';
+import { AGENTE_DIARIO, PLANOS_MENSAIS, entregasDoPlano, entregasDoRobo, idNoServidor, precoComRobo } from './planos';
 
 let falhas = 0;
 const checar = (nome: string, ok: boolean) => { console.log(`  ${ok ? 'PASS ' : 'FALHA'} ${nome}`); if (!ok) falhas++; };
@@ -17,6 +17,7 @@ checar('ids dos planos batem com os do servidor (payments.py)', idNoServidor(ess
 
 checar('a lista do plano NÃO traz o robô (ele é um bloco à parte)', PLANOS_MENSAIS.every(p => (['agencia', 'empresa'] as const).every(m => !entregasDoPlano(p, m).some(t => /rob[ôo]/i.test(t)))));
 checar('o robô lista o que faz e o limite de conversas de cada plano', entregasDoRobo(ess).some(t => t.includes('150 conversas')) && entregasDoRobo(pro).some(t => t.includes('1.000 conversas')) && entregasDoRobo(esc).some(t => t.includes('3.000 conversas')));
+checar('o agente de chat está nos planos e no pacote do robô, com mais mensagens no pacote', PLANOS_MENSAIS.every(p => entregasDoRobo(p).some(t => /Agente de IA/.test(t))) && PLANOS_MENSAIS.filter(p => p.robo === 'complemento').every(p => AGENTE_DIARIO[p.id].comRobo > AGENTE_DIARIO[p.id].semRobo));
 
 console.log(`\n=========== ${falhas === 0 ? 'TUDO PASSOU' : falhas + ' FALHARAM'} ===========`);
 if (falhas) process.exit(1);

@@ -21,6 +21,13 @@ export interface PlanoMensal {
 }
 
 export const ROBO_COMPLEMENTO = 100;
+
+/** Mensagens por dia com o agente de chat. Tem de bater com LIMITES_DIARIOS em backend/app/agente_ia.py. O agente faz parte do pacote com o Robô de IA. */
+export const AGENTE_DIARIO: Record<PlanoMensal['id'], { semRobo: number; comRobo: number }> = {
+  essencial: { semRobo: 15, comRobo: 60 },
+  profissional: { semRobo: 40, comRobo: 150 },
+  escala: { semRobo: 400, comRobo: 400 },
+};
 export const MODO_EXTRA = 97;
 
 export const PLANOS_MENSAIS: PlanoMensal[] = [
@@ -40,6 +47,7 @@ export const entregasDoPlano = (p: PlanoMensal, modo: ModoDaConta): string[] => 
     'Funil de vendas e caixa de entrada com toda a conversa',
     'Seguimento automático de quem não respondeu (2 e 5 dias úteis)',
     'Painel com os segmentos e cidades que mais respondem',
+    ...(p.robo === 'incluso' ? [] : [`Agente de IA no chat: ${n(AGENTE_DIARIO[p.id].semRobo)} mensagens por dia`]),
   ];
   const agencia = [
     `${n(p.sites)} prévias de site por mês para mostrar ao cliente`,
@@ -57,6 +65,7 @@ export const entregasDoPlano = (p: PlanoMensal, modo: ModoDaConta): string[] => 
 
 /** O que o robô de atendimento com IA faz: o mesmo para todos os planos. */
 export const entregasDoRobo = (p: PlanoMensal): string[] => [
+  `Agente de IA no chat: peça "busque dentistas em Campinas" e ele busca, escreve as mensagens e deixa na fila para você revisar (${n(AGENTE_DIARIO[p.id].comRobo)} mensagens por dia)`,
   'Responde as mensagens dos leads no WhatsApp, na hora, e conduz a conversa',
   'Entende áudios e conversas longas',
   'Só promete o que você cadastrou (preço, prazo, garantia)',

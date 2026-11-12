@@ -24,8 +24,9 @@ BRASILIA = timezone(timedelta(hours=-3))
 
 # mensagens por dia, por plano (cada mensagem ao agente é um uso). Quem tem acesso total (admin) não tem limite.
 LIMITES_DIARIOS: Dict[str, int] = {
-    "previa": 5, "start": 20, "pro": 40, "agencia": 100,
-    "m_essencial": 40, "m_essencial_robo": 40, "m_profissional": 120, "m_profissional_robo": 120, "m_escala": 400,
+    "previa": 5, "start": 10, "pro": 40, "agencia": 100,
+    # o agente é parte do pacote com o Robô de IA: quem leva o robô tem bem mais mensagens por dia
+    "m_essencial": 15, "m_essencial_robo": 60, "m_profissional": 40, "m_profissional_robo": 150, "m_escala": 400,
 }
 LIMITE_PADRAO = 5
 MAX_BUSCA = 100
