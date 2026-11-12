@@ -1315,6 +1315,7 @@ async def pipeline_mover(lead_id: str, req: PipelineMoverRequest, user: dict = D
     if await pipeline_store.obter(uid, lead_id) is None:
         if not req.lead:
             raise HTTPException(status_code=404, detail="Lead não encontrado no pipeline.")
+        await pipeline_store.limpar_lapide(uid, lead_id)        # a pessoa mexeu no lead: ela o quer de volta
         await pipeline_store.registrar(uid, {**req.lead, "id": lead_id})
     item = await pipeline_store.mover(uid, lead_id, req.etapa, motivo="movido por você", por="voce")
     return {"etapa": pipeline_store.etapa_valida(req.etapa), "mudou": item is not None}
@@ -1330,6 +1331,7 @@ async def pipeline_agente(lead_id: str, req: PipelineAgenteRequest, user: dict =
     if await pipeline_store.obter(uid, lead_id) is None:
         if not req.lead:
             raise HTTPException(status_code=404, detail="Lead não encontrado no pipeline.")
+        await pipeline_store.limpar_lapide(uid, lead_id)
         await pipeline_store.registrar(uid, {**req.lead, "id": lead_id})
     item = await pipeline_store.definir_agente(uid, lead_id, req.agente)
     return {"agente": (item or {}).get("agente") or agentes.PADRAO, "rotulo": agentes.rotulo(req.agente)}

@@ -334,3 +334,33 @@ def test_rota_de_disparo_pede_consentimento(client, com_plano, monkeypatch):
     monkeypatch.setattr(robo_disparo, "status_modelo", Modelo())
     r = client.post("/api/robo/disparar", json={"lead_ids": ["A"], "consentimento": False})
     assert r.status_code == 400
+
+
+# ------------------------------------------------- lead excluído não volta
+
+def test_lead_excluido_nao_volta_pela_aba_antiga_nem_pela_fila(rodar):
+    card(rodar, "X1")
+    rodar(pipeline_store.apagar, UID, "X1")
+    assert rodar(pipeline_store.obter, UID, "X1") is None
+    # aba antiga do navegador sincroniza a cópia velha (sem salvo_em, ou com salvo_em anterior): não recria
+    rodar(pipeline_store.registrar_varios, UID, [{"id": "X1", "company": "Padaria", "phone": FONE, "salvo_em": "2020-01-01T00:00:00.000Z"}], "salvo")
+    rodar(pipeline_store.registrar_varios, UID, [{"id": "X1", "company": "Padaria", "phone": FONE}], "salvo")
+    assert rodar(pipeline_store.obter, UID, "X1") is None
+    assert all(i["id"] != "X1" for i in rodar(pipeline_store.listar, UID))
+
+
+def test_salvar_de_novo_depois_de_excluir_traz_o_lead_de_volta(rodar):
+    card(rodar, "X2")
+    rodar(pipeline_store.apagar, UID, "X2")
+    rodar(pipeline_store.registrar_varios, UID, [{"id": "X2", "company": "Padaria", "phone": FONE, "salvo_em": "2999-01-01T00:00:00.000Z"}], "salvo")
+    assert rodar(pipeline_store.obter, UID, "X2") is not None
+    assert any(i["id"] == "X2" for i in rodar(pipeline_store.listar, UID))
+
+
+def test_copia_antiga_de_item_excluido_nao_aparece_na_lista(rodar):
+    card(rodar, "X3")
+    rodar(pipeline_store.apagar, UID, "X3")
+    # outro banco ainda tinha o item (failover): a lápide o esconde
+    rodar(robo_store._sql_put, pipeline_store._chave(UID, "X3"), UID, "pipeline", {"id": "X3", "etapa": "Novo Lead", "origem": "salvo", "lead": {}, "atualizado": "2000-01-01T00:00:00+00:00"})
+    pipeline_store._esquecer_lista(UID)
+    assert all(i["id"] != "X3" for i in rodar(pipeline_store.listar, UID))

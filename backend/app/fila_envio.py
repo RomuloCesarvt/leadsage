@@ -787,7 +787,8 @@ async def preparar_lote(
             item["ja_contatado"] = {k: historicos[lid][k] for k in ("quando", "como", "respondeu")}
         # garante que o servidor conhece o lead (o robô reconhece quem responde por ele)
         try:
-            await pipeline_store.registrar(uid, {**lead, "id": lid})
+            if not await pipeline_store.excluido_em(uid, lid):          # lead que a pessoa excluiu não volta sozinho
+                await pipeline_store.registrar(uid, {**lead, "id": lid})
         except Exception as exc:
             print(f"Fila: não registrou no pipeline: {exc}")
 

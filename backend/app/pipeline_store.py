@@ -80,6 +80,45 @@ def _chave(uid: str, lead_id: str) -> str:
     return f"pipeline:{uid}:{lead_id}"
 
 
+# Lead excluído pela pessoa: fica uma lápide. Sem ela, qualquer coisa automática (a aba antiga do navegador sincronizando, a fila de envio, o
+# robô registrando quem respondeu) recriava o card no mesmo instante e o lead "voltava". Só uma ação da pessoa (salvar de novo, mover, agente) a remove.
+TIPO_LAPIDE = "pipeline_excluido"
+
+
+def _chave_lapide(uid: str, lead_id: str) -> str:
+    return f"pipeline-excluido:{uid}:{lead_id}"
+
+
+async def excluido_em(uid: str, lead_id: str) -> str:
+    """Quando a pessoa excluiu este lead (vazio se nunca excluiu ou se já o salvou de novo)."""
+    try:
+        d = await robo_store._sql_get(_chave_lapide(uid, lead_id))
+    except Exception:
+        return ""
+    return str((d or {}).get("em") or "")
+
+
+async def limpar_lapide(uid: str, lead_id: str) -> None:
+    """A pessoa quer o lead de volta (salvou de novo, moveu, escolheu agente): a lápide sai."""
+    try:
+        async with AsyncSessionLocal() as s:
+            row = (await s.execute(select(DBRobo).where(DBRobo.chave == _chave_lapide(uid, lead_id)))).scalar_one_or_none()
+            if row:
+                await s.delete(row)
+                await s.commit()
+    except Exception as exc:
+        print(f"Pipeline: não limpou a lápide do lead: {exc}")
+
+
+async def _lapides(uid: str) -> Dict[str, str]:
+    try:
+        async with AsyncSessionLocal() as s:
+            rows = (await s.execute(select(DBRobo).where(DBRobo.uid == uid, DBRobo.tipo == TIPO_LAPIDE))).scalars().all()
+        return {str(r.chave).rsplit(":", 1)[-1]: str((r.data or {}).get("em") or "") for r in rows}
+    except Exception:
+        return {}
+
+
 def _doc(uid: str, lead_id: str):
     return firestore_db.collection("users").document(uid).collection("pipeline").document(lead_id)
 
@@ -180,6 +219,10 @@ async def listar(uid: str) -> List[Dict[str, Any]]:
             rows = (await s.execute(select(DBRobo).where(DBRobo.uid == uid, DBRobo.tipo == "pipeline"))).scalars().all()
             itens = [dict(r.data or {}) for r in rows]
         lido = sql_principal          # com o Postgres como fonte, a leitura também pode ser guardada por alguns segundos
+    lapides = await _lapides(uid)
+    if lapides:
+        # excluído pela pessoa e não mexido depois: não aparece (cobre cópia antiga no Firestore ou no outro banco)
+        itens = [i for i in itens if not (i.get("id") in lapides and str(i.get("atualizado") or "") <= lapides[i["id"]])]
     for i in itens:
         i["etapa"] = etapa_valida(i.get("etapa", "")) or "Novo Lead"
     itens.sort(key=lambda i: i.get("atualizado") or "", reverse=True)
@@ -226,6 +269,13 @@ async def registrar_varios(uid: str, leads: List[Dict[str, Any]], origem: str = 
         if not lead_id:
             continue
         existente = await _ler(uid, lead_id)
+        lapide = await excluido_em(uid, lead_id)
+        if lapide:
+            # a pessoa excluiu este lead. Só volta se ela o salvou DEPOIS (salvo_em mais novo que a exclusão); a aba antiga com a cópia velha não conta
+            if str(lead.get("salvo_em") or "") > lapide:
+                await limpar_lapide(uid, lead_id)
+            else:
+                continue
         foto = _foto(lead)
         if existente and origem != "busca" and existente.get("origem") == "busca":
             existente["origem"] = origem
@@ -311,6 +361,11 @@ async def achar_por_telefone(uid: str, telefone: str) -> Optional[Dict[str, Any]
 
 async def apagar(uid: str, lead_id: str) -> None:
     _esquecer_lista(uid)
+    # a lápide primeiro: mesmo que a remoção abaixo falhe em um dos bancos, o lead não volta
+    try:
+        await robo_store._sql_put(_chave_lapide(uid, lead_id), uid, TIPO_LAPIDE, {"em": agora()})
+    except Exception as exc:
+        print(f"Pipeline: não gravou a lápide do lead excluído: {exc}")
     # com o SQL como fonte o Firestore nem é tocado; se este usuário ainda não foi copiado de lá, apaga lá também (senão voltaria na cópia)
     if firestore_db is not None and not (robo_store._sql_primeiro() and await robo_store.ja_importado(uid, COLECAO)):
         try:

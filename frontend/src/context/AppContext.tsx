@@ -17,7 +17,7 @@ import type { LeadItem, PipelineItem, SearchHistoryItem, SuggestedNiche, UserPro
 const CAMPOS_PIPELINE = [
   'id', 'name', 'company', 'phone', 'email', 'niche', 'city', 'website', 'instagram',
   'rating', 'rating_count', 'missingDigitalAssets', 'diagnosis', 'hooks', 'opportunityScore',
-  'maps_url', 'pipeline_stage',
+  'maps_url', 'pipeline_stage', 'salvo_em',
 ] as const;
 
 const fotoDoLead = (l: LeadItem): Record<string, unknown> => {
@@ -322,6 +322,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const leadsRef = useRef<LeadItem[]>(leads);
   leadsRef.current = leads;
   const sincronizados = useRef<Set<string>>(new Set());
+  // leads que a pessoa excluiu e o servidor ainda não confirmou: nunca voltam à tela, e a exclusão é repetida até o servidor parar de listá-los
+  const removidos = useRef<Set<string>>(new Set());
 
   const atualizarPipeline = useCallback(async () => {
     if (!auth.currentUser) return;
@@ -331,7 +333,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await api.pipelineSincronizar(novos.slice(0, 300).map(fotoDoLead));
         novos.forEach(l => sincronizados.current.add(l.id));
       }
-      const { itens } = await api.pipelineListar();
+      const { itens: todos } = await api.pipelineListar();
+      // o servidor ainda lista algo que a pessoa excluiu (a exclusão falhou ou ainda não chegou): repete a exclusão e não mostra
+      const pendentes = todos.filter(i => removidos.current.has(i.id));
+      pendentes.forEach(i => { void api.pipelineRemover(i.id).catch(() => {}); });
+      const naLista = new Set(todos.map(i => i.id));
+      Array.from(removidos.current).forEach(id => { if (!naLista.has(id)) removidos.current.delete(id); });
+      const itens = todos.filter(i => !removidos.current.has(i.id));
+      leadsRef.current = leadsRef.current.filter(l => !removidos.current.has(l.id));
       const sairam = nomesDosQueSairam(leadsRef.current, itens);
       if (sairam.length) setSaidasDaRegua(prev => Array.from(new Set([...prev, ...sairam])));
       leadsRef.current = leadsRef.current.filter(l => !saiuPelaRegua(l, itens.find(i => i.id === l.id)));
@@ -363,6 +372,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const salvarLeads = useCallback(async (ids: string[]) => {
     const alvo = new Set(ids);
+    ids.forEach(id => removidos.current.delete(id));        // salvar de novo é pedir o lead de volta
     const agora = new Date().toISOString();
     // o carimbo diz quando entrou em Meus Leads (a fila de envio mostra os mais novos primeiro); quem já tinha carimbo o mantém
     setLeads(prev => prev.map(l => alvo.has(l.id) ? { ...l, salvo: true, salvo_em: l.salvo === true && l.salvo_em ? l.salvo_em : agora, pipeline_stage: l.pipeline_stage || 'Novo Lead' } : l));
@@ -372,8 +382,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const removerLeads = useCallback(async (ids: string[]) => {
     const alvo = new Set(ids);
+    ids.forEach(id => removidos.current.add(id));
     setLeads(prev => prev.filter(l => !alvo.has(l.id)));
+    leadsRef.current = leadsRef.current.filter(l => !alvo.has(l.id));
     ids.forEach(id => sincronizados.current.delete(id));
+    // se o servidor recusar (queda, banco lento), o id continua em "removidos": a próxima atualização do pipeline repete a exclusão
     await Promise.all(ids.map(id => api.pipelineRemover(id).catch(() => {})));
   }, []);
 

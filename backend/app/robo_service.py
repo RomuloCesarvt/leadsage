@@ -140,6 +140,8 @@ async def _achar_ou_criar_no_pipeline(
                 return item
             # não está no pipeline (ou o telefone não casou): quem recebeu a nossa abordagem é o lead de verdade, não um "contato novo"
             original = await _lead_pela_fila(uid, msg.contato)
+            if original and await pipeline_store.excluido_em(uid, original["id"]):
+                original = None         # a pessoa excluiu este lead: a resposta vira conversa, mas o card antigo não ressurge
             if original:
                 existente = await pipeline_store.obter(uid, original["id"])
                 item = existente or await pipeline_store.registrar(uid, original, etapa="Respondeu", origem="fila_de_envio")
