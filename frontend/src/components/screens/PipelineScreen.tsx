@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 import type { LeadItem } from '../../types';
 import { GripVertical, Phone, MessageCircle, Bot, RefreshCw, UserRound, Check, ChevronDown, Trash2 } from 'lucide-react';
 import { AvisoReguaConcluida } from '../AvisoReguaConcluida';
+import { lerFiltroDoPipeline } from '../../lib/atalhosDoPainel';
 import { AnaliseDoPipeline, FaixaDeTags, COR_DA_TAG } from '../AnaliseDoPipeline';
 import { modoAtivoAtual } from '../../services/api';
 import { acoesDoCard, agenteDe, AGENTES_PADRAO, etiquetasDoCard, haQuanto, type Tom } from '../../lib/cardPipeline';
@@ -53,7 +54,7 @@ export const PipelineScreen: React.FC = () => {
   };
   const [atualizando, setAtualizando] = React.useState(false);
   // filtro por tag de qualificação (vazio = todos)
-  const [filtroTag, setFiltroTag] = React.useState('');
+  const [filtroTag, setFiltroTag] = React.useState(() => lerFiltroDoPipeline());
   const empresa = modoAtivoAtual() === 'empresa';
   // cartão com o seletor de agente aberto
   const [agenteAberto, setAgenteAberto] = React.useState<string | null>(null);

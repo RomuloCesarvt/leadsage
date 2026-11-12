@@ -5,9 +5,11 @@ import { api } from '../../services/api';
 import type { DesempenhoPorSegmento } from '../../types';
 import { agrupar, destaques as destaquesDe, segmentosDasLinhas, type Visao } from '../../lib/desempenho';
 import { useApp } from '../../context/AppContext';
+import { PrecisaDeVoce } from '../PrecisaDeVoce';
+import { pedirFiltroDoPipeline } from '../../lib/atalhosDoPainel';
 
 export const DashboardScreen: React.FC = () => {
-  const { setViewState, leads: todos, history, user } = useApp() as any;
+  const { setViewState, leads: todos, history, user, setSelectedProfileLead } = useApp() as any;
   const leads = (todos as any[]).filter(ehSalvo);
 
   // quais segmentos (ramos) respondem mais, mostram mais interesse e mais pedem o link da prévia
@@ -26,6 +28,8 @@ export const DashboardScreen: React.FC = () => {
   const highOpportunity = leads.filter((l: any) => (l.opportunityScore || l.quality_score || 0) >= 80).length;
   const pipelineActive = leads.filter((l: any) => l.pipeline_stage && l.pipeline_stage !== 'Novos' && l.pipeline_stage !== 'Novo Lead').length;
   const avgScore = totalLeads > 0 ? Math.round(leads.reduce((sum: number, l: any) => sum + (l.opportunityScore || l.quality_score || 0), 0) / totalLeads) : 0;
+  const empresa = user?.modo === 'empresa';
+  const quentes = leads.filter((l: any) => ['precisa_voce', 'preco', 'quente'].includes(l.qualificacao?.id)).length;
   const noWebsite = leads.filter((l: any) => l.missingDigitalAssets?.includes('website') || (!l.website && !l.socials?.website)).length;
   const withWhatsapp = leads.filter((l: any) => l.whatsapp === true).length;
   const followUps = leads.filter((l: any) => l.outreach_status === 'Enviado' || l.outreach_status === 'Entregue').length;
@@ -63,7 +67,8 @@ export const DashboardScreen: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         
         {/* Card 1 */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col justify-between h-48">
+        <div role="button" tabIndex={0} title="Abrir Meus Leads" onClick={() => setViewState('workspace')} onKeyDown={e => { if (e.key === 'Enter') setViewState('workspace'); }}
+          className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col justify-between h-48 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all">
           <div className="flex justify-between items-start">
             <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">Leads Encontrados</span>
             <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
@@ -77,7 +82,8 @@ export const DashboardScreen: React.FC = () => {
         </div>
 
         {/* Card 2 (Blue Theme) */}
-        <div className="bg-blue-600 rounded-2xl p-6 shadow-sm flex flex-col justify-between h-48">
+        <div role="button" tabIndex={0} title="Ver os leads de maior oportunidade" onClick={() => setViewState('workspace')} onKeyDown={e => { if (e.key === 'Enter') setViewState('workspace'); }}
+          className="bg-blue-600 rounded-2xl p-6 shadow-sm flex flex-col justify-between h-48 cursor-pointer hover:bg-blue-700 hover:shadow-md transition-all">
           <div className="flex justify-between items-start">
             <span className="text-xs font-bold tracking-widest text-blue-100 uppercase">Oportunidades Altas</span>
             <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
@@ -91,7 +97,8 @@ export const DashboardScreen: React.FC = () => {
         </div>
 
         {/* Card 3 */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col justify-between h-48">
+        <div role="button" tabIndex={0} title="Abrir o pipeline" onClick={() => { pedirFiltroDoPipeline(''); setViewState('pipeline'); }} onKeyDown={e => { if (e.key === 'Enter') setViewState('pipeline'); }}
+          className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col justify-between h-48 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all">
           <div className="flex justify-between items-start">
             <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">Pipeline Ativo</span>
             <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-col gap-0.5">
@@ -109,7 +116,7 @@ export const DashboardScreen: React.FC = () => {
       {/* Row 2: 4 Small Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center gap-4">
+        <div role="button" tabIndex={0} title="Ver os leads" onClick={() => setViewState('workspace')} onKeyDown={e => { if (e.key === 'Enter') setViewState('workspace'); }} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center gap-4 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all">
           <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center shrink-0">
             <Zap className="w-5 h-5 text-slate-400" />
           </div>
@@ -119,17 +126,17 @@ export const DashboardScreen: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center gap-4">
+        <div role="button" tabIndex={0} title="Ver os leads sem site" onClick={() => setViewState('workspace')} onKeyDown={e => { if (e.key === 'Enter') setViewState('workspace'); }} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center gap-4 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all">
           <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center shrink-0">
             <Globe className="w-5 h-5 text-slate-400" />
           </div>
           <div>
-            <span className="text-xs font-bold text-slate-400">Sem Website</span>
-            <div className="text-2xl font-bold text-slate-800 leading-none mt-1">{noWebsite}</div>
+            <span className="text-xs font-bold text-slate-400">{empresa ? 'Pedem atenção' : 'Sem Website'}</span>
+            <div className="text-2xl font-bold text-slate-800 leading-none mt-1">{empresa ? quentes : noWebsite}</div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center gap-4">
+        <div role="button" tabIndex={0} title="Enviar mensagem para quem tem WhatsApp" onClick={() => setViewState('fila')} onKeyDown={e => { if (e.key === 'Enter') setViewState('fila'); }} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center gap-4 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all">
           <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center shrink-0">
             <MessageCircle className="w-5 h-5 text-slate-400" />
           </div>
@@ -139,7 +146,7 @@ export const DashboardScreen: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center gap-4">
+        <div role="button" tabIndex={0} title="Ver quem está em acompanhamento" onClick={() => setViewState('pipeline')} onKeyDown={e => { if (e.key === 'Enter') setViewState('pipeline'); }} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center gap-4 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all">
           <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center shrink-0">
             <Target className="w-5 h-5 text-slate-400" />
           </div>
@@ -150,6 +157,8 @@ export const DashboardScreen: React.FC = () => {
         </div>
 
       </div>
+
+      <PrecisaDeVoce leads={leads} ir={setViewState} abrirLead={(l) => setSelectedProfileLead(l)} />
 
       {/* Row 3: Seu Uso */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -227,7 +236,8 @@ export const DashboardScreen: React.FC = () => {
               const widthPct = totalLeads > 0 ? Math.round((stage.count / maxStageCount) * 100) : 0;
               const pctLabel = totalLeads > 0 ? `${Math.round((stage.count / totalLeads) * 100)}%` : '0%';
               return (
-                <div key={i} className="flex items-center gap-2 sm:gap-4 group">
+                <div key={i} role="button" tabIndex={0} title={`Ver ${stage.label} no pipeline`} onClick={() => { pedirFiltroDoPipeline(''); setViewState('pipeline'); }}
+                  onKeyDown={e => { if (e.key === 'Enter') setViewState('pipeline'); }} className="flex items-center gap-2 sm:gap-4 group cursor-pointer">
                   <div className="w-28 sm:w-40 shrink-0 flex items-center gap-2 text-[13px] sm:text-sm font-medium text-slate-700 leading-tight">
                     <span className={`w-2 h-2 rounded-full ${stage.dot}`}></span>
                     {stage.label}
