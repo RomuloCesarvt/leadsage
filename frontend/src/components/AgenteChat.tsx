@@ -103,10 +103,10 @@ export const AgenteChat: React.FC = () => {
     if (!searchId) return;
     try {
       const { leads } = await api.agenteBusca(searchId);
-      setLeads((prev: any[]) => {
-        const tem = new Set(prev.map(l => l.id));
-        return [...prev, ...leads.filter((l: any) => !tem.has(l.id)).map((l: any) => ({ ...l, salvo: true }))];
-      });
+      // os leads novos vão para o TOPO da lista (os antigos ficam logo abaixo)
+      const novos = leads.map((l: any) => ({ ...l, salvo: true }));
+      const ids = new Set(novos.map((l: any) => l.id));
+      setLeads((prev: any[]) => [...novos, ...prev.filter(l => !ids.has(l.id))]);
       setAberto(false);
       setViewState('workspace');
     } catch (err: any) { setErro(err?.message || 'Não consegui abrir os leads.'); }
