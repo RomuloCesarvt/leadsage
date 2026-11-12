@@ -13,6 +13,7 @@ import {
   Bot, Settings2, FlaskConical, Send, AlertTriangle, Plug,
   Copy, Check, Lock, ExternalLink,
 } from 'lucide-react';
+import { Recolhivel } from '../Recolhivel';
 import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { WhatsAppIcon, InstagramIcon, FacebookIcon } from '../BrandIcons';
@@ -305,13 +306,14 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
     }
   };
 
+  // no celular o Salvar fica sempre à vista, acima do menu de baixo: com tantas seções, rolar até o fim para salvar era o que mais se perdia
   const barraSalvar = (
-    <div className="pt-2 flex justify-end items-center gap-4">
+    <div className="fixed md:static inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-30 bg-white md:bg-transparent border-t md:border-0 border-slate-200 shadow-[0_-6px_20px_-12px_rgba(15,23,42,.35)] md:shadow-none px-4 py-3 md:p-0 md:pt-2 flex justify-end items-center gap-3 md:gap-4">
       {estado === 'salvo' && <span className="text-sm font-semibold text-emerald-600 flex items-center gap-1.5"><Check className="w-4 h-4" /> Salvo</span>}
-      {estado === 'erro' && <span className="text-sm font-semibold text-red-600">{erro}</span>}
+      {estado === 'erro' && <span className="text-sm font-semibold text-red-600 min-w-0 flex-1 md:flex-none break-words">{erro}</span>}
       <button onClick={salvar} disabled={estado === 'salvando'}
-        className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl">
-        {estado === 'salvando' ? 'Salvando…' : 'Salvar'}
+        className="flex-1 md:flex-none min-h-12 md:min-h-0 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl">
+        {estado === 'salvando' ? 'Salvando…' : 'Salvar alterações'}
       </button>
     </div>
   );
@@ -321,29 +323,37 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
     return (
       <div className="space-y-5 pb-8">
         {/* a chave geral: tudo o mais so vale com o robo ligado */}
-        <div className={`rounded-2xl p-5 border flex items-center gap-4 ${form.ativo ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'}`}>
+        <div className={`rounded-2xl p-4 md:p-5 border flex items-center gap-4 ${form.ativo ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'}`}>
           <div className="flex-1">
-            <p className="font-bold text-slate-800">{form.ativo ? 'O robô está atendendo' : 'O robô está desligado'}</p>
-            <p className="text-sm text-slate-500">
+            <p className="font-bold text-base text-slate-900">{form.ativo ? 'O robô está atendendo' : 'O robô está desligado'}</p>
+            <p className="text-[13px] md:text-sm text-slate-500 leading-snug mt-0.5">
               {form.ativo
                 ? 'Ele responde quem escrever nos canais conectados. Você pode pausá-lo numa conversa específica.'
                 : 'Nada é respondido sozinho. Ligue quando terminar de configurar e testar.'}
             </p>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer shrink-0">
-            <span className="text-sm font-bold text-slate-600">{form.ativo ? 'Ligado' : 'Desligado'}</span>
-            <input type="checkbox" checked={!!form.ativo} onChange={e => ligarDesligar(e.target.checked)} className="w-10 h-5 accent-blue-600" aria-label="Ligar o robô" />
+          <label className="flex flex-col md:flex-row items-center gap-1.5 md:gap-2 cursor-pointer shrink-0 min-h-12 justify-center">
+            <input type="checkbox" checked={!!form.ativo} onChange={e => ligarDesligar(e.target.checked)} className="w-12 h-7 md:w-10 md:h-5 accent-blue-600" aria-label="Ligar o robô" />
+            <span className="text-xs md:text-sm font-bold text-slate-600">{form.ativo ? 'Ligado' : 'Desligado'}</span>
           </label>
         </div>
 
-        <MomentoDoValor valor={form.valor} onChange={v => mudar('valor', v)} empresa={empresa} />
+        <Recolhivel cartao titulo="Quando falar de valor" resumo={((form.valor as any)?.momentos?.length ? `${(form.valor as any).momentos.length} momento(s) escolhido(s)` : 'Padrão do sistema')}>
+          <MomentoDoValor valor={form.valor} onChange={v => mudar('valor', v)} empresa={empresa} />
+        </Recolhivel>
 
-        {empresa
-          ? <PromocaoDoServico promocao={form.promocao} servicoPadrao={(form.oferta as any)?.nome || ''} onPromocao={p => mudar('promocao', p)} />
-          : <AbordagemDoRobo estilo={form.estilo as any} promocao={form.promocao} onEstilo={e => mudar('estilo', e)} onPromocao={p => mudar('promocao', p)} />}
+        <Recolhivel cartao titulo={empresa ? 'Promoção do serviço' : 'Forma de abordar e promoção'}
+          resumo={`${empresa ? '' : (form.estilo === 'comercial' ? 'Comercial · ' : 'Consultiva · ')}${(form.promocao as any)?.ativa ? 'promoção ligada' : 'sem promoção'}`}>
+          {empresa
+            ? <PromocaoDoServico promocao={form.promocao} servicoPadrao={(form.oferta as any)?.nome || ''} onPromocao={p => mudar('promocao', p)} />
+            : <AbordagemDoRobo estilo={form.estilo as any} promocao={form.promocao} onEstilo={e => mudar('estilo', e)} onPromocao={p => mudar('promocao', p)} />}
+        </Recolhivel>
 
-        <OfertaDoRobo valor={form.oferta} onChange={o => mudar('oferta', o)} />
+        <Recolhivel cartao titulo="Serviço que o robô vende" resumo={(form.oferta as any)?.nome || 'Escolha o que ele oferece e pode prometer'}>
+          <OfertaDoRobo valor={form.oferta} onChange={o => mudar('oferta', o)} />
+        </Recolhivel>
 
+        <Recolhivel cartao titulo="Como ele conversa" resumo={form.meu_nome || form.minha_empresa ? `Fala como ${[form.meu_nome, form.minha_empresa].filter(Boolean).join(' · ')}` : 'Quem fala, objetivo, agenda e desconto'}>
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-5">
             <Bot className="w-5 h-5 text-blue-600" /> Como ele conversa
@@ -415,6 +425,9 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
           </div>
         </div>
 
+        </Recolhivel>
+
+        <Recolhivel cartao titulo="Regras e respostas prontas" resumo={(form.faq || form.instrucoes) ? 'Perguntas e regras cadastradas' : 'Nenhuma cadastrada'}>
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
           <h2 className="text-lg font-bold text-slate-800 mb-1">Regras e respostas prontas</h2>
           <p className="text-sm text-slate-500 mb-5">Preço e prazo ficam em "O que o robô vende". Aqui vai só o seu jeito de trabalhar.</p>
@@ -433,8 +446,10 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
             </div>
           </div>
         </div>
+        </Recolhivel>
 
         {barraSalvar}
+        <div className="h-16 md:hidden" aria-hidden="true" />
       </div>
     );
   }

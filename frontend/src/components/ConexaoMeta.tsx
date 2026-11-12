@@ -185,7 +185,7 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
             </p>
           </div>
           {waConectado ? (
-            <button onClick={() => desconectar('whatsapp')} className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 flex items-center gap-1.5">
+            <button onClick={() => desconectar('whatsapp')} className="w-full sm:w-auto min-h-11 sm:min-h-0 px-3 py-2 rounded-xl border border-slate-200 sm:border-0 text-sm sm:text-xs font-bold text-slate-600 sm:text-slate-500 hover:bg-slate-100 active:bg-slate-100 flex items-center justify-center gap-1.5">
               <Unplug className="w-3.5 h-3.5" /> Desconectar
             </button>
           ) : (
@@ -202,9 +202,9 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-6 shadow-sm">
+    <div className="sm:bg-white sm:border sm:border-slate-200 sm:rounded-2xl sm:p-6 sm:shadow-sm">
       <h2 className="text-lg font-bold text-slate-800 mb-1">Canais</h2>
-      <p className="text-sm text-slate-500 mb-5">Por onde o robô conversa. Comece pelo WhatsApp: é só escanear o QR code.</p>
+      <p className="text-[14px] sm:text-sm text-slate-500 mb-4 sm:mb-5">Por onde o robô conversa. Comece pelo WhatsApp: é só escanear o QR code.</p>
 
       {!disp.facebook && (
         <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-100 text-sm text-amber-800 flex gap-2">
@@ -219,7 +219,7 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
         <ConectorWhatsApp cfg={cfg} aoMudar={aoMudar} modo="pc" />
 
         {/* Instagram: conta profissional ligada a uma página do Facebook (API oficial da Meta) */}
-        <div className="p-4 rounded-xl border border-slate-200 space-y-2">
+        <div className="p-4 rounded-2xl sm:rounded-xl border border-slate-200 bg-white sm:bg-transparent space-y-2">
           <div className="flex flex-wrap items-center gap-4">
             <InstagramIcon className="w-7 h-7" />
             <div className="flex-1 min-w-[160px]">
@@ -233,12 +233,12 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
               </p>
             </div>
             {fbConectado ? (
-              <button onClick={() => desconectar('facebook')} className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 flex items-center gap-1.5">
+              <button onClick={() => desconectar('facebook')} className="w-full sm:w-auto min-h-11 sm:min-h-0 px-3 py-2 rounded-xl border border-slate-200 sm:border-0 text-sm sm:text-xs font-bold text-slate-600 sm:text-slate-500 hover:bg-slate-100 active:bg-slate-100 flex items-center justify-center gap-1.5">
                 <Unplug className="w-3.5 h-3.5" /> Desconectar
               </button>
             ) : (
               <button onClick={conectarFacebook} disabled={!disp.facebook || !!ocupado}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#833AB4] via-[#E1306C] to-[#F77737] disabled:opacity-40 text-white text-sm font-bold flex items-center gap-2">
+                className="w-full sm:w-auto min-h-12 sm:min-h-0 justify-center px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#833AB4] via-[#E1306C] to-[#F77737] disabled:opacity-40 text-white text-sm font-bold flex items-center gap-2">
                 {ocupado === 'facebook' ? <Loader2 className="w-4 h-4 animate-spin" /> : <InstagramIcon className="w-4 h-4" />}
                 Conectar Instagram
               </button>
@@ -249,18 +249,25 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
               Falta ativar no sistema: <b>{disp.faltando!.join('; ')}</b>.
             </div>
           )}
+          <details className="group rounded-xl border border-slate-200 bg-slate-50/60">
+          <summary className="list-none cursor-pointer min-h-11 px-3 flex items-center justify-between text-[14px] sm:text-sm font-bold text-slate-700">
+            Como conectar o Instagram <span className="text-slate-400 transition-transform group-open:rotate-180">▾</span>
+          </summary>
+          <div className="px-3 pb-3 space-y-2">
           {(!fbConectado || !cfg.ig_usuario) && (
-            <ol className="text-xs text-slate-600 list-decimal pl-5 space-y-0.5">
+            <ol className="text-[14px] sm:text-xs text-slate-600 list-decimal pl-5 space-y-1.5 sm:space-y-0.5">
               <li>No Instagram, mude a conta para <b>profissional</b> (Configurações → Tipo de conta).</li>
               <li>Ligue o Instagram a uma <b>página do Facebook</b> (Configurações → Conta → Página ligada).</li>
               <li>Clique em <b>Conectar Instagram</b>, entre com o Facebook e marque a página e o Instagram.</li>
               <li>No Instagram, ative <b>Permitir acesso às mensagens</b> (Configurações → Mensagens → Ferramentas conectadas).</li>
             </ol>
           )}
-          <p className="text-[11px] text-slate-500">
+          <p className="text-xs text-slate-500">
             Regra do Instagram: o robô responde a quem escreveu primeiro (até 24 h depois). A primeira mensagem para um lead que nunca falou com você segue pelo
             link que abre a conversa pronta. Messenger vem junto, pela mesma página.
           </p>
+          </div>
+          </details>
         </div>
 
         {cfg.paginas_pendentes?.length > 0 && (
@@ -279,7 +286,7 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
         )}
 
         {/* Telegram */}
-        <div className="p-4 rounded-xl border border-slate-200 space-y-3">
+        <div className="p-4 rounded-2xl sm:rounded-xl border border-slate-200 bg-white sm:bg-transparent space-y-3">
           <div className="flex flex-wrap items-center gap-4">
             <TelegramIcon className="w-7 h-7 text-[#26A5E4]" />
             <div className="flex-1 min-w-[160px]">
@@ -291,31 +298,36 @@ export const ConexaoMeta: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConfig) =
               </p>
             </div>
             {cfg.telegram_pronto && (
-              <button onClick={desconectarTelegram} className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 flex items-center gap-1.5">
+              <button onClick={desconectarTelegram} className="w-full sm:w-auto min-h-11 sm:min-h-0 px-3 py-2 rounded-xl border border-slate-200 sm:border-0 text-sm sm:text-xs font-bold text-slate-600 sm:text-slate-500 hover:bg-slate-100 active:bg-slate-100 flex items-center justify-center gap-1.5">
                 <Unplug className="w-3.5 h-3.5" /> Desconectar
               </button>
             )}
           </div>
           {!cfg.telegram_pronto && (
             <div className="space-y-2">
-              <ol className="text-xs text-slate-600 list-decimal pl-5 space-y-0.5">
-                <li>No Telegram, abra o <b>@BotFather</b> e mande <b>/newbot</b>.</li>
-                <li>Escolha o nome e o usuário do bot. Ele devolve um token.</li>
-                <li>Cole o token abaixo.</li>
-              </ol>
+              <details className="group rounded-xl border border-slate-200 bg-slate-50/60">
+                <summary className="list-none cursor-pointer min-h-11 px-3 flex items-center justify-between text-[14px] sm:text-sm font-bold text-slate-700">
+                  Como conseguir o token <span className="text-slate-400 transition-transform group-open:rotate-180">▾</span>
+                </summary>
+                <ol className="px-3 pb-3 pl-8 text-[14px] sm:text-xs text-slate-600 list-decimal space-y-1.5 sm:space-y-0.5">
+                  <li>No Telegram, abra o <b>@BotFather</b> e mande <b>/newbot</b>.</li>
+                  <li>Escolha o nome e o usuário do bot. Ele devolve um token.</li>
+                  <li>Cole o token no campo abaixo.</li>
+                </ol>
+              </details>
               <div className="flex flex-wrap gap-2">
                 <input
                   type="password" autoComplete="off" value={tokenTg} onChange={e => setTokenTg(e.target.value)}
                   placeholder="123456789:AAE…"
-                  className="flex-1 min-w-[200px] px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white"
+                  className="flex-1 min-w-[200px] min-h-12 sm:min-h-0 px-3 py-2.5 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white"
                 />
                 <button onClick={conectarTelegram} disabled={!tokenTg.trim() || !!ocupado}
-                  className="px-4 py-2.5 rounded-xl bg-[#26A5E4] hover:bg-[#1E96D1] disabled:opacity-40 text-white text-sm font-bold flex items-center gap-2">
+                  className="w-full sm:w-auto min-h-12 sm:min-h-0 justify-center px-4 py-2.5 rounded-xl bg-[#26A5E4] hover:bg-[#1E96D1] disabled:opacity-40 text-white text-sm font-bold flex items-center gap-2">
                   {ocupado === 'telegram' ? <Loader2 className="w-4 h-4 animate-spin" /> : <TelegramIcon className="w-4 h-4" />}
                   Conectar bot
                 </button>
               </div>
-              <p className="text-[11px] text-slate-500">O Telegram só deixa o bot falar com quem falou com ele primeiro. Coloque o link do bot no site, no e-mail e no cartão.</p>
+              <p className="text-xs text-slate-500">O Telegram só deixa o bot falar com quem falou com ele primeiro. Coloque o link do bot no site, no e-mail e no cartão.</p>
             </div>
           )}
         </div>
