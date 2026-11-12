@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
+import { useCelular } from '../../lib/useCelular';
 import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { modoDaConta } from '../../lib/modoDaConta';
@@ -12,6 +13,9 @@ export const SubscriptionScreen: React.FC = () => {
   const [pagamentoAtivo, setPagamentoAtivo] = useState(false);     // o servidor diz se a cobrança mensal está configurada de verdade
   const [abrindo, setAbrindo] = useState('');
   const [aviso, setAviso] = useState('');
+  const celular = useCelular();
+  const [planoId, setPlanoId] = useState<string>(() => (PLANOS_MENSAIS.find(x => x.destaque) || PLANOS_MENSAIS[0]).id);
+  const [verTudo, setVerTudo] = useState(false);
   const voltouDoPagamento = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('assinatura');
 
   useEffect(() => { api.assinaturaConfig().then(c => setPagamentoAtivo(Boolean(c.ativo))); }, []);
@@ -48,6 +52,145 @@ export const SubscriptionScreen: React.FC = () => {
   const nomeDoPlano = PLANOS_MENSAIS.find(p => `m_${p.id}` === (user?.assinatura_plano || '').replace(/_robo$/, ''))?.nome;
   const dataBr = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '');
   const statusTexto: Record<string, string> = { authorized: 'Ativa', paused: 'Pausada', cancelled: 'Cancelada (vale até o fim do período pago)' };
+
+
+  if (celular) {
+    const p = PLANOS_MENSAIS.find(x => x.id === planoId) || PLANOS_MENSAIS[0];
+    const idServidor = idNoServidor(p, comRobo);
+    const comRoboAgora = p.robo === 'incluso' || comRobo;
+    const entregas = entregasDoPlano(p, modo);
+    const mostradas = verTudo ? entregas : entregas.slice(0, 5);
+    const rotuloCta = !pagamentoAtivo ? 'Assinatura mensal em breve' : abrindo === idServidor ? 'Abrindo pagamento…' : `Assinar ${p.nome}${comRobo && p.robo === 'complemento' ? ' com robô' : ''}`;
+    return (
+      <div className="flex-1 w-full pb-28" data-testid="assinatura-celular">
+        <h1 className="text-2xl font-black tracking-tight text-slate-900">Planos</h1>
+        <p className="text-[15px] text-slate-500 mt-1">Modo <b className="text-slate-700">{modo === 'empresa' ? 'Empresa' : 'Agência'}</b>: as entregas abaixo são as do seu modo.</p>
+
+        {aviso && <div className="mt-4 p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-[14px] font-semibold">{aviso}</div>}
+        {user?.licenca_expirada && (
+          <div className="mt-4 p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-[14px] font-semibold">
+            Sua assinatura venceu e sua conta voltou para a Prévia. Seus dados estão guardados: assine de novo para recuperar tudo.
+          </div>
+        )}
+        {user?.assinatura_plano && !user?.licenca_expirada && (
+          <div className="mt-4 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Sua assinatura</p>
+            <p className="text-lg font-black text-slate-900 leading-tight mt-0.5">{nomeDoPlano || user.assinatura_plano}{user.assinatura_plano.endsWith('_robo') ? ' + Robô de IA' : ''}</p>
+            <p className="text-[14px] text-slate-500 mt-1">{statusTexto[user.assinatura_status || ''] || '—'} · válida até <b>{dataBr(user.licenca_ate)}</b></p>
+            {user.assinatura_status === 'authorized' && (
+              <button onClick={cancelar} className="mt-3 w-full min-h-12 rounded-xl border border-slate-300 text-[15px] font-bold text-slate-600 active:bg-slate-100">Cancelar assinatura</button>
+            )}
+          </div>
+        )}
+
+        {/* escolhe o plano: três botões grandes com o preço, um plano de cada vez */}
+        <div className="mt-5 grid grid-cols-3 gap-2" role="tablist" aria-label="Planos">
+          {PLANOS_MENSAIS.map(x => {
+            const ativo = x.id === p.id;
+            return (
+              <button key={x.id} type="button" role="tab" aria-selected={ativo} onClick={() => { setPlanoId(x.id); setVerTudo(false); }}
+                className={`relative min-h-16 rounded-2xl border-2 px-1 py-2 flex flex-col items-center justify-center transition-colors ${ativo ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white active:bg-slate-50'}`}>
+                {x.destaque && <span className="absolute -top-2.5 bg-blue-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">Mais escolhido</span>}
+                <span className={`text-[15px] font-black leading-tight ${ativo ? 'text-blue-700' : 'text-slate-800'}`}>{x.nome}</span>
+                <span className="text-[13px] font-bold text-slate-500">R$ {comRobo ? precoComRobo(x) : x.preco}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* o robô de IA: uma chave só, em largura total */}
+        <div className="mt-3 grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-2xl" role="radiogroup" aria-label="Robô de atendimento">
+          <button type="button" role="radio" aria-checked={!comRobo} onClick={() => setComRobo(false)}
+            className={`min-h-12 rounded-xl text-[15px] font-bold transition-all ${!comRobo ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600'}`}>Só o plano</button>
+          <button type="button" role="radio" aria-checked={comRobo} onClick={() => setComRobo(true)}
+            className={`min-h-12 rounded-xl text-[15px] font-bold leading-tight transition-all ${comRobo ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600'}`}>Com robô de IA</button>
+        </div>
+
+        <section className={`mt-4 rounded-3xl bg-white p-5 border ${p.destaque ? 'border-2 border-blue-500 shadow-lg shadow-blue-500/10' : 'border-slate-200 shadow-sm'}`}>
+          <h2 className={`text-xl font-black ${p.destaque ? 'text-blue-600' : 'text-slate-900'}`}>{p.nome}</h2>
+          <p className="text-[15px] text-slate-500 mt-0.5">{p.chamada}</p>
+          <div className="flex items-end gap-1 mt-4">
+            <span className="text-lg font-bold text-slate-500 mb-1.5">R$</span>
+            <span className="text-6xl leading-none font-black tracking-tighter text-slate-900">{comRobo ? precoComRobo(p) : p.preco}</span>
+            <span className="text-base font-bold text-slate-400 mb-1.5">/mês</span>
+          </div>
+          <p className="text-[14px] text-slate-600 mt-2 leading-snug">
+            {p.robo === 'incluso'
+              ? 'Robô de atendimento com IA já incluso.'
+              : comRobo ? `R$ ${p.preco} do plano + R$ ${ROBO_COMPLEMENTO} do robô de IA.` : `Sem o robô de IA. Com o robô: R$ ${precoComRobo(p)}/mês.`}
+          </p>
+          <p className="inline-block mt-3 text-[13px] font-bold text-slate-700 bg-slate-100 rounded-full px-3 py-1">{p.leads.toLocaleString('pt-BR')} leads por mês</p>
+
+          <ul className="mt-5 space-y-3">
+            {mostradas.map(t => (
+              <li key={t} className="flex items-start gap-3 text-[15px] leading-snug text-slate-700">
+                <span className="w-6 h-6 mt-px rounded-full bg-emerald-50 flex items-center justify-center shrink-0"><Check className="w-4 h-4 text-emerald-600" /></span>
+                {t}
+              </li>
+            ))}
+          </ul>
+          {entregas.length > 5 && (
+            <button type="button" onClick={() => setVerTudo(v => !v)} className="mt-3 w-full min-h-12 rounded-xl border border-slate-300 text-[15px] font-bold text-slate-700 active:bg-slate-100 flex items-center justify-center gap-2">
+              {verTudo ? 'Ver menos' : `Ver tudo o que inclui (${entregas.length})`}
+              <ChevronDown className={`w-4 h-4 transition-transform ${verTudo ? 'rotate-180' : ''}`} />
+            </button>
+          )}
+
+          <details className={`mt-4 rounded-2xl border p-4 group ${comRoboAgora ? 'border-blue-200 bg-blue-50/60' : 'border-slate-200 bg-slate-50'}`}>
+            <summary className="list-none cursor-pointer min-h-11 flex items-center justify-between gap-3">
+              <span>
+                <span className="block text-[15px] font-black text-slate-900 leading-tight">Robô de atendimento com IA</span>
+                <span className={`inline-block mt-1 text-[12px] px-2 py-0.5 rounded-full font-bold ${comRoboAgora ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                  {p.robo === 'incluso' ? 'Incluso' : comRobo ? `+R$ ${ROBO_COMPLEMENTO}/mês` : `Opcional: +R$ ${ROBO_COMPLEMENTO}/mês`}
+                </span>
+              </span>
+              <ChevronDown className="w-5 h-5 text-slate-400 shrink-0 transition-transform group-open:rotate-180" />
+            </summary>
+            <ul className="mt-3 space-y-2.5">
+              {entregasDoRobo(p).map(t => (
+                <li key={t} className={`flex items-start gap-2.5 text-[14px] leading-snug ${comRoboAgora ? 'text-slate-700' : 'text-slate-500'}`}>
+                  <Check className={`w-4 h-4 mt-0.5 shrink-0 ${comRoboAgora ? 'text-blue-600' : 'text-slate-400'}`} /> {t}
+                </li>
+              ))}
+            </ul>
+            {p.robo === 'complemento' && !comRobo && (
+              <button type="button" onClick={() => setComRobo(true)} className="mt-3 w-full min-h-11 rounded-xl bg-white border border-blue-200 text-[14px] font-bold text-blue-700 active:bg-blue-50">Ver preço com o robô de IA</button>
+            )}
+          </details>
+        </section>
+
+        <details className="mt-5 rounded-2xl bg-white border border-slate-200 p-4">
+          <summary className="list-none cursor-pointer min-h-11 flex items-center justify-between gap-3">
+            <span className="text-[16px] font-black text-slate-900">Por que o LeadSage</span>
+            <ChevronDown className="w-5 h-5 text-slate-400" />
+          </summary>
+          <ul className="mt-3 divide-y divide-slate-100">
+            {diferenciais(modo).map(d => (
+              <li key={d.titulo} className="py-3">
+                <p className="text-[15px] font-bold text-slate-800">{d.titulo}</p>
+                <p className="text-[14px] text-slate-500 mt-0.5 leading-snug">{d.texto}</p>
+              </li>
+            ))}
+          </ul>
+        </details>
+        <p className="text-[13px] text-slate-500 mt-5 leading-snug">
+          Quer os dois modos (Agência e Empresa)? O segundo custa R$ {MODO_EXTRA}/mês a mais. Leads e conversas extras podem ser comprados avulsos quando a cota acaba.
+        </p>
+
+        {/* barra de assinar: sempre à vista, acima do menu de baixo */}
+        <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-30 bg-white border-t border-slate-200 shadow-[0_-6px_20px_-12px_rgba(15,23,42,.35)] px-4 py-3 flex items-center gap-3">
+          <div className="min-w-0">
+            <p className="text-[13px] font-bold text-slate-500 leading-tight">{p.nome}</p>
+            <p className="text-lg font-black text-slate-900 leading-tight">R$ {comRobo ? precoComRobo(p) : p.preco}<span className="text-sm font-bold text-slate-400">/mês</span></p>
+          </div>
+          <button disabled={!pagamentoAtivo || abrindo !== ''} onClick={() => void assinar(idServidor)}
+            className={`flex-1 min-h-12 rounded-xl text-[15px] font-bold ${pagamentoAtivo ? 'bg-blue-600 active:bg-blue-700 text-white' : 'bg-slate-200 text-slate-500'} disabled:cursor-not-allowed`}>
+            {rotuloCta}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col h-full relative max-w-6xl mx-auto w-full pb-12 pt-8">

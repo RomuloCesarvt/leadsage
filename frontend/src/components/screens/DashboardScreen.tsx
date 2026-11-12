@@ -160,25 +160,6 @@ export const DashboardScreen: React.FC = () => {
 
       <PrecisaDeVoce leads={leads} ir={setViewState} abrirLead={(l) => setSelectedProfileLead(l)} />
 
-      {/* Row 3: Seu Uso */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <span className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-2 block">Seu Uso</span>
-          <div className="flex gap-6 text-sm font-bold text-slate-800">
-            <span>Créditos: <span className="font-medium text-slate-600">{user?.semDados ? '—' : (user?.credits ?? 0)} restantes</span></span>
-            <span>Plano: <span className="font-medium text-slate-600">{user?.plan ?? 'Free'}</span></span>
-          </div>
-        </div>
-        {!user?.oculta_assinatura && (
-          <button 
-            onClick={() => setViewState('subscription')}
-            className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm transition-colors w-full md:w-auto"
-          >
-            Ver detalhes
-          </button>
-        )}
-      </div>
-
       {/* Row 4: Buscas Recentes & Funil de Vendas */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         

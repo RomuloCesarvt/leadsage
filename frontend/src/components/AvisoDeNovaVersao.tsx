@@ -22,16 +22,29 @@ export const AvisoDeNovaVersao = () => {
     const aberto = arquivoAberto();
     if (!aberto) return; // desenvolvimento ou app nativo: não há o que conferir
     let parado = false;
-    const conferir = async () => {
+    // quem volta ao app depois de um tempo fora recebe a versão nova sozinho (sem aviso), desde que nada esteja sendo digitado nem gerado
+    const digitando = () => {
+      const e = document.activeElement as HTMLElement | null;
+      return !!e && (/^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName) || e.isContentEditable);
+    };
+    let saiuEm = 0;
+    const conferir = async (voltouAgora = false) => {
       try {
         const r = await fetch('/', { cache: 'no-store' });
         const html = await r.text();
         const atual = html.match(/\/assets\/(index-[^"'/]+\.js)/)?.[1];
-        if (!parado && atual && atual !== aberto) setNova(true);
+        if (parado || !atual || atual === aberto) return;
+        if (voltouAgora && !emAndamento() && !digitando()) { window.location.reload(); return; }
+        setNova(true);
       } catch { /* sem rede: confere na próxima */ }
     };
-    const ao = () => { if (document.visibilityState === 'visible') void conferir(); };
-    const t = setInterval(conferir, 3 * 60 * 1000);
+    const ao = () => {
+      if (document.visibilityState === 'hidden') { saiuEm = Date.now(); return; }
+      const fora = saiuEm ? Date.now() - saiuEm : 0;
+      saiuEm = 0;
+      void conferir(fora > 2 * 60 * 1000);
+    };
+    const t = setInterval(() => { void conferir(); }, 3 * 60 * 1000);
     document.addEventListener('visibilitychange', ao);
     void conferir();
     return () => { parado = true; clearInterval(t); document.removeEventListener('visibilitychange', ao); };
