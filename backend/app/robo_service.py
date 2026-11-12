@@ -34,6 +34,17 @@ PRAZO_IA = 22.0
 
 CUSTO_RESPOSTA = 1
 
+
+async def _cobrar_resposta(uid: str, email: str, plan_id: str):
+    """Paga uma resposta do robô: primeiro pela cota de conversas do mês do plano (se tiver), depois por 1 crédito de lead. None = sem como pagar."""
+    from app import robo_cota
+    try:
+        if not acesso_total(email) and await robo_cota.tentar_cota(uid, plan_id):
+            return True
+    except Exception as exc:
+        print(f"Robô: cota de conversas indisponível ({exc}); cobrando crédito")
+    return await check_and_deduct_credits(uid, CUSTO_RESPOSTA, email)
+
 Enviar = Callable[[str, str, str, Dict[str, Any]], Awaitable[str]]
 
 
@@ -593,7 +604,7 @@ async def _processar(
 
     if decisao.resposta and decisao.usou_ia:
         try:
-            saldo = await check_and_deduct_credits(uid, CUSTO_RESPOSTA, email)
+            saldo = await _cobrar_resposta(uid, email, perfil.plan_id or "previa")
         except BancoDeCreditosIndisponivel:
             saldo = None
         if saldo is None:
@@ -844,7 +855,7 @@ async def responder_sem_guardar(
     textos = decisao.mensagens or ([decisao.resposta] if decisao.resposta else [])
     if textos and decisao.usou_ia:
         try:
-            saldo = await check_and_deduct_credits(uid, CUSTO_RESPOSTA, email)
+            saldo = await _cobrar_resposta(uid, email, perfil.plan_id or "previa")
         except BancoDeCreditosIndisponivel:
             saldo = None
         if saldo is None:

@@ -201,8 +201,10 @@ def _ensinar_falha(alvo, exc: Exception) -> None:
 
     texto = str(exc)
     status = _status_http(exc)
-    if status in (401, 403, 404) or " 404 " in texto or "NOT_FOUND" in texto or "PERMISSION_DENIED" in texto or "API key not valid" in texto:
-        ia_gate.quebrou(alvo, texto)
+    if status == 402 or " 402 " in texto or "Payment Required" in texto:
+        ia_gate.quebrou(alvo, texto, por_s=6 * 3600)        # conta sem saldo (ex.: OpenRouter): não adianta insistir a cada mensagem
+    elif status in (401, 403, 404) or " 404 " in texto or "NOT_FOUND" in texto or "PERMISSION_DENIED" in texto or "API key not valid" in texto:
+        ia_gate.quebrou(alvo, texto, por_s=3600 if (status == 404 or ' 404 ' in texto or 'NOT_FOUND' in texto) else 600)
     elif status == 429 or "429" in texto or "RESOURCE_EXHAUSTED" in texto:
         ia_gate.recusa(alvo, texto, getattr(exc, "retry_after", None))
     elif status == 503 or "503" in texto or "UNAVAILABLE" in texto or "overloaded" in texto.lower():
