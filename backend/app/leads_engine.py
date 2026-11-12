@@ -102,6 +102,15 @@ def _e_recusa_de_mascara(bruta: str, status: int) -> bool:
 # Prazo do enriquecimento. A busca inteira precisa caber no limite da
 # funcao serverless, entao o scraping trabalha com orcamento fixo.
 ORCAMENTO_ENRIQUECIMENTO = 18.0
+LIMITE_DA_BUSCA = 100       # o máximo de leads por busca
+# O Google entrega no máximo 60 resultados por consulta. Acima disso a busca ganha consultas por região da cidade, que trazem
+# resultados diferentes (e o que se repete é descartado pelo id do lugar).
+REGIOES = ("centro", "zona norte", "zona sul", "zona leste", "zona oeste")
+
+
+def orcamento_do_enriquecimento(quantidade: int) -> float:
+    """Mais leads, mais tempo para ler os sites: 18 s até 60 leads, até 26 s com 100 (a função inteira tem 60 s)."""
+    return min(26.0, ORCAMENTO_ENRIQUECIMENTO + max(0, quantidade - 60) * 0.2)
 
 PAGE_SIZE = 20           # maximo que a Places API (New) aceita por requisicao
 MAX_PAGES_PER_QUERY = 3  # 3 x 20 = ate 60 resultados por variacao de consulta
@@ -638,7 +647,7 @@ class LeadsEngine:
         if not api_key:
             raise ValueError("Chave da API do Google Maps ausente.")
 
-        limit = max(1, min(int(limit or 10), 60))
+        limit = max(1, min(int(limit or 10), LIMITE_DA_BUSCA))
         location_query, fallback_city, fallback_uf = parse_location(location)
 
         extra = (query or "").strip()
@@ -646,6 +655,10 @@ class LeadsEngine:
         for variant in niche_variants(niche):
             term = f"{variant} {extra}".strip()
             queries.append(f"{term} em {location_query}" if location_query else term)
+        if limit > 60 and location_query:
+            # uma consulta só chega a 60: para 100 leads, o mesmo ramo é buscado também por região da cidade
+            termo = f"{niche_variants(niche)[0]} {extra}".strip()
+            queries += [f"{termo} {regiao} em {location_query}" for regiao in REGIOES]
 
         places = await LeadsEngine._collect_places(api_key, queries, limit)
         if not places:
@@ -668,14 +681,18 @@ class LeadsEngine:
             # requisição estourar o limite da Vercel e o usuário não
             # receber lead nenhum.
             try:
+                # com prazo: o que já foi lido entra, o que não deu tempo sai sem as redes (antes, estourar o prazo perdia tudo)
+                prazo = orcamento_do_enriquecimento(len(leads))
                 enrichments = await asyncio.wait_for(
                     SocialScraper.enrich_many(
                         [
                             {"company": l.company, "city": l.city, "website": raw}
                             for l, raw in zip(leads, raw_sites)
-                        ]
+                        ],
+                        concurrency=12 if len(leads) > 40 else 8,
+                        prazo=prazo,
                     ),
-                    timeout=ORCAMENTO_ENRIQUECIMENTO,
+                    timeout=prazo + 2,  # rede de segurança; o prazo interno já devolve o parcial
                 )
             except asyncio.TimeoutError:
                 print("Enriquecimento excedeu o prazo; devolvendo leads sem as redes.")

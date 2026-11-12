@@ -92,7 +92,7 @@ class LeadSearchRequest(BaseModel):
     niche: str
     location: str
     query: Optional[str] = ""
-    limit: Optional[int] = Field(default=10, ge=1, le=60)
+    limit: Optional[int] = Field(default=10, ge=1, le=100)
     enrich: Optional[bool] = True
     filters: Optional[Dict[str, Any]] = None
 

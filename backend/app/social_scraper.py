@@ -364,9 +364,11 @@ class SocialScraper:
 
     @staticmethod
     async def enrich_many(
-        targets: List[Dict[str, str]], concurrency: int = 8
+        targets: List[Dict[str, str]], concurrency: int = 8, prazo: Optional[float] = None
     ) -> List[Dict[str, Any]]:
-        """Enriquece varios leads em paralelo, com teto de concorrencia."""
+        """Enriquece varios leads em paralelo, com teto de concorrencia.
+
+        `prazo` (segundos): ao vencer, devolve o que já ficou pronto e deixa os demais vazios, em vez de perder tudo."""
         sem = asyncio.Semaphore(concurrency)
 
         async def bounded(item: Dict[str, str]) -> Dict[str, Any]:
@@ -378,4 +380,12 @@ class SocialScraper:
                 except Exception:
                     return empty_result()
 
-        return await asyncio.gather(*[bounded(t) for t in targets])
+        if prazo is None:
+            return await asyncio.gather(*[bounded(t) for t in targets])
+        tarefas = [asyncio.ensure_future(bounded(t)) for t in targets]
+        _, pendentes = await asyncio.wait(tarefas, timeout=prazo)
+        for t in pendentes:
+            t.cancel()
+        if pendentes:
+            print(f"Enriquecimento: {len(tarefas) - len(pendentes)} de {len(tarefas)} sites lidos no prazo; o resto segue sem as redes.")
+        return [t.result() if (t.done() and not t.cancelled() and t.exception() is None) else empty_result() for t in tarefas]

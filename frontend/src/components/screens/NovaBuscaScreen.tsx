@@ -187,7 +187,7 @@ export const NovaBuscaScreen: React.FC = () => {
                 onChange={(e) => setSearchLimit(Number(e.target.value))}
                 className="w-full pl-4 pr-10 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer"
               >
-                {[10, 20, 30, 40, 60].map(n => (
+                {[10, 20, 30, 40, 60, 100].map(n => (
                   <option key={n} value={n}>{n} leads &middot; {n} cr&eacute;ditos</option>
                 ))}
               </select>
