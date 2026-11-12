@@ -243,8 +243,12 @@ export function textoParaHtml(texto: string, tituloDoc = ''): string {
   return saida.join('\n');
 }
 
+/** A logo dentro de uma caixa de cantos arredondados e contorno fino: logo quadrada com fundo escuro ou branco deixa de parecer uma imagem colada. */
 export const marcaVisual = (m: MarcaDocumento, tamanho = 48): string => {
-  if (m.logo) return `<img class="logo" src="${m.logo}" alt="${esc(m.empresa)}" style="height:${tamanho}px">`;
+  if (m.logo) {
+    const h = Math.round(tamanho * 1.6);
+    return `<span class="logo-caixa"><img class="logo" src="${m.logo}" alt="${esc(m.empresa)}" style="height:${h}px"></span>`;
+  }
   const iniciais = esc(
     m.empresa.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?'
   );
@@ -270,7 +274,9 @@ p{margin:0 0 10px}
 ul{margin:0 0 12px;padding-left:20px}
 li{margin-bottom:5px}
 hr{border:0;border-top:1px solid var(--linha);margin:18px 0}
-.logo{object-fit:contain}
+.logo{object-fit:contain;display:block;width:auto;max-width:260px}
+.logo-caixa{display:inline-flex;align-items:center;justify-content:center;border-radius:14px;overflow:hidden;box-shadow:0 0 0 1px rgba(148,163,184,.4),0 6px 18px rgba(2,6,23,.16)}
+.logo-caixa .logo{border-radius:0}
 .logo-iniciais{display:inline-flex;align-items:center;justify-content:center;border-radius:10px;
   background:var(--primaria);color:#fff;font-weight:800;letter-spacing:.5px}
 .definicoes{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0 0 14px}
@@ -318,3 +324,6 @@ export const envelope = (m: MarcaDocumento, titulo: string, css: string, corpo: 
 </head>
 <body><div class="folha">${corpo}</div></body>
 </html>`;
+
+/** O nome da empresa ao lado da marca só entra quando NÃO há logo (a logo já traz o nome; repetir ao lado fica amador). */
+export const nomeAoLado = (m: MarcaDocumento, html: string): string => (m.logo ? '' : html);

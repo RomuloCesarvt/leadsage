@@ -5,7 +5,7 @@
  * vindo do modelo preenchido. Todos imprimem em A4.
  */
 import type { DocTheme, MarcaDocumento } from './base';
-import { envelope, esc, marcaVisual, textoParaHtml } from './base';
+import { envelope, esc, marcaVisual, nomeAoLado, textoParaHtml } from './base';
 import { TEMAS_PREMIUM } from './premium';
 
 const rodapeImpresso = (m: MarcaDocumento): string =>
@@ -55,7 +55,7 @@ const classico: DocTheme = {
 `,
       `<div class="faixa-topo"></div>
 <header class="cabecalho">
-  <div class="quem">${marcaVisual(m, 46)}<span class="empresa">${esc(m.empresa)}</span></div>
+  <div class="quem">${marcaVisual(m, 46)}${nomeAoLado(m, `<span class="empresa">${esc(m.empresa)}</span>`)}</div>
   <div class="contato">${esc(m.contato)}</div>
 </header>
 <div class="titulo-doc">
@@ -107,7 +107,7 @@ const moderno: DocTheme = {
 @media print{.capa{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 `,
       `<header class="capa">
-  <div class="quem">${marcaVisual(m, 42)}<span class="empresa">${esc(m.empresa)}</span></div>
+  <div class="quem">${marcaVisual(m, 42)}${nomeAoLado(m, `<span class="empresa">${esc(m.empresa)}</span>`)}</div>
   <h1>${esc(titulo)}</h1>
   <div class="sub">${esc(m.contato)} · ${new Date().toLocaleDateString('pt-BR')}</div>
   <div class="traco"></div>
@@ -156,7 +156,7 @@ h2{color:#111827;border-bottom:0;text-transform:none;letter-spacing:0;font-size:
 .corpo{padding-top:20px}
 .rodape-doc{margin-top:38px;padding:12px 18mm 0;color:var(--suave);font-size:11px;text-align:left}
 `,
-      `<header class="cabecalho">${marcaVisual(m, 34)}<span class="empresa">${esc(m.empresa)}</span></header>
+      `<header class="cabecalho">${marcaVisual(m, 34)}${nomeAoLado(m, `<span class="empresa">${esc(m.empresa)}</span>`)}</header>
 <div class="titulo-doc">
   <h1>${esc(titulo)}</h1>
   <div class="traco"></div>

@@ -10,7 +10,7 @@ import { BancoImagens, buscarFotos } from './BancoImagens';
 import type { FotoBanco } from './BancoImagens';
 import type { DocumentItem } from '../types';
 import { useCelular } from '../lib/useCelular';
-import { prepararImagem } from '../lib/imagem';
+import { prepararImagem, recortarMargens } from '../lib/imagem';
 
 const LIMITE_LOGO = 200 * 1024;
 
@@ -193,7 +193,7 @@ export const TemplateEditor: React.FC<Props> = ({
 
   const enviarLogo = async (arquivo: File) => {
     try {
-      salvarMarca({ logo: await prepararImagem(arquivo, { larguraMaxima: 600, tetoBytes: LIMITE_LOGO }) });
+      salvarMarca({ logo: await prepararImagem(await recortarMargens(arquivo), { larguraMaxima: 600, tetoBytes: LIMITE_LOGO }) });
     } catch (e: any) {
       setErro(e?.message || 'Não foi possível usar esta imagem.');
     }

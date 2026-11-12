@@ -11,7 +11,7 @@
  * primeira folha do PDF sozinha.
  */
 import type { DocTheme, MarcaDocumento } from './base';
-import { cssDocumento, esc, marcaVisual, textoParaHtml } from './base';
+import { cssDocumento, esc, marcaVisual, nomeAoLado, textoParaHtml } from './base';
 
 type Fontes = { titulos: string; corpo: string; google: string };
 
@@ -161,7 +161,7 @@ h2 + p,h2 + ul,h2 + dl,h2 + .bloco-valor,h2 + table{margin-left:38px}
   h2 + p,h2 + ul,h2 + dl,h2 + .bloco-valor,h2 + table,.corpo > p,.corpo > ul,.corpo > dl,.corpo > table,.corpo > .bloco-valor{margin-left:38px}}
 `, `
 <div class="folha capa">
-  <div class="capa-topo">${marcaVisual(m, 44)}<span>${esc(m.empresa)}</span></div>
+  <div class="capa-topo">${marcaVisual(m, 54)}${nomeAoLado(m, `<span>${esc(m.empresa)}</span>`)}</div>
   <div class="capa-meio">
     <span class="rotulo">${ehContrato ? 'Contrato' : 'Proposta comercial'}</span>
     <h1>${esc(titulo)}</h1>
@@ -202,7 +202,7 @@ const contemporaneo: DocTheme = {
 .folha.capa{flex-direction:row}
 .capa-cor{width:42%;background:var(--primaria);position:relative;padding:22mm 14mm;color:#fff;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
 .capa-cor::after{content:'';position:absolute;width:150px;height:150px;border-radius:50%;background:var(--destaque);right:-75px;bottom:70mm}
-.capa-cor .logo,.capa-cor .logo-iniciais{background:#fff;color:var(--primaria);border-radius:16px;padding:6px}
+.capa-cor .logo-iniciais{background:#fff;color:var(--primaria);border-radius:16px;padding:6px}
 .capa-cor .empresa{font-weight:800;font-size:18px;margin-top:14px}
 .capa-cor .contato{font-size:12px;opacity:.85;white-space:pre-line;position:relative;z-index:1}
 .capa-texto{flex:1;padding:0 16mm;display:flex;flex-direction:column;justify-content:center;
@@ -225,7 +225,7 @@ h2 .num{display:grid;place-items:center;width:32px;height:32px;border-radius:10p
 @media print{.corpo{padding:0}.faixa{margin-bottom:8mm}.rodape-doc{margin:26px 0 0}.capa-cor::after{bottom:70mm}}
 `, `
 <div class="folha capa">
-  <div class="capa-cor"><div>${marcaVisual(m, 60)}<div class="empresa">${esc(m.empresa)}</div></div><div class="contato">${esc(m.contato)}</div></div>
+  <div class="capa-cor"><div>${marcaVisual(m, 60)}${nomeAoLado(m, `<div class="empresa">${esc(m.empresa)}</div>`)}</div><div class="contato">${esc(m.contato)}</div></div>
   <div class="capa-texto">
     <div class="rotulo">${ehContrato ? 'Contrato' : 'Proposta'}</div>
     <h1>${esc(titulo)}</h1>
@@ -285,7 +285,7 @@ h2{font-family:"EB Garamond",serif;font-variant:small-caps;font-size:17px;letter
 }
 `, `
 <div class="folha capa"><div class="moldura"></div>
-  <div class="marca">${marcaVisual(m, 46)}<span>${esc(m.empresa)}</span></div>
+  <div class="marca">${marcaVisual(m, 46)}${nomeAoLado(m, `<span>${esc(m.empresa)}</span>`)}</div>
   <h1>${esc(titulo)}</h1>
   <div class="filete"></div>
   ${cliente ? `<div class="partes">Contratante: ${esc(cliente)}<br>Contratada: ${esc(m.empresa)}</div>` : ''}

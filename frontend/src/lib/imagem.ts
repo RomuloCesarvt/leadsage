@@ -241,3 +241,41 @@ function recortarBordasVazias(tela: HTMLCanvasElement): HTMLCanvasElement | null
   nova.getContext('2d')!.drawImage(tela, x0, y0, nova.width, nova.height, 0, 0, nova.width, nova.height);
   return nova;
 }
+
+/**
+ * Tira as margens vazias de uma logo: a cor do canto é o "fundo", e o que sobra é o desenho com uma folga de 14%.
+ * Logo quadrada com o desenho pequeno no meio vira uma marca que ocupa a caixa e parece feita para o documento.
+ * Se não der para recortar (imagem sem fundo liso, canvas indisponível), devolve o arquivo como veio.
+ */
+export async function recortarMargens(arquivo: File): Promise<File> {
+  try {
+    const url = URL.createObjectURL(arquivo);
+    const img = await new Promise<HTMLImageElement>((ok, erro) => { const i = new Image(); i.onload = () => ok(i); i.onerror = erro; i.src = url; });
+    URL.revokeObjectURL(url);
+    const L = Math.min(img.naturalWidth, 800), esc = L / img.naturalWidth, A = Math.round(img.naturalHeight * esc);
+    const c = document.createElement('canvas'); c.width = L; c.height = A;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    if (!g) return arquivo;
+    g.drawImage(img, 0, 0, L, A);
+    const d = g.getImageData(0, 0, L, A).data;
+    const px = (x: number, y: number) => { const k = (y * L + x) * 4; return [d[k], d[k + 1], d[k + 2], d[k + 3]]; };
+    const cantos = [px(0, 0), px(L - 1, 0), px(0, A - 1), px(L - 1, A - 1)];
+    const longe = (a: number[], b: number[]) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) > 60 || Math.abs(a[3] - b[3]) > 60;
+    const fundo = cantos[0];
+    if (cantos.some(k => longe(k, fundo))) return arquivo;                 // cantos diferentes: não há fundo liso para recortar
+    let x0 = L, y0 = A, x1 = -1, y1 = -1;
+    for (let y = 0; y < A; y++) for (let x = 0; x < L; x++) if (longe(px(x, y), fundo)) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 < 0) return arquivo;
+    const w = x1 - x0 + 1, h = y1 - y0 + 1, folga = Math.round(Math.max(w, h) * 0.14);
+    if (w + 2 * folga >= L * 0.97 && h + 2 * folga >= A * 0.97) return arquivo;   // já ocupa a imagem toda
+    const saida = document.createElement('canvas'); saida.width = w + 2 * folga; saida.height = h + 2 * folga;
+    const s = saida.getContext('2d');
+    if (!s) return arquivo;
+    if (fundo[3] > 0) { s.fillStyle = `rgb(${fundo[0]},${fundo[1]},${fundo[2]})`; s.fillRect(0, 0, saida.width, saida.height); }
+    s.drawImage(c, x0, y0, w, h, folga, folga, w, h);
+    const blob: Blob | null = await new Promise(ok => saida.toBlob(ok, 'image/png'));
+    return blob ? new File([blob], 'logo.png', { type: 'image/png' }) : arquivo;
+  } catch {
+    return arquivo;
+  }
+}

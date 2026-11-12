@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Image as ImageIcon, Check, AlertCircle, Save, Upload, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
-import { prepararImagem } from '../lib/imagem';
+import { prepararImagem, recortarMargens } from '../lib/imagem';
 import { acharTheme } from '../templates/docs/themes';
 import type { MarcaDocumento } from '../templates/docs/base';
 
@@ -93,7 +93,7 @@ export const MarcaDoDocumento: React.FC<{ aoSalvar?: () => void }> = ({ aoSalvar
   const enviarLogo = async (arquivo?: File) => {
     if (!arquivo) return;
     setErro('');
-    try { setLogo(await prepararImagem(arquivo, { larguraMaxima: 600, tetoBytes: 200 * 1024 })); mudou(); }
+    try { setLogo(await prepararImagem(await recortarMargens(arquivo), { larguraMaxima: 600, tetoBytes: 200 * 1024 })); mudou(); }
     catch (e: any) { setErro(e?.message || 'Não foi possível usar esta imagem.'); setEstado('error'); }
   };
 
