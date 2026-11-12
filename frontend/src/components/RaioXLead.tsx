@@ -96,6 +96,7 @@ export const RaioXLead: React.FC<{ lead: any; onUsarAbertura?: (texto: string) =
         id: lead.id, company: lead.company, name: lead.name, niche: lead.niche, city: lead.city,
         neighborhood: lead.neighborhood, rating: lead.rating, rating_count: lead.rating_count,
         best_channel: lead.best_channel, whatsapp: lead.whatsapp, phone: lead.phone, email: lead.email,
+        location: lead.location, address: lead.address,
       }));
     } catch (e: any) {
       setErro(e?.message || 'Não foi possível fazer o Raio-X.');

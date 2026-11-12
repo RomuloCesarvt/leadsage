@@ -350,7 +350,7 @@ ESTILO DESTE LEAD (para não ficar igual aos outros): {estilo[1]}
 
 O RAMO: {abordagem_mestra.bloco_do_ramo(lead.get('niche'))}
 
-Regras: português do Brasil, tom natural de WhatsApp, caloroso e respeitoso, sem "prezado", no máximo um emoji,
+{_regra_de_idioma(lead)}Regras: tom natural de WhatsApp, caloroso e respeitoso, sem "prezado", no máximo um emoji,
 sem promessa de resultado, sem inventar fato, sem preço se a oferta não tiver. A abertura tem de 55 a 90 palavras,
 começa cumprimentando (com o nome se houver pessoa identificada), diz quem você é em uma frase, cita um fato concreto
 DESTE negócio, liga o fato ao que o serviço resolve e termina em UMA pergunta fácil. A "proximo_passo" e a "resposta_a_objecao"
@@ -364,6 +364,17 @@ Responda SOMENTE um objeto JSON com estas chaves:
 "resposta_a_objecao": como responder em 1-2 frases,
 "proximo_passo": o que propor depois da resposta (ex.: mostrar esboço, marcar 15 minutos),
 "evitar": o que não dizer para este negócio (1 frase)."""
+
+
+def _regra_de_idioma(lead: Dict[str, Any]) -> str:
+    """Lead de fora do Brasil: a mensagem pronta ("abertura") sai na língua dele; a explicação continua em português, para quem usa o sistema."""
+    from app import idioma
+    lg = idioma.do_lead(lead or {})
+    if lg["pais_codigo"] == "BR":
+        return "Idioma: português do Brasil em tudo.\n"
+    return (f"Idioma: o lead é de {lg['pais']}. A \"abertura\" (a mensagem ao lead) deve estar em {lg['nome']} ({lg['jeito']}), nunca em português. "
+            "Todas as outras chaves (angulo, por_que_funciona, objecao_provavel, resposta_a_objecao, proximo_passo, evitar) ficam em português do Brasil, "
+            "para quem usa o sistema entender; a objeção pode vir traduzida entre aspas.\n")
 
 
 def abordagem_de_reserva(empresa_nome: str, dores: List[Dict[str, str]], pessoa: Optional[Dict[str, str]],
@@ -405,6 +416,12 @@ def gerar_abordagem(lead: Dict[str, Any], raio: Dict[str, Any], dores: List[Dict
     bloco = "O PRODUTO (use só estes fatos):\n" + abordagem_mestra.produto(canal, lead, servico)
     canal_sug = lead.get("best_channel") or melhor_canal(lead)
     reserva = abordagem_de_reserva(nome_empresa, dores, pessoa, estilo, servico, canal_sug)
+
+    # a mensagem de reserva é montada em português: para lead de outro país ela não vale (melhor sem texto do que na língua errada)
+    from app import idioma
+    if idioma.do_lead(lead)["pais_codigo"] != "BR":
+        lg = idioma.do_lead(lead)
+        reserva = {**reserva, "abertura": "", "angulo": f"{reserva['angulo']} (A IA não respondeu agora: use “refazer” para gerar a mensagem em {lg['nome']}.)"}
 
     if not settings.GEMINI_API_KEY:
         return reserva

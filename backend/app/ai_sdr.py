@@ -27,7 +27,7 @@ import re as _re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from app import abordagem_mestra, agentes, ai_oferta, fechamento, identidade, nicho_guia, playbook_vendas, previa_honesta, quem_fala, valor_momento
+from app import abordagem_mestra, idioma, agentes, ai_oferta, fechamento, identidade, nicho_guia, playbook_vendas, previa_honesta, quem_fala, valor_momento
 from app.playbook_sites import FALA_DO_ROBO_SOBRE_SITES
 
 ETAPAS = ("abertura", "descoberta", "diagnostico", "proposta", "objecao", "agendamento", "fechamento", "perdido")
@@ -457,9 +457,10 @@ PROIBIDO antes do passo 5: citar valor, promoção, Pix, sinal, forma de pagamen
 (benefício antes do número). "Pode", "ok", "gostei", "quero ver" significam interesse em VER, não em comprar: mostre e pergunte o que achou.
 O objetivo marcado pelo dono é o ponto de CHEGADA da conversa, nunca o ponto de partida.
 """
+    lingua_bloco = idioma.instrucao(idioma.do_lead(lead or {}), robo=True)
     prompt = f"""Você é {abertura}, conversando pelo {canal} com o dono de um negócio local.
 Agora é {_agora_brasil(agora)}.
-
+{lingua_bloco}
 == O QUE {quem.upper()} VENDE ==
 {oferta}
 {servico}
@@ -866,7 +867,9 @@ def resolver_marcadores(textos: List[str], lead: Optional[Dict[str, Any]]) -> Li
 _SE_DIZ_ROBO = _re.compile(
     r"assistente\s+virtual|assistente\s+digital|atendente\s+virtual|atendimento\s+(?:autom[aá]tico|virtual)|"
     r"\b(?:sou|somos)\s+(?:um|uma|o|a)?\s*(?:rob[oô]|bot|ia|intelig[eê]ncia\s+artificial|chatbot)\b|"
-    r"\bsou\s+(?:um\s+)?assistente\b", _re.I)
+    r"\bsou\s+(?:um\s+)?assistente\b|"
+    r"\bvirtual\s+assistant\b|\bai\s+assistant\b|\bchat\s?bot\b|\bi(?:'m| am)\s+an?\s+(?:ai|bot|artificial)|"
+    r"\basistente\s+virtual\b|\binteligencia\s+artificial\b|\bsoy\s+un\s+(?:bot|asistente)\b", _re.I)
 
 
 FALA_MAXIMA = 500

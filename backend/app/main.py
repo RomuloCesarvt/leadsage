@@ -2958,7 +2958,7 @@ def raio_x_contexto(lead: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     navegador e vai para dentro de um prompt."""
     lead = lead or {}
     texto = {k: str(lead.get(k) or "")[:160] for k in
-             ("id", "company", "name", "niche", "city", "neighborhood", "best_channel", "phone", "email")}
+             ("id", "company", "name", "niche", "city", "neighborhood", "best_channel", "phone", "email", "location", "address")}
     numeros = {k: lead.get(k) for k in ("rating", "rating_count") if isinstance(lead.get(k), (int, float))}
     return {**texto, **numeros, "whatsapp": bool(lead.get("whatsapp"))}
 

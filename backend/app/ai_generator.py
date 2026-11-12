@@ -33,7 +33,7 @@ from app.ai_client import (
     prazo_maximo,
     strip_code_fence,
 )
-from app import abordagem_mestra
+from app import abordagem_mestra, idioma
 from app.copy_knowledge import (
     LIMITE_DE_PALAVRAS,
     bloco_de_mercado,
@@ -149,9 +149,10 @@ def _prompt_da_abordagem(req: PitchGenerationRequest, canal: str) -> str:
 
     brief = (req.service_brief or "").strip() or abordagem_mestra.produto(None, None, vende)
 
-    return f"""Você é um vendedor consultivo brasileiro. Escreva UMA primeira mensagem de prospecção
+    lingua = idioma.do_lead(lead)
+    return f"""Você é um vendedor consultivo. Escreva UMA primeira mensagem de prospecção
 para um negócio local que não pediu contato: simpática, específica sobre ele, nunca com cara de disparo.
-
+{idioma.instrucao(lingua)}
 {abordagem_mestra.momento()}
 
 QUEM ESCREVE: {(req.apresentacao or '').strip() or assina}. Vende: {vende}.
@@ -210,7 +211,7 @@ def _pedido_dos_seguimentos(req: PitchGenerationRequest) -> str:
 def _prompt_dos_seguimentos(req: PitchGenerationRequest, canal: str, primeira: str) -> str:
     lead = req.lead
     return f"""Escreva 2 mensagens de acompanhamento para quem NÃO respondeu a primeira mensagem de prospecção.
-
+{idioma.instrucao(idioma.do_lead(lead))}
 PRIMEIRA MENSAGEM JÁ ENVIADA ({canal}):
 {primeira}
 
@@ -230,7 +231,7 @@ RETORNO: JSON puro com a chave "follow_ups": lista de exatamente 2 objetos com "
 """
 
 
-def _ler_seguimentos(brutos: Any, canal: str):
+def _ler_seguimentos(brutos: Any, canal: str, em_pt: bool = True):
     """Transforma a lista que o modelo devolveu em seguimentos limpos, com os avisos do que escapou."""
     seguimentos: List[Dict[str, str]] = []
     avisos: List[str] = []
@@ -241,13 +242,13 @@ def _ler_seguimentos(brutos: Any, canal: str):
         if not texto:
             continue
         seguimentos.append({
-            "quando": str(item.get("quando") or "").strip() or "alguns dias depois",
+            "quando": str(item.get("quando") or "").strip() or ("alguns dias depois" if em_pt else "+3d"),
             "objetivo": str(item.get("objetivo") or "").strip(),
             "texto": texto,
         })
         # É neles que a invenção costuma escapar: o modelo procura "algo novo para dizer"
         # e inventa um dado de mercado.
-        for defeito in revisar_copy(texto, canal):
+        for defeito in (revisar_copy(texto, canal) if em_pt else []):
             if "não termina em pergunta" in defeito:
                 continue  # o toque 2 não pede nada: entregar valor sem pergunta é o desenho
             avisos.append(f"seguimento {len(seguimentos)}: {defeito}")
@@ -331,15 +332,20 @@ class AIGenerator:
         dados = await asyncio.to_thread(gerar_json, client, prompt, ["body"], 2, limite, True, 560 if com_seguimentos else 400, qualidade=True)
 
         dados["body"], avisos_marcador = limpar_marcadores(str(dados.get("body") or ""), req.nome_de_quem_escreve or req.sender_name or "")
-        dados["body"] = abordagem_mestra.tirar_pergunta_solta(dados["body"])   # "Como anda a agenda?" sem sentido nenhum: nunca chega ao cliente
-        problemas = avisos_marcador + (revisar_copy(dados.get("body", ""), canal)
-                     + abordagem_mestra.revisar_calor(dados.get("body", ""), canal)
-                     + abordagem_mestra.revisar_roteiro(dados.get("body", ""), sem_site, req.previa or ""))
+        em_pt = idioma.e_portugues(idioma.do_lead(lead))
+        if em_pt:
+            dados["body"] = abordagem_mestra.tirar_pergunta_solta(dados["body"])   # "Como anda a agenda?" sem sentido nenhum: nunca chega ao cliente
+            problemas = avisos_marcador + (revisar_copy(dados.get("body", ""), canal)
+                         + abordagem_mestra.revisar_calor(dados.get("body", ""), canal)
+                         + abordagem_mestra.revisar_roteiro(dados.get("body", ""), sem_site, req.previa or ""))
+        else:
+            # as revisões de clichê, saudação e roteiro leem português: em outra língua só vale o que não depende do idioma (os marcadores)
+            problemas = list(avisos_marcador)
 
         # os seguimentos vieram na mesma resposta; se faltaram, a abertura segue sem eles (nunca uma 2a chamada em lote)
         seguimentos: List[Dict[str, str]] = []
         if com_seguimentos:
-            seguimentos, extras = _ler_seguimentos(dados.get("follow_ups"), canal)
+            seguimentos, extras = _ler_seguimentos(dados.get("follow_ups"), canal, em_pt)
             problemas += extras
             if not seguimentos:
                 problemas.append("os seguimentos não vieram nesta resposta")
@@ -369,7 +375,7 @@ class AIGenerator:
             gerar_json, client, _prompt_dos_seguimentos(req, canal, primeira), ["follow_ups"], 2,
             time.monotonic() + prazo_maximo(), True, 500,
         )
-        return _ler_seguimentos(dados.get("follow_ups"), canal)
+        return _ler_seguimentos(dados.get("follow_ups"), canal, idioma.e_portugues(idioma.do_lead(req.lead)))
 
     @staticmethod
     async def generate_demo_site(req, api_key: str = None) -> dict:
