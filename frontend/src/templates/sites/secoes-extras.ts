@@ -111,5 +111,20 @@ export const cssExtras = (escuro = false): string => `
 .sx-btn:hover{transform:translateY(-2px)}
 .sx-btn-1{background:#fff;color:var(--p-texto)}
 .sx-btn-2{background:transparent;color:var(--sobre-p);border-color:currentColor}
-@media(max-width:760px){.sx-btn{width:100%;justify-content:center}.sx-passos li{padding-right:0}}
+@media(max-width:760px){.sx-btn{width:100%;justify-content:center}.sx-passos li{padding-right:0}
+  /* celular: cada item vira uma linha (ícone ou número ao lado do texto), não um cartão alto de computador: metade da altura, mais itens por tela */
+  .sx-grade{gap:12px}
+  .sx-grade li{display:grid;grid-template-columns:44px minmax(0,1fr);column-gap:14px;align-items:start;padding:16px 18px}
+  .sx-ic{width:44px;height:44px;margin:0;grid-row:1/3;border-radius:12px}
+  .sx-grade h3{margin:2px 0 4px;font-size:1.05rem;line-height:1.25}
+  .sx-grade p{font-size:.94rem;line-height:1.5}
+  .sx-passos{gap:4px}
+  .sx-passos li{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:14px;align-items:start;padding:12px 0}
+  .sx-passos li::before{width:40px;height:40px;margin:0;grid-row:1/3;font-size:1rem}
+  .sx-passos h3{margin:2px 0 4px;font-size:1.05rem;line-height:1.25}
+  .sx-passos p{font-size:.94rem;line-height:1.5}
+  .sx-cta-in{padding:30px 20px}
+  .sx-cta-btns{flex-direction:column;gap:10px}
+  .sx-lista summary{padding:16px 18px}
+}
 `;

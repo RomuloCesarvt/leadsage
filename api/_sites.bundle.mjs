@@ -2117,7 +2117,22 @@ var cssExtras = (escuro = false) => `
 .sx-btn:hover{transform:translateY(-2px)}
 .sx-btn-1{background:#fff;color:var(--p-texto)}
 .sx-btn-2{background:transparent;color:var(--sobre-p);border-color:currentColor}
-@media(max-width:760px){.sx-btn{width:100%;justify-content:center}.sx-passos li{padding-right:0}}
+@media(max-width:760px){.sx-btn{width:100%;justify-content:center}.sx-passos li{padding-right:0}
+  /* celular: cada item vira uma linha (\xEDcone ou n\xFAmero ao lado do texto), n\xE3o um cart\xE3o alto de computador: metade da altura, mais itens por tela */
+  .sx-grade{gap:12px}
+  .sx-grade li{display:grid;grid-template-columns:44px minmax(0,1fr);column-gap:14px;align-items:start;padding:16px 18px}
+  .sx-ic{width:44px;height:44px;margin:0;grid-row:1/3;border-radius:12px}
+  .sx-grade h3{margin:2px 0 4px;font-size:1.05rem;line-height:1.25}
+  .sx-grade p{font-size:.94rem;line-height:1.5}
+  .sx-passos{gap:4px}
+  .sx-passos li{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:14px;align-items:start;padding:12px 0}
+  .sx-passos li::before{width:40px;height:40px;margin:0;grid-row:1/3;font-size:1rem}
+  .sx-passos h3{margin:2px 0 4px;font-size:1.05rem;line-height:1.25}
+  .sx-passos p{font-size:.94rem;line-height:1.5}
+  .sx-cta-in{padding:30px 20px}
+  .sx-cta-btns{flex-direction:column;gap:10px}
+  .sx-lista summary{padding:16px 18px}
+}
 `;
 
 // src/templates/sites/documento.ts
@@ -6792,6 +6807,21 @@ img,svg,video,iframe,table{max-width:100%}
   body:has(.acao-movel) :is(.zap,.zap-fixo,[class*="zap-flu"],[class*="wa-fix"]){display:none!important}
   /* o quadradinho de iniciais da marca n\xE3o pode ser espremido pelo nome comprido (virava "M" em cima de "B") */
   [class*="logo"],[class*="iniciais"],[class*="avatar"]{flex-shrink:0}
+  /* capa: mais baixa que a tela cheia (o conte\xFAdo decide), com respiro embaixo de celular e espa\xE7o em cima para o menu flutuante */
+  .capa,[class*="-hero"]{padding-bottom:clamp(40px,11vw,64px)!important}
+  /* t\xEDtulos de se\xE7\xE3o, cart\xF5es e rodap\xE9 com respiro de celular: o de computador (56 px, 32 px, 72 px) deixava a p\xE1gina enorme */
+  .titulo,.cab,.sec-cab{margin-bottom:clamp(20px,6vw,32px)!important}
+  .cartao{padding:clamp(16px,4.6vw,20px)!important}
+  .cartoes,.cartoes-grade,.menu-grade,.grade{gap:12px!important}
+  /* cart\xF5es de servi\xE7o: \xEDcone (ou n\xFAmero) ao lado do texto, como lista de aplicativo, e n\xE3o um bloco alto de computador */
+  .cartao,.servicos .item{display:grid!important;grid-template-columns:48px minmax(0,1fr);column-gap:14px;align-items:start;min-height:0!important}
+  .cartao>.ic{grid-row:1/3;width:48px!important;height:48px!important;margin:0!important}
+  .servicos .item>.n{grid-row:1/3;margin:0!important;font-size:1.35rem!important;line-height:1.1;min-width:48px}
+  .cartao>h3,.servicos .item>h3{margin:2px 0 4px!important;font-size:1.08rem!important;line-height:1.25!important}
+  .cartao>p,.servicos .item>p{margin:0!important;font-size:.95rem;line-height:1.5}
+  footer.rp{padding-top:clamp(40px,11vw,56px)!important}
+  /* a barra de baixo (Ligar/WhatsApp) nunca cobre o fim da p\xE1gina */
+  body:has(.acao-movel){padding-bottom:calc(76px + env(safe-area-inset-bottom))!important}
   /* toda coluna de grade pode encolher; nada de dois lados lado a lado em tela de celular */
   [class*="grid"],[class*="grade"],[class*="cols"]{min-width:0}
 }
@@ -6826,9 +6856,41 @@ alvos.forEach(function(e){var s=e.closest('section')||document.body;var n=porSec
 var tudo=function(){alvos.forEach(function(e){e.classList.add('ac-in')})};
 setTimeout(tudo,4000);addEventListener('beforeprint',tudo);
 }catch(e){}})();`;
+var LIMITE_DO_RESPIRO = 72;
+var respiro = (n) => `clamp(44px,13vw,${n}px)`;
+var ritmoDeCelular = (html) => html.replace(/<style\b([^>]*)>([\s\S]*?)<\/style>/gi, (_t, atrib, css) => {
+  const novo = css.replace(/([^{}]+)\{([^{}]*)\}/g, (regra, seletor, decl) => {
+    if (/(^|[\s,.#>+~])(capa|hero|topo|rp|[a-z]{1,3}-hero|numeros)\b/i.test(seletor) || /@(keyframes|font-face)/i.test(seletor) || /^\s*(from|to|\d+%)/.test(seletor)) return regra;
+    const dec = decl.replace(/(^|;)\s*padding(-top|-bottom)?\s*:\s*([^;]+)/gi, (todo, ini, ladoBruto, valor) => {
+      const lado = ladoBruto || "";
+      if (/clamp|calc|var\(|%|vw|vh|em\b|auto|!important/i.test(valor)) return todo;
+      const partes = valor.trim().split(/\s+/);
+      if (!partes.every((v) => /^-?\d+(\.\d+)?(px)?$/.test(v))) return todo;
+      const n = partes.map((v) => parseFloat(v));
+      let mudou = false;
+      const troca = (v) => {
+        if (v >= LIMITE_DO_RESPIRO) {
+          mudou = true;
+          return respiro(v);
+        }
+        return `${v}px`;
+      };
+      let saida;
+      if (lado) saida = [troca(n[0])];
+      else if (n.length === 1) saida = [troca(n[0])];
+      else if (n.length === 2) saida = [troca(n[0]), `${n[1]}px`];
+      else if (n.length === 3) saida = [troca(n[0]), `${n[1]}px`, troca(n[2])];
+      else saida = [troca(n[0]), `${n[1]}px`, troca(n[2]), `${n[3]}px`];
+      if (n.length === 1 && !lado && mudou) saida = [saida[0], `${n[0]}px`];
+      return mudou ? `${ini}padding${lado}:${saida.join(" ")}` : todo;
+    });
+    return `${seletor}{${dec}}`;
+  });
+  return `<style${atrib}>${novo}</style>`;
+});
 var acabamento = (html) => {
   if (!html || html.includes('id="acabamento"')) return html;
-  let out = html.replace(/min-height:\s*100vh(?!;\s*min-height)/g, "min-height:100vh;min-height:100dvh");
+  let out = ritmoDeCelular(html).replace(/min-height:\s*100vh(?!;\s*min-height)/g, "min-height:100vh;min-height:100dvh");
   const estilo = `<style id="acabamento">${CSS}</style>`;
   const script = `<script id="acabamento-js">${JS}</script>`;
   out = out.includes("</head>") ? out.replace("</head>", `${estilo}</head>`) : estilo + out;

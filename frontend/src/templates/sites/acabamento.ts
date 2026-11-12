@@ -27,6 +27,21 @@ img,svg,video,iframe,table{max-width:100%}
   body:has(.acao-movel) :is(.zap,.zap-fixo,[class*="zap-flu"],[class*="wa-fix"]){display:none!important}
   /* o quadradinho de iniciais da marca não pode ser espremido pelo nome comprido (virava "M" em cima de "B") */
   [class*="logo"],[class*="iniciais"],[class*="avatar"]{flex-shrink:0}
+  /* capa: mais baixa que a tela cheia (o conteúdo decide), com respiro embaixo de celular e espaço em cima para o menu flutuante */
+  .capa,[class*="-hero"]{padding-bottom:clamp(40px,11vw,64px)!important}
+  /* títulos de seção, cartões e rodapé com respiro de celular: o de computador (56 px, 32 px, 72 px) deixava a página enorme */
+  .titulo,.cab,.sec-cab{margin-bottom:clamp(20px,6vw,32px)!important}
+  .cartao{padding:clamp(16px,4.6vw,20px)!important}
+  .cartoes,.cartoes-grade,.menu-grade,.grade{gap:12px!important}
+  /* cartões de serviço: ícone (ou número) ao lado do texto, como lista de aplicativo, e não um bloco alto de computador */
+  .cartao,.servicos .item{display:grid!important;grid-template-columns:48px minmax(0,1fr);column-gap:14px;align-items:start;min-height:0!important}
+  .cartao>.ic{grid-row:1/3;width:48px!important;height:48px!important;margin:0!important}
+  .servicos .item>.n{grid-row:1/3;margin:0!important;font-size:1.35rem!important;line-height:1.1;min-width:48px}
+  .cartao>h3,.servicos .item>h3{margin:2px 0 4px!important;font-size:1.08rem!important;line-height:1.25!important}
+  .cartao>p,.servicos .item>p{margin:0!important;font-size:.95rem;line-height:1.5}
+  footer.rp{padding-top:clamp(40px,11vw,56px)!important}
+  /* a barra de baixo (Ligar/WhatsApp) nunca cobre o fim da página */
+  body:has(.acao-movel){padding-bottom:calc(76px + env(safe-area-inset-bottom))!important}
   /* toda coluna de grade pode encolher; nada de dois lados lado a lado em tela de celular */
   [class*="grid"],[class*="grade"],[class*="cols"]{min-width:0}
 }
@@ -63,10 +78,45 @@ var tudo=function(){alvos.forEach(function(e){e.classList.add('ac-in')})};
 setTimeout(tudo,4000);addEventListener('beforeprint',tudo);
 }catch(e){}})();`;
 
+/**
+ * Ritmo de celular. Os modelos nasceram como desenho de computador (seções com 110 a 130 px de respiro em cima e embaixo) e só
+ * "encolhiam" a grade no celular: sobrava um vazio enorme entre as seções e a página ficava com mais de 10 000 px de rolagem.
+ * Aqui os respiros verticais grandes de QUALQUER modelo viram `clamp(44px, 13vw, N)`: no computador continua N (nada muda), no
+ * celular vira 44 a 56 px. A capa fica de fora (ela precisa de espaço para o menu flutuante) e o que já é pequeno não é mexido.
+ */
+const LIMITE_DO_RESPIRO = 72;
+const respiro = (n: number): string => `clamp(44px,13vw,${n}px)`;
+
+export const ritmoDeCelular = (html: string): string =>
+  html.replace(/<style\b([^>]*)>([\s\S]*?)<\/style>/gi, (_t, atrib: string, css: string) => {
+    const novo = css.replace(/([^{}]+)\{([^{}]*)\}/g, (regra: string, seletor: string, decl: string) => {
+      if (/(^|[\s,.#>+~])(capa|hero|topo|rp|[a-z]{1,3}-hero|numeros)\b/i.test(seletor) || /@(keyframes|font-face)/i.test(seletor) || /^\s*(from|to|\d+%)/.test(seletor)) return regra;
+      const dec = decl.replace(/(^|;)\s*padding(-top|-bottom)?\s*:\s*([^;]+)/gi, (todo: string, ini: string, ladoBruto: string | undefined, valor: string) => {
+        const lado = ladoBruto || '';
+        if (/clamp|calc|var\(|%|vw|vh|em\b|auto|!important/i.test(valor)) return todo;
+        const partes = valor.trim().split(/\s+/);
+        if (!partes.every(v => /^-?\d+(\.\d+)?(px)?$/.test(v))) return todo;
+        const n = partes.map(v => parseFloat(v));
+        let mudou = false;
+        const troca = (v: number) => { if (v >= LIMITE_DO_RESPIRO) { mudou = true; return respiro(v); } return `${v}px`; };
+        let saida: string[];
+        if (lado) saida = [troca(n[0])];
+        else if (n.length === 1) saida = [troca(n[0])];
+        else if (n.length === 2) saida = [troca(n[0]), `${n[1]}px`];
+        else if (n.length === 3) saida = [troca(n[0]), `${n[1]}px`, troca(n[2])];
+        else saida = [troca(n[0]), `${n[1]}px`, troca(n[2]), `${n[3]}px`];
+        if (n.length === 1 && !lado && mudou) saida = [saida[0], `${n[0]}px`];     // "padding:110px" = os quatro lados: só o vertical encolhe
+        return mudou ? `${ini}padding${lado}:${saida.join(' ')}` : todo;
+      });
+      return `${seletor}{${dec}}`;
+    });
+    return `<style${atrib}>${novo}</style>`;
+  });
+
 /** Aplica o acabamento a um documento HTML completo. Não repete se já foi aplicado. */
 export const acabamento = (html: string): string => {
   if (!html || html.includes('id="acabamento"')) return html;
-  let out = html.replace(/min-height:\s*100vh(?!;\s*min-height)/g, 'min-height:100vh;min-height:100dvh');
+  let out = ritmoDeCelular(html).replace(/min-height:\s*100vh(?!;\s*min-height)/g, 'min-height:100vh;min-height:100dvh');
   const estilo = `<style id="acabamento">${CSS}</style>`;
   const script = `<script id="acabamento-js">${JS}</script>`;
   out = out.includes('</head>') ? out.replace('</head>', `${estilo}</head>`) : estilo + out;
