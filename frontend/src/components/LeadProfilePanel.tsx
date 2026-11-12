@@ -89,7 +89,7 @@ export const LeadProfilePanel: React.FC = () => {
         onClick={() => setSelectedProfileLead(null)}
       />
 
-      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-xl bg-slate-50 border-l border-slate-200 shadow-2xl flex flex-col animate-slide-in-right">
+      <div className="fixed inset-y-0 right-0 z-50 h-[100dvh] w-full max-w-xl bg-slate-50 border-l border-slate-200 shadow-2xl flex flex-col animate-slide-in-right">
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
 
@@ -271,10 +271,10 @@ export const LeadProfilePanel: React.FC = () => {
         </div>
 
         {/* Rodapé fixo */}
-        <div className="p-4 bg-white border-t border-slate-200 shrink-0 notranslate" translate="no">
+        <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white border-t border-slate-200 shrink-0 notranslate" translate="no">
           <button
             onClick={() => setSelectedLeadForMessage(lead)}
-            className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+            className="w-full min-h-12 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-700 text-white text-base md:text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
           >
             <Send className="w-4 h-4" />
             <span>Disparar</span>

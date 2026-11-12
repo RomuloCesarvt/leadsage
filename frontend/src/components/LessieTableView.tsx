@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { lerBuscaDeLeads } from '../lib/atalhosDoPainel';
+import { useCelular } from '../lib/useCelular';
 import {
   Star,
   Trash2,
@@ -9,12 +10,14 @@ import {
   Plus,
   Send,
   X,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import type { LeadItem } from '../types';
 import { useApp } from '../context/AppContext';
 import { DigitalPresence } from './DigitalPresence';
 import { WhatsAppIcon, InstagramIcon } from './BrandIcons';
-import { ehSalvo, nichosDe } from '../lib/leadsSalvos';
+import { ehSalvo, nichosDe, foneBonito } from '../lib/leadsSalvos';
 import { FILTROS, alternarFiltro, aplicarFiltros, contarFiltro, type ChaveFiltro } from '../lib/filtrosDeLeads';
 
 /**
@@ -38,6 +41,8 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
 
   // botões que se combinam (Com site + Sem WhatsApp mostra só quem é os dois): servem para descartar rápido
   const [filtros, setFiltros] = useState<Set<ChaveFiltro>>(new Set());
+  const celular = useCelular();
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
   const [empresa, setEmpresa] = useState('');
   const [nicho, setNicho] = useState('');
   const [cidade, setCidade] = useState('');
@@ -149,15 +154,24 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
     );
   }
 
-  const campo = 'px-3 py-2.5 md:py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500';
+  const campo = 'min-h-11 md:min-h-0 px-3 py-2.5 md:py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500';
 
   return (
     <div className="md:flex-1 md:min-h-0 flex flex-col md:overflow-hidden">
 
       {/* Filtros */}
       <div className="bg-white border border-slate-200 rounded-t-xl px-3 md:px-5 py-3 shrink-0">
-        <div className="flex flex-wrap items-center gap-3 mb-3">
-          <div className="flex items-center gap-2 text-slate-500 text-sm font-bold">
+        {celular && (
+          <button type="button" onClick={() => setFiltrosAbertos(v => !v)} aria-expanded={filtrosAbertos}
+            className="w-full min-h-11 mb-2 flex items-center gap-2 text-slate-700 text-[15px] font-bold">
+            <Filter className="w-5 h-5 text-slate-500" /> Filtros
+            {(empresa || nicho || cidade) && <span className="min-w-5 h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center">{[empresa, nicho, cidade].filter(Boolean).length}</span>}
+            <span className="ml-auto text-[13px] font-medium text-slate-500">{filteredLeads.length} de {base.length}</span>
+            {filtrosAbertos ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+          </button>
+        )}
+        <div className={`${celular && !filtrosAbertos ? 'hidden' : 'flex'} flex-wrap items-center gap-3 mb-3`}>
+          <div className="hidden md:flex items-center gap-2 text-slate-500 text-sm font-bold">
             <Filter className="w-4 h-4" /> FILTROS
           </div>
           <div className="relative w-full md:w-auto">
@@ -181,7 +195,7 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
               className="text-xs font-bold text-blue-700 hover:underline flex items-center gap-1"
             ><X className="w-3 h-3" /> Limpar filtros</button>
           )}
-          <span className="text-xs text-slate-500 ml-auto">{filteredLeads.length} de {base.length}</span>
+          <span className="hidden md:inline text-xs text-slate-500 ml-auto">{filteredLeads.length} de {base.length}</span>
         </div>
 
         <div className="flex flex-nowrap md:flex-wrap items-center gap-2 overflow-x-auto md:overflow-visible -mx-3 px-3 md:mx-0 md:px-0 pb-1 md:pb-0 custom-scrollbar" data-testid="filtros-de-leads">

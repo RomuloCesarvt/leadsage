@@ -24,7 +24,7 @@ export const ResultadosBusca: React.FC = () => {
           <p className="text-sm text-slate-600 font-medium mt-1">
             {resultados.length > 0 ? (
               <>
-                <span className="text-blue-700 font-bold">{resultados.length} negócios</span> para você escolher.
+                <span className="text-blue-700 font-bold">{resultados.length} {resultados.length === 1 ? 'negócio' : 'negócios'}</span> para você escolher.
                 Marque os que interessam e adicione a Meus Leads.
               </>
             ) : 'Marque os negócios que interessam e adicione a Meus Leads.'}
