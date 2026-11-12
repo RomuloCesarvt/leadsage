@@ -4,7 +4,8 @@
  * Imagens grandes são reduzidas aqui antes de subir (o WhatsApp comprime de qualquer jeito); PDF vai como está, até 3 MB.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { FileText, ImagePlus, Loader2, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, ImagePlus, Loader2, Trash2 } from 'lucide-react';
+import { useCelular } from '../lib/useCelular';
 import { api, type CriativoInfo } from '../services/api';
 
 const MAX_PDF = 3_000_000;
@@ -33,6 +34,10 @@ export const CriativoDoRobo: React.FC<{ empresa?: boolean; contexto?: 'disparo' 
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState('');
   const entrada = useRef<HTMLInputElement>(null);
+  const celular = useCelular();
+  // no celular o bloco começa recolhido (é configuração, não a tarefa principal da tela); no computador fica aberto
+  const [aberto, setAberto] = useState(false);
+  const mostrar = !celular || aberto;
 
   useEffect(() => {
     let vivo = true;
@@ -72,8 +77,20 @@ export const CriativoDoRobo: React.FC<{ empresa?: boolean; contexto?: 'disparo' 
   const ehPdf = c?.mime === 'application/pdf';
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-      <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-1"><ImagePlus className="w-5 h-5 text-blue-600" /> Criativo do disparo</h2>
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-6 shadow-sm">
+      {celular ? (
+        <button type="button" onClick={() => setAberto(v => !v)} aria-expanded={aberto} className="w-full min-h-12 flex items-center gap-3 text-left">
+          <ImagePlus className="w-5 h-5 text-blue-600 shrink-0" />
+          <span className="flex-1 min-w-0">
+            <span className="block text-base font-bold text-slate-800 leading-tight">Criativo do disparo</span>
+            <span className="block text-[13px] text-slate-500">{existe ? `Anexado: ${c?.nome || 'arquivo'}` : 'Nenhum anexado (opcional)'}</span>
+          </span>
+          {aberto ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+        </button>
+      ) : (
+        <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-1"><ImagePlus className="w-5 h-5 text-blue-600" /> Criativo do disparo</h2>
+      )}
+      {mostrar && <div className={celular ? 'mt-3' : ''}>
       <p className="text-sm text-slate-500 mb-4">
         Coloque aqui o flyer, card ou PDF{empresa ? ' da sua promoção' : ''}. O sistema envia sozinho junto com cada mensagem de WhatsApp do disparo (a mensagem vira a legenda), sem você fazer mais nada. O robô também o manda junto com {empresa ? 'o orçamento' : 'o aviso da promoção'}.
       </p>
@@ -94,8 +111,8 @@ export const CriativoDoRobo: React.FC<{ empresa?: boolean; contexto?: 'disparo' 
             <p className="text-sm font-bold text-slate-800 truncate">{c?.nome}</p>
             <p className="text-xs text-slate-500 mb-3">{Math.round((c?.bytes || 0) / 1024)} KB</p>
             <div className="flex gap-2">
-              <button type="button" onClick={() => entrada.current?.click()} disabled={ocupado} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-60">Trocar</button>
-              <button type="button" onClick={remover} disabled={ocupado} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 hover:bg-red-100 text-red-600 flex items-center gap-1 disabled:opacity-60"><Trash2 className="w-3.5 h-3.5" /> Remover</button>
+              <button type="button" onClick={() => entrada.current?.click()} disabled={ocupado} className="min-h-11 md:min-h-0 px-4 md:px-3 py-2 md:py-1.5 rounded-xl md:rounded-lg text-sm md:text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-60">Trocar</button>
+              <button type="button" onClick={remover} disabled={ocupado} className="min-h-11 md:min-h-0 px-4 md:px-3 py-2 md:py-1.5 rounded-xl md:rounded-lg text-sm md:text-xs font-bold bg-red-50 hover:bg-red-100 text-red-600 flex items-center gap-1 disabled:opacity-60"><Trash2 className="w-3.5 h-3.5" /> Remover</button>
             </div>
           </div>
         </div>
@@ -111,16 +128,17 @@ export const CriativoDoRobo: React.FC<{ empresa?: boolean; contexto?: 'disparo' 
               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500" />
           </div>
           <label className="flex items-start gap-2.5 cursor-pointer">
-            <input type="checkbox" checked={!!c?.usos?.promocao} onChange={e => opcao({ usos: { promocao: e.target.checked } })} className="mt-0.5 w-4 h-4 accent-blue-600" />
+            <input type="checkbox" checked={!!c?.usos?.promocao} onChange={e => opcao({ usos: { promocao: e.target.checked } })} className="mt-0.5 w-5 h-5 md:w-4 md:h-4 accent-blue-600 shrink-0" />
             <span className="text-sm text-slate-700"><b>O robô envia junto com {empresa ? 'o orçamento' : 'o aviso da promoção'}</b> <span className="text-slate-500">(uma vez por conversa, quando o lead responde)</span></span>
           </label>
           <label className="flex items-start gap-2.5 cursor-pointer">
-            <input type="checkbox" checked={!!c?.usos?.abordagem} onChange={e => opcao({ usos: { abordagem: e.target.checked } })} className="mt-0.5 w-4 h-4 accent-blue-600" />
+            <input type="checkbox" checked={!!c?.usos?.abordagem} onChange={e => opcao({ usos: { abordagem: e.target.checked } })} className="mt-0.5 w-5 h-5 md:w-4 md:h-4 accent-blue-600 shrink-0" />
             <span className="text-sm text-slate-700"><b>Enviar junto com cada mensagem do disparo no WhatsApp</b> <span className="text-slate-500">(sai pelo Conector, no ritmo de sempre)</span></span>
           </label>
         </div>
       )}
       {erro && <p className="mt-3 text-sm text-red-600">{erro}</p>}
+      </div>}
     </div>
   );
 };

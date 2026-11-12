@@ -599,11 +599,11 @@ export const FilaDeEnvio: React.FC = () => {
 
       {/* 1. escolher */}
       <section className="bg-white border border-slate-200 rounded-2xl">
-        <button onClick={() => setEscolherAberto(!escolherAberto)} className="w-full flex items-center gap-2 p-4 text-left">
-          <Bot className="w-4 h-4 text-blue-600 shrink-0" />
-          <span className="flex-1">
-            <span className="font-bold text-slate-800 block">1. Escolher leads</span>
-            <span className="text-xs text-slate-500">O robô escreve uma mensagem para cada um. <b>Nada é enviado</b> antes de você revisar.</span>
+        <button onClick={() => setEscolherAberto(!escolherAberto)} className="w-full min-h-14 flex items-center gap-3 p-4 text-left">
+          <Bot className="w-5 h-5 md:w-4 md:h-4 text-blue-600 shrink-0" />
+          <span className="flex-1 min-w-0">
+            <span className="font-bold text-base md:text-sm text-slate-900 block leading-tight">1. Escolher leads</span>
+            <span className="text-[13px] md:text-xs text-slate-500 leading-snug block mt-0.5">O robô escreve uma mensagem para cada um. <b>Nada é enviado</b> antes de você revisar.</span>
           </span>
           {escolherAberto ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
         </button>
@@ -616,11 +616,11 @@ export const FilaDeEnvio: React.FC = () => {
               </p>
             ) : (
               <>
-                <div className="flex items-center justify-between mb-2 text-xs text-slate-600">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3 text-[13px] md:text-xs text-slate-600">
                   <span>{candidatos.length} lead(s) novos · {marcados.size} escolhido(s) (máx. {MAXIMO_POR_RODADA})</span>
-                  <span className="flex gap-3">
-                    <button onClick={() => setMarcados(new Set(candidatos.slice(0, MAXIMO_POR_RODADA).map(l => l.id)))} className="font-semibold text-blue-700 hover:underline">Escolher os primeiros {Math.min(MAXIMO_POR_RODADA, candidatos.length)}</button>
-                    {marcados.size > 0 && <button onClick={() => setMarcados(new Set())} className="font-semibold text-slate-500 hover:underline">Limpar</button>}
+                  <span className="flex gap-2 md:gap-3">
+                    <button onClick={() => setMarcados(new Set(candidatos.slice(0, MAXIMO_POR_RODADA).map(l => l.id)))} className="flex-1 md:flex-none min-h-11 md:min-h-0 px-3 md:px-0 rounded-xl md:rounded-none border border-blue-200 md:border-0 bg-blue-50 md:bg-transparent font-bold md:font-semibold text-blue-700 md:hover:underline">Escolher os primeiros {Math.min(MAXIMO_POR_RODADA, candidatos.length)}</button>
+                    {marcados.size > 0 && <button onClick={() => setMarcados(new Set())} className="min-h-11 md:min-h-0 px-4 md:px-0 rounded-xl md:rounded-none border border-slate-200 md:border-0 font-semibold text-slate-600 md:text-slate-500 md:hover:underline">Limpar</button>}
                   </span>
                 </div>
                 <ul className="max-h-72 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded-xl">
