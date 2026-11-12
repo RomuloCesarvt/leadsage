@@ -4,6 +4,7 @@ import { useCelular } from '../../lib/useCelular';
 import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { modoDaConta } from '../../lib/modoDaConta';
+import { WHATSAPP_SUPORTE } from './HelpScreen';
 import { MODO_EXTRA, diferenciais, idNoServidor, PLANOS_MENSAIS, ROBO_COMPLEMENTO, entregasDoPlano, entregasDoRobo, precoComRobo } from '../../data/planos';
 
 export const SubscriptionScreen: React.FC = () => {
@@ -33,7 +34,13 @@ export const SubscriptionScreen: React.FC = () => {
     return () => clearInterval(t);
   }, [voltouDoPagamento]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const assinar = async (id: string) => {
+  const assinar = async (id: string, rotulo = '') => {
+    // cobrança automática ainda não ligada no servidor: o pedido segue pelo WhatsApp do suporte, com o plano já escrito
+    if (!pagamentoAtivo) {
+      const texto = `Olá! Quero assinar o plano ${rotulo || id} do LeadSage (modo ${modo === 'empresa' ? 'Empresa' : 'Agência'}).`;
+      window.open(`https://wa.me/${WHATSAPP_SUPORTE}?text=${encodeURIComponent(texto)}`, '_blank', 'noopener');
+      return;
+    }
     setAbrindo(id); setAviso('');
     try {
       const { checkout_url } = await api.assinar(id);
@@ -60,7 +67,8 @@ export const SubscriptionScreen: React.FC = () => {
     const comRoboAgora = p.robo === 'incluso' || comRobo;
     const entregas = entregasDoPlano(p, modo);
     const mostradas = verTudo ? entregas : entregas.slice(0, 5);
-    const rotuloCta = !pagamentoAtivo ? 'Assinatura mensal em breve' : abrindo === idServidor ? 'Abrindo pagamento…' : `Assinar ${p.nome}${comRobo && p.robo === 'complemento' ? ' com robô' : ''}`;
+    const rotuloPlano = `${p.nome}${comRobo && p.robo === 'complemento' ? ' com robô' : ''}`;
+    const rotuloCta = abrindo === idServidor ? 'Abrindo pagamento…' : `Assinar ${rotuloPlano}`;
     return (
       <div className="flex-1 w-full pb-28" data-testid="assinatura-celular">
         <h1 className="text-2xl font-black tracking-tight text-slate-900">Planos</h1>
@@ -183,8 +191,8 @@ export const SubscriptionScreen: React.FC = () => {
             <p className="text-[13px] font-bold text-slate-500 leading-tight">{p.nome}</p>
             <p className="text-lg font-black text-slate-900 leading-tight">R$ {comRobo ? precoComRobo(p) : p.preco}<span className="text-sm font-bold text-slate-400">/mês</span></p>
           </div>
-          <button disabled={!pagamentoAtivo || abrindo !== ''} onClick={() => void assinar(idServidor)}
-            className={`flex-1 min-h-12 rounded-xl text-[15px] font-bold ${pagamentoAtivo ? 'bg-blue-600 active:bg-blue-700 text-white' : 'bg-slate-200 text-slate-500'} disabled:cursor-not-allowed`}>
+          <button disabled={abrindo !== ''} onClick={() => void assinar(idServidor, rotuloPlano)}
+            className="flex-1 min-h-12 rounded-xl text-[15px] font-bold bg-blue-600 active:bg-blue-700 text-white disabled:opacity-60 disabled:cursor-not-allowed">
             {rotuloCta}
           </button>
         </div>
@@ -289,9 +297,9 @@ export const SubscriptionScreen: React.FC = () => {
                   <button type="button" onClick={() => setComRobo(true)} className="mt-3 text-xs font-bold text-blue-600 hover:underline">Ver preço com o robô de IA</button>
                 )}
               </div>
-              <button disabled={!pagamentoAtivo || abrindo !== ''} onClick={() => void assinar(idNoServidor(p, comRobo))}
+              <button disabled={abrindo !== ''} onClick={() => void assinar(idNoServidor(p, comRobo), `${p.nome}${comRobo && p.robo === 'complemento' ? ' com robô' : ''}`)}
                 className={`w-full py-3.5 rounded-2xl text-sm font-bold transition-colors disabled:cursor-not-allowed ${p.destaque ? 'bg-blue-600 text-white disabled:opacity-60' : 'bg-slate-900 text-white disabled:opacity-60'}`}>
-                {!pagamentoAtivo ? 'Assinatura mensal em breve' : abrindo === idNoServidor(p, comRobo) ? 'Abrindo pagamento...' : `Assinar ${p.nome}${comRobo && p.robo === 'complemento' ? ' com robô' : ''}`}
+                {abrindo === idNoServidor(p, comRobo) ? 'Abrindo pagamento...' : `Assinar ${p.nome}${comRobo && p.robo === 'complemento' ? ' com robô' : ''}`}
               </button>
             </div>
           ))}

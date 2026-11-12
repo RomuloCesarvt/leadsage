@@ -20,8 +20,6 @@
     overflow-x: hidden;
   }
 
-  /* nenhuma tela do app rola para o lado: o que passar da largura é cortado, e a página nunca desliza e deixa um vão */
-  html { overflow-x: clip; max-width: 100%; }
 }
 
 /* Custom Scrollbars */
