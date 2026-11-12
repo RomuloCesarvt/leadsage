@@ -3,6 +3,7 @@
  * O robô faz tudo sozinho (1º seguimento e contato final); aqui a pessoa só acompanha. Quem responde ou pede para sair sai da régua.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { CalendarClock, Check, CircleDashed, Clock, MessageCircle, RefreshCw, X } from 'lucide-react';
 import { api } from '../services/api';
 import { sondar } from '../lib/sondagem';
@@ -54,6 +55,9 @@ export const ReguaDeSeguimentos: React.FC = () => {
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [filtro, setFiltro] = useState<'todos' | 'na_regua' | 'final' | 'respondeu'>('todos');
+  // a régua é longa (um cartão por lead): na tela de Disparos ela fica recolhida, só com o resumo, e abre quando a pessoa quer conferir
+  const [aberta, setAberta] = useState(false);
+  const [verTodos, setVerTodos] = useState(false);
 
   const carregar = useCallback(async () => {
     try { setRegua(await api.reguaDeSeguimentos()); setErro(''); } catch (e: any) { setErro(e?.message || 'Não foi possível carregar a régua.'); } finally { setCarregando(false); }
@@ -66,10 +70,26 @@ export const ReguaDeSeguimentos: React.FC = () => {
     : filtro === 'respondeu' ? l.situacao === 'respondeu'
       : l.situacao === 'na_regua' && l.passos.some(p => p.n === 2 && ['agendado', 'na_fila'].includes(p.estado)) && l.passos.filter(p => p.n === 1).every(p => p.estado === 'enviado'));
   const r = regua?.resumo;
+  const mostradas = verTodos ? lista : lista.slice(0, 8);
   const dias = regua?.dias_uteis ?? [2, 5];
 
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4" data-testid="regua-de-seguimentos">
+      {!aberta && (
+        <button type="button" onClick={() => setAberta(true)} aria-expanded={false} className="w-full min-h-14 flex items-center gap-3 text-left">
+          <CalendarClock className="w-5 h-5 text-blue-600 shrink-0" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-bold text-slate-800">Régua de seguimentos</span>
+            <span className="block text-xs text-slate-500 mt-0.5">
+              {carregando ? 'Carregando…' : r && r.total > 0
+                ? `${r.na_regua} na régua${r.saem_hoje > 0 ? ` · ${r.saem_hoje} saem hoje` : ''} · ${r.responderam} responderam`
+                : 'O que o robô envia sozinho depois da abordagem'}
+            </span>
+          </span>
+          <span className="shrink-0 text-sm font-bold text-blue-700 flex items-center gap-1">Ver a régua <ChevronDown className="w-4 h-4" /></span>
+        </button>
+      )}
+      {aberta && <>
       <div className="flex items-start gap-3">
         <CalendarClock className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
         <div className="flex-1 min-w-0">
@@ -106,7 +126,7 @@ export const ReguaDeSeguimentos: React.FC = () => {
       )}
 
       <ul className="space-y-3">
-        {lista.map(l => (
+        {mostradas.map(l => (
           <li key={`${l.lead_id}-${l.enviado_em}`} className="border border-slate-200 rounded-xl p-3 sm:p-4">
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <span className="font-bold text-slate-800 text-sm truncate max-w-full">{l.nome || l.telefone}</span>
@@ -124,6 +144,13 @@ export const ReguaDeSeguimentos: React.FC = () => {
           </li>
         ))}
       </ul>
+      {lista.length > 8 && (
+        <button type="button" onClick={() => setVerTodos(v => !v)} className="w-full min-h-11 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 active:bg-slate-50">
+          {verTodos ? 'Mostrar menos' : `Mostrar todos (${lista.length})`}
+        </button>
+      )}
+      <button type="button" onClick={() => setAberta(false)} className="w-full min-h-11 text-sm font-semibold text-slate-500">Recolher a régua</button>
+      </>}
     </section>
   );
 };

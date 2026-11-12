@@ -42,12 +42,13 @@ export const AgenteChat: React.FC = () => {
   const fim = useRef<HTMLDivElement>(null);
   const continuando = useRef(false);
 
-  const aplicar = useCallback((e: Estado) => setEstado(e), []);
+  const valido = (e: any): e is Estado => !!e && Array.isArray(e.mensagens) && !!e.cota;
+  const aplicar = useCallback((e: Estado) => { if (valido(e)) setEstado(e); }, []);
 
   useEffect(() => {
     if (!user) return;
     let vivo = true;
-    api.agenteEstado().then(e => { if (vivo) setEstado(e); }).catch(() => { /* sem agente por enquanto */ });
+    api.agenteEstado().then(e => { if (vivo && valido(e)) setEstado(e); }).catch(() => { /* sem agente por enquanto */ });
     return () => { vivo = false; };
   }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -62,6 +63,7 @@ export const AgenteChat: React.FC = () => {
         while (vivo) {
           const e = await api.agenteContinuar();
           if (!vivo) break;
+          if (!valido(e)) break;
           setEstado(e);
           if (e.tarefa?.status !== 'rodando') break;
         }
