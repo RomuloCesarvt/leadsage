@@ -503,8 +503,8 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
               <button onClick={() => setAberto(null)} className="md:hidden p-2 -ml-1 text-slate-600 rounded-full active:bg-slate-100" aria-label="Voltar"><ChevronLeft className="w-6 h-6" /></button>
               <Avatar nome={aberto.nome} className="w-10 h-10 md:w-9 md:h-9" />
               <div className="min-w-0 flex-1">
-                <p className="font-bold text-base text-slate-800 truncate">{aberto.nome}</p>
-                <p className="text-[13px] md:text-xs text-slate-500">{aberto.grupo ? 'Grupo' : aberto.telefone ? foneBonito(aberto.telefone) : ''}</p>
+                <p className="font-bold text-base text-slate-800 truncate">{(aberto.nome && aberto.nome.trim()) || (aberto.telefone ? foneBonito(aberto.telefone) : 'Contato')}</p>
+                <p className="text-[13px] md:text-xs text-slate-500">{aberto.grupo ? 'Grupo' : (aberto.nome && aberto.nome.trim() && aberto.telefone) ? foneBonito(aberto.telefone) : ''}</p>
               </div>
               <div className="w-full md:w-auto flex items-center gap-2 overflow-x-auto md:overflow-visible pb-0.5 md:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {!aberto.grupo && aberto.telefone && temCriativo && (
