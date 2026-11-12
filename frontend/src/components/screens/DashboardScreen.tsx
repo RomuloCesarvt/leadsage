@@ -6,7 +6,7 @@ import type { DesempenhoPorSegmento } from '../../types';
 import { agrupar, destaques as destaquesDe, segmentosDasLinhas, type Visao } from '../../lib/desempenho';
 import { useApp } from '../../context/AppContext';
 import { PrecisaDeVoce } from '../PrecisaDeVoce';
-import { pedirFiltroDoPipeline } from '../../lib/atalhosDoPainel';
+import { pedirFiltroDoPipeline, pedirBuscaDeLeads } from '../../lib/atalhosDoPainel';
 
 export const DashboardScreen: React.FC = () => {
   const { setViewState, leads: todos, history, user, setSelectedProfileLead } = useApp() as any;
@@ -332,7 +332,10 @@ export const DashboardScreen: React.FC = () => {
                   ) : (
                     <ul className="divide-y divide-slate-100">
                       {grupos.slice(0, 15).map(g => (
-                        <li key={g.nome} className="px-4 sm:px-5 py-3">
+                        <li key={g.nome} role="button" tabIndex={0} title={visao === 'estado' ? undefined : `Ver os leads de ${g.nome}`}
+                          onClick={() => { if (visao === 'estado') return; pedirBuscaDeLeads(`${visao === 'cidade' ? 'cidade' : 'nicho'}:${g.nome}`); setViewState('workspace'); }}
+                          onKeyDown={e => { if (e.key === 'Enter' && visao !== 'estado') { pedirBuscaDeLeads(`${visao === 'cidade' ? 'cidade' : 'nicho'}:${g.nome}`); setViewState('workspace'); } }}
+                          className={`px-4 sm:px-5 py-3 ${visao === 'estado' ? '' : 'cursor-pointer hover:bg-slate-50 active:bg-slate-100'}`}>
                           <div className="sm:grid sm:grid-cols-[1.6fr_repeat(5,1fr)] sm:gap-2 sm:items-center">
                             <p className="font-bold text-slate-800 text-sm truncate">{g.nome}</p>
                             <div className="grid grid-cols-5 gap-2 mt-2 sm:mt-0 sm:contents text-center sm:text-right">

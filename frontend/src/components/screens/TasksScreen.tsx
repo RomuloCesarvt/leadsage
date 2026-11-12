@@ -6,7 +6,7 @@ export const TasksScreen: React.FC = () => {
   const { setViewState } = useApp() as any;
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-[#000000]">
+    <div className="flex-1 flex flex-col h-[calc(100dvh-64px)] overflow-hidden bg-[#000000]">
       <div className="p-8 max-w-4xl mx-auto w-full flex-1 flex flex-col">
         <h1 className="text-2xl font-bold text-zinc-100 mb-8 tracking-tight">Minhas Tarefas</h1>
         

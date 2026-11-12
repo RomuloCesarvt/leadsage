@@ -110,7 +110,7 @@ export const LoginScreen: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#000000] flex items-center justify-center p-4">
+    <div className="min-h-[100dvh] bg-[#000000] flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div className="w-full max-w-lg bg-[#050505] border border-[#18181b] rounded-2xl p-8 shadow-2xl">
         <div className="flex items-center justify-center mb-8">
           <Logo size={38} fundo="escuro" texto="text-2xl" />

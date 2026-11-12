@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { lerBuscaDeLeads } from '../lib/atalhosDoPainel';
 import {
   Star,
   Trash2,
@@ -27,6 +28,8 @@ export type ModoTabela = 'resultados' | 'meus';
 
 const normaliza = (t: string) => (t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
+const chaveDoRamo = (t: string): string => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').trim().split(/\s+/).map(p => (p.length > 4 && p.endsWith('s') ? p.slice(0, -1) : p)).join(' ');
+
 export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
   const {
     leads, setSelectedProfileLead, salvarLeads, removerLeads, alternarFavorito,
@@ -51,6 +54,18 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
       .sort((a, b) => a.localeCompare(b, 'pt-BR')),
     [base],
   );
+
+  // o painel pode abrir esta tela já filtrada por ramo ou cidade ("nicho:Padarias" / "cidade:Bauru"): casa com a opção mais parecida (plural e acento não contam)
+  const atalho = React.useRef<string>(lerBuscaDeLeads());
+  useEffect(() => {
+    const t = atalho.current;
+    if (!t || base.length === 0) return;
+    atalho.current = '';
+    const [tipo, ...resto] = t.split(':');
+    const alvo = chaveDoRamo(resto.join(':'));
+    if (tipo === 'nicho') { const o = nichos.find(n => chaveDoRamo(n) === alvo); if (o) setNicho(o); }
+    else if (tipo === 'cidade') { const o = cidades.find(c => chaveDoRamo(c) === alvo); if (o) setCidade(o); }
+  }, [base, nichos, cidades]);
 
   let universo = base;
   if (empresa.trim()) {

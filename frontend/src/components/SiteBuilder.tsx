@@ -480,7 +480,7 @@ export const SiteBuilder: React.FC = () => {
   );
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-140px)]">
+    <div className="flex-1 flex flex-col h-[calc(100dvh-140px)]">
 
       <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
         <button

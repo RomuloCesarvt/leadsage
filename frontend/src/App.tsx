@@ -42,7 +42,7 @@ const MainApp: React.FC = () => {
   const { viewState, user, authLoading } = useApp() as any;
 
   if (authLoading) {
-    return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="text-slate-500 font-medium">Carregando...</div></div>;
+    return <div className="min-h-[100dvh] bg-slate-50 flex items-center justify-center"><div className="text-slate-500 font-medium">Carregando...</div></div>;
   }
 
   if (!user) {
