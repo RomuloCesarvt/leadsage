@@ -17,6 +17,7 @@ documento) e todos precisam da mesma disciplina:
 """
 import contextvars
 import json
+import os
 import re
 import time
 from typing import Any, Dict, List, Optional
@@ -138,7 +139,7 @@ def _alvos(client, prompt: str, max_tokens: Optional[int], json_mode: bool, qual
             if qualidade and ai_providers.e_pequeno(modelo):
                 continue    # texto para cliente: modelo pequeno escreve seco e igual
             chave = f"{prov['nome']}:{modelo}"
-            alvo = ia_gate.Alvo(chave, prov["nome"], None)
+            alvo = ia_gate.Alvo(chave, prov.get("tipo", prov["nome"]), None)
 
             def chamar(limite_s, prov=prov, modelo=modelo, alvo=alvo):
                 def aprender(h, status):
@@ -170,7 +171,23 @@ def _alvos(client, prompt: str, max_tokens: Optional[int], json_mode: bool, qual
             f"gemini:{modelo}", "gemini",
             lambda limite_s, modelo=modelo: _tentar_modelo(client, modelo, prompt, int(max(3.0, limite_s) * 1000), max_tokens),
         ))
+    # outras contas do Gemini (GEMINI_API_KEY_2, _3...): cada uma tem o seu limite diário, então entram como alvos próprios
+    for n in range(2, 6):
+        chave_extra = (os.getenv(f"GEMINI_API_KEY_{n}") or "").strip()
+        if not chave_extra:
+            continue
+        cliente_extra = _CLIENTES_EXTRAS.get(chave_extra) or _CLIENTES_EXTRAS.setdefault(chave_extra, build_client(chave_extra))
+        for modelo in MODEL_CHAIN:
+            if qualidade and ai_providers.e_pequeno(modelo):
+                continue
+            alvos.append(ia_gate.Alvo(
+                f"gemini{n}:{modelo}", "gemini",
+                lambda limite_s, modelo=modelo, c=cliente_extra: _tentar_modelo(c, modelo, prompt, int(max(3.0, limite_s) * 1000), max_tokens),
+            ))
     return alvos
+
+
+_CLIENTES_EXTRAS: dict = {}
 
 
 def _status_http(exc: Exception) -> int:

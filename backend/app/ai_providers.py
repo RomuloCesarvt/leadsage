@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-PROVEDORES: List[Dict[str, Any]] = [
+PROVEDORES_BASE: List[Dict[str, Any]] = [
     {
         "nome": "groq",
         "url": "https://api.groq.com/openai/v1",
@@ -70,7 +70,27 @@ PROVEDORES: List[Dict[str, Any]] = [
         "env": "NVIDIA_API_KEY",
         "preferidos": ["openai/gpt-oss-120b", "meta/llama-3.3-70b-instruct", "mistralai/mistral-large-2-instruct"],
     },
+    {
+        "nome": "xai",
+        "url": "https://api.x.ai/v1",
+        "env": "XAI_API_KEY",                      # Grok, da xAI (console.x.ai); costuma ter créditos de teste
+        "preferidos": ["grok-4-fast-non-reasoning", "grok-4-fast", "grok-3-mini", "grok-3", "grok-4"],
+    },
 ]
+
+
+def _expandir(base: List[Dict[str, Any]], contas_extras: int = 4) -> List[Dict[str, Any]]:
+    """Mais de uma CONTA por provedor: cada conta tem o seu limite gratuito, então duas contas são o dobro da cota.
+    A primeira usa GROQ_API_KEY; as outras, GROQ_API_KEY_2, GROQ_API_KEY_3... (igual para os demais). `tipo` é o provedor, `nome` é a conta."""
+    saida: List[Dict[str, Any]] = []
+    for p in base:
+        saida.append({**p, "tipo": p["nome"]})
+        for n in range(2, 2 + contas_extras):
+            saida.append({**p, "nome": f"{p['nome']}{n}", "env": f"{p['env']}_{n}", "tipo": p["nome"]})
+    return saida
+
+
+PROVEDORES: List[Dict[str, Any]] = _expandir(PROVEDORES_BASE)
 
 # Instrução igual para todos os motores: a mesma "cabeça" responde, não importa quem congestionou.
 SISTEMA_COMUM = (
@@ -123,7 +143,7 @@ def _chave(p: Dict[str, Any]) -> str:
 
 def _headers(p: Dict[str, Any]) -> Dict[str, str]:
     h = {"Authorization": f"Bearer {_chave(p)}", "Content-Type": "application/json"}
-    if p["nome"] == "openrouter":
+    if p.get("tipo", p["nome"]) == "openrouter":
         h["HTTP-Referer"] = "https://leadsageofc.vercel.app"
         h["X-Title"] = "LeadSage"
     return h
@@ -154,7 +174,7 @@ _NAO_TEXTO = ("whisper", "tts", "guard", "embed", "orpheus", "image", "vision-pr
 
 def escolher_modelo(p: Dict[str, Any], disponiveis: List[str]) -> str:
     """Modelo forçado por variável, senão o primeiro preferido que a conta tem, senão um genérico."""
-    forcado = (os.getenv(f"{p['nome'].upper()}_MODEL") or "").strip()
+    forcado = (os.getenv(f"{p.get('tipo', p['nome']).upper()}_MODEL") or "").strip()
     if forcado:
         return forcado
     for m in p["preferidos"]:
@@ -162,7 +182,7 @@ def escolher_modelo(p: Dict[str, Any], disponiveis: List[str]) -> str:
             return m
     for m in disponiveis:
         baixo = m.lower()
-        if not any(x in baixo for x in _NAO_TEXTO) and any(x in baixo for x in ("llama", "gpt-oss", "qwen", "mistral", "gemma")):
+        if not any(x in baixo for x in _NAO_TEXTO) and any(x in baixo for x in ("llama", "gpt-oss", "qwen", "mistral", "gemma", "grok")):
             return m
     raise ProvedorFalhou(f"{p['nome']}: nenhum modelo de texto disponível")
 
@@ -189,7 +209,7 @@ def modelos_alvo(p: Dict[str, Any], maximo: int = 3) -> List[str]:
         disponiveis = modelos_do_provedor(p)
     except Exception:
         return []
-    forcado = (os.getenv(f"{p['nome'].upper()}_MODEL") or "").strip()
+    forcado = (os.getenv(f"{p.get('tipo', p['nome']).upper()}_MODEL") or "").strip()
     if forcado:
         return [forcado]
     achados = [m for m in p["preferidos"] if m in disponiveis]

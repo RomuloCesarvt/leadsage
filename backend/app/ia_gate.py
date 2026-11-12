@@ -23,8 +23,8 @@ from typing import Any, Deque, Dict, List, Optional, Tuple
 
 # Orçamento por minuto de cada tipo de alvo (abaixo do limite real, para sobrar margem). Provedores com cabeçalho de limite
 # (Groq, Cerebras) corrigem estes valores sozinhos a cada resposta.
-TPM_PADRAO = {"groq": 6500, "cerebras": 40000, "mistral": 30000, "openrouter": 15000, "sambanova": 20000, "nvidia": 20000, "gemini": 120000}
-RPM_PADRAO = {"groq": 25, "cerebras": 20, "mistral": 20, "openrouter": 8, "sambanova": 15, "nvidia": 15, "gemini": 8}
+TPM_PADRAO = {"groq": 6500, "cerebras": 40000, "mistral": 30000, "openrouter": 15000, "sambanova": 20000, "nvidia": 20000, "xai": 60000, "gemini": 120000}
+RPM_PADRAO = {"groq": 25, "cerebras": 20, "mistral": 20, "openrouter": 8, "sambanova": 15, "nvidia": 15, "xai": 20, "gemini": 8}
 PAUSA_APOS_RECUSA_S = 20.0
 PAUSA_DIARIO_S = 1800.0
 
