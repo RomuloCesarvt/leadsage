@@ -68,3 +68,17 @@ export const Logo: React.FC<LockupProps> = ({
     </span>
   </div>
 );
+
+/** O mascote do LS: o pino do mapa com um rosto simpático. Aparece no botão e no cabeçalho do agente. */
+export const MascoteLS: React.FC<{ size?: number; className?: string; piscando?: boolean }> = ({ size = 48, className, piscando = false }) => (
+  <svg width={size} height={size} viewBox="0 0 48 48" className={className} role="img" aria-label="Agente LeadSage">
+    <path d="M24 3c-9.39 0-17 7.61-17 17 0 11.9 15.2 24.1 15.85 24.62a1.85 1.85 0 0 0 2.3 0C25.8 44.1 41 31.9 41 20c0-9.39-7.61-17-17-17z" fill="#2563eb" stroke="#ffffff" strokeWidth="2" />
+    <ellipse cx="17.5" cy="18" rx="3.6" ry={piscando ? 0.8 : 4.4} fill="#ffffff" />
+    <ellipse cx="30.5" cy="18" rx="3.6" ry={piscando ? 0.8 : 4.4} fill="#ffffff" />
+    {!piscando && <><circle cx="18.3" cy="18.8" r="1.9" fill="#0f172a" /><circle cx="31.3" cy="18.8" r="1.9" fill="#0f172a" /></>}
+    <path d="M17 26.5c2 3.2 12 3.2 14 0" fill="none" stroke="#ffffff" strokeWidth="2.4" strokeLinecap="round" />
+    <circle cx="12.6" cy="25" r="2.2" fill="#f59e0b" opacity=".75" />
+    <circle cx="35.4" cy="25" r="2.2" fill="#f59e0b" opacity=".75" />
+    <path d="M24 3v-1.5" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" />
+  </svg>
+);

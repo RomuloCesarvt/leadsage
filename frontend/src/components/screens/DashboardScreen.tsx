@@ -317,14 +317,28 @@ export const DashboardScreen: React.FC = () => {
                           onClick={() => { if (visao === 'estado') return; pedirBuscaDeLeads(`${visao === 'cidade' ? 'cidade' : 'nicho'}:${g.nome}`); setViewState('workspace'); }}
                           onKeyDown={e => { if (e.key === 'Enter' && visao !== 'estado') { pedirBuscaDeLeads(`${visao === 'cidade' ? 'cidade' : 'nicho'}:${g.nome}`); setViewState('workspace'); } }}
                           className={`px-4 sm:px-5 py-3 ${visao === 'estado' ? '' : 'cursor-pointer hover:bg-slate-50 active:bg-slate-100'}`}>
-                          <div className="sm:grid sm:grid-cols-[1.6fr_repeat(5,1fr)] sm:gap-2 sm:items-center">
+                          {/* celular: um cartão limpo por grupo (nome, taxa de resposta, barra e o funil em uma linha) */}
+                          <div className="sm:hidden">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <p className="font-bold text-slate-900 text-[15px] leading-tight min-w-0 truncate">{g.nome}</p>
+                              {g.abordados >= minimo
+                                ? <p className="shrink-0 text-lg font-black text-blue-600 leading-none">{g.taxa_resposta}%<span className="ml-1 text-[11px] font-semibold text-slate-400">responderam</span></p>
+                                : <p className="shrink-0 text-xs text-slate-400">poucos dados</p>}
+                            </div>
+                            <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{ width: `${g.abordados >= minimo ? g.taxa_resposta : 0}%` }} /></div>
+                            <p className="mt-2 text-[13px] text-slate-600 leading-snug">
+                              <b className="text-slate-900">{g.abordados}</b> abordados · <b className="text-slate-900">{g.responderam}</b> responderam
+                            </p>
+                            <p className="mt-0.5 text-[13px] text-slate-500 leading-snug">
+                              {g.interessados} com interesse · {g.pediram_link} pediram link · {g.fechados} fechados
+                            </p>
+                          </div>
+                          <div className="hidden sm:grid sm:grid-cols-[1.6fr_repeat(5,1fr)] sm:gap-2 sm:items-center">
                             <p className="font-bold text-slate-800 text-sm truncate">{g.nome}</p>
-                            <div className="grid grid-cols-5 gap-2 mt-2 sm:mt-0 sm:contents text-center sm:text-right">
+                            <div className="contents text-right">
                               {([['Abord.', g.abordados], ['Resp.', g.responderam], ['Interesse', g.interessados], ['Link', g.pediram_link], ['Fechados', g.fechados]] as const).map(([r, v]) => (
-                                <div key={r} className="sm:text-right">
-                                  <p className="sm:hidden text-[10px] font-bold uppercase text-slate-400">{r}</p>
+                                <div key={r} className="text-right">
                                   <p className="font-bold text-slate-800 text-sm">{v}</p>
-                                  {r === 'Resp.' && g.abordados >= minimo && <p className="text-[11px] text-slate-400 sm:hidden">{g.taxa_resposta}%</p>}
                                 </div>
                               ))}
                             </div>

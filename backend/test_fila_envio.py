@@ -67,10 +67,12 @@ def test_links_abrem_o_chat_certo():
     assert fila_envio.link_do_canal("email", lead(), "x") == ""
 
 
-def test_rodape_de_saida_so_uma_vez():
-    t = fila_envio.com_rodape_de_saida("Olá")
-    assert "responder SAIR" in t
-    assert fila_envio.com_rodape_de_saida(t) == t
+def test_abordagem_nunca_leva_responda_sair():
+    assert fila_envio.sem_rodape_de_saida("Olá") == "Olá"
+    com = "Olá, tudo bem?" + fila_envio.RODAPE_SAIR
+    assert fila_envio.sem_rodape_de_saida(com) == "Olá, tudo bem?"
+    assert "SAIR" not in fila_envio._sem_aviso({"status": "rascunho", "texto": com})["texto"]
+    assert fila_envio._sem_aviso({"status": "enviado", "texto": com})["texto"] == com   # o que já saiu não é reescrito
 
 
 # ------------------------------------------------------------------- lote
@@ -88,7 +90,7 @@ def test_email_sai_sozinho_e_o_resto_vai_para_a_fila(com_robo, rodar):
     assert por_id["N"]["resultado"] == "ignorado"
 
     # só um e-mail foi de fato enviado, com rodapé, e cobrado uma vez
-    assert len(p.enviados) == 1 and "responder SAIR" in p.enviados[0][2]
+    assert len(p.enviados) == 1 and "responder SAIR" not in p.enviados[0][2]
     assert p.cobrancas == 1
 
     itens = {i["lead_id"]: i for i in rodar(fila_envio.listar, UID)}
@@ -222,7 +224,7 @@ def test_editar_muda_o_texto_o_link_do_whatsapp_e_o_rodape_do_email(rodar, com_r
     zap = rodar(fila_envio.editar, UID, "f_B", "Oi, tudo bem? Posso mostrar uma ideia?")
     assert zap["texto"] == "Oi, tudo bem? Posso mostrar uma ideia?" and "Oi%2C%20tudo%20bem" in zap["link"] and zap["editado"]
     mail = rodar(fila_envio.editar, UID, "f_A", "Texto novo sem rodapé", "Assunto novo")
-    assert mail["assunto"] == "Assunto novo" and "responder SAIR" in mail["texto"]
+    assert mail["assunto"] == "Assunto novo" and "responder SAIR" not in mail["texto"]
     with pytest.raises(ValueError):
         rodar(fila_envio.editar, UID, "f_B", "   ")
     assert rodar(fila_envio.editar, UID, "f_nao_existe", "x") is None

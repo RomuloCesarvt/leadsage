@@ -88,7 +88,9 @@ export const FilaDeEnvio: React.FC = () => {
   const [carregando, setCarregando] = useState(true);
   // a seleção sobrevive a uma atualização do app: quem já recebeu mensagem é tirado dela assim que a fila carrega (abaixo)
   const [marcados, setMarcados] = useState<Set<string>>(() => new Set((leadsParaContato && leadsParaContato.length ? leadsParaContato : lerSelecao(user?.uid || ''))));
-  const [escolherAberto, setEscolherAberto] = useState(true);
+  // vindo do agente ("Abrir a fila para revisar"): a lista de escolher leads fecha e a tela desce direto nas mensagens para revisar
+  const [veioDoAgente] = useState(() => { try { return sessionStorage.getItem('leadsage_fila_foco') === 'revisar'; } catch { return false; } });
+  const [escolherAberto, setEscolherAberto] = useState(!veioDoAgente);
   const [preparando, setPreparando] = useState(false);
   const [progresso, setProgresso] = useState({ feitos: 0, total: 0 });
   const [resultados, setResultados] = useState<ResultadoPreparo[]>([]);
@@ -448,6 +450,17 @@ export const FilaDeEnvio: React.FC = () => {
   const pular = (id: string) => acao(id, () => api.filaPular(id), 'Não foi possível remover.');
   const enviarAguardando = () => acao('aguardando', () => api.filaEnviarAguardando(), 'Não foi possível enviar.', atualizarPipeline);
 
+  // desce até as mensagens assim que a fila carrega (rolagem manual: scrollIntoView mexeria também na rolagem horizontal da página)
+  useEffect(() => {
+    if (!veioDoAgente || carregando) return;
+    try { sessionStorage.removeItem('leadsage_fila_foco'); } catch { /* sem armazenamento */ }
+    const t = setTimeout(() => {
+      const el = document.getElementById('fila-revisar');
+      if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 72, behavior: 'smooth' });
+    }, 150);
+    return () => clearTimeout(t);
+  }, [veioDoAgente, carregando]);
+
   const lista = aba === 'revisar' ? rascunhos : aba === 'fila' ? naFila : comProblema;
 
   // ------------------------------------------------------------ cartão de uma mensagem
@@ -692,7 +705,7 @@ export const FilaDeEnvio: React.FC = () => {
       </section>
 
       {/* 2. revisar e enviar */}
-      <section className="space-y-3">
+      <section id="fila-revisar" className="space-y-3">
         <div className="flex items-center gap-2">
           <h2 className="font-bold text-lg md:text-base text-slate-900 flex-1 leading-tight">2. Revisar e enviar</h2>
           <button onClick={() => { void carregar(); void carregarWhats(); }} title="Atualizar" aria-label="Atualizar a fila"

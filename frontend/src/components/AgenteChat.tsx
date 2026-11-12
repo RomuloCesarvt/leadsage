@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Sparkles, X, Send, Trash2, Check, ArrowRight, Loader2 } from 'lucide-react';
+import { X, Send, Trash2, Check, ArrowRight, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
+import { MascoteLS } from './Logo';
+import { useCelular } from '../lib/useCelular';
 import { useApp } from '../context/AppContext';
 
 /**
@@ -30,7 +32,8 @@ const horaDeVolta = (iso?: string) => {
 };
 
 export const AgenteChat: React.FC = () => {
-  const { setViewState, setLeads, user, setUser } = useApp() as any;
+  const { setViewState, setLeads, user, setUser, viewState } = useApp() as any;
+  const celular = useCelular();
   const [aberto, setAberto] = useState(false);
   const [estado, setEstado] = useState<Estado | null>(null);
   const [texto, setTexto] = useState('');
@@ -127,7 +130,7 @@ export const AgenteChat: React.FC = () => {
           </button>
         )}
         {m.cartao?.tipo === 'fila' && (
-          <button type="button" onClick={() => { setAberto(false); setViewState('fila'); }} className="mt-2 w-full min-h-11 rounded-xl bg-blue-600 text-white text-sm font-bold flex items-center justify-center gap-1.5">
+          <button type="button" onClick={() => { try { sessionStorage.setItem('leadsage_fila_foco', 'revisar'); } catch { /* sem armazenamento */ } setAberto(false); setViewState('fila'); }} className="mt-2 w-full min-h-11 rounded-xl bg-blue-600 text-white text-sm font-bold flex items-center justify-center gap-1.5">
             Abrir a fila para revisar <ArrowRight className="w-4 h-4" />
           </button>
         )}
@@ -137,18 +140,18 @@ export const AgenteChat: React.FC = () => {
 
   return (
     <>
-      {!aberto && (
+      {!aberto && !(celular && viewState === 'fila') && (
         <button type="button" onClick={abrir} aria-label="Abrir o agente" data-testid="agente-botao"
-          className="fixed right-4 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-indigo-600 to-blue-600 text-white shadow-lg flex items-center justify-center active:scale-95 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6">
-          {rodando ? <Loader2 className="w-6 h-6 animate-spin" /> : <Sparkles className="w-6 h-6" />}
-          {estado.nao_lidas > 0 && <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-[11px] font-bold flex items-center justify-center">{estado.nao_lidas}</span>}
+          className="fixed right-2 z-40 w-14 h-14 flex items-center justify-center opacity-70 hover:opacity-100 active:opacity-100 active:scale-95 transition-opacity drop-shadow-[0_2px_6px_rgba(15,23,42,0.35)] bottom-[calc(4.25rem+env(safe-area-inset-bottom))] md:bottom-6 md:right-6">
+          <MascoteLS size={52} piscando={false} className={rodando ? 'animate-bounce' : ''} />
+          {estado.nao_lidas > 0 && <span className="absolute top-0 right-0 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center">{estado.nao_lidas}</span>}
         </button>
       )}
 
       {aberto && (
         <div className="fixed inset-0 z-50 md:inset-auto md:right-6 md:bottom-6 md:w-[420px] md:h-[640px] md:max-h-[85vh] bg-white md:rounded-2xl md:shadow-2xl md:border md:border-slate-200 flex flex-col overflow-hidden" role="dialog" aria-label="Agente do LeadSage" data-testid="agente-painel">
           <div className="px-4 py-3 border-b border-slate-200 flex items-center gap-3" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
-            <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 flex items-center justify-center shrink-0"><Sparkles className="w-5 h-5 text-white" /></span>
+            <MascoteLS size={40} className="shrink-0" />
             <div className="min-w-0 flex-1">
               <h2 className="text-base font-bold text-slate-900 leading-tight">Agente LeadSage</h2>
               <p className="text-xs text-slate-500 truncate" data-testid="agente-cota">

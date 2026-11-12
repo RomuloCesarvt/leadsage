@@ -37,7 +37,7 @@ STATUS = ("rascunho", "pendente", "enviado", "pulado", "aguardando_limite", "fal
 # mensagens que ainda podem ser corrigidas antes de sair
 EDITAVEIS = ("rascunho", "pendente", "aguardando_limite", "falhou")
 
-RODAPE_SAIR = "\n\n—\nSe preferir não receber mais mensagens, é só responder SAIR."
+RODAPE_SAIR = "\n\n—\nSe preferir não receber mais mensagens, é só responder SAIR."   # só para reconhecer e tirar de rascunhos antigos
 
 ROTULO_CANAL = {
     "email": "E-mail",
@@ -92,8 +92,13 @@ def link_do_canal(canal: str, lead: Dict[str, Any], texto: str) -> str:
     return ""
 
 
-def com_rodape_de_saida(texto: str) -> str:
-    return texto if "responder SAIR" in texto else texto.rstrip() + RODAPE_SAIR
+def sem_rodape_de_saida(texto: str) -> str:
+    """A abordagem NUNCA leva o aviso "responda SAIR" (parece disparo em massa). Tira o aviso de rascunhos feitos antes desta regra.
+    Quem escreve SAIR por conta própria continua sendo atendido: o robô marca que não quer receber mais."""
+    t = str(texto or "")
+    if "responder SAIR" not in t:
+        return t
+    return re.sub(r"\s*(?:—\s*)?\n?[^\n]*responder SAIR[^\n]*\s*$", "", t).rstrip()
 
 
 # ------------------------------------------------------------ armazenamento
@@ -125,7 +130,18 @@ async def _gravar(uid: str, item: Dict[str, Any]) -> None:
         await s.commit()
 
 
+def _sem_aviso(item: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Rascunhos e pendentes escritos antes da regra "sem responda SAIR" perdem o aviso ao serem lidos (o que já foi enviado fica como está)."""
+    if item and item.get("status") in ("rascunho", "pendente", "aguardando_limite") and "responder SAIR" in str(item.get("texto") or ""):
+        item = {**item, "texto": sem_rodape_de_saida(item["texto"])}
+    return item
+
+
 async def obter(uid: str, item_id: str) -> Optional[Dict[str, Any]]:
+    return _sem_aviso(await _obter_bruto(uid, item_id))
+
+
+async def _obter_bruto(uid: str, item_id: str) -> Optional[Dict[str, Any]]:
     async with AsyncSessionLocal() as s:
         row = (await s.execute(select(DBRobo).where(DBRobo.chave == _chave(uid, item_id)))).scalar_one_or_none()
         no_sql = dict(row.data or {}) if row else None
@@ -160,6 +176,7 @@ async def listar(uid: str) -> List[Dict[str, Any]]:
         async with AsyncSessionLocal() as s:
             rows = (await s.execute(select(DBRobo).where(DBRobo.uid == uid, DBRobo.tipo == "fila"))).scalars().all()
             itens = [dict(r.data or {}) for r in rows]
+    itens = [_sem_aviso(i) for i in itens]
     itens.sort(key=lambda i: i.get("criado") or "", reverse=True)
     return itens
 
@@ -756,7 +773,7 @@ async def preparar_lote(
             saida.append({"lead_id": lid, "nome": nome, "resultado": "falhou", "motivo": "a IA devolveu uma mensagem vazia"})
             continue
         if canal == "email":
-            corpo = com_rodape_de_saida(corpo)
+            corpo = sem_rodape_de_saida(corpo)
 
         # mensagem nova para quem ja recebeu nao apaga o registro do que foi enviado: ganha um id proprio
         novo_id = f"f_{lid}"
@@ -901,7 +918,7 @@ async def editar(uid: str, item_id: str, texto: Optional[str] = None, assunto: O
         if not novo:
             raise ValueError("A mensagem não pode ficar vazia.")
         if item.get("canal") == "email":
-            novo = com_rodape_de_saida(novo)
+            novo = sem_rodape_de_saida(novo)
         novo = novo[:4000]
         contato = item.get("contato") or {}
         lead = {"phone": contato.get("phone", ""), "instagram": contato.get("instagram", ""),

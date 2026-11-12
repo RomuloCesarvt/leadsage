@@ -29,8 +29,7 @@ IDIOMA = "pt_BR"
 # Nao pode comecar nem terminar com variavel (regra da Meta).
 CORPO_PADRAO = (
     "Olá! Aqui é {{1}}, da {{2}}. Vi a {{3}} no Google e tive uma ideia para "
-    "melhorar a presença digital de vocês. Posso te contar em um minuto? "
-    "Se preferir não receber mensagens, é só responder SAIR."
+    "melhorar a presença digital de vocês. Posso te contar em um minuto?"
 )
 EXEMPLO = ["Ana", "LeadSage", "Padaria Favorita"]
 
