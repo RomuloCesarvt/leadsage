@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import credit_system, pipeline_store
+from app import atividade, credit_system, pipeline_store
 from app.credit_system import is_admin
 from app.database import DBSearchHistory, get_db
 from app.firebase_config import get_current_user
@@ -59,8 +59,12 @@ async def usuarios(_: dict = Depends(exigir_admin)):
         contas = _listar_contas()
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Não consegui listar os usuários: {exc}")
+    usos = await atividade.todas()
     for c in contas:
         c["ilimitado"] = await credit_system.e_ilimitado(c["uid"])
+        # vale o mais recente entre o login e o uso real do app (quem fica com a sessão aberta nunca refaz o login)
+        c["ultimo_login"] = c["ultimo_acesso"]
+        c["ultimo_acesso"] = max(c["ultimo_acesso"] or "", usos.get(c["uid"], ""))
     contas.sort(key=lambda c: c["ultimo_acesso"] or c["criado_em"], reverse=True)
     return contas
 

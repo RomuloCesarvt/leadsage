@@ -114,8 +114,9 @@ async def usuario_do_espaco(request: Request, token: dict = Depends(get_current_
 
     `uid` continua sendo o da conta (perfil, plano, créditos); `espaco` é a chave dos dados de trabalho (leads, pipeline, conversas, robô...).
     """
-    from app import espaco as espaco_mod
+    from app import espaco as espaco_mod, atividade
     modo = (request.headers.get("x-modo") or "").strip().lower()
+    await atividade.registrar(token.get("uid") or "")        # último acesso de verdade (o login do Firebase não muda com a sessão aberta)
     return {**token, "modo": modo, "espaco": espaco_mod.do_modo(token.get("uid") or "", modo)}
 
 
@@ -2975,7 +2976,7 @@ async def gerar_raio_x(req: RaioXRequest, user: dict = Depends(usuario_do_espaco
     if not req.refazer:
         guardado = await raio_x.ler_cache(uid, req.place_id)
         if guardado:
-            return {**guardado, "do_cache": True}
+            return {**raio_x.completar(guardado), "do_cache": True}
 
     if await check_and_deduct_credits(_espaco(user), 1, email) is None:
         raise HTTPException(status_code=402, detail="Créditos insuficientes para o raio-x.")

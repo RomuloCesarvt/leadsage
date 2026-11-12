@@ -121,15 +121,37 @@ def atividade_instagram(bd: Dict[str, Any], agora: Optional[datetime] = None) ->
         (p.get("like_count") or 0) + (p.get("comments_count") or 0)
         for p in posts if p.get("like_count") is not None
     ]
+    seguidores = bd.get("followers_count")
+    medio = round(sum(engaj) / len(engaj)) if engaj else None
+    # engajamento sobre os seguidores: o número que diz se a audiência está viva (curtidas+comentários por post / seguidores)
+    taxa = round(100 * medio / seguidores, 2) if (medio is not None and seguidores) else None
+    tipos = [str(p.get("media_type") or "").upper() for p in posts]
+    total_t = len(tipos)
+    formatos = {
+        "video": sum(1 for t in tipos if t == "VIDEO"),
+        "carrossel": sum(1 for t in tipos if t == "CAROUSEL_ALBUM"),
+        "imagem": sum(1 for t in tipos if t == "IMAGE"),
+    } if total_t else {}
     return {
         "disponivel": True,
         "usuario": bd.get("username", ""),
-        "seguidores": bd.get("followers_count"),
+        "nome": bd.get("name") or "",
+        "bio": (bd.get("biography") or "")[:300],
+        "foto": bd.get("profile_picture_url") or "",
+        "link": f"https://instagram.com/{bd.get('username', '')}" if bd.get("username") else "",
+        "seguidores": seguidores,
+        "seguindo": bd.get("follows_count"),
         "publicacoes": bd.get("media_count"),
         "dias_desde_ultimo_post": ultimo,
+        "ultimo_post_em": datas[0].date().isoformat() if datas else "",
         "posts_90_dias": em_90,
-        "engajamento_medio": round(sum(engaj) / len(engaj)) if engaj else None,
+        "posts_por_semana": round(em_90 / 12.9, 1),
+        "engajamento_medio": medio,
+        "taxa_engajamento": taxa,
+        "formatos": formatos,
+        "reels_pct": round(100 * formatos.get("video", 0) / total_t) if total_t else None,
         "bio_tem_link": bool(bd.get("website")),
+        "link_da_bio": bd.get("website") or "",
     }
 
 
@@ -145,14 +167,14 @@ async def consultar_instagram(usuario: str, canal: Dict[str, Any]) -> Dict[str, 
     ig_id, token = canal.get("ig_id"), canal.get("page_token")
     if not (ig_id and token):
         return {
-            "disponivel": False, "usuario": usuario,
-            "motivo": "conecte seu Instagram em Robô de Atendimento para ver a atividade deste perfil",
+            "disponivel": False, "usuario": usuario, "link": f"https://instagram.com/{usuario}",
+            "motivo": "conecte seu Instagram em Robô → Canais para ver seguidores e atividade deste perfil",
         }
 
     campos = (
         f"business_discovery.username({usuario})"
-        "{username,followers_count,media_count,website,"
-        "media.limit(12){timestamp,like_count,comments_count}}"
+        "{username,name,biography,profile_picture_url,followers_count,follows_count,media_count,website,"
+        "media.limit(25){timestamp,like_count,comments_count,media_type,permalink}}"
     )
     try:
         async with httpx.AsyncClient(timeout=15.0) as c:
@@ -160,15 +182,105 @@ async def consultar_instagram(usuario: str, canal: Dict[str, Any]) -> Dict[str, 
                             params={"fields": campos, "access_token": token})
         dados = r.json() if r.content else {}
     except Exception:
-        return {"disponivel": False, "usuario": usuario, "motivo": "o Instagram não respondeu agora"}
+        return {"disponivel": False, "usuario": usuario, "link": f"https://instagram.com/{usuario}", "motivo": "o Instagram não respondeu agora"}
 
     if r.status_code >= 400 or "business_discovery" not in dados:
         # Conta pessoal ou inexistente: a API so enxerga contas comerciais.
         return {
-            "disponivel": False, "usuario": usuario,
+            "disponivel": False, "usuario": usuario, "link": f"https://instagram.com/{usuario}",
             "motivo": "perfil pessoal ou não encontrado — a Meta só mostra dados de contas comerciais",
         }
     return atividade_instagram(dados["business_discovery"])
+
+
+# ------------------------------------------------- leitura de social media
+
+def leitura_social(insta: Dict[str, Any], site: Dict[str, Any], tipo_site: str) -> Dict[str, Any]:
+    """O veredito de SOCIAL MEDIA, pensado para a conversa de uma agência: este lead precisa ou já tem alguém cuidando?
+
+    Só afirma com os dados que existem. Sem acesso ao Instagram, diz que não analisou (e por quê) em vez de chutar.
+    `status`: precisa | irregular | ativo | agencia | sem_dados.
+    """
+    pixel = bool(site.get("pixel_meta"))
+    credito = site.get("credito_agencia") or ""
+    if not insta.get("disponivel"):
+        motivo = insta.get("motivo") or "nenhum Instagram encontrado para este negócio"
+        return {
+            "status": "sem_dados", "rotulo": "Instagram não analisado", "resumo": motivo[0].upper() + motivo[1:] + ".",
+            "motivos": [], "oportunidades": [], "metricas": {}, "usuario": insta.get("usuario", ""), "link": insta.get("link", ""),
+            "anuncios": pixel,
+        }
+
+    dias = insta.get("dias_desde_ultimo_post")
+    p90 = int(insta.get("posts_90_dias") or 0)
+    sem = insta.get("posts_por_semana") or 0
+    taxa = insta.get("taxa_engajamento")
+    seg = insta.get("seguidores") or 0
+    reels = insta.get("reels_pct")
+
+    motivos: List[str] = []       # o que sustenta o veredito
+    oportunidades: List[str] = []  # o que uma agência venderia aqui
+
+    if dias is None:
+        motivos.append("o perfil não tem nenhuma publicação")
+    elif dias > 90:
+        motivos.append(f"parado: o último post foi há {dias} dias")
+    elif dias > 30:
+        motivos.append(f"o último post foi há {dias} dias")
+    if p90 and dias is not None and dias <= 90:
+        motivos.append(f"{p90} posts em 90 dias ({sem:g} por semana)")
+    elif dias is not None and dias <= 90:
+        motivos.append("nenhum post nos últimos 90 dias")
+    if taxa is not None:
+        faixa = "alto" if taxa >= 3 else "bom" if taxa >= 1.5 else "baixo"
+        motivos.append(f"engajamento {faixa}: {str(taxa).replace('.', ',')}% dos seguidores interagem por post")
+    if pixel:
+        motivos.append("o site tem Pixel da Meta (alguém roda ou já rodou anúncio)")
+    if credito:
+        motivos.append(f"o site foi feito por {credito}")
+
+    if not insta.get("bio_tem_link"):
+        oportunidades.append("A bio não tem link: o interessado não tem para onde ir (site, WhatsApp ou catálogo)")
+    if reels is not None and reels < 20 and p90 >= 3:
+        oportunidades.append(f"Só {reels}% dos posts recentes são vídeo/Reels, o formato que mais alcança gente nova")
+    if not pixel:
+        oportunidades.append("Sem Pixel da Meta no site: não dá para fazer anúncio com remarketing nem medir resultado")
+    if taxa is not None and taxa < 1 and seg >= 1000:
+        oportunidades.append("Muito seguidor para pouca interação: conteúdo que não engaja a audiência que já tem")
+    if tipo_site in ("none", "social", "aggregator", "whatsapp"):
+        oportunidades.append("Sem site próprio: toda a presença depende do Instagram")
+
+    if credito or (p90 >= 12 and (pixel or (taxa is not None and taxa >= 1.5))):
+        status, rotulo = "agencia", "Já tem alguém cuidando"
+        resumo = "Ritmo e sinais de quem tem profissional ou calendário. Você precisa mostrar o que o atual não entrega."
+    elif dias is None or dias > 45 or p90 <= 4:
+        status, rotulo = "precisa", "Precisa de social media"
+        resumo = "O perfil está parado ou quase sem publicar. É onde a agência entra, sem substituir ninguém."
+    elif p90 >= 12:
+        status, rotulo = "ativo", "Posta com frequência"
+        resumo = "Há ritmo de publicação. Procure o que falta: formato, engajamento e anúncio."
+    else:
+        status, rotulo = "irregular", "Posta sem constância"
+        resumo = "Alguém posta, mas sem calendário. A oportunidade é constância e estratégia."
+
+    return {
+        "status": status, "rotulo": rotulo, "resumo": resumo, "motivos": motivos, "oportunidades": oportunidades,
+        "usuario": insta.get("usuario", ""), "link": insta.get("link", ""), "anuncios": pixel,
+        "metricas": {
+            "seguidores": insta.get("seguidores"), "seguindo": insta.get("seguindo"), "publicacoes": insta.get("publicacoes"),
+            "posts_90_dias": p90, "posts_por_semana": sem, "dias_desde_ultimo_post": dias, "ultimo_post_em": insta.get("ultimo_post_em", ""),
+            "taxa_engajamento": taxa, "engajamento_medio": insta.get("engajamento_medio"), "reels_pct": reels,
+            "bio": insta.get("bio", ""), "link_da_bio": insta.get("link_da_bio", ""), "nome": insta.get("nome", ""),
+        },
+    }
+
+
+def completar(resultado: Dict[str, Any]) -> Dict[str, Any]:
+    """Raio-x guardado antes da leitura de social media ganha o veredito na hora (sem refazer, sem gastar crédito)."""
+    if resultado and "social" not in resultado:
+        site = resultado.get("site") or {}
+        resultado = {**resultado, "social": leitura_social(resultado.get("instagram") or {}, site, site.get("tipo") or "")}
+    return resultado
 
 
 # --------------------------------------------------------- quem cuida
@@ -432,6 +544,7 @@ async def montar(
             "ano_rodape": sinais_site.get("ano_rodape"),
         },
         "instagram": insta,
+        "social": leitura_social(insta, sinais_site, tipo_site),
         "quem_cuida": quem_cuida(sinais_site, tipo_site, gmn, insta, datetime.now().year),
         "gerado_em": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "gerado_em_ts": time.time(),

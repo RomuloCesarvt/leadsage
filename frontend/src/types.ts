@@ -560,7 +560,19 @@ export interface RaioX {
   instagram: {
     disponivel: boolean; usuario?: string; motivo?: string; seguidores?: number | null;
     publicacoes?: number | null; dias_desde_ultimo_post?: number | null; posts_90_dias?: number;
-    engajamento_medio?: number | null;
+    engajamento_medio?: number | null; link?: string; nome?: string; bio?: string; foto?: string;
+    seguindo?: number | null; ultimo_post_em?: string; posts_por_semana?: number; taxa_engajamento?: number | null;
+    reels_pct?: number | null; bio_tem_link?: boolean; link_da_bio?: string;
+  };
+  /** O veredito de social media (precisa / irregular / ativo / agencia / sem_dados), com os motivos e o que uma agência venderia. */
+  social?: {
+    status: 'precisa' | 'irregular' | 'ativo' | 'agencia' | 'sem_dados';
+    rotulo: string; resumo: string; motivos: string[]; oportunidades: string[]; usuario?: string; link?: string; anuncios?: boolean;
+    metricas: {
+      seguidores?: number | null; seguindo?: number | null; publicacoes?: number | null; posts_90_dias?: number; posts_por_semana?: number;
+      dias_desde_ultimo_post?: number | null; ultimo_post_em?: string; taxa_engajamento?: number | null; engajamento_medio?: number | null;
+      reels_pct?: number | null; bio?: string; link_da_bio?: string; nome?: string;
+    };
   };
   quem_cuida: {
     veredito: 'agencia' | 'dono' | 'abandonado' | 'ninguem' | 'indefinido';
