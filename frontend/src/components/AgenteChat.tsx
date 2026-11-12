@@ -20,11 +20,28 @@ type Estado = {
   cota: { usados: number; limite: number | null; restantes: number | null; volta_em: string };
 };
 
+// ideias do que pedir: só o que o agente faz de verdade. Aparecem 4 por vez e trocam sozinhas, para a pessoa ver o que dá para pedir
 const SUGESTOES = [
   'Busque fisioterapeutas em Campinas, 100 leads',
+  'Busque 30 dentistas em Ribeirão Preto',
+  'Busque 50 academias em Curitiba',
+  'Busque 20 pet shops em Belo Horizonte',
+  'Busque 40 clínicas de estética em Goiânia',
+  'Busque 30 restaurantes em Florianópolis',
+  'Busque 25 advogados em Porto Alegre',
+  'Busque 30 nutricionistas em Salvador',
   'Quanto tenho de créditos?',
   'Como está a fila de envio?',
+  'Resuma os leads da última busca',
+  'Quantos leads da última busca têm WhatsApp?',
+  'Coloque os leads da última busca na fila para eu revisar',
+  'Escreva as mensagens só para quem tem WhatsApp',
+  'O que o LeadSage faz?',
+  'Como crio um site para um lead?',
+  'Onde vejo as conversas do robô?',
 ];
+const POR_VEZ = 4;
+const TROCA_MS = 6000;
 
 const horaDeVolta = (iso?: string) => {
   const d = iso ? new Date(iso) : null;
@@ -40,6 +57,7 @@ export const AgenteChat: React.FC = () => {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
   const fim = useRef<HTMLDivElement>(null);
+  const [rodada, setRodada] = useState(0);
   const continuando = useRef(false);
 
   const valido = (e: any): e is Estado => !!e && Array.isArray(e.mensagens) && !!e.cota;
@@ -77,6 +95,15 @@ export const AgenteChat: React.FC = () => {
   }, [rodando]);
 
   useEffect(() => { fim.current?.scrollIntoView({ block: 'end' }); }, [estado?.mensagens.length, enviando, aberto, estado?.pendente]);
+
+  // as sugestões trocam sozinhas enquanto a conversa está vazia
+  const vazio = !!estado && estado.mensagens.length === 0;
+  useEffect(() => {
+    if (!aberto || !vazio) return;
+    const t = setInterval(() => setRodada(r => r + 1), TROCA_MS);
+    return () => clearInterval(t);
+  }, [aberto, vazio]);
+  const sugeridas = Array.from({ length: POR_VEZ }, (_, i) => SUGESTOES[(rodada * POR_VEZ + i) % SUGESTOES.length]);
 
   const abrir = () => {
     setAberto(true);
@@ -169,10 +196,11 @@ export const AgenteChat: React.FC = () => {
               <div className="text-center pt-6">
                 <p className="text-slate-800 font-bold">O que você quer que eu faça?</p>
                 <p className="text-sm text-slate-500 mt-1 mb-4">Eu busco os leads, escrevo as mensagens e deixo tudo pronto para você revisar. Nada é enviado sem você.</p>
-                <div className="space-y-2">
-                  {SUGESTOES.map(s => (
-                    <button key={s} type="button" onClick={() => enviar(s)} disabled={semCota} className="w-full min-h-12 px-4 rounded-xl border border-slate-200 text-sm text-slate-700 text-left active:bg-slate-50 disabled:opacity-50">{s}</button>
+                <div className="space-y-2" key={rodada} style={{ animation: 'agenteEntrada .45s ease' }}>
+                  {sugeridas.map(sg => (
+                    <button key={sg} type="button" onClick={() => enviar(sg)} disabled={semCota} className="w-full min-h-12 px-4 rounded-xl border border-slate-200 text-sm text-slate-700 text-left active:bg-slate-50 disabled:opacity-50">{sg}</button>
                   ))}
+                  <style>{'@keyframes agenteEntrada{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}'}</style>
                 </div>
               </div>
             )}
