@@ -193,7 +193,7 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
                 key={f.key} type="button" aria-pressed={ligado} data-filtro={f.key}
                 onClick={() => setFiltros(prev => alternarFiltro(prev, f.key))}
                 title={ligado ? 'Clique para tirar este filtro' : `Mostrar só: ${f.rotulo.toLowerCase()}. Os filtros se combinam.`}
-                className={`px-3 py-2 md:py-1.5 shrink-0 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 border whitespace-nowrap ${
+                className={`min-h-11 md:min-h-0 px-3.5 md:px-3 py-2 md:py-1.5 shrink-0 rounded-lg text-[13px] md:text-xs font-bold transition-colors flex items-center gap-1.5 border whitespace-nowrap ${
                   ligado ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                 }`}
               >
@@ -234,7 +234,7 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
                     <p className="text-xs text-slate-500 mt-0.5 break-words">{[lead.niche, lead.city || lead.location?.split(',')[0]].filter(Boolean).join(' · ')}</p>
                     <div className="flex flex-wrap items-center gap-2 mt-2">
                       <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${scoreInfo.color}`}>{scoreInfo.text}</span>
-                      {lead.phone && <span className="text-xs font-medium text-slate-600">+{lead.phone}</span>}
+                      {lead.phone && <span className="text-[13px] md:text-xs font-medium text-slate-600">{foneBonito(lead.phone)}</span>}
                     </div>
                   </button>
                 </div>
@@ -296,7 +296,7 @@ export const LessieTableView: React.FC<{ modo: ModoTabela }> = ({ modo }) => {
                     <p className="text-sm text-slate-600">{lead.city || lead.location?.split(',')[0] || '-'}</p>
                   </td>
                   <td className="hidden md:table-cell py-4 px-4">
-                    <p className="text-sm font-medium text-slate-700">{lead.phone ? `+${lead.phone}` : '-'}</p>
+                    <p className="text-sm font-medium text-slate-700">{lead.phone ? foneBonito(lead.phone) : '-'}</p>
                   </td>
                   <td className="py-4 px-4">
                     <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${scoreInfo.color}`}>{scoreInfo.text}</span>

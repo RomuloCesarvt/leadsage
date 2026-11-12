@@ -6,6 +6,7 @@
  * nada disso é guardado na nuvem. O robô aparece como um selo nas conversas que ele atende
  * e pausa sozinho quando você assume uma conversa respondendo por aqui.
  */
+import { foneBonito } from '../lib/leadsSalvos';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Check, CheckCheck, ChevronLeft, Clock, Power, RefreshCw, Search, Send, UserRound, Wifi } from 'lucide-react';
 import { api } from '../services/api';
@@ -498,34 +499,36 @@ export const ChatWhatsApp: React.FC<{ irConectar: () => void }> = ({ irConectar 
           </div>
         ) : (
           <>
-            <div className="px-3 md:px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] md:pt-3 border-b border-slate-100 flex items-center gap-3 bg-white shrink-0">
+            <div className="px-3 md:px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] md:pt-3 border-b border-slate-100 flex flex-wrap items-center gap-x-3 gap-y-2.5 bg-white shrink-0">
               <button onClick={() => setAberto(null)} className="md:hidden p-2 -ml-1 text-slate-600 rounded-full active:bg-slate-100" aria-label="Voltar"><ChevronLeft className="w-6 h-6" /></button>
               <Avatar nome={aberto.nome} className="w-10 h-10 md:w-9 md:h-9" />
               <div className="min-w-0 flex-1">
                 <p className="font-bold text-base text-slate-800 truncate">{aberto.nome}</p>
-                <p className="text-xs text-slate-500">{aberto.grupo ? 'Grupo' : aberto.telefone ? `+${aberto.telefone}` : ''}</p>
+                <p className="text-[13px] md:text-xs text-slate-500">{aberto.grupo ? 'Grupo' : aberto.telefone ? foneBonito(aberto.telefone) : ''}</p>
               </div>
+              <div className="w-full md:w-auto flex items-center gap-2 overflow-x-auto md:overflow-visible pb-0.5 md:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {!aberto.grupo && aberto.telefone && temCriativo && (
                 <button onClick={mandarCriativo} disabled={enviandoCriativo} title="Envia o flyer ou card da promoção cadastrado no Robô"
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-60 whitespace-nowrap">
+                  className="min-h-10 md:min-h-0 shrink-0 px-3.5 md:px-3 py-2 md:py-1.5 rounded-xl text-[13px] md:text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-60 whitespace-nowrap">
                   {enviandoCriativo ? 'Enviando…' : 'Enviar criativo'}
                 </button>
               )}
               {!aberto.grupo && aberto.telefone && !ehEmpresaDaConta && (
                 <button onClick={mandarPrevia} disabled={enviandoPrevia} title="Cria a prévia do site deste lead (se não existe) e envia o link"
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-60 whitespace-nowrap">
+                  className="min-h-10 md:min-h-0 shrink-0 px-3.5 md:px-3 py-2 md:py-1.5 rounded-xl text-[13px] md:text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-60 whitespace-nowrap">
                   {enviandoPrevia ? 'Enviando…' : 'Enviar prévia'}
                 </button>
               )}
               {!aberto.grupo && aberto.telefone && (
                 <button onClick={alternarRobo}
                   title={conv?.robo_ativo ? 'Clique para pausar o robô nesta conversa' : 'Clique para o robô responder nesta conversa'}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 ${
+                  className={`min-h-10 md:min-h-0 shrink-0 px-3.5 md:px-3 py-2 md:py-1.5 rounded-xl text-[13px] md:text-xs font-bold flex items-center gap-1.5 whitespace-nowrap ${
                     conv?.precisa_humano || conv?.contato_robo ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
                       : conv?.robo_ativo ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
                   <Power className="w-3.5 h-3.5" /> {conv?.robo_ativo ? 'Robô respondendo' : conv?.contato_robo ? 'Robô parou: reativar' : 'Robô desligado: ligar'}
                 </button>
               )}
+              </div>
             </div>
 
             {conv?.contato_robo && (

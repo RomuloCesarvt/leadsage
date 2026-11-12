@@ -52,8 +52,8 @@ export const PipelineCelular: React.FC<Props> = ({ leads, etapas, etapaDe, filtr
       <AnaliseDoPipeline iniciarFechado />
       <FaixaDeTags leads={leads} filtro={filtroTag} aoFiltrar={aoFiltrar} />
 
-      <div className="sticky top-[3.75rem] z-10 -mx-4 px-4 py-2 bg-slate-50/95 backdrop-blur border-b border-slate-200">
-        <div className="flex gap-2 overflow-x-auto snap-x pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Etapas do pipeline">
+      <div className="sticky top-[3.75rem] z-10 -mx-4 py-2 bg-slate-50/95 backdrop-blur border-b border-slate-200">
+        <div className="flex gap-2 overflow-x-auto snap-x scroll-px-4 -mx-4 px-4 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Etapas do pipeline">
           {etapas.map(e => {
             const n = daEtapa(e.key).length;
             const ativo = e.key === etapa;
@@ -104,28 +104,30 @@ export const PipelineCelular: React.FC<Props> = ({ leads, etapas, etapaDe, filtr
                   </p>
                 )}
 
-                <div className="mt-4 flex items-stretch gap-2" onClick={e => e.stopPropagation()}>
+                <div className="mt-4 space-y-2" onClick={e => e.stopPropagation()}>
                   {zap && (
-                    <a href={zap.href} target="_blank" rel="noreferrer" className="flex-1 min-h-12 rounded-xl bg-emerald-600 text-white text-[15px] font-bold flex items-center justify-center gap-2 active:bg-emerald-700">
-                      <MessageCircle className="w-5 h-5" />WhatsApp
+                    <a href={zap.href} target="_blank" rel="noreferrer" className="w-full min-h-12 px-4 rounded-xl bg-emerald-600 text-white text-base font-bold flex items-center justify-center gap-2.5 active:bg-emerald-700">
+                      <MessageCircle className="w-5 h-5 shrink-0" />Chamar no WhatsApp
                     </a>
                   )}
-                  {ligar && (
-                    <a href={ligar.href} aria-label="Ligar" className="w-12 min-h-12 rounded-xl border border-slate-300 text-slate-700 flex items-center justify-center active:bg-slate-100">
-                      <Phone className="w-5 h-5" />
-                    </a>
-                  )}
-                  <label className="relative flex-1 min-h-12 rounded-xl border border-slate-300 bg-white text-slate-700 text-[15px] font-bold flex items-center justify-center gap-1.5 active:bg-slate-100">
-                    Mover<ChevronDown className="w-4 h-4 text-slate-400" />
-                    <select value={etapaDe(l)} aria-label={`Mover ${l.company || l.name} para outra etapa`} onChange={e => mover(l.id, e.target.value)}
-                      className="absolute inset-0 w-full h-full opacity-0 text-base">
-                      {etapas.map(e => <option key={e.key} value={e.key}>{e.key}</option>)}
-                    </select>
-                  </label>
-                  <button type="button" aria-label={`Excluir ${l.company || l.name}`} onClick={() => excluir(l)}
-                    className="w-12 min-h-12 rounded-xl border border-slate-200 text-slate-400 flex items-center justify-center active:bg-rose-50 active:text-rose-600">
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                  <div className="flex items-stretch gap-2">
+                    {ligar && (
+                      <a href={ligar.href} className="flex-1 min-h-12 px-3 rounded-xl border border-slate-300 bg-white text-slate-700 text-[15px] font-bold flex items-center justify-center gap-2 active:bg-slate-100">
+                        <Phone className="w-5 h-5 shrink-0" />Ligar
+                      </a>
+                    )}
+                    <label className="relative flex-1 min-h-12 px-3 rounded-xl border border-slate-300 bg-white text-slate-700 text-[15px] font-bold flex items-center justify-center gap-1.5 active:bg-slate-100">
+                      Mover<ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                      <select value={etapaDe(l)} aria-label={`Mover ${l.company || l.name} para outra etapa`} onChange={e => mover(l.id, e.target.value)}
+                        className="absolute inset-0 w-full h-full opacity-0 text-base">
+                        {etapas.map(e => <option key={e.key} value={e.key}>{e.key}</option>)}
+                      </select>
+                    </label>
+                    <button type="button" aria-label={`Excluir ${l.company || l.name}`} onClick={() => excluir(l)}
+                      className="w-12 min-h-12 shrink-0 rounded-xl border border-slate-200 bg-white text-slate-400 flex items-center justify-center active:bg-rose-50 active:text-rose-600">
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
               </article>
             </li>

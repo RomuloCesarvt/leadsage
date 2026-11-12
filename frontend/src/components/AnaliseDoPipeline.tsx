@@ -30,7 +30,7 @@ export const FaixaDeTags: React.FC<{ leads: LeadItem[]; filtro: string; aoFiltra
   if (!cont.size) return null;
   const ids = Array.from(cont.keys()).sort((a, b) => ORDEM.indexOf(a) - ORDEM.indexOf(b));
   return (
-    <div className="flex md:flex-wrap items-center gap-2 md:gap-1.5 mb-3 overflow-x-auto md:overflow-visible -mx-4 px-4 md:mx-0 md:px-0 pb-1 snap-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="faixa-de-tags">
+    <div className="flex md:flex-wrap items-center gap-2 md:gap-1.5 mb-3 overflow-x-auto md:overflow-visible -mx-4 px-4 md:mx-0 md:px-0 pb-1 snap-x scroll-pl-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="faixa-de-tags">
       {ids.map(id => {
         const t = cont.get(id)!;
         const ativo = filtro === id;
@@ -81,7 +81,7 @@ export const AnaliseDoPipeline: React.FC<{ iniciarFechado?: boolean }> = ({ inic
       <button type="button" onClick={() => setAberto(v => !v)} className="w-full min-h-12 flex items-center justify-between gap-3 px-4 py-3 text-left">
         <span className="flex items-center gap-2 text-[15px] md:text-sm font-bold text-slate-800 leading-tight"><BarChart3 className="w-5 h-5 md:w-4 md:h-4 text-emerald-600 shrink-0" /> O que está funcionando</span>
         <span className="flex items-center gap-3 text-xs text-slate-500 shrink-0">
-          {dados && <span><b className="text-slate-800">{dados.taxa_resposta}%</b> <span className="hidden sm:inline">responderam ({dados.responderam} de {dados.abordados})</span></span>}
+          {dados && typeof dados.taxa_resposta === 'number' && <span><b className="text-slate-800">{dados.taxa_resposta}%</b> <span className="hidden sm:inline">responderam ({dados.responderam} de {dados.abordados})</span></span>}
           {aberto ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </span>
       </button>

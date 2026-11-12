@@ -707,7 +707,7 @@ export const FilaDeEnvio: React.FC = () => {
           </button>
         )}
 
-        <div className="flex gap-2 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-1 snap-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist">
+        <div className="flex gap-2 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-1 snap-x scroll-pl-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist">
           {ABAS.map(a => (
             <button key={a.id} role="tab" aria-selected={aba === a.id} onClick={() => setAba(a.id)}
               className={`snap-start shrink-0 min-h-11 md:min-h-0 px-4 py-2 rounded-full text-sm font-bold border whitespace-nowrap ${aba === a.id ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-600'}`}>
