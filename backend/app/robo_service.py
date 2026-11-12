@@ -14,7 +14,9 @@ tela por que o robo nao respondeu — robo que para em silencio e pior do
 que robo nenhum.
 """
 import asyncio
+import os
 import re
+from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 from sqlalchemy import select
@@ -32,18 +34,48 @@ from app.profile_store import get_profile
 # precisa caber nisso com folga para o envio.
 PRAZO_IA = 22.0
 
-CUSTO_RESPOSTA = 1
+CUSTO_CONVERSA_ATIVA = 1        # créditos por CONVERSA ATIVA (não por mensagem), só em conta que paga o sistema
+JANELA_CONVERSA_ATIVA_DIAS = 30  # a conversa conta uma vez por janela: dentro dela, quantas mensagens forem, não cobra de novo
 
 
-async def _cobrar_resposta(uid: str, email: str, plan_id: str):
-    """Paga uma resposta do robô: primeiro pela cota de conversas do mês do plano (se tiver), depois por 1 crédito de lead. None = sem como pagar."""
-    from app import robo_cota
+def _pausa_humana_vigente(conversa: Dict[str, Any]) -> bool:
+    """True enquanto a pausa por "você respondeu pelo celular" vale: até PAUSA_HUMANA_MIN minutos depois da sua última fala."""
+    if not conversa.get("pausa_humana"):
+        return False
+    quando = None
+    for m in reversed(conversa.get("mensagens") or []):
+        if m.get("de") == "voce":
+            quando = m.get("em")
+            break
     try:
-        if not acesso_total(email) and await robo_cota.tentar_cota(uid, plan_id):
-            return True
-    except Exception as exc:
-        print(f"Robô: cota de conversas indisponível ({exc}); cobrando crédito")
-    return await check_and_deduct_credits(uid, CUSTO_RESPOSTA, email)
+        t = datetime.fromisoformat(str(quando or conversa.get("atualizado") or "").replace("Z", "+00:00"))
+        t = t if t.tzinfo else t.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - t).total_seconds() < PAUSA_HUMANA_MIN * 60
+    except ValueError:
+        return False
+
+
+def _conta_de_teste(perfil) -> bool:
+    """Convite de teste: tudo grátis até a pessoa assinar."""
+    return str(getattr(perfil, "assinatura_status", "") or "") == "convite"
+
+
+async def _cobrar_resposta(uid: str, email: str, perfil, conversa: Dict[str, Any]):
+    """O robô responde de graça no teste. Em conta que paga, cobra por CONVERSA ATIVA: 1 crédito na primeira resposta da conversa e nada
+    nas mensagens seguintes (por 30 dias). True = pode responder; None = conta que paga, sem crédito."""
+    if acesso_total(email) or _conta_de_teste(perfil):
+        return True
+    ate = conversa.get("ativa_ate")
+    try:
+        if ate and datetime.fromisoformat(str(ate)) > datetime.now(timezone.utc):
+            return True                      # conversa já paga neste período
+    except ValueError:
+        pass
+    saldo = await check_and_deduct_credits(uid, CUSTO_CONVERSA_ATIVA, email)
+    if saldo is None:
+        return None
+    conversa["ativa_ate"] = (datetime.now(timezone.utc) + timedelta(days=JANELA_CONVERSA_ATIVA_DIAS)).isoformat(timespec="seconds")
+    return True
 
 Enviar = Callable[[str, str, str, Dict[str, Any]], Awaitable[str]]
 
@@ -248,6 +280,8 @@ async def _abertura_do_lead(uid: str, lead_id: str) -> Optional[Dict[str, Any]]:
 _TRANSITORIOS = ("a IA demorou", "a IA não respondeu", "a IA não produziu")
 MAX_FALHAS_IA = 3
 MAX_AUTOMATICAS = 3
+# quando VOCÊ escreve pelo celular o robô cede a conversa só por um tempo (para não atravessar uma conversa ao vivo); depois, se a pessoa escrever, ele volta a responder
+PAUSA_HUMANA_MIN = int(os.getenv("ROBO_PAUSA_HUMANA_MIN", "30") or 30)
 
 
 def _motivo_transitorio(motivo: str) -> bool:
@@ -513,6 +547,14 @@ async def _processar(
     if not cfg.get("ativo"):
         conversa["silencio"] = "O robô está desligado. Ligue em Robô → Comportamento e clique em Salvar."
         return await salvar()
+    # você escreveu pelo celular há pouco: o robô cede a conversa por PAUSA_HUMANA_MIN minutos; passado o tempo, quem escrever volta a ser atendido
+    if conversa.get("pausa_humana") and not conversa.get("optout") and not conversa.get("contato_robo"):
+        if _pausa_humana_vigente(conversa):
+            conversa["silencio"] = (f"Você respondeu pelo celular há pouco: o robô espera {PAUSA_HUMANA_MIN} min sem você escrever "
+                                    "para voltar a responder. Se quiser, ligue o robô na conversa agora.")
+            return await salvar()
+        conversa.update({"pausa_humana": False, "robo_ativo": True})
+        conversa.pop("silencio", None)
     if not conversa.get("robo_ativo"):
         conversa["silencio"] = ("Você respondeu pelo celular: o robô pausou nesta conversa. Ligue o robô na conversa para ele voltar."
                                 if conversa.get("pausa_humana") else "O robô está pausado nesta conversa.")
@@ -604,7 +646,7 @@ async def _processar(
 
     if decisao.resposta and decisao.usou_ia:
         try:
-            saldo = await _cobrar_resposta(uid, email, perfil.plan_id or "previa")
+            saldo = await _cobrar_resposta(uid, email, perfil, conversa)
         except BancoDeCreditosIndisponivel:
             saldo = None
         if saldo is None:
@@ -697,7 +739,7 @@ async def humano_respondeu(cfg: Dict[str, Any], contato: str, texto: str, meta_i
         conversa["mensagens"].append({"de": "voce", "texto": texto[:2000], "em": robo_store.agora(), "meta_id": meta_id, "origem": "celular"})
         conversa.update({
             "robo_ativo": False, "pausa_humana": True, "precisa_humano": False, "motivo": "",
-            "silencio": "Você respondeu pelo celular: o robô pausou nesta conversa. Ligue o robô na conversa para ele voltar.",
+            "silencio": f"Você respondeu pelo celular: o robô pausou por {PAUSA_HUMANA_MIN} min. Depois disso, quem escrever volta a ser atendido (ou ligue o robô na conversa agora).",
             "atualizado": robo_store.agora(),
         })
         await robo_store.salvar_conversa(uid, conversa)
@@ -853,13 +895,6 @@ async def responder_sem_guardar(
         timeout=PRAZO_IA,
     )
     textos = decisao.mensagens or ([decisao.resposta] if decisao.resposta else [])
-    if textos and decisao.usou_ia:
-        try:
-            saldo = await _cobrar_resposta(uid, email, perfil.plan_id or "previa")
-        except BancoDeCreditosIndisponivel:
-            saldo = None
-        if saldo is None:
-            return {"mensagens": [], "motivo": "sem créditos para o robô responder"}
     return {
         "mensagens": textos,
         "passar_para_humano": bool(decisao.passar_para_humano),
