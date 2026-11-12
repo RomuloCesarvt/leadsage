@@ -6,6 +6,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
+import { AgenteChat } from './components/AgenteChat';
 import { NovaBuscaScreen } from './components/screens/NovaBuscaScreen';
 import { ResultadosBusca } from './components/ResultadosBusca';
 import { SplitViewWorkspace } from './components/SplitViewWorkspace';
@@ -107,6 +108,7 @@ const MainApp: React.FC = () => {
       </div>
 
       <BottomNav abrirMenu={() => setIsSidebarOpen(true)} />
+      <AgenteChat />
 
       {/* Global Modals */}
       <LeadProfilePanel />

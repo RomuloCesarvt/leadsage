@@ -134,6 +134,15 @@ export const api = {
     });
   },
 
+  // agente de chat
+  async agenteEstado(): Promise<any> { return await fetchWithToken('/agente'); },
+  async agenteMensagem(texto: string): Promise<any> { return await fetchWithToken('/agente/mensagem', { method: 'POST', body: JSON.stringify({ texto }) }); },
+  async agenteConfirmar(ok: boolean): Promise<any> { return await fetchWithToken('/agente/confirmar', { method: 'POST', body: JSON.stringify({ ok }) }); },
+  async agenteContinuar(): Promise<any> { return await fetchWithToken('/agente/continuar', { method: 'POST' }); },
+  async agenteLidas(): Promise<any> { return await fetchWithToken('/agente/lidas', { method: 'POST' }); },
+  async agenteLimpar(): Promise<any> { return await fetchWithToken('/agente', { method: 'DELETE' }); },
+  async agenteBusca(searchId: string): Promise<{ leads: any[] }> { return await fetchWithToken(`/agente/busca/${encodeURIComponent(searchId)}`); },
+
   async searchLeads(req: LeadSearchRequest): Promise<LeadSearchResponse> {
     return await fetchWithToken('/search-leads', {
       method: 'POST',

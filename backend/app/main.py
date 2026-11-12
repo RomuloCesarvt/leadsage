@@ -1489,6 +1489,111 @@ async def fila_preparar(req: FilaPrepararRequest, user: dict = Depends(usuario_d
         raise HTTPException(status_code=504, detail="O preparo demorou demais. Envie menos leads por vez.")
 
 
+# ---------------------------------------------------------------- agente de chat
+
+async def _agente_contexto(user: dict):
+    """plano da conta, se tem acesso total, e as ferramentas do agente (as mesmas funções dos botões do app)."""
+    from app import agente_ia
+    uid = _espaco(user)
+    email = user.get("email")
+    total = acesso_total(email)
+    plano = (await get_profile(user.get("uid"))).plan_id or "previa"
+
+    async def buscar(nicho: str, local: str, quantidade: int):
+        async with AsyncSessionLocal() as db:
+            r = await search_leads(None, LeadSearchRequest(niche=nicho, location=local, limit=quantidade), user, db)
+        return {"search_id": r.search_id, "credits_consumed": r.credits_consumed, "leads": [l.model_dump() for l in r.leads]}
+
+    async def saldo() -> int:
+        return int((await get_user_balance(uid, email)).get("credits", 0))
+
+    async def leads_da_busca(search_id: str):
+        if not search_id:
+            return []
+        async with AsyncSessionLocal() as db:
+            linhas = (await db.execute(select(DBLead).where(DBLead.search_id == search_id, DBLead.owner_uid == uid))).scalars().all()
+        saida = []
+        for l in linhas:
+            d = {c.name: getattr(l, c.name) for c in DBLead.__table__.columns}
+            d["id"] = str(d["id"]).split("::", 1)[-1]
+            saida.append(d)
+        return saida
+
+    async def preparar_lote(leads):
+        # sempre para revisão: o agente nunca envia
+        return await fila_preparar(FilaPrepararRequest(leads=leads, revisar=True), user)
+
+    async def resumo_fila():
+        return fila_envio.resumo(await fila_envio.listar(uid))
+
+    return agente_ia, plano, total, agente_ia.Ferramentas(buscar, saldo, leads_da_busca, preparar_lote, resumo_fila)
+
+
+class AgenteMensagem(BaseModel):
+    texto: str = Field(max_length=600)
+
+
+class AgenteConfirmar(BaseModel):
+    ok: bool = True
+
+
+@app.get("/api/agente")
+async def agente_estado(user: dict = Depends(usuario_do_espaco)):
+    from app import agente_ia
+    plano = (await get_profile(user.get("uid"))).plan_id or "previa"
+    return await agente_ia.visao(_espaco(user), plano, acesso_total(user.get("email")), user.get("uid") or "")
+
+
+@app.post("/api/agente/mensagem")
+async def agente_mensagem(body: AgenteMensagem, user: dict = Depends(usuario_do_espaco)):
+    from app import ai_client
+    mod, plano, total, f = await _agente_contexto(user)
+
+    def llm(prompt: str):
+        ai_client.PRAZO_DA_IA_S.set(24.0)
+        return ai_client.gerar_json(ai_client.build_client(settings.GEMINI_API_KEY), prompt, obrigatorias=["fala"], tentativas=2, prazo=30, rapido=True, max_tokens=700)
+
+    r = await mod.conversar(_espaco(user), body.texto, plano, total, llm, f, user.get("uid") or "")
+    if r.get("sem_cota"):
+        raise HTTPException(status_code=429, detail=r["erro"])
+    if r.get("erro"):
+        raise HTTPException(status_code=400, detail=r["erro"])
+    return r
+
+
+@app.post("/api/agente/confirmar")
+async def agente_confirmar(body: AgenteConfirmar, user: dict = Depends(usuario_do_espaco)):
+    mod, plano, total, f = await _agente_contexto(user)
+    return await mod.confirmar(_espaco(user), body.ok, plano, total, f, user.get("uid") or "")
+
+
+@app.post("/api/agente/continuar")
+async def agente_continuar(user: dict = Depends(usuario_do_espaco)):
+    mod, plano, total, f = await _agente_contexto(user)
+    return await mod.continuar(_espaco(user), plano, total, f, user.get("uid") or "")
+
+
+@app.get("/api/agente/busca/{search_id}")
+async def agente_busca(search_id: str, user: dict = Depends(usuario_do_espaco)):
+    """Os leads que o agente trouxe, para a tela mostrar em Meus Leads."""
+    _, _, _, f = await _agente_contexto(user)
+    return {"leads": await f.leads_da_busca(search_id)}
+
+
+@app.post("/api/agente/lidas")
+async def agente_lidas(user: dict = Depends(usuario_do_espaco)):
+    from app import agente_ia
+    await agente_ia.marcar_lidas(_espaco(user))
+    return {"ok": True}
+
+
+@app.delete("/api/agente")
+async def agente_limpar(user: dict = Depends(usuario_do_espaco)):
+    from app import agente_ia
+    await agente_ia.limpar(_espaco(user))
+    return {"ok": True}
+
+
 class VisitaBody(BaseModel):
     cliente: Optional[str] = None
     telefone: Optional[str] = None
