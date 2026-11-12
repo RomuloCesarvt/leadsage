@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { sondar } from '../lib/sondagem';
+import { foneBonito } from '../lib/leadsSalvos';
 import { Balao, ICONE_CANAL, NOME_CANAL, quando } from './conversaUi';
 import type { RoboCanal, RoboConversa, RoboConversaResumo } from '../types';
 
@@ -173,7 +174,7 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
   const chips: (RoboCanal | 'todos')[] = ['todos', ...CANAIS.filter(c => SEMPRE.includes(c) || contagem[c])];
 
   return (
-    <div className="h-[calc(100dvh-230px)] min-h-[460px] max-h-[920px] bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex">
+    <div className={`bg-white border border-slate-200 shadow-sm overflow-hidden flex ${aberta ? 'fixed inset-0 z-[60] rounded-none pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]' : 'h-[calc(100dvh-230px)] min-h-[460px] rounded-2xl'} md:static md:z-auto md:h-[calc(100dvh-230px)] md:min-h-[460px] md:max-h-[920px] md:rounded-2xl md:pt-0 md:pb-0`}>
       {/* lista com filtros */}
       <div className={`w-full md:w-96 border-r border-slate-100 flex-col min-h-0 ${aberta ? 'hidden md:flex' : 'flex'}`}>
         <div className="px-3 pt-3 pb-2 border-b border-slate-100 space-y-2.5">
@@ -191,7 +192,7 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
             </button>
           </div>
 
-          <div className="flex gap-1.5 flex-wrap" role="tablist" aria-label="Filtrar por canal">
+          <div className="flex gap-1.5 md:flex-wrap overflow-x-auto md:overflow-visible -mx-3 px-3 md:mx-0 md:px-0 pb-0.5 snap-x scroll-pl-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Filtrar por canal">
             {chips.map(c => {
               const ativo = canal === c;
               const total = c === 'todos' ? lista.length : (contagem[c] || 0);
@@ -199,7 +200,7 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
               return (
                 <button
                   key={c} role="tab" aria-selected={ativo} onClick={() => setCanal(c)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+                  className={`shrink-0 flex items-center gap-1.5 min-h-10 md:min-h-0 px-3 md:px-2.5 py-1.5 rounded-full text-[13px] md:text-xs font-bold border transition-colors ${
                     ativo ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                   } ${!total && !ativo ? 'opacity-50' : ''}`}
                 >
@@ -286,13 +287,13 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
           </div>
         ) : (
           <>
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
-              <button onClick={() => setAberta(null)} className="md:hidden p-1 text-slate-400" aria-label="Voltar">
-                <ChevronLeft className="w-5 h-5" />
+            <div className="px-3 md:px-4 py-3 border-b border-slate-100 flex flex-wrap items-center gap-x-3 gap-y-2.5 shrink-0">
+              <button onClick={() => setAberta(null)} className="md:hidden w-11 h-11 -ml-1 flex items-center justify-center text-slate-600 rounded-full active:bg-slate-100" aria-label="Voltar">
+                <ChevronLeft className="w-6 h-6" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="font-bold text-slate-800 truncate">{aberta.nome || aberta.contato}</p>
-                <p className="text-xs text-slate-500">{NOME_CANAL[aberta.canal]} · {aberta.contato}</p>
+                <p className="font-bold text-base text-slate-900 leading-snug break-words">{aberta.nome || foneBonito(aberta.contato) || aberta.contato}</p>
+                <p className="text-[13px] md:text-xs text-slate-500 break-all">{NOME_CANAL[aberta.canal]}{aberta.nome ? ` · ${foneBonito(aberta.contato) || aberta.contato}` : ''}</p>
               </div>
               {aberta.somente_leitura ? (
                 <span className="text-xs font-bold text-sky-700 flex items-center gap-1">
@@ -305,7 +306,7 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
               ) : (
                 <button
                   onClick={alternarRobo}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 ${
+                  className={`w-full md:w-auto min-h-11 md:min-h-0 justify-center px-4 md:px-3 py-2 md:py-1.5 rounded-xl text-sm md:text-xs font-bold flex items-center gap-2 md:gap-1.5 ${
                     aberta.robo_ativo
                       ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -324,7 +325,7 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
               </div>
             )}
 
-            <div ref={painel} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 space-y-2 bg-slate-50/50">
+            <div ref={painel} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar p-3 md:p-4 space-y-2.5 md:space-y-2 bg-slate-50/50">
               {aberta.mensagens.map((m, i) => <Balao key={i} m={m} />)}
             </div>
 
@@ -332,7 +333,7 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
               <div className="p-4 border-t border-slate-100 text-sm text-slate-500 text-center space-y-3">
                 {aberta.canal === 'whatsapp' && (
                   <button onClick={mandarPrevia} disabled={enviando}
-                    className="px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold disabled:opacity-60">Enviar a prévia do site agora</button>
+                    className="min-h-11 md:min-h-0 w-full md:w-auto px-4 md:px-3 py-2 rounded-xl md:rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-sm md:text-xs font-bold disabled:opacity-60">Enviar a prévia do site agora</button>
                 )}
                 {erro && <p className="text-xs text-red-600">{erro}</p>}
                 <p>
@@ -340,11 +341,11 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
                 </p>
               </div>
             ) : (
-              <div className="p-3 border-t border-slate-100">
+              <div className="p-3 border-t border-slate-100 shrink-0">
                 {erro && <p className="text-xs text-red-600 mb-2">{erro}</p>}
                 {aberta.canal === 'whatsapp' && !aberta.optout && (
                   <button onClick={mandarPrevia} disabled={enviando}
-                    className="mb-2 px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold disabled:opacity-60">
+                    className="mb-2 min-h-11 md:min-h-0 w-full md:w-auto px-4 md:px-3 py-2 rounded-xl md:rounded-lg bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-100 text-emerald-800 text-sm md:text-xs font-bold disabled:opacity-60">
                     Enviar a prévia do site agora
                   </button>
                 )}
@@ -357,14 +358,14 @@ export const CaixaDeEntrada: React.FC<{ onBloqueio: (m: string) => void; irConfi
                     }}
                     rows={1}
                     disabled={aberta.optout}
-                    placeholder={aberta.optout ? 'Esta pessoa pediu para não receber mais mensagens' : 'Responder você mesmo (pausa o robô nesta conversa)'}
-                    className={`${campo} resize-none`}
+                    placeholder={aberta.optout ? 'Esta pessoa pediu para não receber mais mensagens' : 'Responder (pausa o robô aqui)'}
+                    className={`${campo} resize-none min-h-12 md:min-h-0 text-base md:text-sm`}
                   />
                   <button
                     onClick={responder}
                     disabled={enviando || !texto.trim() || aberta.optout}
-                    className="px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white"
-                    title="Enviar"
+                    className="w-12 min-h-12 md:min-h-0 md:w-auto md:px-4 shrink-0 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white flex items-center justify-center"
+                    title="Enviar" aria-label="Enviar"
                   >
                     <Send className="w-4 h-4" />
                   </button>
