@@ -54,6 +54,7 @@ const mesclarPipeline = (atuais: LeadItem[], itens: PipelineItem[]): LeadItem[] 
       ...l, pipeline_stage: i.etapa, pipeline_por: ultimo?.por, pipeline_motivo: ultimo?.motivo, pipeline_em: ultimo?.em,
       pipeline_origem: i.origem, qualificacao: i.qualificacao, salvo: l.salvo === true || salvoPeloServidor(i.origem, i.etapa),
       agente: i.agente, previa_visitas: i.previa_abertura?.visitas, previa_ultima: i.previa_abertura?.ultima,
+      reuniao_em: i.reuniao_em, reuniao_texto: i.reuniao_texto,
     };
   });
   for (const i of itens) {
@@ -66,6 +67,7 @@ const mesclarPipeline = (atuais: LeadItem[], itens: PipelineItem[]): LeadItem[] 
       ...leadDeItem(i), pipeline_stage: i.etapa, pipeline_por: ultimo?.por, pipeline_motivo: ultimo?.motivo, pipeline_em: ultimo?.em,
       pipeline_origem: i.origem, qualificacao: i.qualificacao, salvo: salvoPeloServidor(i.origem, i.etapa),
       agente: i.agente, previa_visitas: i.previa_abertura?.visitas, previa_ultima: i.previa_abertura?.ultima,
+      reuniao_em: i.reuniao_em, reuniao_texto: i.reuniao_texto,
     });
   }
   return saida;

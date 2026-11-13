@@ -192,6 +192,25 @@ async def _achar_ou_criar_no_pipeline(
         return None
 
 
+async def _registrar_reuniao(uid: str, conversa: Dict[str, Any], sdr: Dict[str, Any]) -> None:
+    """Reunião combinada pelo robô: vira data e hora de verdade no card (status "Reunião") e gera os avisos de 1 hora e 10 minutos antes."""
+    texto = str((sdr or {}).get("reuniao") or "").strip()
+    lead_id = conversa.get("lead_id")
+    if not texto or not lead_id or conversa.get("reuniao_texto") == texto:
+        return
+    try:
+        from app import reunioes
+        quando = reunioes.interpretar(texto)
+        conversa["reuniao_texto"] = texto
+        if quando is None:
+            print(f"Reunião sem data/hora reconhecível ({texto!r}): sem aviso.")
+            return
+        conversa["reuniao_em"] = reunioes._iso(quando)
+        await pipeline_store.definir_reuniao(uid, str(lead_id), conversa["reuniao_em"], texto, por="robô")
+    except Exception as exc:
+        print(f"Falha ao registrar a reunião no pipeline: {exc}")
+
+
 async def _atualizar_pipeline(uid: str, conversa: Dict[str, Any], sdr: Dict[str, Any]) -> None:
     """Move o card conforme a conversa. Nunca derruba a resposta ao lead."""
     lead_id = conversa.get("lead_id")
@@ -654,6 +673,7 @@ async def _processar(
     if decisao.sdr:
         conversa["sdr"] = decisao.sdr
         await _atualizar_pipeline(uid, conversa, decisao.sdr)
+        await _registrar_reuniao(uid, conversa, decisao.sdr)
 
     if decisao.optout:
         await _atualizar_pipeline(uid, conversa, {"etapa": "perdido"})

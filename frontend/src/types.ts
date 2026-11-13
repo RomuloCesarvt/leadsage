@@ -49,6 +49,9 @@ export interface LeadItem {
   // quem moveu o card por ultimo ("robô" ou "voce") e por que
   pipeline_por?: string;
   pipeline_motivo?: string;
+  /** reunião marcada (instante em UTC): o card vira "Reunião" e há avisos 1 hora e 10 minutos antes */
+  reuniao_em?: string;
+  reuniao_texto?: string;
   pipeline_em?: string;
   /** quem atende o lead: robo | consultivo | direto | humano (vazio = robô padrão) */
   agente?: string;
@@ -496,7 +499,7 @@ export interface EstadoFilaWhats {
 /** Um aviso para o dono: prévia aberta, lead pedindo uma pessoa ou resposta nova. */
 export interface Aviso {
   id: string;
-  tipo: 'previa' | 'humano' | 'resposta';
+  tipo: 'previa' | 'humano' | 'resposta' | 'reuniao';
   titulo: string;
   texto: string;
   quando: string;
@@ -629,6 +632,8 @@ export interface PipelineItem {
   historico?: PipelineMovimento[];
   atualizado?: string;
   agente?: string;
+  reuniao_em?: string;
+  reuniao_texto?: string;
   previa_abertura?: { visitas: number; ultima: string };
   /** a régua de abordagens terminou sem resposta: o lead saiu de Meus Leads e do pipeline (o registro fica no servidor) */
   encerrado?: { em: string; motivo: string };

@@ -134,6 +134,10 @@ export const api = {
     });
   },
 
+  async pipelineReuniao(leadId: string, em: string | null, texto = ''): Promise<{ etapa: string; reuniao_em?: string }> {
+    return await fetchWithToken(`/pipeline/${encodeURIComponent(leadId)}/reuniao`, { method: 'PUT', body: JSON.stringify({ em, texto }) });
+  },
+
   // agente de chat
   async agenteEstado(): Promise<any> { return await fetchWithToken('/agente'); },
   async agenteMensagem(texto: string): Promise<any> { return await fetchWithToken('/agente/mensagem', { method: 'POST', body: JSON.stringify({ texto }) }); },

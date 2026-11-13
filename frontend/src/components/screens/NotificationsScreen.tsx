@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, ArrowRight, Sparkles, Eye, UserRound, MessageCircle } from 'lucide-react';
+import { Bell, ArrowRight, Sparkles, Eye, UserRound, MessageCircle, CalendarClock } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { marcarAvisosComoVistos, useAvisos } from '../../lib/avisos';
 import type { Aviso } from '../../types';
 
-const ICONE = { previa: Eye, humano: UserRound, resposta: MessageCircle } as const;
-const COR = { previa: 'bg-violet-50 text-violet-600', humano: 'bg-rose-50 text-rose-600', resposta: 'bg-emerald-50 text-emerald-600' } as const;
+const ICONE = { previa: Eye, humano: UserRound, resposta: MessageCircle, reuniao: CalendarClock } as const;
+const COR = { previa: 'bg-violet-50 text-violet-600', humano: 'bg-rose-50 text-rose-600', resposta: 'bg-emerald-50 text-emerald-600', reuniao: 'bg-amber-50 text-amber-600' } as const;
 
 function ha(iso: string): string {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -29,7 +29,7 @@ export const NotificationsScreen: React.FC = () => {
     marcarAvisosComoVistos();
   }, [carregado]);
 
-  const ir = (a: Aviso) => setViewState(a.tipo === 'previa' ? 'workspace' : 'conversas');
+  const ir = (a: Aviso) => setViewState(a.tipo === 'previa' ? 'workspace' : a.tipo === 'reuniao' ? 'pipeline' : 'conversas');
 
   return (
     <div className="flex-1 flex flex-col h-full relative max-w-4xl w-full">

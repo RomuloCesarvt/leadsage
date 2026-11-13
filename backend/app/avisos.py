@@ -50,9 +50,11 @@ def _da_conversa(c: Dict[str, Any]) -> Dict[str, Any] | None:
     return None
 
 
-def montar(aberturas: List[Dict[str, Any]], conversas: List[Dict[str, Any]], limite: int = LIMITE) -> List[Dict[str, Any]]:
+def montar(aberturas: List[Dict[str, Any]], conversas: List[Dict[str, Any]], limite: int = LIMITE, reunioes_marcadas: List[Dict[str, Any]] | None = None) -> List[Dict[str, Any]]:
     """Os avisos, do mais recente para o mais antigo."""
-    avisos = [x for x in [*(_da_previa(a) for a in aberturas), *(_da_conversa(c) for c in conversas)] if x]
+    from app import reunioes
+    das_reunioes = [a for item in (reunioes_marcadas or []) for a in reunioes.avisos_da_reuniao(item)]
+    avisos = [x for x in [*(_da_previa(a) for a in aberturas), *(_da_conversa(c) for c in conversas), *das_reunioes] if x]
     avisos.sort(key=lambda a: a["quando"], reverse=True)
     return avisos[:limite]
 

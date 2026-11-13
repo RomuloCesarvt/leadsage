@@ -2,7 +2,8 @@ import { ehSalvo } from '../../lib/leadsSalvos';
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import type { LeadItem } from '../../types';
-import { GripVertical, Phone, MessageCircle, Bot, RefreshCw, UserRound, Check, ChevronDown, Trash2 } from 'lucide-react';
+import { GripVertical, Phone, MessageCircle, Bot, RefreshCw, UserRound, Check, ChevronDown, Trash2, CalendarClock } from 'lucide-react';
+import { MarcarReuniao, quandoDaReuniao } from '../MarcarReuniao';
 import { AvisoReguaConcluida } from '../AvisoReguaConcluida';
 import { lerFiltroDoPipeline } from '../../lib/atalhosDoPainel';
 import { AnaliseDoPipeline, FaixaDeTags, COR_DA_TAG } from '../AnaliseDoPipeline';
@@ -55,6 +56,7 @@ export const PipelineScreen: React.FC = () => {
     await removerLeads([lead.id]);
   };
   const [atualizando, setAtualizando] = React.useState(false);
+  const [reuniaoDe, setReuniaoDe] = React.useState<LeadItem | null>(null);
   // filtro por tag de qualificação (vazio = todos)
   const [filtroTag, setFiltroTag] = React.useState(() => lerFiltroDoPipeline());
   const empresa = modoAtivoAtual() === 'empresa';
@@ -215,6 +217,12 @@ export const PipelineScreen: React.FC = () => {
                         </select>
                       </label>
 
+                      {lead.reuniao_em && (
+                        <p className="mt-2.5 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 flex items-center gap-1.5" data-testid="reuniao-do-card">
+                          <CalendarClock className="w-3.5 h-3.5 shrink-0" /> Reunião {quandoDaReuniao(lead.reuniao_em)}
+                        </p>
+                      )}
+
                       {lead.pipeline_motivo && (
                         <p className="mt-2.5 text-[11px] text-slate-500 flex items-start gap-1.5 leading-snug">
                           {lead.pipeline_por === 'robô'
@@ -273,6 +281,13 @@ export const PipelineScreen: React.FC = () => {
                           </a>
                         ))}
                         <button
+                          type="button" data-testid="marcar-reuniao" title="Marcar reunião: o lead vira Reunião e você é avisado 1 hora e 10 minutos antes"
+                          onClick={e => { e.stopPropagation(); setReuniaoDe(lead); }}
+                          className="p-1.5 rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 transition-colors"
+                        >
+                          <CalendarClock className="w-3.5 h-3.5" />
+                        </button>
+                        <button
                           type="button" data-testid="excluir-lead" title="Excluir este lead: ele sai e nada mais é enviado para ele"
                           onClick={e => { e.stopPropagation(); void excluirLead(lead); }}
                           className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-colors"
@@ -288,6 +303,7 @@ export const PipelineScreen: React.FC = () => {
           );
         })}
       </div>
+      {reuniaoDe && <MarcarReuniao lead={reuniaoDe} aoFechar={() => setReuniaoDe(null)} />}
     </div>
   );
 };

@@ -1,7 +1,8 @@
 import React from 'react';
-import { Bot, ChevronDown, MessageCircle, Phone, RefreshCw, Trash2 } from 'lucide-react';
+import { Bot, ChevronDown, MessageCircle, Phone, RefreshCw, Trash2, CalendarClock } from 'lucide-react';
 import { AnaliseDoPipeline, COR_DA_TAG, FaixaDeTags } from './AnaliseDoPipeline';
 import { acoesDoCard, haQuanto } from '../lib/cardPipeline';
+import { MarcarReuniao, quandoDaReuniao } from './MarcarReuniao';
 import type { LeadItem } from '../types';
 
 export interface EtapaDoQuadro { key: string; color: string }
@@ -30,6 +31,7 @@ const PRIORIDADE = ['Respondeu', 'Qualificado', 'Reunião', 'Proposta', 'Contato
 export const PipelineCelular: React.FC<Props> = ({ leads, etapas, etapaDe, filtroTag, aoFiltrar, mover, abrir, excluir, atualizar, empresa }) => {
   const daEtapa = (k: string) => leads.filter(l => etapaDe(l) === k && (!filtroTag || l.qualificacao?.id === filtroTag));
   const [etapa, setEtapa] = React.useState(() => PRIORIDADE.find(k => leads.some(l => etapaDe(l) === k)) || 'Novo Lead');
+  const [reuniaoDe, setReuniaoDe] = React.useState<LeadItem | null>(null);
   const [quantos, setQuantos] = React.useState(POR_PAGINA);
   const [atualizando, setAtualizando] = React.useState(false);
   React.useEffect(() => { setQuantos(POR_PAGINA); }, [etapa, filtroTag]);
@@ -110,6 +112,12 @@ export const PipelineCelular: React.FC<Props> = ({ leads, etapas, etapaDe, filtr
                   </p>
                 )}
 
+                {l.reuniao_em && (
+                  <p className="mt-3 text-[13px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-2" data-testid="reuniao-do-card">
+                    <CalendarClock className="w-4 h-4 shrink-0" /> Reunião {quandoDaReuniao(l.reuniao_em)} · aviso 1 h e 10 min antes
+                  </p>
+                )}
+
                 <div className="mt-4 space-y-2" onClick={e => e.stopPropagation()}>
                   {zap && (
                     <a href={zap.href} target="_blank" rel="noreferrer" className="w-full min-h-12 px-4 rounded-xl bg-emerald-600 text-white text-base font-bold flex items-center justify-center gap-2.5 active:bg-emerald-700">
@@ -122,6 +130,10 @@ export const PipelineCelular: React.FC<Props> = ({ leads, etapas, etapaDe, filtr
                         <Phone className="w-5 h-5 shrink-0" />Ligar
                       </a>
                     )}
+                    <button type="button" onClick={() => setReuniaoDe(l)} aria-label={`Marcar reunião com ${l.company || l.name}`}
+                      className="w-12 min-h-12 shrink-0 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 flex items-center justify-center active:bg-amber-100">
+                      <CalendarClock className="w-5 h-5" />
+                    </button>
                     <label className="relative flex-1 min-h-12 px-3 rounded-xl border border-slate-300 bg-white text-slate-700 text-[15px] font-bold flex items-center justify-center gap-1.5 active:bg-slate-100">
                       Mover<ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
                       <select value={etapaDe(l)} aria-label={`Mover ${l.company || l.name} para outra etapa`} onChange={e => mover(l.id, e.target.value)}
@@ -148,6 +160,7 @@ export const PipelineCelular: React.FC<Props> = ({ leads, etapas, etapaDe, filtr
         </button>
       )}
       <div className={`h-1 mt-6 rounded-full ${cor} opacity-0`} />
+      {reuniaoDe && <MarcarReuniao lead={reuniaoDe} aoFechar={() => setReuniaoDe(null)} />}
     </div>
   );
 };

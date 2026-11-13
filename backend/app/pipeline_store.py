@@ -287,6 +287,23 @@ async def registrar_varios(uid: str, leads: List[Dict[str, Any]], origem: str = 
     return novos
 
 
+async def definir_reuniao(uid: str, lead_id: str, em: Optional[str], texto: str = "", por: str = "voce") -> Optional[Dict[str, Any]]:
+    """Guarda o instante da reunião no card (`reuniao_em`, UTC) e coloca o lead em "Reunião" (agendado). `em` vazio desmarca a reunião."""
+    item = await _ler(uid, lead_id)
+    if item is None:
+        return None
+    if not em:
+        item.pop("reuniao_em", None)
+        item.pop("reuniao_texto", None)
+        await _gravar(uid, item)
+        return item
+    item["reuniao_em"] = em
+    item["reuniao_texto"] = texto
+    await _gravar(uid, item)
+    movido = await mover(uid, lead_id, "Reunião", motivo="reunião marcada" + (f" ({texto})" if texto else ""), por=por)
+    return movido or await _ler(uid, lead_id)
+
+
 async def mover(
     uid: str, lead_id: str, etapa: str, motivo: str = "", por: str = "voce", sozinho: bool = False,
 ) -> Optional[Dict[str, Any]]:

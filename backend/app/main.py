@@ -1251,6 +1251,32 @@ class PipelineAgenteRequest(BaseModel):
     lead: Optional[Dict[str, Any]] = None
 
 
+class PipelineReuniaoRequest(BaseModel):
+    # data e hora da reunião: "2026-11-18T12:30" (horário de Brasília) ou com fuso; vazio desmarca
+    em: Optional[str] = None
+    texto: str = ""
+
+
+@app.put("/api/pipeline/{lead_id}/reuniao")
+async def pipeline_reuniao(lead_id: str, req: PipelineReuniaoRequest, user: dict = Depends(usuario_do_espaco)):
+    """Marca (ou desmarca) a reunião do lead: o card vai para "Reunião" e os avisos de 1 hora e 10 minutos antes aparecem em Avisos."""
+    from app import reunioes
+    await exigir_recurso(user, "pipeline", "O pipeline")
+    uid = _espaco(user)
+    em = None
+    if req.em:
+        try:
+            dt = datetime.fromisoformat(req.em.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Data e hora inválidas.")
+        dt = dt if dt.tzinfo else dt.replace(tzinfo=reunioes.BRASILIA)
+        em = reunioes._iso(dt)
+    item = await pipeline_store.definir_reuniao(uid, lead_id, em, req.texto.strip()[:80] or (reunioes._quando_texto(dt) if em else ""), por="voce")
+    if item is None:
+        raise HTTPException(status_code=404, detail="Lead não encontrado no pipeline.")
+    return {"etapa": item.get("etapa"), "reuniao_em": item.get("reuniao_em")}
+
+
 class PipelineMoverRequest(BaseModel):
     etapa: str
     # foto do lead, para o caso de o servidor ainda nao conhece-lo
@@ -1838,7 +1864,12 @@ async def listar_avisos(user: dict = Depends(usuario_do_espaco)):
     except Exception as exc:
         print(f"Avisos: sem as conversas: {type(exc).__name__}")
         conversas = []
-    return {"avisos": avisos.montar(aberturas, conversas)}
+    try:
+        marcadas = [i for i in await pipeline_store.listar(uid) if i.get("reuniao_em")]
+    except Exception as exc:
+        print(f"Avisos: sem as reuniões: {type(exc).__name__}")
+        marcadas = []
+    return {"avisos": avisos.montar(aberturas, conversas, reunioes_marcadas=marcadas)}
 
 
 @app.get("/api/robo/conversas/{cid}")
