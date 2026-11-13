@@ -295,10 +295,12 @@ async def definir_reuniao(uid: str, lead_id: str, em: Optional[str], texto: str 
     if not em:
         item.pop("reuniao_em", None)
         item.pop("reuniao_texto", None)
+        item.pop("reuniao_por", None)
         await _gravar(uid, item)
         return item
     item["reuniao_em"] = em
     item["reuniao_texto"] = texto
+    item["reuniao_por"] = por
     await _gravar(uid, item)
     movido = await mover(uid, lead_id, "Reunião", motivo="reunião marcada" + (f" ({texto})" if texto else ""), por=por)
     return movido or await _ler(uid, lead_id)

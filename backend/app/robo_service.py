@@ -192,6 +192,28 @@ async def _achar_ou_criar_no_pipeline(
         return None
 
 
+async def _sincronizar_reuniao(uid: str, conversa: Dict[str, Any]) -> None:
+    """Se a conversa JÁ tem um dia e hora combinados (pelo robô, por você ou pelo cliente), o card vai para "Reunião" com a data e os avisos
+    de 1 hora e 10 minutos antes nascem. Roda a cada mensagem, até com o robô pausado: quem combinou foi você pelo celular e o sistema ainda assim tem de saber.
+    Uma reunião que VOCÊ marcou à mão no card não é trocada pelo sistema."""
+    lead_id = conversa.get("lead_id")
+    if not lead_id:
+        return
+    try:
+        from app import reunioes
+        achada = reunioes.detectar(conversa.get("mensagens") or [])
+        if not achada:
+            return
+        item = await pipeline_store.obter(uid, str(lead_id))
+        if item is None or (item.get("reuniao_em") == achada["em"]) or (item.get("reuniao_em") and item.get("reuniao_por") == "voce"):
+            return
+        await pipeline_store.definir_reuniao(uid, str(lead_id), achada["em"], achada["texto"], por="robô")
+        conversa["reuniao_em"], conversa["reuniao_texto"] = achada["em"], achada["texto"]
+        print(f"Reunião combinada na conversa de {lead_id}: {achada['em']}")
+    except Exception as exc:
+        print(f"Falha ao sincronizar a reunião da conversa: {exc}")
+
+
 async def _registrar_reuniao(uid: str, conversa: Dict[str, Any], sdr: Dict[str, Any]) -> None:
     """Reunião combinada pelo robô: vira data e hora de verdade no card (status "Reunião") e gera os avisos de 1 hora e 10 minutos antes."""
     texto = str((sdr or {}).get("reuniao") or "").strip()
@@ -541,6 +563,7 @@ async def _processar(
     # o que o proprio WhatsApp ja mostra neste chat (a oferta da previa, a apresentacao) entra primeiro: sem isso um "pode" do lead fica sem pergunta
     _semear_do_whatsapp(conversa, contexto)
     await _incluir_abordagem(uid, conversa, lead, msg)
+    await _sincronizar_reuniao(uid, conversa)
     if not (conversa.get("sdr") or {}).get("momento_valor"):
         from app import valor_momento
         conversa.setdefault("sdr", {})["momento_valor"] = valor_momento.escolher(cfg, str((lead or {}).get("id") or conversa.get("lead_id") or ""))
@@ -744,6 +767,7 @@ async def _processar(
             conversa["robo_ativo"] = False      # pausa de verdade só quando o robô precisa mesmo de gente; falha da IA é passageira
         _marcar(conversa, decisao.motivo or "o robô pediu sua ajuda")
 
+    await _sincronizar_reuniao(uid, conversa)       # a resposta do robô também pode fechar o horário ("quarta às 12h30 está ótimo")
     return await salvar()
 
 
@@ -779,6 +803,7 @@ async def humano_respondeu(cfg: Dict[str, Any], contato: str, texto: str, meta_i
             "silencio": "Você respondeu pelo celular: o robô pausou nesta conversa. Ligue o robô na conversa para ele voltar.",
             "atualizado": robo_store.agora(),
         })
+        await _sincronizar_reuniao(uid, conversa)      # você combinou um horário pelo celular: o sistema agenda e avisa
         await robo_store.salvar_conversa(uid, conversa)
         return conversa
 
@@ -805,6 +830,7 @@ async def responder_como_humano(
     conversa["precisa_humano"] = False
     conversa["motivo"] = ""
     conversa["atualizado"] = robo_store.agora()
+    await _sincronizar_reuniao(uid, conversa)
     await robo_store.salvar_conversa(uid, conversa)
     return conversa
 

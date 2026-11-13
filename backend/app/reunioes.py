@@ -98,3 +98,60 @@ def avisos_da_reuniao(item: Dict[str, Any], agora: Optional[datetime] = None) ->
             "lead_id": str(item.get("id") or ""),
         })
     return saida
+
+
+# ---------------------------------------------------------------- detectar a reunião combinada na própria conversa
+_AFIRMA = re.compile(r"\b(pode( ser)?( sim)?|combinado|ok|certo|fechado|perfeito|otimo|sim|claro|beleza|ta bom|tudo certo|confirmado|esta (otimo|bom)|"
+                     r"vou agendar|agendado|marcado|te espero|nos falamos|ate la|show|blz|top|bora|positivo|esta marcado|ja anotei|anotado)\b")
+_CANCELA = re.compile(r"\b(remarc|reagend|cancel|nao consigo|nao posso|nao vou conseguir|adiar|mudar o horario|trocar o horario|outro horario|outro dia)\b")
+_HORA = re.compile(r"\b\d{1,2}\s*(?:h|:)\s*\d{0,2}\b|\bas\s+\d{1,2}\b")
+
+
+def _momento(m: Dict[str, Any]) -> Optional[datetime]:
+    try:
+        d = datetime.fromisoformat(str(m.get("em") or "").replace("Z", "+00:00"))
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def detectar(mensagens: List[Dict[str, Any]], agora: Optional[datetime] = None) -> Optional[Dict[str, Any]]:
+    """A reunião JÁ COMBINADA na conversa (por quem for: o robô, você ou o cliente): alguém propõe UM dia e hora e o outro lado confirma.
+
+    Devolve {"em": instante UTC, "texto": o que foi dito} da última combinada que ainda vai acontecer, ou None. Mensagem com dois horários ("terça
+    às 12h ou quarta às 12h30") é oferta, não combinado; cancelar ou pedir para remarcar depois desfaz."""
+    agora = agora or datetime.now(timezone.utc)
+    lado = lambda m: "cliente" if m.get("de") == "contato" else "equipe"
+    candidatos = []
+    for i, m in enumerate(mensagens):
+        texto = str(m.get("texto") or "")
+        base = _momento(m)
+        if not texto.strip() or base is None:
+            continue
+        if len(_HORA.findall(_normal(texto))) != 1:                  # nenhum ou mais de um horário: não é um combinado
+            continue
+        dt = interpretar(texto, base)
+        if dt:
+            candidatos.append((i, lado(m), dt, texto.strip()))
+    acordo = None
+    for i, quem, dt, texto in candidatos:
+        for m2 in mensagens[i + 1: i + 5]:
+            n2 = _normal(m2.get("texto") or "")
+            if lado(m2) != quem and (_AFIRMA.search(n2) or _mesmo_horario(m2, dt)):
+                acordo = (i, dt, texto)
+                break
+    if not acordo:
+        return None
+    i, dt, texto = acordo
+    for m in mensagens[i + 1:]:
+        if _CANCELA.search(_normal(m.get("texto") or "")) and m.get("de") == "contato":
+            return None                                              # o cliente pediu para mudar depois: espera o novo combinado
+    if dt < agora - timedelta(minutes=30):
+        return None                                                  # já passou
+    return {"em": _iso(dt), "texto": texto[:80]}
+
+
+def _mesmo_horario(m: Dict[str, Any], dt: datetime) -> bool:
+    base = _momento(m)
+    outro = interpretar(str(m.get("texto") or ""), base) if base else None
+    return bool(outro and abs((outro - dt).total_seconds()) < 60)
