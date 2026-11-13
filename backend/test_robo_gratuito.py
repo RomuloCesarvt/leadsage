@@ -53,16 +53,14 @@ def test_conta_que_paga_sem_credito_nao_responde(monkeypatch):
     assert asyncio.run(robo_service._cobrar_resposta("u", "a@b.com", _Perfil("ativa"), {"mensagens": []})) is None
 
 
-def test_pausa_por_voce_ter_escrito_vale_so_por_um_tempo():
-    conv = {"pausa_humana": True, "robo_ativo": False, "mensagens": [{"de": "contato", "texto": "oi", "em": _iso(50)}, {"de": "voce", "texto": "já respondo", "em": _iso(5)}]}
-    assert robo_service._pausa_humana_vigente(conv) is True            # você falou há 5 min: o robô espera
-    conv["mensagens"][-1]["em"] = _iso(robo_service.PAUSA_HUMANA_MIN + 1)
-    assert robo_service._pausa_humana_vigente(conv) is False           # passou o tempo: quem escrever volta a ser atendido
-
-
-def test_sem_pausa_ou_sem_data_nao_trava_o_robo():
-    assert robo_service._pausa_humana_vigente({"mensagens": []}) is False
-    assert robo_service._pausa_humana_vigente({"pausa_humana": True, "mensagens": [{"de": "voce", "em": "lixo"}]}) is False
+def test_lead_avancado_com_mensagem_sua_o_robo_nao_retoma():
+    voce = {"mensagens": [{"de": "contato", "texto": "oi"}, {"de": "voce", "texto": "combinado, quarta 14h15"}]}
+    for etapa in ("Reunião", "Proposta", "Fechado"):
+        assert robo_service._conduzida_por_voce({"etapa": etapa}, voce) is True        # o caso da Clínica Inovar
+    assert robo_service._conduzida_por_voce({"etapa": "Respondeu"}, voce) is False      # no início do funil o robô conduz normalmente
+    so_robo = {"mensagens": [{"de": "contato", "texto": "ok"}, {"de": "robo", "texto": "fechado"}]}
+    assert robo_service._conduzida_por_voce({"etapa": "Reunião"}, so_robo) is False     # reunião marcada pelo próprio robô: ele segue
+    assert robo_service._conduzida_por_voce(None, voce) is False
 
 
 class _P:

@@ -39,21 +39,10 @@ CUSTO_CONVERSA_ATIVA = 1        # créditos por CONVERSA ATIVA (não por mensage
 JANELA_CONVERSA_ATIVA_DIAS = 30  # a conversa conta uma vez por janela: dentro dela, quantas mensagens forem, não cobra de novo
 
 
-def _pausa_humana_vigente(conversa: Dict[str, Any]) -> bool:
-    """True enquanto a pausa por "você respondeu pelo celular" vale: até PAUSA_HUMANA_MIN minutos depois da sua última fala."""
-    if not conversa.get("pausa_humana"):
-        return False
-    quando = None
-    for m in reversed(conversa.get("mensagens") or []):
-        if m.get("de") == "voce":
-            quando = m.get("em")
-            break
-    try:
-        t = datetime.fromisoformat(str(quando or conversa.get("atualizado") or "").replace("Z", "+00:00"))
-        t = t if t.tzinfo else t.replace(tzinfo=timezone.utc)
-        return (datetime.now(timezone.utc) - t).total_seconds() < PAUSA_HUMANA_MIN * 60
-    except ValueError:
-        return False
+def _conduzida_por_voce(item: Optional[Dict[str, Any]], conversa: Dict[str, Any]) -> bool:
+    """Lead já avançado no funil E mensagem sua na conversa: quem conduz é você, o robô não retoma."""
+    return bool(item and str(item.get("etapa") or "") in ETAPAS_CONDUZIDAS_POR_VOCE
+                and any(m.get("de") == "voce" for m in conversa.get("mensagens") or []))
 
 
 def _conta_de_teste(perfil) -> bool:
@@ -281,8 +270,8 @@ async def _abertura_do_lead(uid: str, lead_id: str) -> Optional[Dict[str, Any]]:
 _TRANSITORIOS = ("a IA demorou", "a IA não respondeu", "a IA não produziu")
 MAX_FALHAS_IA = 3
 MAX_AUTOMATICAS = 3
-# quando VOCÊ escreve pelo celular o robô cede a conversa só por um tempo (para não atravessar uma conversa ao vivo); depois, se a pessoa escrever, ele volta a responder
-PAUSA_HUMANA_MIN = int(os.getenv("ROBO_PAUSA_HUMANA_MIN", "30") or 30)
+# etapas em que quem conduz é você: com mensagem sua na conversa, o robô não responde
+ETAPAS_CONDUZIDAS_POR_VOCE = ("Reunião", "Proposta", "Fechado")
 
 
 def _motivo_transitorio(motivo: str) -> bool:
@@ -567,14 +556,12 @@ async def _processar(
     if not cfg.get("ativo"):
         conversa["silencio"] = "O robô está desligado. Ligue em Robô → Comportamento e clique em Salvar."
         return await salvar()
-    # você escreveu pelo celular há pouco: o robô cede a conversa por PAUSA_HUMANA_MIN minutos; passado o tempo, quem escrever volta a ser atendido
-    if conversa.get("pausa_humana") and not conversa.get("optout") and not conversa.get("contato_robo"):
-        if _pausa_humana_vigente(conversa):
-            conversa["silencio"] = (f"Você respondeu pelo celular há pouco: o robô espera {PAUSA_HUMANA_MIN} min sem você escrever "
-                                    "para voltar a responder. Se quiser, ligue o robô na conversa agora.")
-            return await salvar()
-        conversa.update({"pausa_humana": False, "robo_ativo": True})
-        conversa.pop("silencio", None)
+    # CONVERSA CONDUZIDA POR VOCÊ: se o lead já está avançado no funil (reunião, proposta, fechado) e você mesmo escreveu nesta conversa,
+    # o robô NUNCA retoma sozinho: recomeçar a venda por cima do que você combinou desfaz o que estava fechado.
+    if _conduzida_por_voce(item, conversa):
+        conversa["silencio"] = (f"Este lead está em \"{item.get('etapa')}\" e você mesmo conduziu a conversa: o robô não responde. "
+                                "Para ele voltar, ligue o robô na conversa.")
+        return await salvar()
     if not conversa.get("robo_ativo"):
         conversa["silencio"] = ("Você respondeu pelo celular: o robô pausou nesta conversa. Ligue o robô na conversa para ele voltar."
                                 if conversa.get("pausa_humana") else "O robô está pausado nesta conversa.")
@@ -767,7 +754,7 @@ async def humano_respondeu(cfg: Dict[str, Any], contato: str, texto: str, meta_i
         conversa["mensagens"].append({"de": "voce", "texto": texto[:2000], "em": robo_store.agora(), "meta_id": meta_id, "origem": "celular"})
         conversa.update({
             "robo_ativo": False, "pausa_humana": True, "precisa_humano": False, "motivo": "",
-            "silencio": f"Você respondeu pelo celular: o robô pausou por {PAUSA_HUMANA_MIN} min. Depois disso, quem escrever volta a ser atendido (ou ligue o robô na conversa agora).",
+            "silencio": "Você respondeu pelo celular: o robô pausou nesta conversa. Ligue o robô na conversa para ele voltar.",
             "atualizado": robo_store.agora(),
         })
         await robo_store.salvar_conversa(uid, conversa)
