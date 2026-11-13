@@ -18,7 +18,7 @@ import os
 import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
-from typing import Any, Awaitable, Callable, Dict, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from sqlalchemy import select
 
@@ -473,12 +473,61 @@ _TRAVAS: Dict[str, asyncio.Lock] = {}
 _CUMPRIMENTO = re.compile(r"^(oi+e?|ola+|opa|eae|e ai|hey|hello|hi|bom dia|boa tarde|boa noite)( (tudo bem|td bem|tudo bom|como vai|tudo certo))?$|^(tudo bem|td bem|tudo bom|como vai|tudo certo)$")
 
 
-def _decisao_de_reserva(conversa: Dict[str, Any], perfil) -> Optional[Decisao]:
-    """Resposta SEM IA para quem só cumprimenta, usada quando a IA está indisponível. Qualquer outra coisa espera a IA voltar (o Conector tenta de novo)."""
+_PERGUNTA_SERVICOS = re.compile(r"(quais|que|outros|mais|demais|todos os|tipos de).{0,30}servic|o que (voces|vcs|vc|a empresa) (faz|fazem|presta|prestam|trabalha|trabalham|oferece|oferecem)$|"
+                                r"o que (mais )?(voces|vcs) (fazem|tem)|fazem (mais|outro|outras)|(outros|outras|demais) (coisas|trabalhos|produtos)")
+_PERGUNTA_PRECO = re.compile(r"\b(quanto (custa|e|fica|sai|cobra)|qual (o )?(valor|preco)|valor|preco|orcamento|tabela)\b")
+_PERGUNTA_GARANTIA = re.compile(r"\bgarantia\b")
+_PERGUNTA_HORARIO = re.compile(r"\b(horario|funcionam|funciona|abrem|abre|atendem (de|aos|no)|dias de atendimento)\b")
+
+
+def _normal_texto(t: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]+", " ", unicodedata.normalize("NFKD", str(t or "").lower()).encode("ascii", "ignore").decode())).strip()
+
+
+def _linhas(texto: Any, maximo: int = 6, largura: int = 120) -> List[str]:
+    saida = []
+    for l in str(texto or "").splitlines():
+        l = l.strip(" -•*\t")
+        if l:
+            saida.append(l if len(l) <= largura else l[:largura].rsplit(" ", 1)[0] + "…")
+    return saida[:maximo]
+
+
+def _resposta_do_cadastro(pergunta: str, cfg: Dict[str, Any]) -> Optional[str]:
+    """Responde SEM IA o que está CADASTRADO (serviços, tabela de preços, garantia, horário). Só devolve fatos do cadastro; nada é inventado."""
+    oferta = (cfg or {}).get("oferta") if isinstance((cfg or {}).get("oferta"), dict) else {}
+    t = _normal_texto(pergunta)
+    if not t:
+        return None
+    if _PERGUNTA_SERVICOS.search(t):
+        itens = _linhas(oferta.get("inclui"), 7) or _linhas(oferta.get("nome"), 1)
+        if itens:
+            return "Trabalhamos com:\n" + "\n".join(f"• {i}" for i in itens) + "\n\nQual deles você está precisando?"
+    if _PERGUNTA_GARANTIA.search(t) and str(oferta.get("garantia") or "").strip():
+        return f"Nossa garantia é de {str(oferta['garantia']).strip()}. Se quiser, já agendamos o melhor dia e horário pra você."
+    if _PERGUNTA_HORARIO.search(t) and str(oferta.get("agenda") or "").strip():
+        return f"Atendemos {str(oferta['agenda']).strip()}. Qual dia e horário fica melhor pra você?"
+    if _PERGUNTA_PRECO.search(t):
+        tabela = _linhas(oferta.get("tabela_precos") or (cfg or {}).get("catalogo"), 8, 140)
+        if tabela:
+            filtradas = [l for l in tabela if any(p in _normal_texto(l) for p in re.findall(r"[a-z]{5,}", t))] or tabela
+            visita = ""
+            if str(oferta.get("visita") or "") == "paga" and oferta.get("visita_preco"):
+                visita = f" A visita técnica é R$ {int(float(oferta['visita_preco']))}."
+            return "Os valores são:\n" + "\n".join(f"• {l}" for l in filtradas[:6]) + "\n\nO valor final o técnico confirma conforme o aparelho e o local." + visita
+    return None
+
+
+def _decisao_de_reserva(conversa: Dict[str, Any], perfil, cfg: Optional[Dict[str, Any]] = None) -> Optional[Decisao]:
+    """Resposta SEM IA para quando os motores de IA estão indisponíveis: 1) quem só cumprimenta; 2) pergunta que o CADASTRO responde (quais serviços,
+    preços da tabela, garantia, horário). Qualquer outra coisa espera a IA voltar (o Conector tenta de novo)."""
     ultima = next((m for m in reversed(conversa.get("mensagens") or []) if m.get("de") == "contato"), None)
     if not ultima:
         return None
-    texto = re.sub(r"\s+", " ", re.sub(r"[^a-z ]+", " ", unicodedata.normalize("NFKD", str(ultima.get("texto") or "").lower()).encode("ascii", "ignore").decode())).strip()
+    resposta = _resposta_do_cadastro(str(ultima.get("texto") or ""), cfg or {})
+    if resposta:
+        return Decisao(resposta=resposta, mensagens=[resposta], usou_ia=False)
+    texto = _normal_texto(ultima.get("texto") or "")
     if not texto or len(texto) > 40 or not _CUMPRIMENTO.match(texto):
         return None
     if sum(1 for m in conversa.get("mensagens") or [] if m.get("de") == "robo") >= 2:
@@ -668,7 +717,7 @@ async def _processar(
         motivo_falha = f"a IA não respondeu ({type(exc).__name__})"
     if decisao is None:
         # todos os motores de IA fora (limite diário, sem saldo): um cumprimento simples ("bom dia", "tudo bem?") não pode ficar sem resposta
-        decisao = _decisao_de_reserva(conversa, perfil)
+        decisao = _decisao_de_reserva(conversa, perfil, ai_oferta.aplicar(cfg))
         if decisao is None:
             _falha_da_ia(conversa, motivo_falha)
             return await salvar()

@@ -142,3 +142,30 @@ def test_robo_nao_reabre_reuniao_em_conversa_da_equipe():
     assert reabre_reuniao(["Claro! Terça às 10h ou quarta às 15h?"], msgs2, lead) is None
     # conversa sem equipe e fora do funil avançado: segue o fluxo normal
     assert reabre_reuniao(["Segunda às 10h ou às 15h?"], [{"de": "contato", "texto": "oi"}], {"etapa_funil": "Respondeu"}) is None
+
+
+# ---- IA fora do ar: o que está CADASTRADO ainda é respondido (caso real da Vizar: "Quais outros serviços vocês prestam?")
+CFG_VIZAR = {"oferta": {
+    "nome": "Manutenção em linha branca", "agenda": "segunda-feira à sexta-feira, das 08h00 as 18h00", "garantia": "90 dias", "visita": "paga", "visita_preco": 70,
+    "inclui": "Instalação de ar-condicionado residencial e comercial.\nHigienização de ar-condicionado, garantindo melhor qualidade do ar.\nManutenção preventiva e corretiva de aparelhos.",
+    "tabela_precos": "Higienização de ar condicionado de 9 e 12 mil Btus: R$ 180,00\nHigienização de ar condicionado de 18 e 24 mil btus: R$ 220,00\nRecarga de gás: mediante orçamento."}}
+
+
+def test_pergunta_de_servicos_e_respondida_pelo_cadastro_sem_ia():
+    conv = {"mensagens": [{"de": "robo", "texto": "Qual o melhor dia: segunda ou terça?"}, {"de": "contato", "texto": "Quais outros serviços voces prestam?"}]}
+    d = robo_service._decisao_de_reserva(conv, _P(), CFG_VIZAR)
+    assert d and d.usou_ia is False
+    t = d.mensagens[0]
+    assert "Instalação de ar-condicionado" in t and "Higienização" in t and "Manutenção preventiva" in t and "Qual deles" in t
+
+
+def test_preco_garantia_e_horario_saem_so_do_cadastro():
+    def resp(q):
+        d = robo_service._decisao_de_reserva({"mensagens": [{"de": "contato", "texto": q}]}, _P(), CFG_VIZAR)
+        return d.mensagens[0] if d else None
+    p = resp("qual o valor da higienização?")
+    assert "R$ 180,00" in p and "R$ 220,00" in p and "técnico confirma" in p and "R$ 70" in p
+    assert "90 dias" in resp("tem garantia?") and "08h00" in resp("que horas vocês funcionam?")
+    assert resp("vocês fazem instalação em prédio com andaime e laudo?") is None            # o que o cadastro não responde espera a IA
+    sem = {"mensagens": [{"de": "contato", "texto": "quais serviços vocês prestam?"}]}
+    assert robo_service._decisao_de_reserva(sem, _P(), {}) is None                          # sem cadastro, não inventa
