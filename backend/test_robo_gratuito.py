@@ -94,3 +94,51 @@ def test_cumprimento_usa_o_prompt_curto_e_a_conversa_de_verdade_o_completo():
     assert "MÉTODO DE VENDAS" not in curto and "MÉTODO DE VENDAS" in cheio
     for regra in ("PROIBIDO: urgência ou escassez inventada", "NUNCA invente preço", "NUNCA se apresente nem se descreva"):
         assert regra in curto and regra in cheio           # as travas de segurança não saem nunca
+
+
+# ---- o caso da Clínica Inovar: conversa já conduzida pela equipe, lead em "Reunião"
+def _conversa_inovar():
+    t = "2026-11-12T16:%02d:00+00:00"
+    return [
+        {"de": "robo", "texto": "Boa tarde! Me chamo Rômulo, consultor da Seometria...", "em": "2026-11-11T16:30:00+00:00"},
+        {"de": "contato", "texto": "Amanhã pode ser umas 14h15?", "em": "2026-11-11T18:12:00+00:00"},
+        {"de": "voce", "texto": "Claro, pode ser sim", "em": "2026-11-11T18:23:00+00:00"},
+        {"de": "voce", "texto": "Vou aprimorar essa previa para te apresentar amanhã esse horário.", "em": "2026-11-11T18:23:30+00:00"},
+        {"de": "voce", "texto": "Barbara, estamos com um mutirão de sites: seu site sairia por apenas R$ 450,00, com 50% de desconto.", "em": t % 48},
+        {"de": "contato", "texto": "Bom dia! Tudo bem e com você?", "em": "2026-11-13T14:34:00+00:00"},
+    ]
+
+
+def test_contexto_da_conversa_vai_no_topo_do_pedido_com_o_que_a_equipe_combinou():
+    from app.ai_sdr import montar_prompt
+    cfg = {"objetivo": "agendar", "oferta": {"servico": "site", "nome": "Site", "preco": "900"}}
+    lead = {"id": "1", "name": "Clínica Inovar", "etapa_funil": "Reunião"}
+    p = montar_prompt(_conversa_inovar(), "whatsapp", {"company_name": "Seometria"}, cfg, lead, None, {"reuniao": "sexta 14h15"})
+    topo = p[:p.index("== O QUE ")]
+    assert "CONTEXTO DESTA CONVERSA" in topo and "da equipe de Seometria (humano)" in topo
+    assert "Situação no funil de vendas: Reunião" in topo and "JÁ COMBINADA: sexta 14h15" in topo
+    assert "Claro, pode ser sim" in topo and "R$ 450" in topo                       # o que o dono combinou e ofereceu
+    assert "NÃO proponha, remarque nem crie outra reunião" in topo and "NÃO é uma conversa nova" in topo
+
+
+def test_conversa_curta_sem_equipe_nao_ganha_bloco_de_contexto():
+    from app.ai_sdr import montar_prompt
+    cfg = {"objetivo": "agendar", "oferta": {"servico": "site", "nome": "Site", "preco": "900"}}
+    p = montar_prompt([{"de": "robo", "texto": "Oi"}, {"de": "contato", "texto": "Boa tarde"}], "whatsapp", {"company_name": "X"}, cfg, {"id": "1"})
+    assert "CONTEXTO DESTA CONVERSA" not in p
+
+
+def test_robo_nao_reabre_reuniao_em_conversa_da_equipe():
+    from app.ai_sdr import reabre_reuniao
+    lead = {"etapa_funil": "Reunião"}
+    msgs = _conversa_inovar()
+    for resposta in ("Terça ou quarta-feira seria melhor? Se sim, prefere de manhã ou de tarde?",
+                     "Qual desses horários te atende melhor para nossa rápida ligação?",
+                     "Quarta-feira às 12h30 está ótimo! Vou agendar nossa ligação de 10 minutos."):
+        assert reabre_reuniao([resposta], msgs, lead), resposta
+    assert reabre_reuniao(["Bom dia, Barbara! Tudo ótimo. Vi sua resposta sobre a proposta, quer tirar alguma dúvida?"], msgs, lead) is None
+    # se o CLIENTE pediu para mudar, o robô pode propor
+    msgs2 = msgs + [{"de": "contato", "texto": "Preciso remarcar, não consigo nesse horário", "em": "2026-11-13T15:00:00+00:00"}]
+    assert reabre_reuniao(["Claro! Terça às 10h ou quarta às 15h?"], msgs2, lead) is None
+    # conversa sem equipe e fora do funil avançado: segue o fluxo normal
+    assert reabre_reuniao(["Segunda às 10h ou às 15h?"], [{"de": "contato", "texto": "oi"}], {"etapa_funil": "Respondeu"}) is None

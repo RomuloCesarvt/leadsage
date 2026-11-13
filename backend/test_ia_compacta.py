@@ -53,7 +53,7 @@ def test_fala_enorme_do_cliente_nao_enche_o_pedido():
     assert menu not in p and "[…]" in p
     longa = [{"de": "contato" if i % 2 else "robo", "texto": f"fala {i}"} for i in range(40)]
     q = ai_sdr.montar_prompt(longa, "whatsapp", {"name": "R"}, {"ativo": True}, {"id": "L1", "name": "M"})
-    assert "fala 39" in q and "fala 23" not in q                   # só as 16 últimas
+    assert "fala 39" in q and "fala 15" not in q and "fala 16" in q   # só as 24 últimas (o contexto da conversa pesa mais que o tamanho do pedido)
 
 
 def test_todos_os_motores_recebem_a_mesma_instrucao_e_a_resposta_sai_limpa():

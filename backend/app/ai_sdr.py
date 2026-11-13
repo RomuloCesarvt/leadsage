@@ -393,9 +393,10 @@ def montar_prompt(
 
     historico = "\n".join(
         f"{'CLIENTE' if m.get('de') == 'contato' else ('VOCÊ' if m.get('de') == 'robo' else quem.upper() + ' (humano)')}: {_cortar_fala(m.get('texto', ''))}"
-        for m in mensagens[-16:]
+        for m in mensagens[-24:]
     )
 
+    contexto_conversa = _bloco_contexto(mensagens, lead, sdr, quem)
     reuniao_padrao = f"""== COMO TRAZER A REUNIÃO (o que separa SDR de atendente) ==
 1. Responda PRIMEIRO o que a pessoa perguntou, em uma frase; só depois conduza. Quem pergunta e não recebe resposta desconfia.
 2. Termine cada mensagem com UM próximo passo, no formato mais fácil de aceitar: pergunta de sim/não ou escolha entre duas opções.
@@ -470,7 +471,7 @@ O objetivo marcado pelo dono é o ponto de CHEGADA da conversa, nunca o ponto de
     prompt = f"""Você é {abertura}, conversando pelo {canal} com o dono de um negócio local.
 Agora é {_agora_brasil(agora)}.
 {lingua_bloco}
-== O QUE {quem.upper()} VENDE ==
+{contexto_conversa}== O QUE {quem.upper()} VENDE ==
 {oferta}
 {servico}
 {valor_momento.bloco((sdr or {}).get("momento_valor") or valor_momento.escolher(cfg, str((lead or {}).get("id", ""))), cfg, "robo")}
@@ -921,6 +922,71 @@ def compactar(prompt: str, limite_objecoes: int = 1500) -> str:
     return _re.sub(r"(?ms)^== OBJEÇÕES[^\n]*==\n.*?(?=^== |\Z)", curto, saida)
 
 
+ETAPAS_AVANCADAS = ("Reunião", "Proposta", "Fechado")
+
+
+def _dia_hora(m: Dict[str, Any]) -> str:
+    try:
+        d = datetime.fromisoformat(str(m.get("em") or "").replace("Z", "+00:00"))
+        return d.astimezone(timezone(timedelta(hours=-3))).strftime("%d/%m %H:%M")
+    except ValueError:
+        return ""
+
+
+def _bloco_contexto(mensagens: List[Dict[str, Any]], lead: Optional[Dict[str, Any]], sdr: Optional[Dict[str, Any]], quem: str) -> str:
+    """O RESUMO DO QUE JÁ ACONTECEU, feito em código (não depende do modelo ler 24 falas): quem já falou, o que a equipe combinou, o que foi
+    oferecido. Vem no topo do pedido, antes de tudo. Sem isto o robô recomeçava a venda por cima de uma conversa que a equipe já conduzia."""
+    if len(mensagens) < 3:
+        return ""
+    equipe = [m for m in mensagens if m.get("de") == "voce"]
+    robo = [m for m in mensagens if m.get("de") == "robo"]
+    cliente = [m for m in mensagens if m.get("de") == "contato"]
+    etapa = str((lead or {}).get("etapa_funil") or "")
+    reuniao = str((sdr or {}).get("reuniao") or "")
+    avancada = etapa in ETAPAS_AVANCADAS or bool(reuniao)
+    linhas = [f"== CONTEXTO DESTA CONVERSA (LEIA ANTES DE QUALQUER COISA) ==",
+              f"Já foram {len(mensagens)} mensagens: {len(cliente)} do cliente, {len(robo)} suas e {len(equipe)} da equipe de {quem} (humano)"
+              + (f", desde {_dia_hora(mensagens[0])}." if _dia_hora(mensagens[0]) else ".")]
+    if etapa:
+        linhas.append(f"Situação no funil de vendas: {etapa}.")
+    if reuniao:
+        linhas.append(f"Reunião/ligação JÁ COMBINADA: {reuniao}.")
+    if equipe:
+        linhas.append(f"O QUE A EQUIPE (humano) JÁ DISSE, em ordem (é o que foi combinado e oferecido; vale mais que qualquer roteiro):")
+        for m in equipe[-8:]:
+            linhas.append(f"  - [{_dia_hora(m)}] {_cortar_fala(m.get('texto', ''), 260)}")
+    valores = [m for m in mensagens if m.get("de") in ("voce", "robo") and _re.search(r"R\$\s?\d", str(m.get("texto") or ""))]
+    if valores:
+        linhas.append("Valores/propostas JÁ apresentados ao cliente (não repita nem mude): " + " | ".join(_cortar_fala(m.get("texto", ""), 180) for m in valores[-2:]))
+    if equipe or avancada or len(mensagens) >= 8:
+        linhas.append(
+            "REGRAS DESTE CONTEXTO: esta NÃO é uma conversa nova. Você CONTINUA de onde pararam: não se apresente de novo, não refaça perguntas já respondidas, "
+            "não reenvie prévia/link/preço que já foi enviado e não recomece a descoberta. "
+            + ("Já existe reunião ou proposta combinada: NÃO proponha, remarque nem crie outra reunião ou ligação; confirme o que foi combinado e só ajuste se o CLIENTE pedir. "
+               if (avancada or equipe) else "")
+            + "Responda ao que o cliente acabou de dizer À LUZ de tudo acima. Se não tiver certeza do que foi combinado, diga que confirma com a equipe e marque passar_para_humano true.")
+    return "\n".join(linhas) + "\n\n"
+
+
+_PEDE_REMARCAR = _re.compile(r"\b(remarc|mudar|trocar|outro (hor[aá]rio|dia)|n[aã]o (consigo|posso|d[aá])|adiar|cancel|reagend)", _re.I)
+_PROPOE_HORARIO = _re.compile(
+    r"((segunda|ter[çc]a|quarta|quinta|sexta|s[aá]bado|amanh[ãa]|hoje)[^.?!\n]{0,40}\b(\d{1,2}\s?h|\d{1,2}:\d{2}|[àa]s \d{1,2}))|"
+    r"(qual (desses )?hor[aá]rios?)|(prefere [^.?!\n]{0,40} ou )|(posso (te )?ligar)|(vou agendar)|(nossa liga[çc][aã]o)", _re.I)
+
+
+def reabre_reuniao(textos: List[str], mensagens: List[Dict[str, Any]], lead: Optional[Dict[str, Any]]) -> Optional[str]:
+    """A resposta propõe/marca reunião numa conversa que a equipe já conduziu ou que já tem reunião/proposta? Devolve o trecho, ou None."""
+    avancada = str((lead or {}).get("etapa_funil") or "") in ETAPAS_AVANCADAS
+    equipe = sum(1 for m in mensagens if m.get("de") == "voce") >= 3        # a equipe conduziu de verdade (um "oi" do dono não conta)
+    if not (avancada or equipe):
+        return None
+    ultima_do_cliente_ = " ".join(m.get("texto", "") for m in mensagens[-3:] if m.get("de") == "contato")
+    if _PEDE_REMARCAR.search(ultima_do_cliente_):
+        return None                                    # foi o cliente quem pediu para mudar: aí pode propor
+    achou = _PROPOE_HORARIO.search(" ".join(textos))
+    return achou.group(0) if achou else None
+
+
 # O robô puxando o fechamento sem o lead ter pedido: fala de Pix, sinal, contrato ou "fechar" quando ele nem tocou no assunto (valor por iniciativa já é barrado em forma_do_preco). É o que espanta quem
 # ainda está conhecendo o serviço. Vale para a resposta do modelo; as mensagens de código (promoção cadastrada, fechamento a pedido) não passam por aqui.
 _PUXA_FECHAMENTO = _re.compile(
@@ -946,6 +1012,10 @@ def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: Lis
                           criando_previa: bool = False, momento: str = "") -> List[str]:
     """`criando_previa`: o sistema vai criar o site agora e trocar [LINK_DA_PREVIA] pelo link; o marcador e a promessa do link valem."""
     erros: List[str] = []
+    reabriu = reabre_reuniao(textos, mensagens, lead)
+    if reabriu:
+        erros.append(f"Esta conversa já foi conduzida pela equipe (ou já tem reunião/proposta): NÃO proponha, remarque nem crie reunião ou ligação (apareceu \"{reabriu}\"). "
+                     "Responda só ao que o cliente disse, à luz do que já foi combinado.")
     # -2) modo empresa vende serviço: a resposta nunca fala de Google, nota, avaliações ou marketing
     if ai_oferta.sem_previa(cfg):
         m = _MARKETING_NO_SERVICO.search(" ".join(textos))

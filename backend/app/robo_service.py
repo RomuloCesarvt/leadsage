@@ -507,6 +507,8 @@ async def _processar(
         # o lead tinha saído (régua concluída sem resposta) e agora respondeu: volta para Meus Leads e para o pipeline
         item = await pipeline_store.reabrir(uid, item["id"]) or item
     lead = _lead_do_item(item) if item else await _lead_do_contato(uid, msg.canal, msg.contato)
+    if lead and item:
+        lead["etapa_funil"] = str(item.get("etapa") or "")      # o robô precisa saber em que ponto do funil o lead está (Reunião, Proposta...)
     if lead:
         conversa["lead_id"] = lead["id"]
         conversa["nome"] = conversa["nome"] or lead.get("company") or lead.get("name") or ""
