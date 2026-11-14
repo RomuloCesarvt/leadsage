@@ -169,3 +169,53 @@ def test_preco_garantia_e_horario_saem_so_do_cadastro():
     assert resp("vocês fazem instalação em prédio com andaime e laudo?") is None            # o que o cadastro não responde espera a IA
     sem = {"mensagens": [{"de": "contato", "texto": "quais serviços vocês prestam?"}]}
     assert robo_service._decisao_de_reserva(sem, _P(), {}) is None                          # sem cadastro, não inventa
+
+
+# ---- TRAVA DE IDIOMA (caso Espaço Bella Vitta: lead escreveu em português e o robô respondeu em inglês)
+def test_id_interno_do_whatsapp_nao_e_telefone_nem_vira_pais():
+    from app import idioma
+    assert idioma.pais_do_telefone("+199088981168177") == ""                 # LID de 15 dígitos: o "+1" já foi lido como EUA
+    assert idioma.do_lead({"phone": "+199088981168177"})["codigo"] == "pt"   # sem sinal de país: Brasil, português
+    assert idioma.pais_do_telefone("+5515991965370") == "BR" and idioma.pais_do_telefone("+14155550123") == "US"
+    assert idioma.pais_do_telefone("+351912345678") == "PT"
+    assert not idioma.telefone_plausivel("199088981168177") and idioma.telefone_plausivel("5515991965370")
+
+
+def test_detecta_o_idioma_do_texto():
+    from app import idioma
+    assert idioma.detectar("Sim. Mas só poderei te atender após as 22 hs. Assim posso me concentrar melhor. Pode ser?") == "pt"
+    assert idioma.detectar("Qual horário?") == "pt" and idioma.detectar("Bom dia!") == "pt"
+    assert idioma.detectar("Understood! I'll be here after 10 PM to chat about the color palette and updates. Does that work for you?") == "en"
+    assert idioma.detectar("Sorry for the confusion! I meant any time after 10 PM (22:00) works for me.") == "en"
+    assert idioma.detectar("Hola, buenos dias, quiero saber el valor de la limpieza") == "es"
+    assert idioma.detectar("ok") == ""
+
+
+CONVERSA_BELLA = [
+    {"de": "robo", "texto": "Deixamos o site com a sua cara, mas mesmo nessa versão prévia você pode ver que ele já tem redirecionamento para seu canal de atendimento aqui no whatsapp"},
+    {"de": "contato", "texto": "Sim. Mas só poderei te atender após as 22 hs. Assim posso me concentrar melhor. Tenho interesse em atualizar e deixar minha cara com informações precisas e paleta de cores mais atualizadas. Pode ser?"},
+]
+
+
+def test_resposta_em_ingles_para_cliente_em_portugues_e_barrada():
+    from app.ai_sdr import problemas_da_resposta
+    lead = {"id": "in_whatsapp_199088981168177", "phone": "+199088981168177"}
+    ingles = ["Understood! I'll be here after 10 PM to chat about the color palette and updates. Does that work for you?"]
+    erros = problemas_da_resposta(ingles, {}, CONVERSA_BELLA, lead)
+    assert any("IDIOMA ERRADO" in e and "português" in e for e in erros)
+    assert not any("IDIOMA ERRADO" in e for e in problemas_da_resposta(["Combinado! Depois das 22h então. Qual dia fica melhor pra você?"], {}, CONVERSA_BELLA, lead))
+
+
+def test_prompt_manda_responder_no_idioma_do_cliente_mesmo_com_cadastro_de_outro_pais():
+    from app.ai_sdr import montar_prompt
+    cfg = {"objetivo": "agendar", "oferta": {"servico": "site", "nome": "Site", "preco": "900"}}
+    lead = {"id": "x", "phone": "+14155550123", "location": "Austin, United States"}         # cadastro diz EUA...
+    p = montar_prompt(CONVERSA_BELLA, "whatsapp", {"company_name": "Seometria"}, cfg, lead)   # ...mas o cliente escreve em português
+    assert "IDIOMA DA CONVERSA" in p and "português do Brasil" in p and "o lead é de Estados Unidos" not in p
+    ingles = [{"de": "contato", "texto": "Hello, can you send me the price? We would like to start next week."}]
+    assert "o cliente está escrevendo em inglês" in montar_prompt(ingles, "whatsapp", {"company_name": "Seometria"}, cfg, lead)
+
+
+def test_reserva_em_portugues_nao_responde_quem_escreve_em_outro_idioma():
+    conv = {"mensagens": [{"de": "contato", "texto": "Good morning, could you tell me what services you offer?"}]}
+    assert robo_service._decisao_de_reserva(conv, _P(), CFG_VIZAR) is None

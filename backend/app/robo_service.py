@@ -185,7 +185,10 @@ async def _achar_ou_criar_no_pipeline(
         novo_id = f"in_{robo_store.id_da_conversa(msg.canal, msg.contato)}"
         foto: Dict[str, Any] = {"id": novo_id, "name": nome, "company": nome}
         if msg.canal == "whatsapp":
-            foto["phone"] = "+" + re.sub(r"\D", "", msg.contato)
+            from app import idioma
+            numero = re.sub(r"\D", "", msg.contato)
+            if idioma.telefone_plausivel(numero):       # id interno do WhatsApp (LID) não é telefone: gravar como "+1..." fazia o robô falar inglês
+                foto["phone"] = "+" + numero
         return await pipeline_store.registrar(uid, foto, etapa="Respondeu", origem=f"inbound_{msg.canal}")
     except Exception as exc:
         print(f"Falha ao ligar a conversa ao pipeline: {exc}")
@@ -524,6 +527,9 @@ def _decisao_de_reserva(conversa: Dict[str, Any], perfil, cfg: Optional[Dict[str
     ultima = next((m for m in reversed(conversa.get("mensagens") or []) if m.get("de") == "contato"), None)
     if not ultima:
         return None
+    from app import idioma
+    if idioma.da_conversa(conversa.get("mensagens")) not in ("", "pt"):
+        return None                                       # a reserva é em português: quem escreve em outro idioma espera a IA
     resposta = _resposta_do_cadastro(str(ultima.get("texto") or ""), cfg or {})
     if resposta:
         return Decisao(resposta=resposta, mensagens=[resposta], usou_ia=False)

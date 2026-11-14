@@ -467,7 +467,9 @@ PROIBIDO antes do passo 5: citar valor, promoção, Pix, sinal, forma de pagamen
 O objetivo marcado pelo dono é o ponto de CHEGADA da conversa, nunca o ponto de partida.
 """
     persuasao = PERSUASAO_COMPLETA if precisa_fundo else PERSUASAO_RESUMO
-    lingua_bloco = idioma.instrucao(idioma.do_lead(lead or {}), robo=True)
+    # o idioma em que o CLIENTE escreve manda mais que o país do cadastro (o cadastro pode estar errado; o cliente não)
+    _lg_conversa = idioma.da_conversa(mensagens)
+    lingua_bloco = idioma.instrucao_da_conversa(_lg_conversa) if _lg_conversa else idioma.instrucao(idioma.do_lead(lead or {}), robo=True)
     prompt = f"""Você é {abertura}, conversando pelo {canal} com o dono de um negócio local.
 Agora é {_agora_brasil(agora)}.
 {lingua_bloco}
@@ -1012,6 +1014,11 @@ def problemas_da_resposta(textos: List[str], cfg: Dict[str, Any], mensagens: Lis
                           criando_previa: bool = False, momento: str = "") -> List[str]:
     """`criando_previa`: o sistema vai criar o site agora e trocar [LINK_DA_PREVIA] pelo link; o marcador e a promessa do link valem."""
     erros: List[str] = []
+    # TRAVA DE IDIOMA: a resposta sai no idioma em que o cliente escreve. Português na conversa e resposta em inglês nunca passa.
+    _lg_cliente, _lg_resposta = idioma.da_conversa(mensagens), idioma.detectar(" ".join(textos))
+    if _lg_cliente and _lg_resposta and _lg_cliente != _lg_resposta:
+        erros.append(f"IDIOMA ERRADO: o cliente escreve em {idioma.NOMES_DO_IDIOMA.get(_lg_cliente, _lg_cliente)} e a sua resposta saiu em "
+                     f"{idioma.NOMES_DO_IDIOMA.get(_lg_resposta, _lg_resposta)}. Reescreva TODA a resposta em {idioma.NOMES_DO_IDIOMA.get(_lg_cliente, _lg_cliente)}.")
     reabriu = reabre_reuniao(textos, mensagens, lead)
     if reabriu:
         erros.append(f"Esta conversa já foi conduzida pela equipe (ou já tem reunião/proposta): NÃO proponha, remarque nem crie reunião ou ligação (apareceu \"{reabriu}\"). "
