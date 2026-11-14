@@ -219,3 +219,22 @@ def test_prompt_manda_responder_no_idioma_do_cliente_mesmo_com_cadastro_de_outro
 def test_reserva_em_portugues_nao_responde_quem_escreve_em_outro_idioma():
     conv = {"mensagens": [{"de": "contato", "texto": "Good morning, could you tell me what services you offer?"}]}
     assert robo_service._decisao_de_reserva(conv, _P(), CFG_VIZAR) is None
+
+
+# ---- o telefone NÃO decide o idioma; a conversa decide; o país só vale quando a BUSCA foi lá fora
+def test_telefone_nunca_decide_o_idioma():
+    from app import idioma
+    for fone in ("+14155550123", "+199088981168177", "+351912345678", "+34600111222"):
+        assert idioma.do_lead({"phone": fone})["pais_codigo"] == "BR"                 # sem localização da busca: Brasil, português
+    assert idioma.do_lead({"location": "Austin, United States", "phone": "+5515991965370"})["codigo"] == "en"   # busca nos EUA: inglês
+    assert idioma.do_lead({"location": "Campinas, SP", "phone": "+14155550123"})["codigo"] == "pt"              # busca no Brasil: português
+
+
+def test_conversa_nao_troca_de_idioma_no_meio():
+    from app import idioma
+    pt = [{"de": "robo", "texto": "Bom dia! Tudo bem? Posso te mostrar a prévia do site que montamos para vocês?"},
+          {"de": "contato", "texto": "ok"}, {"de": "contato", "texto": "sim"}]
+    assert idioma.da_conversa(pt) == "pt"                                              # cliente só disse "ok/sim": vale o que a conversa já vinha sendo
+    en = [{"de": "robo", "texto": "Hello! Can I show you the preview we made for your business?"}, {"de": "contato", "texto": "ok"}]
+    assert idioma.da_conversa(en) == "en"
+    assert idioma.da_conversa([{"de": "contato", "texto": "Hello, how much does it cost?"}, {"de": "robo", "texto": "Olá"}]) == "en"   # o cliente escreveu em inglês: inglês

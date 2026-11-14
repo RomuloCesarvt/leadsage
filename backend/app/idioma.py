@@ -98,14 +98,16 @@ def pais_do_telefone(fone: str) -> str:
 
 
 def pais_do_lead(lead: Any) -> str:
-    """O código do país do lead: localização -> endereço -> telefone -> Brasil."""
+    """O código do país do lead: o que a BUSCA diz (localização) -> endereço -> cidade -> Brasil.
+
+    O TELEFONE NÃO ENTRA. O código do telefone não diz em que língua a pessoa fala (um "+1" pode ser um brasileiro, um identificador interno do WhatsApp...):
+    o país só vale quando a busca foi feita lá ("Austin, United States"). Quem escreve para nós vale pelo idioma da conversa (`da_conversa`)."""
     g = (lambda k: (lead.get(k) if isinstance(lead, dict) else getattr(lead, k, "")) or "")
     for campo in ("location", "address", "city"):
         cod = pais_do_texto(str(g(campo)))
         if cod:
             return cod
-    cod = pais_do_telefone(str(g("phone")))
-    return cod or "BR"
+    return "BR"
 
 
 def do_lead(lead: Any, pais: Optional[str] = None) -> Dict[str, str]:
@@ -173,9 +175,12 @@ def detectar(texto: str) -> str:
 
 
 def da_conversa(mensagens: Any) -> str:
-    """O idioma em que o CLIENTE está escrevendo (as últimas falas dele), ou '' se ainda não dá para saber."""
-    falas = [str(m.get("texto") or "")[:240] for m in (mensagens or []) if isinstance(m, dict) and m.get("de") == "contato"][-4:]
-    return detectar(" ".join(falas))
+    """O idioma em que a CONVERSA está, pelo que já foi escrito (nunca pelo telefone): as últimas falas do cliente; se forem curtas demais ("ok", "sim"),
+    todas as falas dele; se ainda não der, o que NÓS já escrevemos nela. Assim a conversa não troca de idioma no meio."""
+    msgs = [m for m in (mensagens or []) if isinstance(m, dict)]
+    cliente = [str(m.get("texto") or "")[:240] for m in msgs if m.get("de") == "contato"]
+    nossas = [str(m.get("texto") or "")[:240] for m in msgs if m.get("de") in ("robo", "voce")]
+    return detectar(" ".join(cliente[-4:])) or detectar(" ".join(cliente[-15:])) or detectar(" ".join(nossas[-6:]))
 
 
 def instrucao_da_conversa(codigo: str) -> str:

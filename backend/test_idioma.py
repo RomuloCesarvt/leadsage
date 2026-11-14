@@ -11,11 +11,11 @@ def lead(**kw):
     return LeadItem(**base)
 
 
-def test_pais_pelo_texto_endereco_e_telefone():
+def test_pais_pelo_texto_da_busca_e_endereco_nunca_pelo_telefone():
     assert idioma.pais_do_lead({"location": "Madrid, Spain"}) == "ES"
     assert idioma.pais_do_lead({"location": "Austin, TX, USA"}) == "US"
     assert idioma.pais_do_lead({"location": "Itu, SP, Brazil"}) == "BR"
-    assert idioma.pais_do_lead({"location": "", "phone": "+351 912 345 678"}) == "PT"
+    assert idioma.pais_do_lead({"location": "", "phone": "+351 912 345 678"}) == "BR"      # o telefone não decide: o país vem da busca
     assert idioma.pais_do_lead({"location": "Botucatu", "phone": "14991884926"}) == "BR"      # sem sinal: Brasil
     assert idioma.pais_do_lead({}) == "BR"
 
