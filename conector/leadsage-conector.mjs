@@ -22,7 +22,35 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '3.0.3';
+export const VERSAO = '3.0.4';
+
+// O WhatsApp Web muda de tempos em tempos e a biblioteca quebra no envio com erros como
+// "Data passed to getter must include an id property (it's how we memoize) but got undefined".
+// 1) o envio normal não pede o "visto" (era isso que quebrava); 2) se ainda assim falhar, a conversa é aberta e a mensagem enviada pela própria página.
+export const ERRO_DE_PAGINA = /Data passed to getter|id property|memoize|Evaluation failed|Execution context was destroyed|detached Frame|is not a function|Cannot read prop/i;
+
+export async function enviarTextoSeguro(client, chatId, texto) {
+  try {
+    return await client.sendMessage(chatId, texto, { sendSeen: false });
+  } catch (e) {
+    if (!ERRO_DE_PAGINA.test(String(e?.message || e))) throw e;
+    const ok = await client.pupPage.evaluate(async (id, t) => {
+      const wid = window.require('WAWebWidFactory').createWid(id);
+      let chat = null;
+      try { chat = window.require('WAWebCollections').Chat.get(wid); } catch (_) { /* tenta achar/criar */ }
+      if (!chat) {
+        const m = window.require('WAWebFindChatAction');
+        const r = await (m.findOrCreateLatestChat ? m.findOrCreateLatestChat(wid) : m.findChat(wid));
+        chat = r && (r.chat || r);
+      }
+      if (!chat) throw new Error('conversa não encontrada nesta versão do WhatsApp Web');
+      await window.WWebJS.sendMessage(chat, t, { sendSeen: false });
+      return true;
+    }, chatId, texto);
+    if (!ok) throw e;
+    return { id: { _serialized: `local_${Date.now()}` } };
+  }
+}
 const PORTA = 2790;           // a primeira porta; se estiver ocupada (outro Conector aberto), tenta as seguintes
 const PORTAS_EXTRAS = 9;
 
@@ -659,15 +687,17 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
         if (midia && midia.url) {
           // flyer, card ou PDF do dono: vai como imagem/documento e o texto vira a legenda
           const arquivo = await MessageMedia.fromUrl(midia.url, { unsafeMime: true, filename: midia.nome || undefined });
-          await client.sendMessage(id._serialized, arquivo, { caption: texto, sendMediaAsDocument: midia.mime === 'application/pdf' });
+          await client.sendMessage(id._serialized, arquivo, { caption: texto, sendMediaAsDocument: midia.mime === 'application/pdf', sendSeen: false });
         } else {
-          await client.sendMessage(id._serialized, texto);
+          await enviarTextoSeguro(client, id._serialized, texto);
         }
         await digitando.parar(telefone);
         await estado('stop');
         return { ok: true };
       } catch (e) {
-        return { ok: false, erro: String(e.message || e).slice(0, 160) };
+        const msg = String(e.message || e);
+        // erro da página do WhatsApp Web (e não do número): o servidor não conta isso como número restrito
+        return { ok: false, erro: ((ERRO_DE_PAGINA.test(msg) ? '[tecnico] ' : '') + msg).slice(0, 160) };
       }
     },
     // ---- o chat: o que o usuário vê no LeadSage, como no WhatsApp Web
@@ -767,7 +797,7 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
     diagnostico: () => ({ ...diag, historicoChats: historico.chats(1000).length }),
     async enviarNoChat(chatId, texto) {
       envios.registrar(texto);
-      const enviada = await client.sendMessage(chatId, texto);
+      const enviada = await enviarTextoSeguro(client, chatId, texto);
       // nas versões atuais a biblioteca pode devolver nada mesmo com a mensagem enviada;
       // falhar aqui faria a tela mostrar erro e a pessoa reenviar (mensagem em dobro)
       if (!enviada || !enviada.id) {

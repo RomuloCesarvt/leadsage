@@ -2614,8 +2614,18 @@ async def conector_ping(req: ConectorPing, request: Request):
         if req.numero:
             canal["cw_numero"] = re.sub(r"\D", "", req.numero)[:20]
         await conector_whatsapp.restaurar_aquecimento(canal)  # reconectar o mesmo numero nao zera o aquecimento
+        versao_antes = canal.get("cw_versao")
         canal["cw_status"] = req.status
         canal["cw_versao"] = req.versao
+        if versao_antes and versao_antes != req.versao:
+            # o Conector foi atualizado: o que falhou por defeito técnico dele volta para a fila e a pausa por "falhas" (que não eram do número) cai
+            try:
+                voltaram = await conector_whatsapp.reenfileirar_falhas_tecnicas(canal["uid"])
+                if voltaram:
+                    conector_whatsapp.retomar(canal)
+                    print(f"Conector atualizado ({versao_antes} -> {req.versao}): {voltaram} envio(s) voltaram para a fila.")
+            except Exception as exc:
+                print(f"Conector: não reenfileirou as falhas técnicas: {exc}")
         await _gravar_canal_do_conector(canal)
     # a conexao mudou (QR novo, codigo, pronto): a tela do celular precisa ver
     marca = f"{req.fase}|{req.codigo}|{hashlib.md5(req.qr.encode()).hexdigest()[:8] if req.qr else ''}"

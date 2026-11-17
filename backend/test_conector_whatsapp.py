@@ -368,3 +368,10 @@ def test_saude_numeros_inexistentes_e_pedidos_de_sair_derrubam_a_nota(rodar):
 def test_rota_de_saude_exige_plano_e_responde(client, com_robo):
     r = client.get("/api/robo/conector/saude")
     assert r.status_code == 200 and r.json() == {"disponivel": False}
+
+
+def test_falha_tecnica_e_numero_sem_whatsapp_nao_pausam_o_numero():
+    from app import conector_whatsapp as cw
+    assert cw.falha_tecnica("Data passed to getter must include an id property (it's how we memoize) but got undefined s (https://static.whatsapp.net/rsrc.php/v4/yZ/r/aHNOrI028GZ.js:85:180)")
+    assert cw.falha_tecnica("[tecnico] algo") and not cw.falha_tecnica("esse número não está no WhatsApp")
+    assert cw._NUMERO_SEM_WHATSAPP.search("esse número não está no WhatsApp") and not cw.falha_tecnica("o WhatsApp não aceitou a mensagem")

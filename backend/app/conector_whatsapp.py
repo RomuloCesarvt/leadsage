@@ -523,9 +523,37 @@ async def enviar_agora(uid: str, item_id: str) -> bool:
 _FALHA_DE_CONEXAO = re.compile(r"n[aã]o est[aá] conectado|connection (closed|lost|failure)|conflict|stream errored|timed out|timeout", re.I)
 
 
+_FALHA_TECNICA = re.compile(r"\[tecnico\]|Data passed to getter|memoize|Evaluation failed|Execution context was destroyed|detached Frame|is not a function|Cannot read prop", re.I)
+_NUMERO_SEM_WHATSAPP = re.compile(r"n[aã]o est[aá] no whatsapp", re.I)
+MOTIVO_TECNICO = ("Problema técnico do WhatsApp Web no Conector (não é restrição do seu número). Atualize o Conector; "
+                  "estas mensagens voltam sozinhas para a fila quando ele reconectar atualizado.")
+
+
+def falha_tecnica(erro: str) -> bool:
+    """O envio falhou por um defeito do WhatsApp Web / da biblioteca no computador do usuário, não por decisão do WhatsApp sobre o número."""
+    return bool(_FALHA_TECNICA.search(erro or ""))
+
+
 def falha_de_conexao(erro: str) -> bool:
     """O envio falhou porque a conexão do serviço caiu, não porque o WhatsApp recusou a mensagem."""
     return bool(_FALHA_DE_CONEXAO.search(erro or ""))
+
+
+async def reenfileirar_falhas_tecnicas(uid: str) -> int:
+    """Depois que o Conector foi atualizado: o que falhou por defeito técnico volta para a fila (pendente), sem a pessoa ter de apertar "Tentar de novo" em cada um."""
+    voltaram = 0
+    try:
+        itens = await fila_envio.listar(uid)
+    except Exception as exc:
+        print(f"Conector: sem a fila para reenfileirar: {exc}")
+        return 0
+    for i in itens:
+        if i.get("canal") == "whatsapp" and i.get("status") == "falhou" and i.get("falha_tecnica"):
+            i["status"], i["motivo"] = "pendente", ""
+            i.pop("falha_tecnica", None)
+            await fila_envio._gravar(uid, i)
+            voltaram += 1
+    return voltaram
 
 
 def retomar(canal: Dict[str, Any]) -> None:
@@ -544,8 +572,8 @@ async def registrar_resultado(canal: Dict[str, Any], tarefa_id: str, ok: bool, e
     agora = _agora_dt()
     if ok:
         canal["cw_falhas"] = 0
-    elif falha_de_conexao(erro):
-        pass  # o WhatsApp do serviço estava desconectado: tentar de novo depois, sem pausar o número
+    elif falha_de_conexao(erro) or falha_tecnica(erro) or _NUMERO_SEM_WHATSAPP.search(erro or ""):
+        pass  # conexão caída, defeito técnico do WhatsApp Web ou número que não tem WhatsApp: nada disso é sinal de número restrito, então não pausa
     else:
         canal["cw_falhas"] = int(canal.get("cw_falhas") or 0) + 1
         if canal["cw_falhas"] >= FALHAS_PARA_PAUSAR:
@@ -564,7 +592,9 @@ async def registrar_resultado(canal: Dict[str, Any], tarefa_id: str, ok: bool, e
                 await fila_envio._gravar(uid, item)
         else:
             item["status"] = "falhou"
-            item["motivo"] = (erro or "o WhatsApp não aceitou a mensagem")[:200]
+            item["motivo"] = (MOTIVO_TECNICO if falha_tecnica(erro) else (erro or "o WhatsApp não aceitou a mensagem"))[:260]
+            if falha_tecnica(erro):
+                item["falha_tecnica"] = True
             await fila_envio._gravar(uid, item)
         return True
 
