@@ -37,7 +37,14 @@ export type Geo = {
   estadosDe: (pais: string) => Estado[];
   temEstado: (pais: string, estado: string) => boolean;
   cidadesDe: (pais: string, estado: string) => Cidade[];
+  /** Busca por nome (sem acento, por prefixo/palavra) no pais todo ou so em um estado. */
+  buscarCidades: (pais: string, termo: string, estado?: string, limite?: number) => CidadeAchada[];
 };
+
+export type CidadeAchada = { nome: string; estado: string; estadoNome: string };
+
+export const semAcento = (t: string) =>
+  t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
 /** Mesma superfície que a tela já usava, sobre o recorte local. */
 export const montarGeo = (dados: Record<string, PaisBruto>): Geo => {
@@ -55,5 +62,23 @@ export const montarGeo = (dados: Record<string, PaisBruto>): Geo => {
     temEstado: (pais, estado) => Boolean(acharEstado(pais, estado)),
     cidadesDe: (pais, estado) =>
       (acharEstado(pais, estado)?.cidades || []).map(name => ({ name })),
+    buscarCidades: (pais, termo, estado, limite = 8) => {
+      const q = semAcento(termo);
+      if (!q) return [];
+      const inicio: CidadeAchada[] = [];
+      const meio: CidadeAchada[] = [];
+      for (const e of dados[pais]?.estados || []) {
+        if (estado && e.c !== estado) continue;
+        for (const nome of e.cidades) {
+          const n = semAcento(nome);
+          const achada = { nome, estado: e.c, estadoNome: e.n };
+          if (n === q || n.startsWith(q)) inicio.push(achada);
+          else if (n.includes(' ' + q)) meio.push(achada);
+        }
+      }
+      // exato primeiro, depois menor nome
+      inicio.sort((a, b) => (semAcento(a.nome) === q ? -1 : 0) - (semAcento(b.nome) === q ? -1 : 0) || a.nome.length - b.nome.length);
+      return [...inicio, ...meio].slice(0, limite);
+    },
   };
 };

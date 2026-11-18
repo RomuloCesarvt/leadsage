@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ChevronDown, AlertCircle } from 'lucide-react';
+import { Search, ChevronDown, AlertCircle, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { carregarGeo, montarGeo } from '../../lib/geo';
-import type { Geo, Pais, Estado, Cidade } from '../../lib/geo';
+import type { Geo, Pais, Estado, CidadeAchada } from '../../lib/geo';
 import { SeletorNicho } from '../SeletorNicho';
 
 export const NovaBuscaScreen: React.FC = () => {
@@ -23,7 +23,19 @@ export const NovaBuscaScreen: React.FC = () => {
   const [geo, setGeo] = useState<Geo | null>(null);
   const [countries, setCountries] = useState<Pais[]>([]);
   const [states, setStates] = useState<Estado[]>([]);
-  const [cities, setCities] = useState<Cidade[]>([]);
+  const [cidAberta, setCidAberta] = useState(false);
+  const [cidAtiva, setCidAtiva] = useState(0);
+  // digitar "Campinas" sem escolher o estado: procura no pais todo; com estado
+  // escolhido, so nele. Escolher a sugestao ja preenche o estado.
+  const sugestoes: CidadeAchada[] = geo && city.trim()
+    ? geo.buscarCidades(country, city, state || undefined, 8)
+    : [];
+  useEffect(() => { setCidAtiva(0); }, [city, state]);
+  const escolherCidade = (c: CidadeAchada) => {
+    setCity(c.nome);
+    setState(c.estado);
+    setCidAberta(false);
+  };
 
   useEffect(() => {
     let active = true;
@@ -41,19 +53,26 @@ export const NovaBuscaScreen: React.FC = () => {
     setStates(geo.estadosDe(country));
   }, [geo, country]);
 
-  useEffect(() => {
-    if (!geo || !state) { setCities([]); return; }
-    setCities(geo.temEstado(country, state) ? geo.cidadesDe(country, state) : []);
-  }, [geo, country, state]);
-
   const handleSearch = async () => {
-    if (!niche || !city || !state) {
-      setErroBusca('Preencha Nicho, Estado e Cidade para buscar.');
+    let estado = state;
+    let cidade = city.trim();
+    // cidade digitada sem estado: se so existe uma com esse nome, usa-a
+    if (geo && cidade && !estado) {
+      const achadas = geo.buscarCidades(country, cidade, undefined, 50)
+        .filter(c => c.nome.toLowerCase() === cidade.toLowerCase());
+      if (achadas.length === 1) { estado = achadas[0].estado; cidade = achadas[0].nome; setState(estado); setCity(cidade); }
+      else if (achadas.length > 1) {
+        setErroBusca(`Há mais de uma cidade chamada "${cidade}". Escolha uma na lista ou selecione o Estado.`);
+        return;
+      }
+    }
+    if (!niche || !cidade || !estado) {
+      setErroBusca('Preencha Nicho e Cidade (escolha na lista ou selecione o Estado).');
       return;
     }
     setErroBusca('');
     const countryName = countries.find(c => c.isoCode === country)?.name || 'Brasil';
-    const fullLocation = `${neighborhood ? neighborhood + ', ' : ''}${city}, ${state}, ${countryName}`;
+    const fullLocation = `${neighborhood ? neighborhood + ', ' : ''}${cidade}, ${estado}, ${countryName}`;
     
     setIsSearching(true);
     try {
@@ -115,7 +134,6 @@ export const NovaBuscaScreen: React.FC = () => {
                 value={state}
                 onChange={(e) => {
                   setState(e.target.value);
-                  setCity('');
                 }}
                 disabled={!country}
                 className="w-full pl-4 pr-10 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -132,29 +150,46 @@ export const NovaBuscaScreen: React.FC = () => {
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Cidade</label>
             <div className="relative">
-              <select 
+              <input
+                type="text"
+                role="combobox"
+                aria-expanded={cidAberta && sugestoes.length > 0}
+                autoComplete="off"
+                placeholder="Digite a cidade (ex: Campinas)"
                 value={city}
-                onChange={(e) => setCity(e.target.value)}
-                disabled={!state || cities.length === 0}
-                className="w-full pl-4 pr-10 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="">{cities.length === 0 && state ? "Digite abaixo ou mude o estado" : "Selecione a cidade..."}</option>
-                {cities.map(c => (
-                  <option key={c.name} value={c.name}>{c.name}</option>
-                ))}
-              </select>
-              <ChevronDown className="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-            {/* Fallback para países sem lista de cidades mapeada */}
-            {state && cities.length === 0 && (
-              <input 
-                type="text" 
-                placeholder="Digite o nome da cidade"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="w-full mt-2 px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                onChange={(e) => { setCity(e.target.value); setCidAberta(true); }}
+                onFocus={() => setCidAberta(true)}
+                onBlur={() => setTimeout(() => setCidAberta(false), 150)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setCidAberta(false);
+                  else if (e.key === 'ArrowDown') { e.preventDefault(); setCidAtiva(i => Math.min(i + 1, sugestoes.length - 1)); }
+                  else if (e.key === 'ArrowUp') { e.preventDefault(); setCidAtiva(i => Math.max(i - 1, 0)); }
+                  else if (e.key === 'Enter' && cidAberta && sugestoes[cidAtiva]) { e.preventDefault(); escolherCidade(sugestoes[cidAtiva]); }
+                }}
+                className="w-full pl-4 pr-10 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               />
-            )}
+              {city && (
+                <button type="button" aria-label="Limpar cidade" onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setCity('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+              {cidAberta && sugestoes.length > 0 && (
+                <ul role="listbox" className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 max-h-72 overflow-y-auto p-2">
+                  {sugestoes.map((c, i) => (
+                    <li key={`${c.nome}-${c.estado}`} role="option" aria-selected={i === cidAtiva}>
+                      <button type="button" onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => escolherCidade(c)} onMouseEnter={() => setCidAtiva(i)}
+                        className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-left text-sm ${i === cidAtiva ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'}`}>
+                        <span className="font-semibold">{c.nome}</span>
+                        <span className="text-[11px] text-slate-400 shrink-0">{c.estadoNome}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         </div>
 
