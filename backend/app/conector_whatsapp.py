@@ -56,7 +56,7 @@ FRIO_POR_DIA = 5               # quanto o limite cresce a cada dia
 FRIO_MAXIMO = 60               # teto diário: acima disso o risco de banimento sobe muito
 MAX_TAREFAS = 3
 CAMPOS_CONECTOR = ("cw_hash", "cw_prefixo", "cw_criado", "cw_visto", "cw_primeiro", "cw_numero",
-                   "cw_status", "cw_ultimo_frio", "cw_versao", "cw_frio_dia", "cw_frio_n", "cw_atividade",
+                   "cw_status", "cw_ultimo_frio", "cw_versao", "cw_lib", "cw_frio_dia", "cw_frio_n", "cw_atividade",
                    "cw_proximo_frio_em", "cw_falhas", "cw_pausa_ate")
 
 AVISO_SAIR = "\n\n(Se preferir não receber mais mensagens, é só responder SAIR.)"
@@ -525,8 +525,8 @@ _FALHA_DE_CONEXAO = re.compile(r"n[aã]o est[aá] conectado|connection (closed|l
 
 _FALHA_TECNICA = re.compile(r"\[tecnico\]|Data passed to getter|memoize|Evaluation failed|Execution context was destroyed|detached Frame|is not a function|Cannot read prop", re.I)
 _NUMERO_SEM_WHATSAPP = re.compile(r"n[aã]o est[aá] no whatsapp", re.I)
-MOTIVO_TECNICO = ("Problema técnico do WhatsApp Web no Conector (não é restrição do seu número). Atualize o Conector; "
-                  "estas mensagens voltam sozinhas para a fila quando ele reconectar atualizado.")
+MOTIVO_TECNICO = ("O WhatsApp Web mudou e o Conector estava com a biblioteca antiga. Feche o Conector e abra de novo (ele atualiza a biblioteca sozinho, cerca de 1 minuto): "
+                  "estas mensagens voltam para a fila e saem. Não é restrição do seu número.")
 
 
 def falha_tecnica(erro: str) -> bool:
@@ -595,6 +595,8 @@ async def registrar_resultado(canal: Dict[str, Any], tarefa_id: str, ok: bool, e
             item["motivo"] = (MOTIVO_TECNICO if falha_tecnica(erro) else (erro or "o WhatsApp não aceitou a mensagem"))[:260]
             if falha_tecnica(erro):
                 item["falha_tecnica"] = True
+                item["erro_bruto"] = (erro or "")[:300]          # o texto real do Conector, para diagnóstico (o motivo da tela é o texto amigável)
+                print(f"Conector: falha técnica no envio de {item_id}: {(erro or '')[:200]}")
             await fila_envio._gravar(uid, item)
         return True
 

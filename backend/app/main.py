@@ -2252,6 +2252,7 @@ class ConectorPing(BaseModel):
     numero: str = Field(default="", max_length=40)
     status: str = Field(default="", max_length=40)
     versao: str = Field(default="", max_length=20)
+    lib: str = Field(default="", max_length=20)      # versão da biblioteca whatsapp-web.js instalada no computador do usuário
     # o estado da conexao, para a tela do celular mostrar o QR code ou o codigo de pareamento
     fase: str = Field(default="", max_length=20)
     qr: str = Field(default="", max_length=30000)
@@ -2615,9 +2616,12 @@ async def conector_ping(req: ConectorPing, request: Request):
             canal["cw_numero"] = re.sub(r"\D", "", req.numero)[:20]
         await conector_whatsapp.restaurar_aquecimento(canal)  # reconectar o mesmo numero nao zera o aquecimento
         versao_antes = canal.get("cw_versao")
+        lib_antes = canal.get("cw_lib")
         canal["cw_status"] = req.status
         canal["cw_versao"] = req.versao
-        if versao_antes and versao_antes != req.versao:
+        if req.lib:
+            canal["cw_lib"] = req.lib[:20]                     # versão da biblioteca do WhatsApp no computador do usuário (diagnóstico)
+        if (versao_antes and versao_antes != req.versao) or (req.lib and lib_antes and lib_antes != req.lib):
             # o Conector foi atualizado: o que falhou por defeito técnico dele volta para a fila e a pausa por "falhas" (que não eram do número) cai
             try:
                 voltaram = await conector_whatsapp.reenfileirar_falhas_tecnicas(canal["uid"])

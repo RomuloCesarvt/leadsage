@@ -15,14 +15,14 @@
  * restringir o número. Use um número secundário e não aumente o ritmo de envio.
  */
 import { readFile, writeFile } from 'node:fs/promises';
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { exec, execFile } from 'node:child_process';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '3.0.4';
+export const VERSAO = '3.0.5';
 
 // O WhatsApp Web muda de tempos em tempos e a biblioteca quebra no envio com erros como
 // "Data passed to getter must include an id property (it's how we memoize) but got undefined".
@@ -53,6 +53,41 @@ export async function enviarTextoSeguro(client, chatId, texto) {
 }
 const PORTA = 2790;           // a primeira porta; se estiver ocupada (outro Conector aberto), tenta as seguintes
 const PORTAS_EXTRAS = 9;
+
+// A biblioteca do WhatsApp (whatsapp-web.js) precisa acompanhar o WhatsApp Web. Em 2026-07 o WhatsApp Web trocou `_serialized` por `$1` nos
+// identificadores e a versão 1.34.7 passou a falhar em TODO envio ("Data passed to getter must include an id property...").
+// A 1.34.8 corrige. O instalador só roda `npm install` na primeira vez, então quem já tinha instalado ficava para sempre na versão quebrada:
+// o próprio Conector confere e atualiza a biblioteca ao abrir.
+export const BIBLIOTECA_MINIMA = '1.34.8';
+
+export function versaoDaBiblioteca(pasta = AQUI) {
+  try { return String(JSON.parse(readFileSync(join(pasta, 'node_modules', 'whatsapp-web.js', 'package.json'), 'utf8')).version || ''); } catch { return ''; }
+}
+
+export function versaoMenor(a, b) {
+  const n = (v) => String(v || '0').split('-')[0].split('.').map((x) => parseInt(x, 10) || 0);
+  const [x, y] = [n(a), n(b)];
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0);
+  return false;
+}
+
+export async function garantirBiblioteca({ pasta = AQUI, executar = null, aviso = (...a) => console.log(...a) } = {}) {
+  const atual = versaoDaBiblioteca(pasta);
+  if (atual && !versaoMenor(atual, BIBLIOTECA_MINIMA)) return { atualizou: false, versao: atual };
+  aviso(`A biblioteca do WhatsApp (${atual || 'não instalada'}) está desatualizada e não envia mensagens. Atualizando para ${BIBLIOTECA_MINIMA} ou mais (cerca de 1 minuto)...`);
+  const rodar = executar || ((cmd) => new Promise((ok, erro) => {
+    exec(cmd, { cwd: pasta, windowsHide: true, timeout: 5 * 60_000, env: { ...process.env, PUPPETEER_SKIP_DOWNLOAD: 'true' } }, (e, out, err) => (e ? erro(new Error(String(err || e.message).slice(-300))) : ok(out)));
+  }));
+  try {
+    await rodar(`npm install whatsapp-web.js@^${BIBLIOTECA_MINIMA} --omit=dev --no-audit --no-fund`);
+    const nova = versaoDaBiblioteca(pasta);
+    aviso(`Biblioteca atualizada para ${nova || BIBLIOTECA_MINIMA}.`);
+    return { atualizou: true, versao: nova };
+  } catch (e) {
+    aviso(`Não consegui atualizar a biblioteca do WhatsApp sozinho (${e.message}). Abra o Prompt de Comando na pasta do Conector e rode: npm install whatsapp-web.js@latest`);
+    return { atualizou: false, versao: atual, erro: e.message };
+  }
+}
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (...a) => console.log(new Date().toLocaleTimeString('pt-BR'), ...a);
@@ -104,7 +139,7 @@ export function clienteLeadsage({ site, chave }) {
   const h = { 'x-conector-key': chave };
   const base = `${site}/api/conector`;
   return {
-    ping: (numero, status, extra = {}) => http_(`${base}/ping`, { metodo: 'POST', cabecalhos: h, corpo: { numero: numero || '', status: status || '', versao: VERSAO, ...extra } }),
+    ping: (numero, status, extra = {}) => http_(`${base}/ping`, { metodo: 'POST', cabecalhos: h, corpo: { numero: numero || '', status: status || '', versao: VERSAO, lib: versaoDaBiblioteca(), ...extra } }),
     espelho: (corpo) => http_(`${base}/espelho`, { metodo: 'POST', cabecalhos: h, corpo, tempoMs: 30000 }),
     tarefas: () => http_(`${base}/tarefas`, { cabecalhos: h }),
     resultado: (id, ok, erro = '') => http_(`${base}/tarefas/${encodeURIComponent(id)}/resultado`, { metodo: 'POST', cabecalhos: h, corpo: { ok, erro } }),
@@ -595,6 +630,7 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
   });
   const navegador = acharNavegador();
   if (!navegador) throw new Error('Não achei o Microsoft Edge nem o Google Chrome neste computador. Instale um deles e abra de novo.');
+  await garantirBiblioteca({ aviso: log });
   const { default: pkg } = await import('whatsapp-web.js');
   const { Client, LocalAuth, MessageMedia } = pkg;
   const client = new Client({
