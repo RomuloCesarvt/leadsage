@@ -76,3 +76,13 @@ test('biblioteca em dia não roda npm; sem internet o Conector segue e avisa', a
   assert.equal(falhou.atualizou, false);
   assert.match(mensagens.join(' '), /npm install whatsapp-web\.js@latest/);
 });
+
+test('número que a biblioteca diz que não existe ainda é tentado (getNumberId devolve null por engano)', async () => {
+  const { resolverNumero, variantesDoNumero } = await import('./leadsage-conector.mjs');
+  assert.deepEqual(variantesDoNumero('5519991234567'), ['5519991234567', '551991234567']);
+  const id = await resolverNumero({ getNumberId: async () => null }, '5519991234567');
+  assert.equal(id._serialized, '5519991234567@c.us');
+  const certo = await resolverNumero({ getNumberId: async (v) => (v.length === 12 ? { _serialized: v + '@c.us' } : null) }, '5519991234567');
+  assert.equal(certo._serialized, '551991234567@c.us');
+  assert.equal(await resolverNumero({ getNumberId: async () => { throw new Error('x'); } }, '123'), null);
+});

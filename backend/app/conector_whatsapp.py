@@ -548,7 +548,9 @@ async def reenfileirar_falhas_tecnicas(uid: str) -> int:
         print(f"Conector: sem a fila para reenfileirar: {exc}")
         return 0
     for i in itens:
-        if i.get("canal") == "whatsapp" and i.get("status") == "falhou" and i.get("falha_tecnica"):
+        # "não está no WhatsApp" vindo de um Conector antigo era, em geral, um falso negativo da biblioteca
+        falso_negativo = bool(_NUMERO_SEM_WHATSAPP.search(i.get("motivo") or ""))
+        if i.get("canal") == "whatsapp" and i.get("status") == "falhou" and (i.get("falha_tecnica") or falso_negativo):
             i["status"], i["motivo"] = "pendente", ""
             i.pop("falha_tecnica", None)
             await fila_envio._gravar(uid, i)

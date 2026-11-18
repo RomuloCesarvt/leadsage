@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '3.0.5';
+export const VERSAO = '3.0.6';
 
 // O WhatsApp Web muda de tempos em tempos e a biblioteca quebra no envio com erros como
 // "Data passed to getter must include an id property (it's how we memoize) but got undefined".
@@ -493,6 +493,35 @@ export function textoDaMensagem(tipo, body, caption) {
   return pareceBase64(body) ? '' : String(body || '').trim();
 }
 
+/**
+ * Descobre o id do número no WhatsApp.
+ *
+ * `client.getNumberId()` devolve `null` para números que EXISTEM quando o WhatsApp Web muda
+ * (e erra o 9º dígito de celulares do Brasil), e o Conector tratava `null` como "não tem
+ * WhatsApp" sem nem tentar enviar. Agora: tenta o número como veio e a variante com/sem o 9;
+ * se a biblioteca ainda assim não souber, tenta o envio direto para `número@c.us` (é o que o
+ * WhatsApp faz ao abrir wa.me/número). Se o número realmente não existe, o envio falha e aí
+ * sim vira "não está no WhatsApp".
+ */
+export function variantesDoNumero(telefone) {
+  const t = String(telefone || '').replace(/\D/g, '');
+  const out = [t];
+  if (/^55\d{2}9\d{8}$/.test(t)) out.push(t.slice(0, 4) + t.slice(5));        // com o 9 -> sem o 9
+  else if (/^55\d{2}[2-9]\d{7}$/.test(t)) out.push(t.slice(0, 4) + '9' + t.slice(4)); // sem o 9 -> com o 9
+  return out;
+}
+
+export async function resolverNumero(client, telefone) {
+  for (const v of variantesDoNumero(telefone)) {
+    try {
+      const id = await client.getNumberId(v);
+      if (id) return id;
+    } catch (_) { /* biblioteca quebrada nesta versão: segue para o envio direto */ }
+  }
+  const limpo = String(telefone || '').replace(/\D/g, '');
+  return limpo.length >= 10 && limpo.length <= 13 ? { _serialized: `${limpo}@c.us`, presumido: true } : null;
+}
+
 /** "+55 11 96462-3668" -> "5511964623668"; nome de pessoa ou grupo -> "". */
 export function telefoneDoTitulo(titulo) {
   const t = String(titulo || '').trim();
@@ -711,7 +740,7 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
         let id = null;
         const conhecido = chatId || destinos.get(telefone) || (telefone.length >= 14 ? `${telefone}@lid` : '');
         if (conhecido) id = { _serialized: conhecido };
-        else id = await client.getNumberId(telefone);
+        else id = await resolverNumero(client, telefone);
         if (!id) return { ok: false, erro: 'esse número não está no WhatsApp' };
         // "digitando…" direto pela página: client.getChatById quebra nas versões atuais do WhatsApp Web
         // ("r"), e antes isso derrubava TODO envio do robô. O indicador é só um detalhe humano.
