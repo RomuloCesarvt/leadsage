@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
 import httpx
+from app import rede_segura
 from bs4 import BeautifulSoup
 
 from app.config import settings
@@ -170,7 +171,8 @@ async def ler_site(url: str) -> str:
     textos: List[str] = []
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(7.0, connect=4.0), follow_redirects=True,
-                                     headers=BROWSER_HEADERS, verify=False) as c:
+                                     headers=BROWSER_HEADERS, verify=False,
+                                     event_hooks=rede_segura.ganchos()) as c:
             async def baixar(u: str) -> str:
                 try:
                     r = await c.get(u)

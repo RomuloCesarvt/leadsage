@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 
 import httpx
+from app import rede_segura
 from bs4 import BeautifulSoup
 
 HEADERS = {
@@ -169,7 +170,7 @@ async def buscar(site: str = "", instagram: str = "", cliente: Optional[httpx.As
     """Junta o que o site e o perfil do Instagram mostram. Nunca levanta erro."""
     out = vazia()
     proprio = cliente is None
-    cli = cliente or httpx.AsyncClient(timeout=httpx.Timeout(7.0, connect=4.0), verify=False, follow_redirects=True)
+    cli = cliente or httpx.AsyncClient(timeout=httpx.Timeout(7.0, connect=4.0), verify=False, follow_redirects=True, event_hooks=rede_segura.ganchos())
 
     async def baixar(url: str, cab: Dict[str, str]) -> str:
         try:

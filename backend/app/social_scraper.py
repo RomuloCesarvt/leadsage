@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 
 import httpx
+from app import rede_segura
 from bs4 import BeautifulSoup
 
 from app import identidade_lead
@@ -244,6 +245,7 @@ class SocialScraper:
                 timeout=httpx.Timeout(8.0, connect=4.0),
                 verify=False,
                 follow_redirects=True,
+                event_hooks=rede_segura.ganchos(),
                 headers=BROWSER_HEADERS,
             ) as client:
                 inicio = time.monotonic()
