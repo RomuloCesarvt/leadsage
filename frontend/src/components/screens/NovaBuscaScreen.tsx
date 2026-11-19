@@ -27,9 +27,13 @@ export const NovaBuscaScreen: React.FC = () => {
   const [cidAtiva, setCidAtiva] = useState(0);
   // digitar "Campinas" sem escolher o estado: procura no pais todo; com estado
   // escolhido, so nele. Escolher a sugestao ja preenche o estado.
-  const sugestoes: CidadeAchada[] = geo && city.trim()
-    ? geo.buscarCidades(country, city, state || undefined, 8)
-    : [];
+  const estadoNome = states.find(e => e.isoCode === state)?.name || '';
+  const sugestoes: CidadeAchada[] = !geo ? [] : city.trim()
+    ? geo.buscarCidades(country, city, state || undefined, state ? 60 : 8)
+    // campo vazio com estado escolhido: a lista completa do estado, como o seletor de antes
+    : state
+      ? geo.cidadesDe(country, state).map(c => ({ nome: c.name, estado: state, estadoNome }))
+      : [];
   useEffect(() => { setCidAtiva(0); }, [city, state]);
   const escolherCidade = (c: CidadeAchada) => {
     setCity(c.nome);
@@ -155,7 +159,7 @@ export const NovaBuscaScreen: React.FC = () => {
                 role="combobox"
                 aria-expanded={cidAberta && sugestoes.length > 0}
                 autoComplete="off"
-                placeholder="Digite a cidade (ex: Campinas)"
+                placeholder={state ? 'Escolha ou digite a cidade' : 'Digite a cidade (ex: Campinas)'}
                 value={city}
                 onChange={(e) => { setCity(e.target.value); setCidAberta(true); }}
                 onFocus={() => setCidAberta(true)}
@@ -166,14 +170,27 @@ export const NovaBuscaScreen: React.FC = () => {
                   else if (e.key === 'ArrowUp') { e.preventDefault(); setCidAtiva(i => Math.max(i - 1, 0)); }
                   else if (e.key === 'Enter' && cidAberta && sugestoes[cidAtiva]) { e.preventDefault(); escolherCidade(sugestoes[cidAtiva]); }
                 }}
-                className="w-full pl-4 pr-10 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                className="w-full pl-4 pr-[4.5rem] py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               />
-              {city && (
-                <button type="button" aria-label="Limpar cidade" onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => setCity('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100">
-                  <X className="w-4 h-4" />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {city && (
+                  <button type="button" aria-label="Limpar cidade" onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setCity('')}
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+                <button type="button" aria-label={cidAberta ? 'Fechar lista de cidades' : 'Abrir lista de cidades'}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setCidAberta(a => !a)}
+                  className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+                  <ChevronDown className={`w-5 h-5 transition-transform ${cidAberta ? 'rotate-180' : ''}`} />
                 </button>
+              </div>
+              {cidAberta && !city.trim() && !state && (
+                <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-3 text-sm text-slate-500">
+                  Escolha o Estado para ver todas as cidades, ou digite o nome da cidade.
+                </div>
               )}
               {cidAberta && sugestoes.length > 0 && (
                 <ul role="listbox" className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 max-h-72 overflow-y-auto p-2">
