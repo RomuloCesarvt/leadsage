@@ -131,14 +131,24 @@ async def _sql_get(chave: str) -> Optional[Dict[str, Any]]:
 
 
 async def _sql_put(chave: str, uid: str, tipo: str, data: Dict[str, Any]) -> None:
-    async with AsyncSessionLocal() as s:
-        row = (await s.execute(select(DBRobo).where(DBRobo.chave == chave))).scalar_one_or_none()
-        if row:
-            row.data = data
-            row.atualizado = agora()
-        else:
-            s.add(DBRobo(chave=chave, uid=uid, tipo=tipo, data=data, atualizado=agora()))
-        await s.commit()
+    """Grava ou atualiza. Duas mensagens do mesmo contato chegando juntas tentavam criar a mesma linha ao mesmo tempo:
+    a segunda estourava com `duplicate key` e a mensagem se perdia. Agora, se a linha acabou de nascer, atualiza."""
+    from sqlalchemy.exc import IntegrityError
+    for tentativa in range(2):
+        async with AsyncSessionLocal() as s:
+            row = (await s.execute(select(DBRobo).where(DBRobo.chave == chave))).scalar_one_or_none()
+            if row:
+                row.data = data
+                row.atualizado = agora()
+            else:
+                s.add(DBRobo(chave=chave, uid=uid, tipo=tipo, data=data, atualizado=agora()))
+            try:
+                await s.commit()
+                return
+            except IntegrityError:
+                await s.rollback()
+                if tentativa:
+                    raise
 
 
 async def _sql_listar(uid: str, tipo: str) -> List[Dict[str, Any]]:

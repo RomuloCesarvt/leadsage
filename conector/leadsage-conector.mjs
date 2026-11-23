@@ -15,14 +15,14 @@
  * restringir o número. Use um número secundário e não aumente o ritmo de envio.
  */
 import { readFile, writeFile } from 'node:fs/promises';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, renameSync } from 'node:fs';
 import { exec, execFile } from 'node:child_process';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '3.0.6';
+export const VERSAO = '3.0.7';
 
 // O WhatsApp Web muda de tempos em tempos e a biblioteca quebra no envio com erros como
 // "Data passed to getter must include an id property (it's how we memoize) but got undefined".
@@ -669,6 +669,9 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
     puppeteer: { executablePath: navegador, headless: true, args: ['--no-sandbox', '--disable-gpu'] },
   });
 
+  // sinais de que o WhatsApp Web abriu de verdade (QR, código, autenticado ou pronto); sem nenhum, a abertura travou
+  let vivo = false;
+  for (const ev of ['qr', 'code', 'authenticated', 'ready']) client.on(ev, () => { vivo = true; });
   client.on('qr', (qr) => aoQr(qr));
   client.on('code', (codigo) => aoCodigo(String(codigo)));
   client.on('ready', () => aoPronto(String(client.info?.wid?.user || '')));
@@ -722,14 +725,34 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
     }
   });
 
+  const abrir = async () => {
+    try {
+      await client.initialize();
+    } catch (e) {
+      if (!/already running|userDataDir/i.test(String(e?.message))) throw e;
+      // sobrou um navegador de uma execução anterior segurando a pasta da sessão: fecha só o que usa ESTA pasta e tenta de novo
+      log('O navegador desta pasta ficou aberto de antes; fechando e tentando de novo.');
+      await liberarPastaDaSessao(join(AQUI, 'sessao'));
+      await client.initialize();
+    }
+  };
+  // Se o WhatsApp Web não mostrar nem QR nem código em 4 minutos, a abertura travou (sessão antiga incompatível com a biblioteca nova,
+  // navegador preso...). Em vez de ficar parado para sempre, guarda a sessão antiga de lado e avisa para tentar de novo, já limpo.
+  const TRAVOU_MS = 4 * 60_000;
+  const vigia = setTimeout(async () => {
+    if (vivo) return;
+    log('O WhatsApp Web não abriu em 4 minutos. Guardando a sessão antiga de lado e reiniciando a conexão.');
+    try { await client.destroy(); } catch { /* já caiu */ }
+    try { await liberarPastaDaSessao(join(AQUI, 'sessao')); } catch { /* ok */ }
+    try { renameSync(join(AQUI, 'sessao'), join(AQUI, `sessao-antiga-${Date.now()}`)); } catch { /* sem sessão para guardar */ }
+    aoCair('a abertura travou; a sessão antiga foi guardada de lado. Feche e abra o Conector para ler um QR novo');
+  }, TRAVOU_MS);
+  vigia.unref?.();
   try {
-    await client.initialize();
+    await abrir();
   } catch (e) {
-    if (!/already running|userDataDir/i.test(String(e?.message))) throw e;
-    // sobrou um navegador de uma execução anterior segurando a pasta da sessão: fecha só o que usa ESTA pasta e tenta de novo
-    log('O navegador desta pasta ficou aberto de antes; fechando e tentando de novo.');
-    await liberarPastaDaSessao(join(AQUI, 'sessao'));
-    await client.initialize();
+    clearTimeout(vigia);
+    throw e;
   }
 
   return {
