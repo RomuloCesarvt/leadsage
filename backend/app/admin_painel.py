@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import atividade, credit_system, pipeline_store
+from app import espaco, atividade, credit_system, pipeline_store
 from app.credit_system import is_admin
 from app.database import DBSearchHistory, get_db
 from app.firebase_config import get_current_user
@@ -28,6 +28,8 @@ async def exigir_admin(user: dict = Depends(get_current_user)) -> dict:
 
 class Ilimitado(BaseModel):
     ativo: bool
+    # cada modo tem a sua carteira: "agencia" = uid, "empresa" = uid~empresa
+    modo: str = "agencia"
 
 
 def _quando(ms) -> str:
@@ -62,6 +64,7 @@ async def usuarios(_: dict = Depends(exigir_admin)):
     usos = await atividade.todas()
     for c in contas:
         c["ilimitado"] = await credit_system.e_ilimitado(c["uid"])
+        c["ilimitado_empresa"] = await credit_system.e_ilimitado(espaco.do_modo(c["uid"], "empresa"))
         # vale o mais recente entre o login e o uso real do app (quem fica com a sessão aberta nunca refaz o login)
         c["ultimo_login"] = c["ultimo_acesso"]
         c["ultimo_acesso"] = max(c["ultimo_acesso"] or "", usos.get(c["uid"], ""))
@@ -102,5 +105,7 @@ async def creditos_do_usuario(uid: str, _: dict = Depends(exigir_admin)):
 
 @router.post("/usuarios/{uid}/ilimitado")
 async def definir_ilimitado(uid: str, req: Ilimitado, admin: dict = Depends(exigir_admin)):
-    await credit_system.definir_ilimitado(uid, req.ativo, por=admin.get("email") or "")
-    return {"uid": uid, "ilimitado": req.ativo}
+    modo = "empresa" if req.modo == "empresa" else "agencia"
+    carteira = espaco.do_modo(uid, modo)
+    await credit_system.definir_ilimitado(carteira, req.ativo, por=admin.get("email") or "")
+    return {"uid": uid, "modo": modo, "ilimitado": req.ativo}

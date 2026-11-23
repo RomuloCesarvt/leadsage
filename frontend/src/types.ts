@@ -705,6 +705,7 @@ export interface UsuarioAdmin {
   ultimo_acesso: string;
   admin: boolean;
   ilimitado: boolean;
+  ilimitado_empresa?: boolean;
 }
 
 export interface SaudeDoNumero {

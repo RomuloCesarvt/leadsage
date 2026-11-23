@@ -548,8 +548,8 @@ export const api = {
     return await fetchWithToken(`/admin/usuarios/${encodeURIComponent(uid)}/creditos`);
   },
 
-  async adminIlimitado(uid: string, ativo: boolean): Promise<{ ilimitado: boolean }> {
-    return await fetchWithToken(`/admin/usuarios/${encodeURIComponent(uid)}/ilimitado`, { method: 'POST', body: JSON.stringify({ ativo }) });
+  async adminIlimitado(uid: string, ativo: boolean, modo: 'agencia' | 'empresa' = 'agencia'): Promise<{ ilimitado: boolean }> {
+    return await fetchWithToken(`/admin/usuarios/${encodeURIComponent(uid)}/ilimitado`, { method: 'POST', body: JSON.stringify({ ativo, modo }) });
   },
 
   async whatsEstado(): Promise<{ conectado: boolean; online: boolean; fase?: string; qr?: string; codigo?: string; numero?: string; visto_s?: number | null; estado_s?: number | null; nuvem?: boolean }> {

@@ -55,11 +55,12 @@ export const AdminScreen: React.FC = () => {
     return (usuarios || []).filter(u => !q || `${u.email} ${u.nome}`.toLowerCase().includes(q));
   }, [usuarios, busca]);
 
-  const alternar = async (u: UsuarioAdmin) => {
+  const alternar = async (u: UsuarioAdmin, modo: 'agencia' | 'empresa' = 'agencia') => {
     setSalvando(true);
     try {
-      const r = await api.adminIlimitado(u.uid, !u.ilimitado);
-      const novo = { ...u, ilimitado: r.ilimitado };
+      const atual = modo === 'empresa' ? !!u.ilimitado_empresa : u.ilimitado;
+      const r = await api.adminIlimitado(u.uid, !atual, modo);
+      const novo = modo === 'empresa' ? { ...u, ilimitado_empresa: r.ilimitado } : { ...u, ilimitado: r.ilimitado };
       setUsuarios(prev => (prev || []).map(x => (x.uid === u.uid ? novo : x)));
       setAberto(novo);
     } catch (e: any) { setErro(e?.message || 'Não foi possível mudar.'); }
@@ -95,7 +96,7 @@ export const AdminScreen: React.FC = () => {
                 </div>
                 <div className="flex flex-col items-end gap-1.5 shrink-0">
                   {u.admin && <span className="text-xs font-bold uppercase bg-blue-50 text-blue-700 rounded-md px-2 py-0.5">admin</span>}
-                  {u.ilimitado && <InfinitoIcon className="w-5 h-5 text-emerald-600" aria-label="Créditos infinitos" />}
+                  {(u.ilimitado || u.ilimitado_empresa) && <InfinitoIcon className="w-5 h-5 text-emerald-600" aria-label="Créditos infinitos" />}
                 </div>
               </button>
             );
@@ -110,11 +111,18 @@ export const AdminScreen: React.FC = () => {
               <p className="text-[13px] text-slate-500 break-all">{aberto.email}</p>
               <p className="text-[13px] text-slate-600 mt-0.5">Último acesso: <b className="text-slate-800">{quando(aberto.ultimo_acesso).texto}</b>{aberto.criado_em ? <span className="text-slate-400"> · criou a conta em {data(aberto.criado_em)}</span> : null}</p>
             </div>
-            <button onClick={() => alternar(aberto)} disabled={salvando}
-              className={`w-full md:w-auto min-h-12 md:min-h-0 justify-center px-4 md:px-3 py-2 rounded-xl text-[15px] md:text-xs font-bold flex items-center gap-2 md:gap-1.5 disabled:opacity-60 ${
-                aberto.ilimitado ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-              <InfinitoIcon className="w-4 h-4" /> {aberto.ilimitado ? 'Créditos infinitos: ligado' : 'Dar créditos infinitos'}
-            </button>
+            <div className="flex flex-col gap-2 w-full md:w-auto">
+              <button onClick={() => alternar(aberto)} disabled={salvando}
+                className={`w-full md:w-auto min-h-12 md:min-h-0 justify-center px-4 md:px-3 py-2 rounded-xl text-[15px] md:text-xs font-bold flex items-center gap-2 md:gap-1.5 disabled:opacity-60 ${
+                  aberto.ilimitado ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                <InfinitoIcon className="w-4 h-4" /> {aberto.ilimitado ? 'Agência: créditos infinitos ligado' : 'Agência: dar créditos infinitos'}
+              </button>
+              <button onClick={() => alternar(aberto, 'empresa')} disabled={salvando}
+                className={`w-full md:w-auto min-h-12 md:min-h-0 justify-center px-4 md:px-3 py-2 rounded-xl text-[15px] md:text-xs font-bold flex items-center gap-2 md:gap-1.5 disabled:opacity-60 ${
+                  aberto.ilimitado_empresa ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                <InfinitoIcon className="w-4 h-4" /> {aberto.ilimitado_empresa ? 'Empresa: créditos infinitos ligado' : 'Empresa: dar créditos infinitos'}
+              </button>
+            </div>
           </div>
           {erro && <p className="text-xs text-red-600">{erro}</p>}
 
