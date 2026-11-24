@@ -2257,6 +2257,7 @@ class ConectorPing(BaseModel):
     fase: str = Field(default="", max_length=20)
     qr: str = Field(default="", max_length=30000)
     codigo: str = Field(default="", max_length=20)
+    mensagem: str = Field(default="", max_length=200)   # em que etapa está / por que falhou (diagnóstico)
 
 
 class ConectorEspelho(BaseModel):
@@ -2608,7 +2609,8 @@ async def conector_ping(req: ConectorPing, request: Request):
     canal = await _canal_do_conector(request)
     agora_dt = datetime.now(timezone.utc)
     visto = conector_whatsapp._ler_data(canal.get("cw_visto"))
-    mudou = (req.numero and req.numero != canal.get("cw_numero")) or (req.status != canal.get("cw_status", ""))
+    mudou = (req.numero and req.numero != canal.get("cw_numero")) or (req.status != canal.get("cw_status", "")) \
+        or (req.status != "ready" and (req.mensagem or "") != canal.get("cw_etapa", ""))
     if mudou or not visto or (agora_dt - visto).total_seconds() > 80:
         canal["cw_visto"] = agora_dt.isoformat()
         canal.setdefault("cw_primeiro", canal["cw_visto"])
@@ -2618,6 +2620,7 @@ async def conector_ping(req: ConectorPing, request: Request):
         versao_antes = canal.get("cw_versao")
         lib_antes = canal.get("cw_lib")
         canal["cw_status"] = req.status
+        canal["cw_etapa"] = "" if req.status == "ready" else (req.mensagem or "")[:200]
         canal["cw_versao"] = req.versao
         if req.lib:
             canal["cw_lib"] = req.lib[:20]                     # versão da biblioteca do WhatsApp no computador do usuário (diagnóstico)

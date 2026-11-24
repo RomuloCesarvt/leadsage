@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '3.0.7';
+export const VERSAO = '3.0.8';
 
 // O WhatsApp Web muda de tempos em tempos e a biblioteca quebra no envio com erros como
 // "Data passed to getter must include an id property (it's how we memoize) but got undefined".
@@ -646,7 +646,7 @@ export async function liberarPastaDaSessao(pasta, plataforma = process.platform)
 }
 
 /** Liga o WhatsApp Web. Devolve um adaptador { enviar, parar } e chama os ouvintes. */
-async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = () => {}, aoCodigo = () => {}, parear = '' }) {
+async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = () => {}, aoCodigo = () => {}, aoEtapa = () => {}, parear = '' }) {
   const envios = criarGuardaDeEnvios();
   const historico = criarHistorico(join(AQUI, 'historico.json'));
   await historico.carregar();
@@ -736,24 +736,38 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
       await client.initialize();
     }
   };
-  // Se o WhatsApp Web não mostrar nem QR nem código em 4 minutos, a abertura travou (sessão antiga incompatível com a biblioteca nova,
-  // navegador preso...). Em vez de ficar parado para sempre, guarda a sessão antiga de lado e avisa para tentar de novo, já limpo.
-  const TRAVOU_MS = 4 * 60_000;
-  const vigia = setTimeout(async () => {
-    if (vivo) return;
-    log('O WhatsApp Web não abriu em 4 minutos. Guardando a sessão antiga de lado e reiniciando a conexão.');
-    try { await client.destroy(); } catch { /* já caiu */ }
-    try { await liberarPastaDaSessao(join(AQUI, 'sessao')); } catch { /* ok */ }
-    try { renameSync(join(AQUI, 'sessao'), join(AQUI, `sessao-antiga-${Date.now()}`)); } catch { /* sem sessão para guardar */ }
-    aoCair('a abertura travou; a sessão antiga foi guardada de lado. Feche e abra o Conector para ler um QR novo');
-  }, TRAVOU_MS);
-  vigia.unref?.();
-  try {
-    await abrir();
-  } catch (e) {
-    clearTimeout(vigia);
-    throw e;
-  }
+  // A abertura roda em segundo plano, vigiada. Antes o Conector ESPERAVA o `initialize()` terminar: se o WhatsApp Web travava ao abrir
+  // (sessão antiga que a biblioteca nova não aceita, navegador preso, página que não carrega), o Conector ficava mudo para sempre,
+  // sem QR, sem erro e sem avisar o LeadSage. Agora: sem QR/código/login em 3 minutos, fecha tudo, guarda a sessão antiga de lado
+  // e tenta de novo (até 3 vezes), contando ao LeadSage em que etapa está e qual foi o erro.
+  const LIMITE_MS = 3 * 60_000;
+  const supervisor = async () => {
+    let ultimoErro = '';
+    for (let n = 1; n <= 3 && !parado; n++) {
+      aoEtapa(n === 1 ? 'Abrindo o WhatsApp Web…' : `Abrindo o WhatsApp Web de novo (tentativa ${n} de 3)…`);
+      const inicio = Date.now();
+      const rodando = abrir().then(() => '', (e) => String(e?.message || e).slice(0, 200));
+      // espera o sinal de vida ou o erro, até o limite
+      while (!vivo && !parado && Date.now() - inicio < LIMITE_MS) {
+        const r = await Promise.race([rodando, dormir(1000).then(() => null)]);
+        if (r) { ultimoErro = r; break; }
+      }
+      if (vivo || parado) return;
+      ultimoErro = ultimoErro || 'o WhatsApp Web não abriu em 3 minutos';
+      log(`Abertura do WhatsApp Web falhou (${ultimoErro}).`);
+      aoEtapa(`Falhou ao abrir (${ultimoErro}). Reiniciando…`);
+      try { await client.destroy(); } catch { /* já caiu */ }
+      try { await liberarPastaDaSessao(join(AQUI, 'sessao')); } catch { /* ok */ }
+      // falha de internet/DNS não é culpa da sessão: guardar a sessão de lado só faria a pessoa ler o QR de novo à toa
+      if (n >= 2 && !/net::ERR_|ENOTFOUND|ECONN|EAI_AGAIN|ETIMEDOUT/i.test(ultimoErro)) {
+        // a sessão antiga pode ser a causa: guarda de lado (não apaga) para ler um QR novo
+        try { renameSync(join(AQUI, 'sessao'), join(AQUI, `sessao-antiga-${Date.now()}`)); log('Sessão antiga guardada de lado.'); } catch { /* sem sessão */ }
+      }
+    }
+    if (!vivo && !parado) aoCair(`não consegui abrir o WhatsApp Web em 3 tentativas (${ultimoErro}). Confira a internet e se o Edge/Chrome abre; depois feche e abra o Conector`);
+  };
+  let parado = false;
+  supervisor().catch((e) => aoCair(`erro ao abrir: ${String(e?.message || e).slice(0, 200)}`));
 
   return {
     async enviar(telefone, texto, digitandoMs, chatId = '', midia = null) {
@@ -901,7 +915,7 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
         await client.sendSeen(chatId);
       } catch (e) { diag.erros.lida = String(e.message || e).slice(0, 200); }
     },
-    parar: () => client.destroy().catch(() => {}),
+    parar: () => { parado = true; return client.destroy().catch(() => {}); },
     /** Sai do número atual e apaga a sessão, para conectar outro número (pelo código ou pelo QR). */
     async sair() {
       try { await client.logout(); } catch { /* já estava fora */ }
@@ -1075,6 +1089,7 @@ export async function executar() {
     const empurrarEstado = async () => {
       const p = await ls.ping(estado.numero, estado.fase === 'pronto' ? 'ready' : estado.fase, {
         fase: estado.fase, qr: estado.fase === 'qr' ? estado.qr : '', codigo: estado.codigo || '',
+        mensagem: String(estado.mensagem || '').slice(0, 200),
       });
       ultimoPing = Date.now();
       lerPing(p);
@@ -1104,6 +1119,7 @@ export async function executar() {
           setTimeout(() => ls.reprocessar('').then((r) => { if (r.dados?.respondidas) log(`Robô respondeu a ${r.dados.respondidas} conversa(s) que estavam sem resposta.`); }).catch(() => {}), 10000);
           log(`WhatsApp pronto${numero ? ` (${numero})` : ''}.`);
         },
+        aoEtapa: (msg) => { if (!pronto) { estado.mensagem = msg; log(msg); empurrarEstado().catch(() => {}); } },
         aoCair: (motivo) => {
           pronto = false; pareando = ''; estado.fase = 'erro'; estado.mensagem = `WhatsApp desconectado (${motivo}). Feche e abra o Conector.`; log(estado.mensagem);
           empurrarEstado().catch(() => {});
@@ -1130,7 +1146,9 @@ export async function executar() {
       pareando = pedidos.parear || '';
       await ligarWhatsApp(pareando);
     } catch (e) {
-      estado.fase = 'erro'; estado.mensagem = e.message; log('Erro:', e.message); ligado = false; return;
+      estado.fase = 'erro'; estado.mensagem = e.message; log('Erro:', e.message); ligado = false;
+      await empurrarEstado().catch(() => {});   // o LeadSage precisa saber POR QUE não abriu (antes só a tela do PC mostrava)
+      return;
     }
 
     // o celular está olhando: manda a lista de conversas e as mensagens das conversas abertas

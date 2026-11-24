@@ -57,7 +57,7 @@ FRIO_MAXIMO = 60               # teto diário: acima disso o risco de banimento 
 MAX_TAREFAS = 3
 CAMPOS_CONECTOR = ("cw_hash", "cw_prefixo", "cw_criado", "cw_visto", "cw_primeiro", "cw_numero",
                    "cw_status", "cw_ultimo_frio", "cw_versao", "cw_lib", "cw_frio_dia", "cw_frio_n", "cw_atividade",
-                   "cw_proximo_frio_em", "cw_falhas", "cw_pausa_ate")
+                   "cw_proximo_frio_em", "cw_falhas", "cw_pausa_ate", "cw_etapa")
 
 AVISO_SAIR = "\n\n(Se preferir não receber mais mensagens, é só responder SAIR.)"
 
@@ -186,6 +186,7 @@ def visao(canal: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         "conector_visto": c.get("cw_visto", ""),
         "conector_numero": c.get("cw_numero", ""),
         "conector_status": c.get("cw_status", ""),
+        "conector_etapa": c.get("cw_etapa", ""),
         "conector_frio_hoje": frios_hoje,
         "conector_frio_limite": limite_frio_do_dia(c),
         "nuvem": bool(c.get("nuvem_chave")),

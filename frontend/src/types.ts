@@ -462,6 +462,7 @@ export interface RoboConfig extends Omit<RoboConfigEntrada, 'app_secret' | 'wa_t
   conector_visto: string;
   conector_numero: string;
   conector_status: string;
+  conector_etapa?: string;
   conector_frio_hoje: number;
   conector_frio_limite: number;
   /** @ do bot do Telegram, sem o arroba */

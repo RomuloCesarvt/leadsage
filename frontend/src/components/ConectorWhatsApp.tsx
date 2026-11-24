@@ -302,7 +302,7 @@ export const ConectorWhatsApp: React.FC<{ cfg: RoboConfig; aoMudar: (c: RoboConf
             {ativo
               ? conectado
                 ? <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold"><Wifi className="w-3.5 h-3.5" /> Conectado{cfg.conector_numero ? ` · ${cfg.conector_numero}` : ''}</span>
-                : <span className="inline-flex items-center gap-1 text-slate-500"><WifiOff className="w-3.5 h-3.5" /> {nuvem ? 'Aguardando a conexão do número.' : 'Desconectado. Abra o Conector no computador.'}</span>
+                : <span className="inline-flex items-center gap-1 text-slate-500"><WifiOff className="w-3.5 h-3.5" /> {nuvem ? 'Aguardando a conexão do número.' : (cfg.conector_online && cfg.conector_etapa ? `Abrindo no computador: ${cfg.conector_etapa}` : 'Desconectado. Abra o Conector no computador.')}</span>
               : nuvem
                 ? 'Fica conectado na sua conta, em um servidor, sem nenhum aparelho ligado. Funciona no celular e no computador.'
                 : 'O seu computador envia e recebe pelo seu próprio WhatsApp, e o robô do LeadSage conversa. O computador precisa ficar ligado.'}
