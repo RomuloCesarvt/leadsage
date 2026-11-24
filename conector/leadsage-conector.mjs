@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const VERSAO = '3.0.8';
+export const VERSAO = '3.0.9';
 
 // O WhatsApp Web muda de tempos em tempos e a biblioteca quebra no envio com erros como
 // "Data passed to getter must include an id property (it's how we memoize) but got undefined".
@@ -666,6 +666,9 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
     authStrategy: new LocalAuth({ dataPath: join(AQUI, 'sessao') }),
     // conectar pelo numero do telefone: o WhatsApp devolve um codigo para digitar no proprio celular (sem 2o aparelho)
     ...(parear ? { pairWithPhoneNumber: { phoneNumber: parear, showNotification: true } } : {}),
+    // A biblioteca (1.34.x) espera só 30 s o WhatsApp Web sair de "abrindo" e desiste com "Waiting failed: 30000ms exceeded".
+    // Em computador/internet mais lentos, ou com sessão grande, isso demora mais: dá 2,5 minutos.
+    authTimeoutMs: 150_000,
     puppeteer: { executablePath: navegador, headless: true, args: ['--no-sandbox', '--disable-gpu'] },
   });
 
@@ -738,9 +741,9 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
   };
   // A abertura roda em segundo plano, vigiada. Antes o Conector ESPERAVA o `initialize()` terminar: se o WhatsApp Web travava ao abrir
   // (sessão antiga que a biblioteca nova não aceita, navegador preso, página que não carrega), o Conector ficava mudo para sempre,
-  // sem QR, sem erro e sem avisar o LeadSage. Agora: sem QR/código/login em 3 minutos, fecha tudo, guarda a sessão antiga de lado
+  // sem QR, sem erro e sem avisar o LeadSage. Agora: sem QR/código/login em 5 minutos, fecha tudo, guarda a sessão antiga de lado
   // e tenta de novo (até 3 vezes), contando ao LeadSage em que etapa está e qual foi o erro.
-  const LIMITE_MS = 3 * 60_000;
+  const LIMITE_MS = 5 * 60_000;
   const supervisor = async () => {
     let ultimoErro = '';
     for (let n = 1; n <= 3 && !parado; n++) {
@@ -753,13 +756,13 @@ async function iniciarWhatsApp({ aoQr, aoPronto, aoCair, aoReceber, aoMinha = ()
         if (r) { ultimoErro = r; break; }
       }
       if (vivo || parado) return;
-      ultimoErro = ultimoErro || 'o WhatsApp Web não abriu em 3 minutos';
+      ultimoErro = ultimoErro || 'o WhatsApp Web não abriu em 5 minutos';
       log(`Abertura do WhatsApp Web falhou (${ultimoErro}).`);
       aoEtapa(`Falhou ao abrir (${ultimoErro}). Reiniciando…`);
       try { await client.destroy(); } catch { /* já caiu */ }
       try { await liberarPastaDaSessao(join(AQUI, 'sessao')); } catch { /* ok */ }
-      // falha de internet/DNS não é culpa da sessão: guardar a sessão de lado só faria a pessoa ler o QR de novo à toa
-      if (n >= 2 && !/net::ERR_|ENOTFOUND|ECONN|EAI_AGAIN|ETIMEDOUT/i.test(ultimoErro)) {
+      // lentidão/internet/DNS não é culpa da sessão: guardar a sessão de lado só faria a pessoa ler o QR de novo à toa
+      if (n >= 2 && !/net::ERR_|ENOTFOUND|ECONN|EAI_AGAIN|ETIMEDOUT|Waiting failed|timeout|timed out/i.test(ultimoErro)) {
         // a sessão antiga pode ser a causa: guarda de lado (não apaga) para ler um QR novo
         try { renameSync(join(AQUI, 'sessao'), join(AQUI, `sessao-antiga-${Date.now()}`)); log('Sessão antiga guardada de lado.'); } catch { /* sem sessão */ }
       }
