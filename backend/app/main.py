@@ -1563,6 +1563,35 @@ class AgenteConfirmar(BaseModel):
     ok: bool = True
 
 
+class ConhecimentoNovo(BaseModel):
+    titulo: str = Field(default="", max_length=120)
+    texto: str = Field(min_length=1, max_length=40000)
+
+
+@app.get("/api/conhecimento")
+async def conhecimento_listar(user: dict = Depends(usuario_do_espaco)):
+    """A base de conhecimento do robô deste espaço (agência e empresa têm bases separadas)."""
+    from app import conhecimento
+    return await conhecimento.listar(_espaco(user))
+
+
+@app.post("/api/conhecimento")
+async def conhecimento_adicionar(body: ConhecimentoNovo, user: dict = Depends(usuario_do_espaco)):
+    from app import conhecimento
+    try:
+        return await conhecimento.adicionar(_espaco(user), body.titulo, body.texto)
+    except conhecimento.LimiteExcedido as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.delete("/api/conhecimento/{doc_id}")
+async def conhecimento_apagar(doc_id: str, user: dict = Depends(usuario_do_espaco)):
+    from app import conhecimento
+    if not re.fullmatch(r"[a-f0-9]{12}", doc_id):
+        raise HTTPException(status_code=400, detail="Documento inválido.")
+    return {"apagados": await conhecimento.apagar(_espaco(user), doc_id)}
+
+
 @app.get("/api/agente")
 async def agente_estado(user: dict = Depends(usuario_do_espaco)):
     from app import agente_ia

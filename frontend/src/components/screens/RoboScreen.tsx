@@ -21,6 +21,7 @@ import { ConexaoMeta } from '../ConexaoMeta';
 import { DisparoWhatsApp } from '../DisparoWhatsApp';
 import { Balao } from '../conversaUi';
 import { OfertaDoRobo } from '../OfertaDoRobo';
+import { BaseDeConhecimento } from '../BaseDeConhecimento';
 import { AbordagemDoRobo } from '../AbordagemDoRobo';
 import { MomentoDoValor } from '../MomentoDoValor';
 import { PromocaoDoServico } from '../PromocaoDoServico';
@@ -446,6 +447,10 @@ const Configurar: React.FC<{ parte: 'canais' | 'comportamento'; onBloqueio: (m: 
             </div>
           </div>
         </div>
+        </Recolhivel>
+
+        <Recolhivel cartao titulo="Base de conhecimento" resumo="Documentos que o robô consulta">
+          <BaseDeConhecimento />
         </Recolhivel>
 
         {barraSalvar}

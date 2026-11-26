@@ -138,6 +138,10 @@ export const api = {
     return await fetchWithToken(`/pipeline/${encodeURIComponent(leadId)}/reuniao`, { method: 'PUT', body: JSON.stringify({ em, texto }) });
   },
 
+  // base de conhecimento do robô (RAG)
+  async conhecimentoListar(): Promise<any> { return await fetchWithToken('/conhecimento'); },
+  async conhecimentoAdicionar(titulo: string, texto: string): Promise<any> { return await fetchWithToken('/conhecimento', { method: 'POST', body: JSON.stringify({ titulo, texto }) }); },
+  async conhecimentoApagar(id: string): Promise<any> { return await fetchWithToken(`/conhecimento/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
   // agente de chat
   async agenteEstado(): Promise<any> { return await fetchWithToken('/agente'); },
   async agenteMensagem(texto: string): Promise<any> { return await fetchWithToken('/agente/mensagem', { method: 'POST', body: JSON.stringify({ texto }) }); },

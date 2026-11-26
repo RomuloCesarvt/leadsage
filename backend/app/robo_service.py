@@ -709,11 +709,14 @@ async def _processar(
     ia_gate.PRIORIDADE.set("alta")      # responder quem escreveu vem antes de gerar lote: a conversa não espera na fila da IA
     decisao: Optional[Decisao] = None
     motivo_falha = ""
+    # base de conhecimento (RAG): só os trechos que respondem ao que o lead perguntou entram no prompt
+    from app import conhecimento
+    cfg_ia = {**cfg, "_conhecimento": await conhecimento.consultar_para_o_robo(uid, conversa["mensagens"])}
     try:
         decisao = await asyncio.wait_for(
             asyncio.to_thread(
                 decidir, conversa["mensagens"], msg.canal,
-                perfil.model_dump(), cfg, lead, gerador, raio, conversa.get("sdr"),
+                perfil.model_dump(), cfg_ia, lead, gerador, raio, conversa.get("sdr"),
             ),
             timeout=PRAZO_IA,
         )

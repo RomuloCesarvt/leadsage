@@ -479,6 +479,7 @@ Agora é {_agora_brasil(agora)}.
 {valor_momento.bloco((sdr or {}).get("momento_valor") or valor_momento.escolher(cfg, str((lead or {}).get("id", ""))), cfg, "robo")}
 {f"Catálogo e preços (só estes existem):{chr(10)}{cfg['catalogo']}" if cfg.get('catalogo') else "Não há catálogo de preços: NUNCA diga valores; diga que depende do escopo e proponha a conversa."}
 {f"Perguntas frequentes (respostas oficiais):{chr(10)}{cfg['faq']}" if cfg.get('faq') else ""}
+{cfg.get('_conhecimento') or ""}
 {_regra_de_desconto(cfg)}
 {f"Link para agendar: {cfg['link_agenda']}" if cfg.get('link_agenda') else ""}
 Instruções do dono: {cfg.get('instrucoes') or '(nenhuma)'}
